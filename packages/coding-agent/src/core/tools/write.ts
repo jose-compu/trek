@@ -1,11 +1,12 @@
 import type { AgentTool } from "@trek/agent-core";
 import { Container, Text } from "@trek/tui";
-import { mkdir as fsMkdir, writeFile as fsWriteFile } from "fs/promises";
+import { mkdir as fsMkdir, readFile as fsReadFile, writeFile as fsWriteFile } from "fs/promises";
 import { dirname } from "path";
 import { type Static, Type } from "typebox";
 import { keyHint } from "../../modes/interactive/components/keybinding-hints.ts";
 import { getLanguageFromPath, highlightCode, type Theme } from "../../modes/interactive/theme/theme.ts";
 import type { ToolDefinition, ToolRenderResultOptions } from "../extensions/types.ts";
+import { generateDiffString, generateUnifiedPatch } from "./edit-diff.ts";
 import { withFileMutationQueue } from "./file-mutation-queue.ts";
 import { resolveToCwd } from "./path-utils.ts";
 import { normalizeDisplayText, renderToolPath, replaceTabs, str } from "./render-utils.ts";
@@ -27,16 +28,37 @@ export interface WriteOperations {
 	writeFile: (absolutePath: string, content: string) => Promise<void>;
 	/** Create directory recursively */
 	mkdir: (dir: string) => Promise<void>;
+	/** Read current content for a dry-run diff preview; return null when the file does not exist. */
+	readFile?: (absolutePath: string) => Promise<string | null>;
 }
 
 const defaultWriteOperations: WriteOperations = {
 	writeFile: (path, content) => fsWriteFile(path, content, "utf-8"),
 	mkdir: (dir) => fsMkdir(dir, { recursive: true }).then(() => {}),
+	readFile: async (path) => {
+		try {
+			return await fsReadFile(path, "utf-8");
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+				return null;
+			}
+			throw error;
+		}
+	},
 };
+
+/** Details returned by the write tool (populated for dry-run previews). */
+export interface WriteToolDetails {
+	dryRun?: boolean;
+	diff?: string;
+	patch?: string;
+}
 
 export interface WriteToolOptions {
 	/** Custom operations for file writing. Default: local filesystem */
 	operations?: WriteOperations;
+	/** When this returns true, compute a diff preview and do NOT mutate the filesystem (SPECS_SAFETY_HARNESS §5.4, §6). */
+	dryRun?: () => boolean;
 }
 
 type WriteHighlightCache = {
@@ -181,8 +203,9 @@ function formatWriteResult(
 export function createWriteToolDefinition(
 	cwd: string,
 	options?: WriteToolOptions,
-): ToolDefinition<typeof writeSchema, undefined> {
+): ToolDefinition<typeof writeSchema, WriteToolDetails | undefined> {
 	const ops = options?.operations ?? defaultWriteOperations;
+	const isDryRun = options?.dryRun ?? (() => false);
 	return {
 		name: "write",
 		label: "write",
@@ -211,6 +234,24 @@ export function createWriteToolDefinition(
 				};
 
 				throwIfAborted();
+
+				// Dry-run: compute a diff preview against current content and skip all mutation.
+				if (isDryRun()) {
+					const previous = (await ops.readFile?.(absolutePath)) ?? "";
+					throwIfAborted();
+					const diff = generateDiffString(previous, content).diff;
+					const patch = generateUnifiedPatch(path, previous, content);
+					return {
+						content: [
+							{
+								type: "text",
+								text: `[dry-run] would write ${content.length} bytes to ${path} (no changes applied)`,
+							},
+						],
+						details: { dryRun: true, diff, patch },
+					};
+				}
+
 				// Create parent directories if needed.
 				await ops.mkdir(dir);
 				throwIfAborted();

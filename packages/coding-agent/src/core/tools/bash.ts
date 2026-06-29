@@ -147,6 +147,8 @@ export interface BashToolOptions {
 	shellPath?: string;
 	/** Hook to adjust command, cwd, or env before execution */
 	spawnHook?: BashSpawnHook;
+	/** When this returns true, do NOT execute; report the command that would run (SPECS_SAFETY_HARNESS §6). */
+	dryRun?: () => boolean;
 }
 
 const BASH_PREVIEW_LINES = 5;
@@ -273,6 +275,7 @@ export function createBashToolDefinition(
 	const ops = options?.operations ?? createLocalBashOperations({ shellPath: options?.shellPath });
 	const commandPrefix = options?.commandPrefix;
 	const spawnHook = options?.spawnHook;
+	const isDryRun = options?.dryRun ?? (() => false);
 	return {
 		name: "bash",
 		label: "bash",
@@ -288,6 +291,15 @@ export function createBashToolDefinition(
 			_ctx?,
 		) {
 			const resolvedCommand = commandPrefix ? `${commandPrefix}\n${command}` : command;
+
+			// Dry-run: do not execute; report the command that would run.
+			if (isDryRun()) {
+				return {
+					content: [{ type: "text", text: `[dry-run] would execute:\n${command}` }],
+					details: undefined,
+				};
+			}
+
 			const spawnContext = resolveSpawnContext(resolvedCommand, cwd, spawnHook);
 			const output = new OutputAccumulator({ tempFilePrefix: "pi-bash" });
 			let updateTimer: NodeJS.Timeout | undefined;

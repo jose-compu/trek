@@ -1762,6 +1762,16 @@ export class InteractiveMode {
 		}
 	}
 
+	/** Toggle dry-run mode (issue #9): edits/writes/bash are previewed but not applied. */
+	private handleToggleDryRun(): void {
+		const enabled = !this.session.isDryRun();
+		this.session.setDryRun(enabled);
+		this.flashStatus(
+			"dryRun",
+			enabled ? "Dry-run ON: edits previewed, not applied" : "Dry-run OFF: edits applied normally",
+		);
+	}
+
 	/** Keep all pending agent edits (issue #15): clears the undo buffer without touching disk. */
 	private handleKeepAllEdits(): void {
 		if (!this.session.hasUndoableEdits()) {
@@ -2519,6 +2529,7 @@ export class InteractiveMode {
 		this.defaultEditor.onAction("app.session.resume", () => this.showSessionSelector());
 		this.defaultEditor.onAction("app.edits.undo", () => void this.handleUndoEdits());
 		this.defaultEditor.onAction("app.edits.keepAll", () => this.handleKeepAllEdits());
+		this.defaultEditor.onAction("app.edits.dryRun", () => this.handleToggleDryRun());
 
 		this.defaultEditor.onChange = (text: string) => {
 			const wasBashMode = this.isBashMode;

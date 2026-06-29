@@ -345,6 +345,8 @@ export class AgentSession {
 	private _readFiles = new Set<string>();
 	private _halted = false;
 	private _allowDestructiveOps = false;
+	// Dry-run mode (#9): write/edit/bash compute previews and skip mutation.
+	private _dryRunEnabled = false;
 
 	constructor(config: AgentSessionConfig) {
 		this.agent = config.agent;
@@ -606,6 +608,17 @@ export class AgentSession {
 	/** Allow destructive shell operations (e.g. rm -rf, force-push) for this session. */
 	setAllowDestructiveOps(allow: boolean): void {
 		this._allowDestructiveOps = allow;
+	}
+
+	/** Enable/disable dry-run mode: write/edit/bash produce previews without mutating (#9). */
+	setDryRun(enabled: boolean): void {
+		this._dryRunEnabled = enabled;
+		debugLog("safety", "dry-run mode", { enabled });
+	}
+
+	/** Whether dry-run mode is currently enabled. */
+	isDryRun(): boolean {
+		return this._dryRunEnabled;
 	}
 
 	// =========================================================================
@@ -2650,7 +2663,9 @@ export class AgentSession {
 				)
 			: createAllToolDefinitions(this._cwd, {
 					read: { autoResizeImages },
-					bash: { commandPrefix: shellCommandPrefix, shellPath },
+					bash: { commandPrefix: shellCommandPrefix, shellPath, dryRun: () => this._dryRunEnabled },
+					write: { dryRun: () => this._dryRunEnabled },
+					edit: { dryRun: () => this._dryRunEnabled },
 				});
 
 		this._baseToolDefinitions = new Map(
