@@ -9,9 +9,9 @@
 			"version": "0.3.0",
 			"license": "MIT",
 			"dependencies": {
-				"@trek/agent-core": "^0.1.0",
-				"@trek/ai": "^0.1.0",
-				"@trek/tui": "^0.1.0",
+				"@trek/agent-core": "^0.3.0",
+				"@trek/ai": "^0.3.0",
+				"@trek/tui": "^0.3.0",
 				"@silvia-odwyer/photon-node": "0.3.4",
 				"chalk": "5.6.2",
 				"cross-spawn": "7.0.6",
@@ -935,7 +935,7 @@
 			"resolved": "https://registry.npmjs.org/@trek/agent-core/-/agent-core-0.3.0.tgz",
 			"license": "MIT",
 			"dependencies": {
-				"@trek/ai": "^0.1.0",
+				"@trek/ai": "^0.3.0",
 				"ignore": "7.0.5",
 				"typebox": "1.1.38",
 				"yaml": "2.9.0"
