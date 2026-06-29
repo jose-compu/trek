@@ -1,0 +1,23 @@
+{
+	"extends": "./tsconfig.base.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"paths": {
+			"*": ["./*"],
+			"@trek/ai": ["./packages/ai/src/index.ts"],
+			"@trek/ai/oauth": ["./packages/ai/src/oauth.ts"],
+			"@trek/ai/*": ["./packages/ai/src/*.ts", "./packages/ai/src/providers/*.ts"],
+			"@trek/ai/dist/*": ["./packages/ai/src/*"],
+			"@trek/agent-core": ["./packages/agent/src/index.ts"],
+			"@trek/agent-core/*": ["./packages/agent/src/*"],
+			"@trek/coding-agent": ["./packages/coding-agent/src/index.ts"],
+			"@trek/coding-agent/hooks": ["./packages/coding-agent/src/core/hooks/index.ts"],
+			"@trek/coding-agent/*": ["./packages/coding-agent/src/*"],
+			"typebox": ["./node_modules/typebox"],
+			"@trek/tui": ["./packages/tui/src/index.ts"],
+			"@trek/tui/*": ["./packages/tui/src/*"]
+		}
+	},
+	"include": ["packages/*/src/**/*", "packages/*/test/**/*", "packages/coding-agent/examples/**/*"],
+	"exclude": ["**/dist/**"]
+}
