@@ -3834,6 +3834,7 @@ export class InteractiveMode {
 		if (allQueued.length === 0) {
 			this.updatePendingMessagesDisplay();
 			if (options?.abort) {
+				this.session.requestHalt();
 				this.agent.abort();
 			}
 			return 0;
@@ -3844,6 +3845,7 @@ export class InteractiveMode {
 		this.editor.setText(combinedText);
 		this.updatePendingMessagesDisplay();
 		if (options?.abort) {
+			this.session.requestHalt();
 			this.agent.abort();
 		}
 		return allQueued.length;

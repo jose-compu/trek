@@ -79,6 +79,7 @@ import {
 	wrapRegisteredTools,
 } from "./extensions/index.ts";
 import { emitSessionShutdownEvent } from "./extensions/runner.ts";
+import { resolveReversibilityTier } from "./extensions/types.ts";
 import type { BashExecutionMessage, CustomMessage } from "./messages.ts";
 import type { ModelRegistry } from "./model-registry.ts";
 import { hashContent, type LoadedPrologue, loadPrologue } from "./prologue.ts";
@@ -89,6 +90,7 @@ import {
 	ReflectiveLoopController,
 } from "./reflective-loop/index.ts";
 import type { ResourceExtensionPaths, ResourceLoader } from "./resource-loader.ts";
+import { SafetyChecker, type SafetyEnv } from "./safety/index.ts";
 import type { BranchSummaryEntry, CompactionEntry, SessionManager } from "./session-manager.ts";
 import { CURRENT_SESSION_VERSION, getLatestCompactionEntry, type SessionHeader } from "./session-manager.ts";
 import type { SettingsManager } from "./settings-manager.ts";
@@ -338,6 +340,12 @@ export class AgentSession {
 	private _currentPromptNumber = 0;
 	private _currentPromptId = "#0";
 
+	// Safety harness: pre-flight Laws checker (#1/#2), read-before-write tracking (#5), HALT (#7).
+	private _safetyChecker = new SafetyChecker();
+	private _readFiles = new Set<string>();
+	private _halted = false;
+	private _allowDestructiveOps = false;
+
 	constructor(config: AgentSessionConfig) {
 		this.agent = config.agent;
 		this.sessionManager = config.sessionManager;
@@ -422,6 +430,12 @@ export class AgentSession {
 	 */
 	private _installAgentToolHooks(): void {
 		this.agent.beforeToolCall = async ({ toolCall, args }) => {
+			const verdict = await this._checkToolSafety(toolCall.name, args);
+			if (!verdict.allowed) {
+				debugLog("safety", "tool call blocked", { tool: toolCall.name, law: verdict.law, reason: verdict.reason });
+				return { block: true, reason: verdict.reason };
+			}
+
 			await this._captureEditCheckpoint(toolCall.name, args);
 
 			const runner = this._extensionRunner;
@@ -445,6 +459,8 @@ export class AgentSession {
 		};
 
 		this.agent.afterToolCall = async ({ toolCall, args, result, isError }) => {
+			this._recordFileAccessForSafety(toolCall.name, args, isError);
+
 			const runner = this._extensionRunner;
 			if (!runner.hasHandlers("tool_result")) {
 				return undefined;
@@ -526,6 +542,70 @@ export class AgentSession {
 	keepAllEdits(): void {
 		this._editCheckpoints.keepAll();
 		debugLog("undo", "keepAllEdits", {});
+	}
+
+	// =========================================================================
+	// Safety harness (issues #1/#2 Laws + SafetyChecker, #5 read-before-write, #7 HALT)
+	// =========================================================================
+
+	/** Pre-flight Laws/HALT evaluation for a tool call. Never throws (fails open is avoided: errors block). */
+	private async _checkToolSafety(
+		toolName: string,
+		args: unknown,
+	): Promise<{ allowed: boolean; law?: number; reason?: string }> {
+		const tier = resolveReversibilityTier(this._baseToolDefinitions.get(toolName)?.reversibilityTier);
+		const env: SafetyEnv = {
+			halted: this._halted,
+			requireDestructiveConfirm: this._allowDestructiveOps,
+			hasReadFile: (absPath: string) => this._readFiles.has(absPath),
+			fileExists: async (absPath: string) => existsSync(absPath),
+			resolvePath: (filePath: string) => resolveToCwd(filePath, this._cwd),
+		};
+		return this._safetyChecker.checkToolCall({ toolName, args: (args ?? {}) as Record<string, unknown>, tier }, env);
+	}
+
+	/**
+	 * Record a successful file access so later edits/writes satisfy read-before-write.
+	 * A successful `read`, `write`, or `edit` all mean the agent now has authoritative
+	 * knowledge of that file's contents.
+	 */
+	private _recordFileAccessForSafety(toolName: string, args: unknown, isError: boolean): void {
+		if (isError || (toolName !== "read" && toolName !== "write" && toolName !== "edit")) {
+			return;
+		}
+		const rawPath = (args as { path?: unknown; file_path?: unknown } | undefined)?.path;
+		const altPath = (args as { file_path?: unknown } | undefined)?.file_path;
+		const filePath = typeof rawPath === "string" ? rawPath : typeof altPath === "string" ? altPath : undefined;
+		if (!filePath) {
+			return;
+		}
+		try {
+			this._readFiles.add(resolveToCwd(filePath, this._cwd));
+		} catch {
+			// Ignore unresolved paths; they simply will not satisfy read-before-write.
+		}
+	}
+
+	/** Engage the operator HALT/off-switch: blocks tool calls at the next boundary (#7). */
+	requestHalt(): void {
+		this._halted = true;
+		debugLog("safety", "HALT engaged", {});
+	}
+
+	/** Release the HALT/off-switch so tool calls may resume. */
+	clearHalt(): void {
+		this._halted = false;
+		debugLog("safety", "HALT cleared", {});
+	}
+
+	/** Whether the operator HALT/off-switch is currently engaged. */
+	isHalted(): boolean {
+		return this._halted;
+	}
+
+	/** Allow destructive shell operations (e.g. rm -rf, force-push) for this session. */
+	setAllowDestructiveOps(allow: boolean): void {
+		this._allowDestructiveOps = allow;
 	}
 
 	// =========================================================================
@@ -1030,6 +1110,8 @@ export class AgentSession {
 		const preview = expandedText.slice(0, 200);
 		this._currentPromptNumber = promptNumber;
 		this._currentPromptId = promptId;
+		// A new user prompt is an explicit go-ahead: release any prior HALT.
+		this._halted = false;
 		this.sessionManager.appendPromptMeta(promptNumber, promptId, preview);
 		this._emit({ type: "prompt_meta", promptNumber, promptId, preview });
 		debugLog("prompt", "numbered", { promptNumber, promptId, preview });
