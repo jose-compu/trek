@@ -430,6 +430,21 @@ export interface ToolRenderContext<TState = any, TArgs = any> {
 /**
  * Tool definition for registerTool().
  */
+/**
+ * Reversibility tier for a tool's side effects (SPECS_SAFETY_HARNESS §5.4).
+ * Higher tiers require more operator oversight before the action runs.
+ * - "free": no durable mutation (reads, dry-runs, sandboxed execution).
+ * - "cheap": easily reversible writes (file edits, scratch dirs, branch commits).
+ * - "gated": writes that should be confirmed (writes to main, installs, network mutations, arbitrary shell).
+ * - "forbidden": disallowed by default (force-push, history rewrite, prod deploys); needs operator co-sign.
+ */
+export type ReversibilityTier = "free" | "cheap" | "gated" | "forbidden";
+
+/** Resolve a tool's effective reversibility tier, defaulting to "gated" when unset. */
+export function resolveReversibilityTier(tier: ReversibilityTier | undefined): ReversibilityTier {
+	return tier ?? "gated";
+}
+
 export interface ToolDefinition<TParams extends TSchema = TSchema, TDetails = unknown, TState = any> {
 	/** Tool name (used in LLM tool calls) */
 	name: string;
@@ -437,6 +452,12 @@ export interface ToolDefinition<TParams extends TSchema = TSchema, TDetails = un
 	label: string;
 	/** Description for LLM */
 	description: string;
+	/**
+	 * Reversibility tier for this tool's side effects (SPECS_SAFETY_HARNESS §5.4).
+	 * Used by the safety layer to decide gating/confirmation and undo handling.
+	 * Defaults to "gated" when omitted (treated as needing care).
+	 */
+	reversibilityTier?: ReversibilityTier;
 	/** Optional one-line snippet for the Available tools section in the default system prompt. Custom tools are omitted from that section when this is not provided. */
 	promptSnippet?: string;
 	/** Optional guideline bullets appended to the default system prompt Guidelines section when this tool is active. */

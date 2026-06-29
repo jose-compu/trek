@@ -44,6 +44,12 @@ import {
 	shouldCompact,
 } from "./compaction/index.ts";
 import { DEFAULT_THINKING_LEVEL } from "./defaults.ts";
+import {
+	type BatchSummary,
+	EditCheckpointManager,
+	nodeCheckpointFsOps,
+	type UndoResult,
+} from "./edit-checkpoints/index.ts";
 import { exportSessionToHtml, type ToolHtmlRenderer } from "./export-html/index.ts";
 import { createToolHtmlRenderer } from "./export-html/tool-renderer.ts";
 import {
@@ -91,6 +97,7 @@ import { createSyntheticSourceInfo, type SourceInfo } from "./source-info.ts";
 import { type BuildSystemPromptOptions, buildSystemPrompt } from "./system-prompt.ts";
 import { type BashOperations, createLocalBashOperations } from "./tools/bash.ts";
 import { createAllToolDefinitions } from "./tools/index.ts";
+import { resolveToCwd } from "./tools/path-utils.ts";
 import { createToolDefinitionFromAgentTool } from "./tools/tool-definition-wrapper.ts";
 
 // ============================================================================
@@ -326,6 +333,11 @@ export class AgentSession {
 	private _reflectiveLoop: ReflectiveLoopController | undefined;
 	private _lastPromptTask = "";
 
+	// Edit-batch checkpoints for multi-level Undo (issue #16).
+	private _editCheckpoints = new EditCheckpointManager(nodeCheckpointFsOps);
+	private _currentPromptNumber = 0;
+	private _currentPromptId = "#0";
+
 	constructor(config: AgentSessionConfig) {
 		this.agent = config.agent;
 		this.sessionManager = config.sessionManager;
@@ -410,6 +422,8 @@ export class AgentSession {
 	 */
 	private _installAgentToolHooks(): void {
 		this.agent.beforeToolCall = async ({ toolCall, args }) => {
+			await this._captureEditCheckpoint(toolCall.name, args);
+
 			const runner = this._extensionRunner;
 			if (!runner.hasHandlers("tool_call")) {
 				return undefined;
@@ -456,6 +470,62 @@ export class AgentSession {
 				isError: hookResult.isError ?? isError,
 			};
 		};
+	}
+
+	// =========================================================================
+	// Edit checkpoints / Undo (issue #16)
+	// =========================================================================
+
+	/**
+	 * Record a pre-image of a file before a mutating tool (`write`/`edit`) runs, tagged with
+	 * the current prompt cycle so it can be undone later. Capture failures never block the tool.
+	 */
+	private async _captureEditCheckpoint(toolName: string, args: unknown): Promise<void> {
+		if (toolName !== "write" && toolName !== "edit") {
+			return;
+		}
+		const rawPath = (args as { path?: unknown; file_path?: unknown } | undefined)?.path;
+		const altPath = (args as { file_path?: unknown } | undefined)?.file_path;
+		const filePath = typeof rawPath === "string" ? rawPath : typeof altPath === "string" ? altPath : undefined;
+		if (!filePath) {
+			return;
+		}
+		try {
+			const absolutePath = resolveToCwd(filePath, this._cwd);
+			await this._editCheckpoints.capture(this._currentPromptNumber, this._currentPromptId, absolutePath);
+		} catch (error) {
+			debugLog("undo", "pre-image capture failed", { filePath, error: String(error) });
+		}
+	}
+
+	/** True when there is at least one undoable edit batch. */
+	hasUndoableEdits(): boolean {
+		return this._editCheckpoints.hasChanges();
+	}
+
+	/** Edit-batch summaries (newest first) for an undo selector. */
+	listEditBatches(): BatchSummary[] {
+		return this._editCheckpoints.listBatches();
+	}
+
+	/** Undo the most recent `n` edit batches (default 1). */
+	async undoLastEditBatches(n = 1): Promise<UndoResult> {
+		const result = await this._editCheckpoints.undoLastBatches(n);
+		debugLog("undo", "undoLastEditBatches", { n, ...result });
+		return result;
+	}
+
+	/** Undo back to prompt `#m`, reverting that prompt and everything after it. */
+	async undoToPrompt(m: number): Promise<UndoResult> {
+		const result = await this._editCheckpoints.undoToPrompt(m);
+		debugLog("undo", "undoToPrompt", { m, ...result });
+		return result;
+	}
+
+	/** Accept all pending edits (Keep All): clear tracked checkpoints without touching disk. */
+	keepAllEdits(): void {
+		this._editCheckpoints.keepAll();
+		debugLog("undo", "keepAllEdits", {});
 	}
 
 	// =========================================================================
@@ -958,6 +1028,8 @@ export class AgentSession {
 		const promptNumber = this.sessionManager.getNextPromptNumber();
 		const promptId = `#${promptNumber}`;
 		const preview = expandedText.slice(0, 200);
+		this._currentPromptNumber = promptNumber;
+		this._currentPromptId = promptId;
 		this.sessionManager.appendPromptMeta(promptNumber, promptId, preview);
 		this._emit({ type: "prompt_meta", promptNumber, promptId, preview });
 		debugLog("prompt", "numbered", { promptNumber, promptId, preview });

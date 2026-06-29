@@ -25,6 +25,8 @@ export interface AppKeybindings {
 	"app.editor.external": true;
 	"app.message.followUp": true;
 	"app.message.dequeue": true;
+	"app.edits.undo": true;
+	"app.edits.keepAll": true;
 	"app.clipboard.pasteImage": true;
 	"app.session.new": true;
 	"app.session.tree": true;
@@ -102,6 +104,14 @@ export const KEYBINDINGS = {
 	"app.message.dequeue": {
 		defaultKeys: "alt+up",
 		description: "Restore queued messages",
+	},
+	"app.edits.undo": {
+		defaultKeys: "shift+ctrl+z",
+		description: "Undo last agent edit batch",
+	},
+	"app.edits.keepAll": {
+		defaultKeys: "shift+ctrl+k",
+		description: "Keep all pending agent edits",
 	},
 	"app.clipboard.pasteImage": {
 		defaultKeys: process.platform === "win32" ? "alt+v" : "ctrl+v",
