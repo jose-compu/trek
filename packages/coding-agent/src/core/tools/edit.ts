@@ -65,6 +65,8 @@ export interface EditToolDetails {
 	patch: string;
 	/** Line number of the first change in the new file (for editor navigation) */
 	firstChangedLine?: number;
+	/** True when this was a dry-run preview and no changes were written. */
+	dryRun?: boolean;
 }
 
 /**
@@ -89,6 +91,8 @@ const defaultEditOperations: EditOperations = {
 export interface EditToolOptions {
 	/** Custom operations for file editing. Default: local filesystem */
 	operations?: EditOperations;
+	/** When this returns true, compute a diff preview and do NOT write to disk (SPECS_SAFETY_HARNESS §5.4, §6). */
+	dryRun?: () => boolean;
 }
 
 function prepareEditArguments(input: unknown): EditToolInput {
@@ -289,9 +293,11 @@ export function createEditToolDefinition(
 	options?: EditToolOptions,
 ): ToolDefinition<typeof editSchema, EditToolDetails | undefined, EditRenderState> {
 	const ops = options?.operations ?? defaultEditOperations;
+	const isDryRun = options?.dryRun ?? (() => false);
 	return {
 		name: "edit",
 		label: "edit",
+		reversibilityTier: "cheap",
 		description:
 			"Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
 		promptSnippet:
@@ -344,11 +350,30 @@ export function createEditToolDefinition(
 				throwIfAborted();
 
 				const finalContent = bom + restoreLineEndings(newContent, originalEnding);
+				const diffResult = generateDiffString(baseContent, newContent);
+				const patch = generateUnifiedPatch(path, baseContent, newContent);
+
+				// Dry-run: report the computed diff but skip the write.
+				if (isDryRun()) {
+					return {
+						content: [
+							{
+								type: "text",
+								text: `[dry-run] would replace ${edits.length} block(s) in ${path} (no changes applied).`,
+							},
+						],
+						details: {
+							diff: diffResult.diff,
+							patch,
+							firstChangedLine: diffResult.firstChangedLine,
+							dryRun: true,
+						},
+					};
+				}
+
 				await ops.writeFile(absolutePath, finalContent);
 				throwIfAborted();
 
-				const diffResult = generateDiffString(baseContent, newContent);
-				const patch = generateUnifiedPatch(path, baseContent, newContent);
 				return {
 					content: [
 						{

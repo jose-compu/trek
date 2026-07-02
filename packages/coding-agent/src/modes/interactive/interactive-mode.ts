@@ -1741,6 +1741,48 @@ export class InteractiveMode {
 		this.ui.requestRender();
 	}
 
+	/** Briefly show a transient footer notice, then clear it. */
+	private flashStatus(key: string, text: string, durationMs = 4000): void {
+		this.setExtensionStatus(key, text);
+		setTimeout(() => this.setExtensionStatus(key, undefined), durationMs).unref?.();
+	}
+
+	/** Undo the most recent agent edit batch (issue #16). */
+	private async handleUndoEdits(): Promise<void> {
+		if (!this.session.hasUndoableEdits()) {
+			this.flashStatus("undo", "Undo: no agent edits to revert");
+			return;
+		}
+		try {
+			const result = await this.session.undoLastEditBatches(1);
+			const changed = result.restored.length + result.removed.length;
+			this.flashStatus("undo", `Undid 1 edit batch (${changed} file${changed === 1 ? "" : "s"})`);
+		} catch (error) {
+			this.flashStatus("undo", `Undo failed: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	/** Toggle dry-run mode (issue #9): edits/writes/bash are previewed but not applied. */
+	private handleToggleDryRun(): void {
+		const enabled = !this.session.isDryRun();
+		this.session.setDryRun(enabled);
+		this.flashStatus(
+			"dryRun",
+			enabled ? "Dry-run ON: edits previewed, not applied" : "Dry-run OFF: edits applied normally",
+		);
+	}
+
+	/** Keep all pending agent edits (issue #15): clears the undo buffer without touching disk. */
+	private handleKeepAllEdits(): void {
+		if (!this.session.hasUndoableEdits()) {
+			this.flashStatus("undo", "Keep all: nothing pending");
+			return;
+		}
+		const batches = this.session.listEditBatches().length;
+		this.session.keepAllEdits();
+		this.flashStatus("undo", `Kept all edits (${batches} batch${batches === 1 ? "" : "es"})`);
+	}
+
 	private getWorkingLoaderMessage(): string {
 		return this.workingMessage ?? this.defaultWorkingMessage;
 	}
@@ -2485,6 +2527,9 @@ export class InteractiveMode {
 		this.defaultEditor.onAction("app.session.tree", () => this.showTreeSelector());
 		this.defaultEditor.onAction("app.session.fork", () => this.showUserMessageSelector());
 		this.defaultEditor.onAction("app.session.resume", () => this.showSessionSelector());
+		this.defaultEditor.onAction("app.edits.undo", () => void this.handleUndoEdits());
+		this.defaultEditor.onAction("app.edits.keepAll", () => this.handleKeepAllEdits());
+		this.defaultEditor.onAction("app.edits.dryRun", () => this.handleToggleDryRun());
 
 		this.defaultEditor.onChange = (text: string) => {
 			const wasBashMode = this.isBashMode;
@@ -3800,6 +3845,7 @@ export class InteractiveMode {
 		if (allQueued.length === 0) {
 			this.updatePendingMessagesDisplay();
 			if (options?.abort) {
+				this.session.requestHalt();
 				this.agent.abort();
 			}
 			return 0;
@@ -3810,6 +3856,7 @@ export class InteractiveMode {
 		this.editor.setText(combinedText);
 		this.updatePendingMessagesDisplay();
 		if (options?.abort) {
+			this.session.requestHalt();
 			this.agent.abort();
 		}
 		return allQueued.length;

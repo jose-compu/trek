@@ -44,6 +44,12 @@ import {
 	shouldCompact,
 } from "./compaction/index.ts";
 import { DEFAULT_THINKING_LEVEL } from "./defaults.ts";
+import {
+	type BatchSummary,
+	EditCheckpointManager,
+	nodeCheckpointFsOps,
+	type UndoResult,
+} from "./edit-checkpoints/index.ts";
 import { exportSessionToHtml, type ToolHtmlRenderer } from "./export-html/index.ts";
 import { createToolHtmlRenderer } from "./export-html/tool-renderer.ts";
 import {
@@ -73,6 +79,7 @@ import {
 	wrapRegisteredTools,
 } from "./extensions/index.ts";
 import { emitSessionShutdownEvent } from "./extensions/runner.ts";
+import { resolveReversibilityTier } from "./extensions/types.ts";
 import type { BashExecutionMessage, CustomMessage } from "./messages.ts";
 import type { ModelRegistry } from "./model-registry.ts";
 import { hashContent, type LoadedPrologue, loadPrologue } from "./prologue.ts";
@@ -83,6 +90,7 @@ import {
 	ReflectiveLoopController,
 } from "./reflective-loop/index.ts";
 import type { ResourceExtensionPaths, ResourceLoader } from "./resource-loader.ts";
+import { SafetyChecker, type SafetyEnv } from "./safety/index.ts";
 import type { BranchSummaryEntry, CompactionEntry, SessionManager } from "./session-manager.ts";
 import { CURRENT_SESSION_VERSION, getLatestCompactionEntry, type SessionHeader } from "./session-manager.ts";
 import type { SettingsManager } from "./settings-manager.ts";
@@ -91,6 +99,7 @@ import { createSyntheticSourceInfo, type SourceInfo } from "./source-info.ts";
 import { type BuildSystemPromptOptions, buildSystemPrompt } from "./system-prompt.ts";
 import { type BashOperations, createLocalBashOperations } from "./tools/bash.ts";
 import { createAllToolDefinitions } from "./tools/index.ts";
+import { resolveToCwd } from "./tools/path-utils.ts";
 import { createToolDefinitionFromAgentTool } from "./tools/tool-definition-wrapper.ts";
 
 // ============================================================================
@@ -326,6 +335,19 @@ export class AgentSession {
 	private _reflectiveLoop: ReflectiveLoopController | undefined;
 	private _lastPromptTask = "";
 
+	// Edit-batch checkpoints for multi-level Undo (issue #16).
+	private _editCheckpoints = new EditCheckpointManager(nodeCheckpointFsOps);
+	private _currentPromptNumber = 0;
+	private _currentPromptId = "#0";
+
+	// Safety harness: pre-flight Laws checker (#1/#2), read-before-write tracking (#5), HALT (#7).
+	private _safetyChecker = new SafetyChecker();
+	private _readFiles = new Set<string>();
+	private _halted = false;
+	private _allowDestructiveOps = false;
+	// Dry-run mode (#9): write/edit/bash compute previews and skip mutation.
+	private _dryRunEnabled = false;
+
 	constructor(config: AgentSessionConfig) {
 		this.agent = config.agent;
 		this.sessionManager = config.sessionManager;
@@ -410,6 +432,14 @@ export class AgentSession {
 	 */
 	private _installAgentToolHooks(): void {
 		this.agent.beforeToolCall = async ({ toolCall, args }) => {
+			const verdict = await this._checkToolSafety(toolCall.name, args);
+			if (!verdict.allowed) {
+				debugLog("safety", "tool call blocked", { tool: toolCall.name, law: verdict.law, reason: verdict.reason });
+				return { block: true, reason: verdict.reason };
+			}
+
+			await this._captureEditCheckpoint(toolCall.name, args);
+
 			const runner = this._extensionRunner;
 			if (!runner.hasHandlers("tool_call")) {
 				return undefined;
@@ -431,6 +461,8 @@ export class AgentSession {
 		};
 
 		this.agent.afterToolCall = async ({ toolCall, args, result, isError }) => {
+			this._recordFileAccessForSafety(toolCall.name, args, isError);
+
 			const runner = this._extensionRunner;
 			if (!runner.hasHandlers("tool_result")) {
 				return undefined;
@@ -456,6 +488,137 @@ export class AgentSession {
 				isError: hookResult.isError ?? isError,
 			};
 		};
+	}
+
+	// =========================================================================
+	// Edit checkpoints / Undo (issue #16)
+	// =========================================================================
+
+	/**
+	 * Record a pre-image of a file before a mutating tool (`write`/`edit`) runs, tagged with
+	 * the current prompt cycle so it can be undone later. Capture failures never block the tool.
+	 */
+	private async _captureEditCheckpoint(toolName: string, args: unknown): Promise<void> {
+		if (toolName !== "write" && toolName !== "edit") {
+			return;
+		}
+		const rawPath = (args as { path?: unknown; file_path?: unknown } | undefined)?.path;
+		const altPath = (args as { file_path?: unknown } | undefined)?.file_path;
+		const filePath = typeof rawPath === "string" ? rawPath : typeof altPath === "string" ? altPath : undefined;
+		if (!filePath) {
+			return;
+		}
+		try {
+			const absolutePath = resolveToCwd(filePath, this._cwd);
+			await this._editCheckpoints.capture(this._currentPromptNumber, this._currentPromptId, absolutePath);
+		} catch (error) {
+			debugLog("undo", "pre-image capture failed", { filePath, error: String(error) });
+		}
+	}
+
+	/** True when there is at least one undoable edit batch. */
+	hasUndoableEdits(): boolean {
+		return this._editCheckpoints.hasChanges();
+	}
+
+	/** Edit-batch summaries (newest first) for an undo selector. */
+	listEditBatches(): BatchSummary[] {
+		return this._editCheckpoints.listBatches();
+	}
+
+	/** Undo the most recent `n` edit batches (default 1). */
+	async undoLastEditBatches(n = 1): Promise<UndoResult> {
+		const result = await this._editCheckpoints.undoLastBatches(n);
+		debugLog("undo", "undoLastEditBatches", { n, ...result });
+		return result;
+	}
+
+	/** Undo back to prompt `#m`, reverting that prompt and everything after it. */
+	async undoToPrompt(m: number): Promise<UndoResult> {
+		const result = await this._editCheckpoints.undoToPrompt(m);
+		debugLog("undo", "undoToPrompt", { m, ...result });
+		return result;
+	}
+
+	/** Accept all pending edits (Keep All): clear tracked checkpoints without touching disk. */
+	keepAllEdits(): void {
+		this._editCheckpoints.keepAll();
+		debugLog("undo", "keepAllEdits", {});
+	}
+
+	// =========================================================================
+	// Safety harness (issues #1/#2 Laws + SafetyChecker, #5 read-before-write, #7 HALT)
+	// =========================================================================
+
+	/** Pre-flight Laws/HALT evaluation for a tool call. Never throws (fails open is avoided: errors block). */
+	private async _checkToolSafety(
+		toolName: string,
+		args: unknown,
+	): Promise<{ allowed: boolean; law?: number; reason?: string }> {
+		const tier = resolveReversibilityTier(this._baseToolDefinitions.get(toolName)?.reversibilityTier);
+		const env: SafetyEnv = {
+			halted: this._halted,
+			requireDestructiveConfirm: this._allowDestructiveOps,
+			hasReadFile: (absPath: string) => this._readFiles.has(absPath),
+			fileExists: async (absPath: string) => existsSync(absPath),
+			resolvePath: (filePath: string) => resolveToCwd(filePath, this._cwd),
+		};
+		return this._safetyChecker.checkToolCall({ toolName, args: (args ?? {}) as Record<string, unknown>, tier }, env);
+	}
+
+	/**
+	 * Record a successful file access so later edits/writes satisfy read-before-write.
+	 * A successful `read`, `write`, or `edit` all mean the agent now has authoritative
+	 * knowledge of that file's contents.
+	 */
+	private _recordFileAccessForSafety(toolName: string, args: unknown, isError: boolean): void {
+		if (isError || (toolName !== "read" && toolName !== "write" && toolName !== "edit")) {
+			return;
+		}
+		const rawPath = (args as { path?: unknown; file_path?: unknown } | undefined)?.path;
+		const altPath = (args as { file_path?: unknown } | undefined)?.file_path;
+		const filePath = typeof rawPath === "string" ? rawPath : typeof altPath === "string" ? altPath : undefined;
+		if (!filePath) {
+			return;
+		}
+		try {
+			this._readFiles.add(resolveToCwd(filePath, this._cwd));
+		} catch {
+			// Ignore unresolved paths; they simply will not satisfy read-before-write.
+		}
+	}
+
+	/** Engage the operator HALT/off-switch: blocks tool calls at the next boundary (#7). */
+	requestHalt(): void {
+		this._halted = true;
+		debugLog("safety", "HALT engaged", {});
+	}
+
+	/** Release the HALT/off-switch so tool calls may resume. */
+	clearHalt(): void {
+		this._halted = false;
+		debugLog("safety", "HALT cleared", {});
+	}
+
+	/** Whether the operator HALT/off-switch is currently engaged. */
+	isHalted(): boolean {
+		return this._halted;
+	}
+
+	/** Allow destructive shell operations (e.g. rm -rf, force-push) for this session. */
+	setAllowDestructiveOps(allow: boolean): void {
+		this._allowDestructiveOps = allow;
+	}
+
+	/** Enable/disable dry-run mode: write/edit/bash produce previews without mutating (#9). */
+	setDryRun(enabled: boolean): void {
+		this._dryRunEnabled = enabled;
+		debugLog("safety", "dry-run mode", { enabled });
+	}
+
+	/** Whether dry-run mode is currently enabled. */
+	isDryRun(): boolean {
+		return this._dryRunEnabled;
 	}
 
 	// =========================================================================
@@ -958,6 +1121,10 @@ export class AgentSession {
 		const promptNumber = this.sessionManager.getNextPromptNumber();
 		const promptId = `#${promptNumber}`;
 		const preview = expandedText.slice(0, 200);
+		this._currentPromptNumber = promptNumber;
+		this._currentPromptId = promptId;
+		// A new user prompt is an explicit go-ahead: release any prior HALT.
+		this._halted = false;
 		this.sessionManager.appendPromptMeta(promptNumber, promptId, preview);
 		this._emit({ type: "prompt_meta", promptNumber, promptId, preview });
 		debugLog("prompt", "numbered", { promptNumber, promptId, preview });
@@ -2496,7 +2663,9 @@ export class AgentSession {
 				)
 			: createAllToolDefinitions(this._cwd, {
 					read: { autoResizeImages },
-					bash: { commandPrefix: shellCommandPrefix, shellPath },
+					bash: { commandPrefix: shellCommandPrefix, shellPath, dryRun: () => this._dryRunEnabled },
+					write: { dryRun: () => this._dryRunEnabled },
+					edit: { dryRun: () => this._dryRunEnabled },
 				});
 
 		this._baseToolDefinitions = new Map(
