@@ -79,6 +79,7 @@ import { defaultModelPerProvider, findExactModelReferenceMatch, resolveModelScop
 import { DefaultPackageManager } from "../../core/package-manager.ts";
 import { BUILT_IN_PROVIDER_DISPLAY_NAMES } from "../../core/provider-display-names.ts";
 import type { ResourceDiagnostic } from "../../core/resource-loader.ts";
+import { isSandboxAvailable } from "../../core/safety/index.ts";
 import { formatMissingSessionCwdPrompt, MissingSessionCwdError } from "../../core/session-cwd.ts";
 import { type SessionContext, SessionManager } from "../../core/session-manager.ts";
 import { BUILTIN_SLASH_COMMANDS } from "../../core/slash-commands.ts";
@@ -96,6 +97,7 @@ import { killTrackedDetachedChildren } from "../../utils/shell.ts";
 import { ensureTool } from "../../utils/tools-manager.ts";
 import { checkForNewPiVersion, type LatestPiRelease } from "../../utils/version-check.ts";
 import { ArminComponent } from "./components/armin.ts";
+import { AsciiBannerComponent } from "./components/ascii-banner.ts";
 import { AssistantMessageComponent } from "./components/assistant-message.ts";
 import { BashExecutionComponent } from "./components/bash-execution.ts";
 import { BorderedLoader } from "./components/bordered-loader.ts";
@@ -118,9 +120,15 @@ import { type AuthSelectorProvider, OAuthSelectorComponent } from "./components/
 import { ScopedModelsSelectorComponent } from "./components/scoped-models-selector.ts";
 import { SessionSelectorComponent } from "./components/session-selector.ts";
 import { SettingsSelectorComponent } from "./components/settings-selector.ts";
+import {
+	cycleShortcutBarVisibility,
+	ShortcutBarComponent,
+	type ShortcutBarVisibility,
+} from "./components/shortcut-bar.ts";
 import { SkillInvocationMessageComponent } from "./components/skill-invocation-message.ts";
 import { ToolExecutionComponent } from "./components/tool-execution.ts";
 import { TreeSelectorComponent } from "./components/tree-selector.ts";
+import { UndoSelectorComponent } from "./components/undo-selector.ts";
 import { UserMessageComponent } from "./components/user-message.ts";
 import { UserMessageSelectorComponent } from "./components/user-message-selector.ts";
 import {
@@ -273,6 +281,9 @@ export class InteractiveMode {
 	private editorContainer: Container;
 	private footer: FooterComponent;
 	private footerDataProvider: FooterDataProvider;
+	private shortcutBar: ShortcutBarComponent;
+	private shortcutBarVisibility: ShortcutBarVisibility = "compact";
+	private asciiBanner: AsciiBannerComponent;
 	// Stored so the same manager can be injected into custom editors, selectors, and extension UI.
 	private keybindings: KeybindingsManager;
 	private version: string;
@@ -413,6 +424,8 @@ export class InteractiveMode {
 		this.footerDataProvider = new FooterDataProvider(this.sessionManager.getCwd());
 		this.footer = new FooterComponent(this.session, this.footerDataProvider);
 		this.footer.setAutoCompactEnabled(this.session.autoCompactionEnabled);
+		this.shortcutBar = new ShortcutBarComponent(() => this.shortcutBarVisibility);
+		this.asciiBanner = new AsciiBannerComponent();
 
 		// Load hide thinking block setting
 		this.hideThinkingBlock = this.settingsManager.getHideThinkingBlock();
@@ -716,7 +729,9 @@ export class InteractiveMode {
 		this.ui.addChild(this.statusContainer);
 		this.renderWidgets(); // Initialize with default spacer
 		this.ui.addChild(this.widgetContainerAbove);
+		this.ui.addChild(this.asciiBanner);
 		this.ui.addChild(this.editorContainer);
+		this.ui.addChild(this.shortcutBar);
 		this.ui.addChild(this.widgetContainerBelow);
 		this.ui.addChild(this.footer);
 		this.ui.setFocus(this.editor);
@@ -1747,19 +1762,74 @@ export class InteractiveMode {
 		setTimeout(() => this.setExtensionStatus(key, undefined), durationMs).unref?.();
 	}
 
-	/** Undo the most recent agent edit batch (issue #16). */
+	/** Undo: open selector to pick prompt #M (issue #16). Shift+ctrl+z = last batch quick undo when only one batch. */
 	private async handleUndoEdits(): Promise<void> {
 		if (!this.session.hasUndoableEdits()) {
 			this.flashStatus("undo", "Undo: no agent edits to revert");
 			return;
 		}
-		try {
-			const result = await this.session.undoLastEditBatches(1);
-			const changed = result.restored.length + result.removed.length;
-			this.flashStatus("undo", `Undid 1 edit batch (${changed} file${changed === 1 ? "" : "s"})`);
-		} catch (error) {
-			this.flashStatus("undo", `Undo failed: ${error instanceof Error ? error.message : String(error)}`);
+		const batches = this.session.listEditBatches();
+		if (batches.length === 1) {
+			try {
+				const result = await this.session.undoLastEditBatches(1);
+				const changed = result.restored.length + result.removed.length;
+				this.flashStatus("undo", `Undid 1 edit batch (${changed} file${changed === 1 ? "" : "s"})`);
+			} catch (error) {
+				this.flashStatus("undo", `Undo failed: ${error instanceof Error ? error.message : String(error)}`);
+			}
+			return;
 		}
+		this.showUndoSelector();
+	}
+
+	/** Undo selector (issue #16): pick a prompt `#M` to revert back to. */
+	private showUndoSelector(): void {
+		const batches = this.session.listEditBatches();
+		if (batches.length === 0) {
+			this.flashStatus("undo", "Undo: no agent edits to revert");
+			return;
+		}
+		this.showSelector((done) => {
+			const selector = new UndoSelectorComponent(
+				batches,
+				(promptNumber) => {
+					done();
+					void this.session.undoToPrompt(promptNumber).then(
+						(result) => {
+							const changed = result.restored.length + result.removed.length;
+							this.flashStatus(
+								"undo",
+								`Undid ${result.batchesUndone} batch${result.batchesUndone === 1 ? "" : "es"} (${changed} file${changed === 1 ? "" : "s"} reverted)`,
+							);
+						},
+						(error: unknown) => {
+							this.flashStatus("undo", `Undo failed: ${error instanceof Error ? error.message : String(error)}`);
+						},
+					);
+				},
+				() => done(),
+			);
+			return { component: selector, focus: selector.getSelectList() };
+		});
+	}
+
+	/** Toggle OS-level sandbox for agent bash commands (issue #10). */
+	private handleToggleSandbox(): void {
+		const enabled = !this.session.isSandboxBash();
+		if (enabled && !isSandboxAvailable()) {
+			this.flashStatus(
+				"sandbox",
+				process.platform === "darwin"
+					? "Sandbox unavailable: sandbox-exec not found"
+					: `Sandbox not supported on ${process.platform}`,
+			);
+			return;
+		}
+		this.session.setSandboxBash(enabled);
+		this.flashStatus(
+			"sandbox",
+			enabled ? "Sandbox ON: bash restricted to cwd/tmp, network denied" : "Sandbox OFF: bash runs unrestricted",
+		);
 	}
 
 	/** Toggle dry-run mode (issue #9): edits/writes/bash are previewed but not applied. */
@@ -1770,6 +1840,12 @@ export class InteractiveMode {
 			"dryRun",
 			enabled ? "Dry-run ON: edits previewed, not applied" : "Dry-run OFF: edits applied normally",
 		);
+	}
+
+	/** Cycle shortcut bar: compact → expanded → hidden → compact. */
+	private handleToggleShortcutBar(): void {
+		this.shortcutBarVisibility = cycleShortcutBarVisibility(this.shortcutBarVisibility);
+		this.ui.requestRender();
 	}
 
 	/** Keep all pending agent edits (issue #15): clears the undo buffer without touching disk. */
@@ -2530,6 +2606,7 @@ export class InteractiveMode {
 		this.defaultEditor.onAction("app.edits.undo", () => void this.handleUndoEdits());
 		this.defaultEditor.onAction("app.edits.keepAll", () => this.handleKeepAllEdits());
 		this.defaultEditor.onAction("app.edits.dryRun", () => this.handleToggleDryRun());
+		this.defaultEditor.onAction("app.shortcuts.toggle", () => this.handleToggleShortcutBar());
 
 		this.defaultEditor.onChange = (text: string) => {
 			const wasBashMode = this.isBashMode;
@@ -2663,6 +2740,16 @@ export class InteractiveMode {
 				const customInstructions = text.startsWith("/compact ") ? text.slice(9).trim() : undefined;
 				this.editor.setText("");
 				await this.handleCompactCommand(customInstructions);
+				return;
+			}
+			if (text === "/undo") {
+				this.editor.setText("");
+				this.showUndoSelector();
+				return;
+			}
+			if (text === "/sandbox") {
+				this.editor.setText("");
+				this.handleToggleSandbox();
 				return;
 			}
 			if (text === "/reload") {

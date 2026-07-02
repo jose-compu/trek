@@ -80,6 +80,12 @@ import {
 } from "./extensions/index.ts";
 import { emitSessionShutdownEvent } from "./extensions/runner.ts";
 import { resolveReversibilityTier } from "./extensions/types.ts";
+import {
+	HONESTY_PROMPT_SECTION,
+	type HonestyReport,
+	isHonestyProtocolEnabled,
+	parseHonestyReport,
+} from "./honesty/index.ts";
 import type { BashExecutionMessage, CustomMessage } from "./messages.ts";
 import type { ModelRegistry } from "./model-registry.ts";
 import { hashContent, type LoadedPrologue, loadPrologue } from "./prologue.ts";
@@ -90,7 +96,13 @@ import {
 	ReflectiveLoopController,
 } from "./reflective-loop/index.ts";
 import type { ResourceExtensionPaths, ResourceLoader } from "./resource-loader.ts";
-import { SafetyChecker, type SafetyEnv } from "./safety/index.ts";
+import {
+	formatSchemaMismatchNote,
+	SafetyChecker,
+	type SafetyEnv,
+	validateToolResultShape,
+	wrapCommandWithSandbox,
+} from "./safety/index.ts";
 import type { BranchSummaryEntry, CompactionEntry, SessionManager } from "./session-manager.ts";
 import { CURRENT_SESSION_VERSION, getLatestCompactionEntry, type SessionHeader } from "./session-manager.ts";
 import type { SettingsManager } from "./settings-manager.ts";
@@ -347,6 +359,8 @@ export class AgentSession {
 	private _allowDestructiveOps = false;
 	// Dry-run mode (#9): write/edit/bash compute previews and skip mutation.
 	private _dryRunEnabled = false;
+	// Sandbox mode (#10): agent bash commands run inside an OS-level sandbox.
+	private _sandboxBashEnabled = false;
 
 	constructor(config: AgentSessionConfig) {
 		this.agent = config.agent;
@@ -463,9 +477,16 @@ export class AgentSession {
 		this.agent.afterToolCall = async ({ toolCall, args, result, isError }) => {
 			this._recordFileAccessForSafety(toolCall.name, args, isError);
 
+			// Post-flight safety + typed output validation (#1/#2, #8): append visible notes.
+			const safetyNotes = this._collectPostFlightNotes(toolCall.name, args, result, isError);
+			let content = result.content;
+			if (safetyNotes.length > 0) {
+				content = [...content, ...safetyNotes.map((text) => ({ type: "text" as const, text }))];
+			}
+
 			const runner = this._extensionRunner;
 			if (!runner.hasHandlers("tool_result")) {
-				return undefined;
+				return safetyNotes.length > 0 ? { content, details: result.details, isError } : undefined;
 			}
 
 			const hookResult = await runner.emitToolResult({
@@ -473,13 +494,13 @@ export class AgentSession {
 				toolName: toolCall.name,
 				toolCallId: toolCall.id,
 				input: args as Record<string, unknown>,
-				content: result.content,
+				content,
 				details: result.details,
 				isError,
 			});
 
 			if (!hookResult) {
-				return undefined;
+				return safetyNotes.length > 0 ? { content, details: result.details, isError } : undefined;
 			}
 
 			return {
@@ -588,6 +609,52 @@ export class AgentSession {
 		}
 	}
 
+	/**
+	 * Post-flight pass over an executed tool's result (issues #1/#2 post-flight Laws,
+	 * #8 typed output validation). Returns visible notes to append to the tool result;
+	 * the action already ran, so violations are surfaced rather than blocked.
+	 */
+	private _collectPostFlightNotes(
+		toolName: string,
+		args: unknown,
+		result: { content: Array<{ type: string; text?: string }> },
+		isError: boolean,
+	): string[] {
+		const notes: string[] = [];
+		try {
+			// #8 — typed tool output validation; reflection note on mismatch.
+			const shapeIssues = validateToolResultShape(result);
+			if (shapeIssues.length > 0) {
+				notes.push(formatSchemaMismatchNote(toolName, shapeIssues));
+				debugLog("safety", "tool output schema mismatch", { tool: toolName, issues: shapeIssues });
+			}
+
+			// #1/#2 — post-flight Law 0 pass on mutating tool output.
+			if (!isError && shapeIssues.length === 0) {
+				const tier = resolveReversibilityTier(this._baseToolDefinitions.get(toolName)?.reversibilityTier);
+				const resultText = result.content
+					.filter((part) => part.type === "text" && typeof part.text === "string")
+					.map((part) => part.text)
+					.join("\n");
+				const verdict = this._safetyChecker.checkToolResult(
+					{ toolName, args: (args ?? {}) as Record<string, unknown>, tier },
+					resultText,
+				);
+				if (!verdict.allowed && verdict.reason) {
+					notes.push(verdict.reason);
+					debugLog("safety", "post-flight violation", {
+						tool: toolName,
+						law: verdict.law,
+						reason: verdict.reason,
+					});
+				}
+			}
+		} catch (error) {
+			debugLog("safety", "post-flight check failed", { tool: toolName, error: String(error) });
+		}
+		return notes;
+	}
+
 	/** Engage the operator HALT/off-switch: blocks tool calls at the next boundary (#7). */
 	requestHalt(): void {
 		this._halted = true;
@@ -619,6 +686,40 @@ export class AgentSession {
 	/** Whether dry-run mode is currently enabled. */
 	isDryRun(): boolean {
 		return this._dryRunEnabled;
+	}
+
+	/**
+	 * Honesty protocol (#4/#6): parse the `<honesty>` footer from the most recent
+	 * assistant message into a structured report (confidence, assumption ledger,
+	 * unverified claims). `present` is false when the footer is missing.
+	 */
+	getLastHonestyReport(): HonestyReport {
+		for (let i = this.messages.length - 1; i >= 0; i--) {
+			const message = this.messages[i];
+			if (message.role !== "assistant") {
+				continue;
+			}
+			const text = (message.content as Array<{ type: string; text?: string }>)
+				.filter((part) => part.type === "text" && typeof part.text === "string")
+				.map((part) => part.text)
+				.join("\n");
+			return parseHonestyReport(text);
+		}
+		return { present: false, assumptions: [], unverified: [] };
+	}
+
+	/**
+	 * Sandbox execution (#10): when enabled, agent bash commands are wrapped in an
+	 * OS-level sandbox (macOS sandbox-exec; other platforms run unsandboxed with a notice).
+	 */
+	setSandboxBash(enabled: boolean): void {
+		this._sandboxBashEnabled = enabled;
+		debugLog("safety", "sandbox mode", { enabled });
+	}
+
+	/** Whether bash sandboxing is currently enabled. */
+	isSandboxBash(): boolean {
+		return this._sandboxBashEnabled;
 	}
 
 	// =========================================================================
@@ -1082,7 +1183,11 @@ export class AgentSession {
 		}
 
 		const loaderSystemPrompt = this._resourceLoader.getSystemPrompt();
-		const loaderAppendSystemPrompt = this._resourceLoader.getAppendSystemPrompt();
+		const loaderAppendSystemPrompt = [...this._resourceLoader.getAppendSystemPrompt()];
+		// Honesty protocol (#4/#6): instruct the model to emit the <honesty> footer.
+		if (isHonestyProtocolEnabled()) {
+			loaderAppendSystemPrompt.push(HONESTY_PROMPT_SECTION);
+		}
 		const appendSystemPrompt =
 			loaderAppendSystemPrompt.length > 0 ? loaderAppendSystemPrompt.join("\n\n") : undefined;
 		const loadedSkills = this._resourceLoader.getSkills().skills;
@@ -1123,8 +1228,8 @@ export class AgentSession {
 		const preview = expandedText.slice(0, 200);
 		this._currentPromptNumber = promptNumber;
 		this._currentPromptId = promptId;
-		// A new user prompt is an explicit go-ahead: release any prior HALT.
-		this._halted = false;
+		// A new user prompt is an explicit resume after operator HALT (Escape / Stop).
+		this.clearHalt();
 		this.sessionManager.appendPromptMeta(promptNumber, promptId, preview);
 		this._emit({ type: "prompt_meta", promptNumber, promptId, preview });
 		debugLog("prompt", "numbered", { promptNumber, promptId, preview });
@@ -2663,7 +2768,23 @@ export class AgentSession {
 				)
 			: createAllToolDefinitions(this._cwd, {
 					read: { autoResizeImages },
-					bash: { commandPrefix: shellCommandPrefix, shellPath, dryRun: () => this._dryRunEnabled },
+					bash: {
+						commandPrefix: shellCommandPrefix,
+						shellPath,
+						dryRun: () => this._dryRunEnabled,
+						// Sandbox execution (#10): wrap agent bash in an OS-level sandbox when enabled.
+						spawnHook: (context) => {
+							if (!this._sandboxBashEnabled) {
+								return context;
+							}
+							const wrapped = wrapCommandWithSandbox(context.command, context.cwd);
+							if (!wrapped.sandboxed) {
+								debugLog("safety", "sandbox unavailable", { notice: wrapped.notice });
+								return context;
+							}
+							return { ...context, command: wrapped.command };
+						},
+					},
 					write: { dryRun: () => this._dryRunEnabled },
 					edit: { dryRun: () => this._dryRunEnabled },
 				});

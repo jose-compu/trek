@@ -26,6 +26,13 @@ export interface ReflectiveComponentRecord {
 	note?: string;
 }
 
+/** Result of the Laws/policy gate for one cycle (issue #3: single loop, laws in trace). */
+export interface LawsVerdictRecord {
+	allowed: boolean;
+	law?: number;
+	reason?: string;
+}
+
 /** Persisted once per user prompt cycle in session JSONL. */
 export interface ReflectiveCycleTrace {
 	cycleNumber: number;
@@ -34,6 +41,8 @@ export interface ReflectiveCycleTrace {
 	taskPreview: string;
 	phases: Record<ReflectivePhase, ReflectivePhaseRecord>;
 	components: ReflectiveComponentRecord[];
+	/** Pre-flight laws verdict for the task (gate between Intend and Act). */
+	lawsVerdict?: LawsVerdictRecord;
 }
 
 export interface ReflectiveObservation {
@@ -62,6 +71,8 @@ export interface ReflectiveReflection {
 export interface PolicyCheckResult {
 	allowed: boolean;
 	reason?: string;
+	/** The law (0-3) that produced a block, when `allowed` is false. */
+	law?: number;
 }
 
 export interface ReflectiveLoopContext {

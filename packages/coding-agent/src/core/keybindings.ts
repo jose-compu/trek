@@ -28,6 +28,7 @@ export interface AppKeybindings {
 	"app.edits.undo": true;
 	"app.edits.keepAll": true;
 	"app.edits.dryRun": true;
+	"app.shortcuts.toggle": true;
 	"app.clipboard.pasteImage": true;
 	"app.session.new": true;
 	"app.session.tree": true;
@@ -108,7 +109,7 @@ export const KEYBINDINGS = {
 	},
 	"app.edits.undo": {
 		defaultKeys: "shift+ctrl+z",
-		description: "Undo last agent edit batch",
+		description: "Undo last edit batch (opens selector when multiple batches)",
 	},
 	"app.edits.keepAll": {
 		defaultKeys: "shift+ctrl+k",
@@ -117,6 +118,10 @@ export const KEYBINDINGS = {
 	"app.edits.dryRun": {
 		defaultKeys: "shift+ctrl+y",
 		description: "Toggle dry-run mode (preview edits without applying)",
+	},
+	"app.shortcuts.toggle": {
+		defaultKeys: "shift+ctrl+/",
+		description: "Toggle shortcut cheat sheet below editor",
 	},
 	"app.clipboard.pasteImage": {
 		defaultKeys: process.platform === "win32" ? "alt+v" : "ctrl+v",

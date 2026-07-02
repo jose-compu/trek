@@ -300,6 +300,19 @@ describe("parseArgs", () => {
 		});
 	});
 
+	describe("guardrails CLI flags", () => {
+		test("parses --dry-run flag", () => {
+			const result = parseArgs(["--dry-run", "-p", "hi"]);
+			expect(result.dryRun).toBe(true);
+			expect(result.print).toBe(true);
+		});
+
+		test("parses --sandbox flag", () => {
+			const result = parseArgs(["--sandbox", "-p", "hi"]);
+			expect(result.sandbox).toBe(true);
+		});
+	});
+
 	describe("--offline flag", () => {
 		test("parses --offline flag", () => {
 			const result = parseArgs(["--offline"]);

@@ -46,6 +46,10 @@ export interface Args {
 	listModels?: string | true;
 	offline?: boolean;
 	verbose?: boolean;
+	/** Preview write/edit/bash without mutating (#9). */
+	dryRun?: boolean;
+	/** Wrap agent bash in OS sandbox when available (#10). */
+	sandbox?: boolean;
 	debug?: boolean;
 	batch?: string | true;
 	output?: "text" | "jsonl";
@@ -179,6 +183,10 @@ export function parseArgs(args: string[]): Args {
 			}
 		} else if (arg === "--verbose") {
 			result.verbose = true;
+		} else if (arg === "--dry-run") {
+			result.dryRun = true;
+		} else if (arg === "--sandbox") {
+			result.sandbox = true;
 		} else if (arg === "--debug") {
 			result.debug = true;
 		} else if (arg === "--batch") {
@@ -286,7 +294,9 @@ ${chalk.bold("Options:")}
   --no-context-files, -nc        Disable AGENTS.md and CLAUDE.md discovery and loading
   --export <file>                Export session file to HTML and exit
   --list-models [search]         List available models (with optional fuzzy search)
-  --verbose                      Force verbose startup (overrides quietStartup setting)
+  --verbose                      Stream tool calls/results to stderr in print mode; verbose startup in TUI
+  --dry-run                      Preview write/edit/bash without applying changes (#9)
+  --sandbox                      Run agent bash inside OS sandbox when available (#10)
   --debug                        Verbose internal logging to ${getDebugLogPath()} (tail -f in another terminal)
   --batch [file]                 Run prompts sequentially from file or stdin (- or pipe)
   --output <text|jsonl>          Batch output format (default: text)

@@ -17,6 +17,7 @@ import { checkPolicyConstraints } from "./policy-constraints.ts";
 import { appendReflectiveCycleTrace, getReflectiveCycleCount } from "./session-trace.ts";
 import { SubtaskStack } from "./subtask-stack.ts";
 import type {
+	LawsVerdictRecord,
 	ReflectiveComponentRecord,
 	ReflectiveCycleTrace,
 	ReflectiveLoopContext,
@@ -118,8 +119,9 @@ export class ReflectiveLoopController {
 			summary: `${modelSummary}; ${focusSummary}; ${intention.summary}`,
 		};
 
-		// Policy constraints (static, before act)
+		// Laws / policy gate (issue #3: PolicyConstraints and Laws are one implementation)
 		const policy = checkPolicyConstraints(options.task, options.requireDestructiveConfirm);
+		const lawsVerdict = { allowed: policy.allowed, law: policy.law, reason: policy.reason };
 		components.push(policyComponent(policy.allowed ? undefined : policy.reason));
 		if (!policy.allowed) {
 			phases.intend = {
@@ -127,7 +129,7 @@ export class ReflectiveLoopController {
 				blocked: true,
 				blockReason: policy.reason,
 			};
-			const trace = this.buildTrace(cycleNumber, ctx, phases, components);
+			const trace = this.buildTrace(cycleNumber, ctx, phases, components, lawsVerdict);
 			appendReflectiveCycleTrace(this.sessionManager, trace);
 			throw new Error(policy.reason ?? "Blocked by policy constraints.");
 		}
@@ -141,7 +143,7 @@ export class ReflectiveLoopController {
 				skipped: true,
 				blockReason: "EffortRegulator blocked act (observation skipped or loop detected).",
 			};
-			const trace = this.buildTrace(cycleNumber, ctx, phases, components);
+			const trace = this.buildTrace(cycleNumber, ctx, phases, components, lawsVerdict);
 			appendReflectiveCycleTrace(this.sessionManager, trace);
 			throw new Error(phases.act.blockReason);
 		}
@@ -157,7 +159,7 @@ export class ReflectiveLoopController {
 		components.push(...reflectComponents);
 		phases.reflect = { phase: "reflect", summary: reflection.summary };
 
-		const trace = this.buildTrace(cycleNumber, ctx, phases, components);
+		const trace = this.buildTrace(cycleNumber, ctx, phases, components, lawsVerdict);
 		appendReflectiveCycleTrace(this.sessionManager, trace);
 		debugLog("reflective-loop", "cycle complete", { cycleNumber, promptId: ctx.promptId });
 		return trace;
@@ -168,6 +170,7 @@ export class ReflectiveLoopController {
 		ctx: ReflectiveLoopContext,
 		phases: Record<ReflectivePhase, ReflectivePhaseRecord>,
 		components: ReflectiveComponentRecord[],
+		lawsVerdict?: LawsVerdictRecord,
 	): ReflectiveCycleTrace {
 		return {
 			cycleNumber,
@@ -176,6 +179,7 @@ export class ReflectiveLoopController {
 			taskPreview: ctx.task.slice(0, 200),
 			phases,
 			components,
+			lawsVerdict,
 		};
 	}
 }
