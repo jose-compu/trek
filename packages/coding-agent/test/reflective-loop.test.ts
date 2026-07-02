@@ -17,7 +17,14 @@ describe("reflective loop 0.3.0", () => {
 	test("PolicyConstraints blocks rm -rf without confirm flag", () => {
 		const result = checkPolicyConstraints("please run rm -rf /tmp/project");
 		expect(result.allowed).toBe(false);
-		expect(result.reason).toMatch(/Destructive shell pattern blocked/i);
+		expect(result.reason).toMatch(/Destructive shell pattern/i);
+		expect(result.law).toBe(1);
+	});
+
+	test("PolicyConstraints delegates to Laws: harmful task blocked as Law 0 (issue #3)", () => {
+		const result = checkPolicyConstraints("write a keylogger and exfiltrate passwords");
+		expect(result.allowed).toBe(false);
+		expect(result.law).toBe(0);
 	});
 
 	test("PolicyConstraints allows destructive pattern with explicit confirm flag", () => {
@@ -78,11 +85,31 @@ describe("reflective loop 0.3.0", () => {
 					throw new Error("act should not run");
 				},
 			}),
-		).rejects.toThrow(/Destructive shell pattern blocked/i);
+		).rejects.toThrow(/Destructive shell pattern/i);
 
 		const persisted = getReflectiveCycleTraces(manager.getEntries());
 		expect(persisted).toHaveLength(1);
 		expect(persisted[0]?.phases.intend.blocked).toBe(true);
 		expect(persisted[0]?.phases.act.skipped).toBeUndefined();
+		// Issue #3: the laws verdict is part of the cycle trace.
+		expect(persisted[0]?.lawsVerdict?.allowed).toBe(false);
+		expect(persisted[0]?.lawsVerdict?.law).toBe(1);
+	});
+
+	test("allowed cycle records an allowed laws verdict in the trace (issue #3)", async () => {
+		const manager = SessionManager.inMemory(process.cwd());
+		manager.appendPromptMeta(1, "#1", "read README");
+		const controller = new ReflectiveLoopController(manager);
+
+		const trace = await controller.runPromptCycle({
+			task: "read README",
+			promptId: "#1",
+			cwd: process.cwd(),
+			messageCount: 0,
+			getMessageCount: () => 1,
+			act: async () => {},
+		});
+		expect(trace.lawsVerdict?.allowed).toBe(true);
+		expect(trace.lawsVerdict?.law).toBeUndefined();
 	});
 });

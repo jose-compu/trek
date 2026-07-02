@@ -84,3 +84,45 @@ export async function evaluateLaws(descriptor: ToolCallDescriptor, env: SafetyEn
 	}
 	return { allowed: true };
 }
+
+/**
+ * Law 0/1 evaluation of a raw task/prompt string. Used by the reflective loop's
+ * Intend gate so PolicyConstraints and the Laws hierarchy are one implementation
+ * (0.3.0 decision point, issue #3).
+ */
+export function evaluateTaskLaws(task: string, requireDestructiveConfirm = false): SafetyVerdict {
+	const normalized = task.trim();
+	if (!normalized) {
+		return { allowed: false, law: 2, reason: "Empty task rejected (Law 2: nothing to obey)." };
+	}
+	if (HARMFUL_PATTERN.test(normalized)) {
+		return {
+			allowed: false,
+			law: 0,
+			reason: "Task appears to facilitate broadly harmful work (Law 0) and was blocked.",
+		};
+	}
+	if (DESTRUCTIVE_BASH.test(normalized) && !requireDestructiveConfirm) {
+		return {
+			allowed: false,
+			law: 1,
+			reason: "Destructive shell pattern in task blocked without explicit confirmation (Law 1).",
+		};
+	}
+	return { allowed: true };
+}
+
+/**
+ * Post-flight Law 0 pass over a mutating tool's result (SPECS_SAFETY_HARNESS §4.2).
+ * The action already executed, so a violation cannot be blocked — it is surfaced
+ * as a visible conflict message appended to the result instead.
+ */
+export function checkLaw0PostFlight(descriptor: ToolCallDescriptor, resultText: string): string | undefined {
+	if (descriptor.tier === "free") {
+		return undefined;
+	}
+	if (HARMFUL_PATTERN.test(resultText)) {
+		return `Post-flight check: output of "${descriptor.toolName}" matches broadly harmful patterns (Law 0). Review and revert if needed.`;
+	}
+	return undefined;
+}

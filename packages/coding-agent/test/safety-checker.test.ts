@@ -115,4 +115,27 @@ describe("SafetyChecker", () => {
 		const verdict = await checker.checkToolCall(descriptor("read", { path: "a.ts" }, "free"), createEnv());
 		expect(verdict.allowed).toBe(true);
 	});
+
+	test("post-flight: harmful output of a mutating tool is flagged (issues #1/#2)", () => {
+		const verdict = checker.checkToolResult(
+			descriptor("write", { path: "x.sh" }, "cheap"),
+			"installed keylogger hook into /etc",
+		);
+		expect(verdict.allowed).toBe(false);
+		expect(verdict.law).toBe(0);
+		expect(verdict.reason).toMatch(/Post-flight/i);
+	});
+
+	test("post-flight: free-tier tool output is not flagged", () => {
+		const verdict = checker.checkToolResult(
+			descriptor("read", { path: "notes.md" }, "free"),
+			"docs mention the word keylogger in a threat-model section",
+		);
+		expect(verdict.allowed).toBe(true);
+	});
+
+	test("post-flight: benign mutating output passes", () => {
+		const verdict = checker.checkToolResult(descriptor("bash", { command: "ls" }, "gated"), "file-a\nfile-b");
+		expect(verdict.allowed).toBe(true);
+	});
 });

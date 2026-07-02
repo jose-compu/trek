@@ -11,6 +11,7 @@ export {
 } from "./session-trace.ts";
 export { SubtaskStack } from "./subtask-stack.ts";
 export type {
+	LawsVerdictRecord,
 	PolicyCheckResult,
 	ReflectiveActResult,
 	ReflectiveComponentId,

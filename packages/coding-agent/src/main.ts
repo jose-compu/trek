@@ -754,6 +754,13 @@ export async function main(args: string[], options?: MainOptions) {
 		process.exit(1);
 	}
 
+	if (parsed.dryRun) {
+		session.setDryRun(true);
+	}
+	if (parsed.sandbox) {
+		session.setSandboxBash(true);
+	}
+
 	const startupBenchmark = isTrekEnvTruthy("STARTUP_BENCHMARK");
 	if (startupBenchmark && appMode !== "interactive") {
 		console.error(chalk.red("Error: TREK_STARTUP_BENCHMARK only supports interactive mode"));
@@ -807,6 +814,7 @@ export async function main(args: string[], options?: MainOptions) {
 		printTimings();
 		const exitCode = await runPrintMode(runtime, {
 			mode: toPrintOutputMode(appMode),
+			verbose: parsed.verbose,
 			messages: parsed.messages,
 			initialMessage,
 			initialImages,
