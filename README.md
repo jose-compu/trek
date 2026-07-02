@@ -1,12 +1,27 @@
 # Trek Agent
 
-Hard fork of the Pi Coding Agent — a terminal coding agent with tools, extensions, and session management.
+Trek is a **hard fork of the [Pi Coding Agent](https://pi.dev/)** — the minimal terminal coding agent with read, bash, edit, write tools, sessions, and a TypeScript extension ecosystem.
 
-**Version:** 0.3.0 — see [CHANGELOG.md](./CHANGELOG.md).
+Pi optimizes for simplicity and adaptability: you extend it with plugins rather than inheriting a heavy built-in stack. Trek keeps that surface — CLI ergonomics, Pi packages, and extension APIs — and adds a **staged roadmap** toward a production-grade agent with explicit safety, auditability, memory, and local model routing.
+
+**What Trek adds (roadmap-driven):**
+
+| Layer | Goal | Releases |
+|---|---|---|
+| **Safety** | Laws hierarchy, HALT, read-before-write, honesty protocol, dry-run, sandbox, undo | **0.4.0 Guardrails** (current) → 0.13.0 Guardrails+ |
+| **Determinism** | Full O→I→A→R traces, replay, seed logging, honest reproducibility limits | 0.6.0 Trace → 0.7.0 Audit |
+| **Memory** | Session / project / global layers with incremental indexing | 0.11.0 Memory |
+| **Local model hierarchy** | Tooling → work-horse → planning tiers, llama.cpp runtime, per-component routing | 0.8.0 Runtime → 0.9.0 Routing |
+
+Every user turn follows **Observe → Intend → Act → Reflect** (O→I→A→R). Safety checks wrap **Act**; traces and audit metadata accumulate over time so behavior is inspectable, not opaque.
+
+Pi compatibility is preserved: community packages from [pi.dev/packages](https://pi.dev/packages) install with `trek install npm:<package>`. See [Pi Coding Agent plugins](#pi-coding-agent-plugins) below.
+
+**Version:** 0.4.0 — see [CHANGELOG.md](./CHANGELOG.md). Full plan: [ROADMAP.md](../ROADMAP.md).
 
 ## Status
 
-This is the initial hard fork release. See the parent repo [ROADMAP.md](../ROADMAP.md) for the staged implementation plan.
+**0.4.0 Guardrails** shipped — SafetyChecker + Laws, HALT, read-before-write, dry-run, sandbox, multi-level undo, honesty protocol, and acceptance test gate. Next: **0.5.0 Undo** (`.trek` versioning) and **0.6.0 Trace**.
 
 ## Quick start
 
