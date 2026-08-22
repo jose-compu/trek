@@ -50,6 +50,8 @@ export interface Args {
 	dryRun?: boolean;
 	/** Wrap agent bash in OS sandbox when available (#10). */
 	sandbox?: boolean;
+	/** After a mutating prompt, create a small labeled git commit (0.5.0). */
+	gitCommit?: boolean;
 	debug?: boolean;
 	batch?: string | true;
 	output?: "text" | "jsonl";
@@ -185,6 +187,8 @@ export function parseArgs(args: string[]): Args {
 			result.verbose = true;
 		} else if (arg === "--dry-run") {
 			result.dryRun = true;
+		} else if (arg === "--git-commit") {
+			result.gitCommit = true;
 		} else if (arg === "--sandbox") {
 			result.sandbox = true;
 		} else if (arg === "--debug") {
@@ -255,6 +259,9 @@ ${chalk.bold("Commands:")}
   ${APP_NAME} uninstall <source> [-l]   Alias for remove
   ${APP_NAME} update [source|self|pi]   Update ${APP_NAME} and installed extensions
   ${APP_NAME} list                      List installed extensions from settings
+  ${APP_NAME} history                   List .trek file versions for this project
+  ${APP_NAME} revert --prompt N         Restore files from .trek history
+  ${APP_NAME} revert --step ID          Restore files from a recorded step id
   ${APP_NAME} config                    Open TUI to enable/disable package resources
   ${APP_NAME} <command> --help          Show help for install/remove/uninstall/update/list
 
@@ -296,6 +303,7 @@ ${chalk.bold("Options:")}
   --list-models [search]         List available models (with optional fuzzy search)
   --verbose                      Stream tool calls/results to stderr in print mode; verbose startup in TUI
   --dry-run                      Preview write/edit/bash without applying changes (#9)
+  --git-commit                   After mutations, create a labeled git commit (0.5.0)
   --sandbox                      Run agent bash inside OS sandbox when available (#10)
   --debug                        Verbose internal logging to ${getDebugLogPath()} (tail -f in another terminal)
   --batch [file]                 Run prompts sequentially from file or stdin (- or pipe)

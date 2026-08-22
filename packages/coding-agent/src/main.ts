@@ -41,6 +41,7 @@ import {
 import { assertValidSessionId, SessionManager } from "./core/session-manager.ts";
 import { SettingsManager } from "./core/settings-manager.ts";
 import { printTimings, resetTimings, time } from "./core/timings.ts";
+import { handleHistoryCommand, handleRevertCommand } from "./history-cli.ts";
 import { runMigrations, showDeprecationWarnings } from "./migrations.ts";
 import { InteractiveMode, runBatchMode, runPrintMode, runRpcMode } from "./modes/index.ts";
 import { ExtensionSelectorComponent } from "./modes/interactive/components/extension-selector.ts";
@@ -490,6 +491,14 @@ export async function main(args: string[], options?: MainOptions) {
 		return;
 	}
 
+	if (await handleHistoryCommand(args)) {
+		return;
+	}
+
+	if (await handleRevertCommand(args)) {
+		return;
+	}
+
 	if (await handleConfigCommand(args)) {
 		return;
 	}
@@ -756,6 +765,9 @@ export async function main(args: string[], options?: MainOptions) {
 
 	if (parsed.dryRun) {
 		session.setDryRun(true);
+	}
+	if (parsed.gitCommit) {
+		session.setGitCommit(true);
 	}
 	if (parsed.sandbox) {
 		session.setSandboxBash(true);

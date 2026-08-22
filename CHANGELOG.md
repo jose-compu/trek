@@ -1,10 +1,47 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.3.0`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.5.0`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.5.0] - 2026-08-22
+
+**Undo** — durable `.trek` file history (ROADMAP 0.5.0).
+
+### Added
+
+- **`.trek/manifest.json` + version artifacts:** diffs for edits; full snapshots on create/delete/rename.
+- **Session JSONL checkpoints:** `trek:edit_batch_checkpoint` so in-session undo survives restart.
+- **CLI:** `trek history`, `trek revert --prompt N`, `trek revert --step ID`.
+- **Parsed bash undo:** simple `rm` / `mv` (no pipes) snapshot before mutation.
+- **Optional labeled git commits:** `--git-commit` / `TREK_GIT_COMMIT=1` (no stash, no history rewrite).
+- **Idempotency keys** on write/edit/bash for the current prompt.
+- **Dry-run** no longer records undo batches.
+
+### Tests
+
+- ROADMAP gate (3-prompt revert, delete snapshot, gated block) plus scripted mock operator shortcuts.
+
+## [0.4.0] - 2026-07-02
+
+**Guardrails** — safety harness minimum (SPECS_SAFETY_HARNESS MVP).
+
+### Added
+
+- **SafetyChecker + Laws hierarchy:** pre-flight and post-flight checks on mutating tools (Law 0 harmful intent, Law 1 destructive shell / read-before-write).
+- **HALT / Off switch** at tool boundaries; new user prompt clears HALT (explicit resume).
+- **Reversibility tiers** on built-in tools: `free | cheap | gated | forbidden`.
+- **Undo engine:** multi-level undo (`undoLastBatches`, `undoToPrompt`), Keep All, undo selector UI in TUI.
+- **Dry-run** for write/edit/bash (TUI toggle, `--dry-run` CLI flag).
+- **Sandbox** for bash via macOS `sandbox-exec` (`/sandbox`, `--sandbox` CLI flag).
+- **Honesty protocol:** confidence + `assumption_ledger[]` in final output; verified vs `from_training_unverified` claims.
+- **Reflective loop integration:** O→I→A→R trace fields and `lawsVerdict` on cycle traces.
+- **Typed tool output validation** with `[schema-mismatch]` reflection notes.
+- **TUI polish:** shortcut bar (`shift+ctrl+/`), ASCII banner above input; print mode `--verbose`.
+- **Acceptance test gate:** `guardrails-checklist.test.ts` (14 tests) + live CLI smoke script.
+- **Pi Coding Agent plugins:** community packages from [pi.dev/packages](https://pi.dev/packages) install via `trek install npm:<package>`; Pi import aliases and `"pi"` manifests supported (see README).
 
 ## [0.3.0] - 2026-06-14
 
