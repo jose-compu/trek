@@ -705,7 +705,7 @@ describe("Generate E2E Tests", () => {
 	describe.skipIf(!hasCloudflareAiGatewayCredentials() || !process.env.ANTHROPIC_API_KEY)(
 		"Cloudflare AI Gateway → Anthropic BYOK (claude-sonnet-4-5 via /anthropic messages)",
 		() => {
-			const llm = getModel("cloudflare-ai-gateway", "claude-sonnet-4-5");
+			const llm = getModel("cloudflare-ai-gateway", "claude-sonnet-4.5");
 			const options = { headers: { Authorization: `Bearer ${process.env.ANTHROPIC_API_KEY}` } };
 			const thinkingOptions = {
 				...options,
@@ -921,7 +921,7 @@ describe("Generate E2E Tests", () => {
 	);
 
 	describe.skipIf(!process.env.ZAI_API_KEY)("zAI Provider (glm-5.1 via OpenAI Completions)", () => {
-		const llm = getModel("zai", "glm-5.1");
+		const llm = getModel("zai", "glm-5.2");
 
 		it("should complete basic text generation", { retry: 3 }, async () => {
 			await basicTextGeneration(llm);
@@ -1021,7 +1021,7 @@ describe("Generate E2E Tests", () => {
 	describe.skipIf(!process.env.KIMI_API_KEY)(
 		"Kimi For Coding Provider (kimi-k2-thinking via Anthropic Messages)",
 		() => {
-			const llm = getModel("kimi-coding", "kimi-k2-thinking");
+			const llm = getModel("kimi-coding", "kimi-for-coding");
 
 			it("should complete basic text generation", { retry: 3 }, async () => {
 				await basicTextGeneration(llm);

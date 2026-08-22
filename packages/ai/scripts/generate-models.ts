@@ -318,7 +318,7 @@ function applyThinkingLevelMetadata(model: Model<any>): void {
 	if (isGoogleThinkingApi(model) && isGemma4Model(model.id)) {
 		mergeThinkingLevelMap(model, { off: null, minimal: "MINIMAL", low: null, medium: null, high: "HIGH" });
 	}
-	if (model.provider === "groq" && model.id === "qwen/qwen3-32b") {
+	if (model.provider === "groq" && (model.id === "qwen/qwen3-32b" || model.id === "qwen/qwen3.6-27b")) {
 		mergeThinkingLevelMap(model, { minimal: null, low: null, medium: null, high: "default" });
 	}
 	if (model.provider === "openai-codex" && supportsOpenAiXhigh(model.id)) {
@@ -1028,11 +1028,19 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 					baseUrl = `${variant.basePath}/v1`;
 				}
 
-				if (variant.provider === "opencode" && modelId === "grok-build-0.1") {
+				if (
+					api === "openai-completions" &&
+					variant.provider === "opencode" &&
+					modelId === "grok-build-0.1"
+				) {
 					compat = { ...(compat ?? {}), supportsReasoningEffort: false };
 				}
 
-				if ((variant.provider === "opencode" || variant.provider === "opencode-go") && modelId === "kimi-k2.6") {
+				if (
+					api === "openai-completions" &&
+					(variant.provider === "opencode" || variant.provider === "opencode-go") &&
+					modelId === "kimi-k2.6"
+				) {
 					// OpenCode Kimi K2.6 accepts Anthropic-style thinking objects
 					// and rejects string thinking values or combined reasoning_effort.
 					compat = { ...(compat ?? {}), thinkingFormat: "deepseek", supportsReasoningEffort: false };
@@ -1072,7 +1080,7 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 						cacheRead: m.cost?.cache_read || 0,
 						cacheWrite: m.cost?.cache_write || 0,
 					},
-					...(compat ? { compat } : {}),
+					...(api === "openai-completions" && compat ? { compat } : {}),
 					contextWindow: m.limit?.context || 4096,
 					maxTokens: m.limit?.output || 4096,
 				});
