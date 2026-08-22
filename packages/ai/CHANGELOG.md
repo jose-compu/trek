@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-22
+
+Lockstep with Trek 0.5.0 Undo. Model generator no longer attaches completions-only `compat` fields to `openai-responses` models.
+
 ### Added
 
 - Added Ant Ling as a built-in OpenAI-compatible provider with Ling 2.6 and Ring 2.6 models.
