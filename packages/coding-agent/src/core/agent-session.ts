@@ -13,6 +13,7 @@
  * Modes use this class and add their own I/O layer on top.
  */
 
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import type { Agent, AgentEvent, AgentMessage, AgentState, AgentTool, ThinkingLevel } from "@trek/agent-core";
@@ -48,6 +49,7 @@ import {
 	type BatchSummary,
 	EditCheckpointManager,
 	nodeCheckpointFsOps,
+	type SerializedCheckpoints,
 	type UndoResult,
 } from "./edit-checkpoints/index.ts";
 import { exportSessionToHtml, type ToolHtmlRenderer } from "./export-html/index.ts";
@@ -113,6 +115,13 @@ import { type BashOperations, createLocalBashOperations } from "./tools/bash.ts"
 import { createAllToolDefinitions } from "./tools/index.ts";
 import { resolveToCwd } from "./tools/path-utils.ts";
 import { createToolDefinitionFromAgentTool } from "./tools/tool-definition-wrapper.ts";
+import {
+	commitPromptFiles,
+	nodeTrekStoreFs,
+	parseBashPathOps,
+	TrekVersionStore,
+	type VersionKind,
+} from "./trek-store/index.ts";
 
 // ============================================================================
 // Skill Block Parsing
@@ -347,10 +356,15 @@ export class AgentSession {
 	private _reflectiveLoop: ReflectiveLoopController | undefined;
 	private _lastPromptTask = "";
 
-	// Edit-batch checkpoints for multi-level Undo (issue #16).
+	// Edit-batch checkpoints for multi-level Undo (issue #16 / 0.5.0).
 	private _editCheckpoints = new EditCheckpointManager(nodeCheckpointFsOps);
+	private _trekStore: TrekVersionStore;
 	private _currentPromptNumber = 0;
 	private _currentPromptId = "#0";
+	private _idempotency = new Map<string, { text: string; isError: boolean }>();
+	private _idempotencyInFlight = new Set<string>();
+	private _promptTouchedRelPaths = new Set<string>();
+	private _gitCommitEnabled = process.env.TREK_GIT_COMMIT === "1";
 
 	// Safety harness: pre-flight Laws checker (#1/#2), read-before-write tracking (#5), HALT (#7).
 	private _safetyChecker = new SafetyChecker();
@@ -377,6 +391,8 @@ export class AgentSession {
 		this._excludedToolNames = config.excludedToolNames ? new Set(config.excludedToolNames) : undefined;
 		this._baseToolsOverride = config.baseToolsOverride;
 		this._sessionStartEvent = config.sessionStartEvent ?? { type: "session_start", reason: "startup" };
+		this._trekStore = new TrekVersionStore(this._cwd, nodeTrekStoreFs);
+		this._editCheckpoints.hydrate(this.sessionManager.getLatestEditBatchCheckpoint<SerializedCheckpoints>());
 
 		if (isReflectiveLoopEnabled()) {
 			this._reflectiveLoop = new ReflectiveLoopController(this.sessionManager);
@@ -452,6 +468,11 @@ export class AgentSession {
 				return { block: true, reason: verdict.reason };
 			}
 
+			const idem = this._lookupIdempotent(toolCall.name, args);
+			if (idem) {
+				return { block: true, reason: `[idempotent] ${idem.text}` };
+			}
+
 			await this._captureEditCheckpoint(toolCall.name, args);
 
 			const runner = this._extensionRunner;
@@ -476,6 +497,10 @@ export class AgentSession {
 
 		this.agent.afterToolCall = async ({ toolCall, args, result, isError }) => {
 			this._recordFileAccessForSafety(toolCall.name, args, isError);
+			this._rememberIdempotent(toolCall.name, args, result, isError);
+			if (!isError && !this._dryRunEnabled) {
+				await this._recordTrekVersion(toolCall.name, args);
+			}
 
 			// Post-flight safety + typed output validation (#1/#2, #8): append visible notes.
 			const safetyNotes = this._collectPostFlightNotes(toolCall.name, args, result, isError);
@@ -512,29 +537,196 @@ export class AgentSession {
 	}
 
 	// =========================================================================
-	// Edit checkpoints / Undo (issue #16)
+	// Edit checkpoints / Undo (issue #16) + .trek history (0.5.0)
 	// =========================================================================
 
-	/**
-	 * Record a pre-image of a file before a mutating tool (`write`/`edit`) runs, tagged with
-	 * the current prompt cycle so it can be undone later. Capture failures never block the tool.
-	 */
-	private async _captureEditCheckpoint(toolName: string, args: unknown): Promise<void> {
-		if (toolName !== "write" && toolName !== "edit") {
-			return;
-		}
+	private _persistCheckpoints(): void {
+		this.sessionManager.appendEditBatchCheckpoint(this._editCheckpoints.serialize());
+	}
+
+	private _toolFilePath(args: unknown): string | undefined {
 		const rawPath = (args as { path?: unknown; file_path?: unknown } | undefined)?.path;
 		const altPath = (args as { file_path?: unknown } | undefined)?.file_path;
-		const filePath = typeof rawPath === "string" ? rawPath : typeof altPath === "string" ? altPath : undefined;
-		if (!filePath) {
+		return typeof rawPath === "string" ? rawPath : typeof altPath === "string" ? altPath : undefined;
+	}
+
+	private _pathsToCapture(toolName: string, args: unknown): string[] {
+		if (toolName === "write" || toolName === "edit") {
+			const filePath = this._toolFilePath(args);
+			return filePath ? [filePath] : [];
+		}
+		if (toolName === "bash") {
+			const command = (args as { command?: unknown } | undefined)?.command;
+			if (typeof command !== "string") {
+				return [];
+			}
+			const ops = parseBashPathOps(command);
+			if (!ops) {
+				return [];
+			}
+			return ops.flatMap((op) => (op.kind === "delete" ? [op.path] : [op.from, op.to]));
+		}
+		return [];
+	}
+
+	/**
+	 * Record a pre-image before write/edit/parsed bash rm|mv. Skipped in dry-run.
+	 */
+	private async _captureEditCheckpoint(toolName: string, args: unknown): Promise<void> {
+		if (this._dryRunEnabled) {
 			return;
 		}
-		try {
-			const absolutePath = resolveToCwd(filePath, this._cwd);
-			await this._editCheckpoints.capture(this._currentPromptNumber, this._currentPromptId, absolutePath);
-		} catch (error) {
-			debugLog("undo", "pre-image capture failed", { filePath, error: String(error) });
+		const paths = this._pathsToCapture(toolName, args);
+		let changed = false;
+		for (const filePath of paths) {
+			try {
+				const absolutePath = resolveToCwd(filePath, this._cwd);
+				const rel = this._trekStore.toRelPath(absolutePath);
+				if (!rel) {
+					continue;
+				}
+				const captured = await this._editCheckpoints.capture(
+					this._currentPromptNumber,
+					this._currentPromptId,
+					absolutePath,
+				);
+				changed = changed || captured;
+			} catch (error) {
+				debugLog("undo", "pre-image capture failed", { filePath, error: String(error) });
+			}
 		}
+		if (changed) {
+			this._persistCheckpoints();
+		}
+	}
+
+	private async _recordTrekVersion(toolName: string, args: unknown): Promise<void> {
+		try {
+			if (toolName === "write" || toolName === "edit") {
+				const filePath = this._toolFilePath(args);
+				if (!filePath) {
+					return;
+				}
+				const abs = resolveToCwd(filePath, this._cwd);
+				const rel = this._trekStore.toRelPath(abs);
+				if (!rel) {
+					return;
+				}
+				const before = this._editCheckpoints.getPreImage(this._currentPromptNumber, abs);
+				if (!before) {
+					return;
+				}
+				const after = existsSync(abs) ? readFileSync(abs, "utf-8") : null;
+				const kind: VersionKind = before.kind === "absent" ? "create" : after === null ? "delete" : "edit";
+				await this._trekStore.record({
+					promptNumber: this._currentPromptNumber,
+					promptId: this._currentPromptId,
+					stepId: `${this._currentPromptId}:${rel}`,
+					relPath: rel,
+					kind,
+					before,
+					after,
+				});
+				this._promptTouchedRelPaths.add(rel);
+				return;
+			}
+			if (toolName !== "bash") {
+				return;
+			}
+			const command = (args as { command?: unknown } | undefined)?.command;
+			if (typeof command !== "string") {
+				return;
+			}
+			const ops = parseBashPathOps(command);
+			if (!ops) {
+				return;
+			}
+			for (const op of ops) {
+				if (op.kind === "delete") {
+					const abs = resolveToCwd(op.path, this._cwd);
+					const rel = this._trekStore.toRelPath(abs);
+					const before = this._editCheckpoints.getPreImage(this._currentPromptNumber, abs);
+					if (!rel || !before) {
+						continue;
+					}
+					await this._trekStore.record({
+						promptNumber: this._currentPromptNumber,
+						promptId: this._currentPromptId,
+						stepId: `${this._currentPromptId}:${rel}`,
+						relPath: rel,
+						kind: "delete",
+						before,
+						after: null,
+					});
+					this._promptTouchedRelPaths.add(rel);
+				} else {
+					const fromAbs = resolveToCwd(op.from, this._cwd);
+					const toAbs = resolveToCwd(op.to, this._cwd);
+					const rel = this._trekStore.toRelPath(fromAbs);
+					const toRel = this._trekStore.toRelPath(toAbs);
+					const before = this._editCheckpoints.getPreImage(this._currentPromptNumber, fromAbs);
+					if (!rel || !before) {
+						continue;
+					}
+					await this._trekStore.record({
+						promptNumber: this._currentPromptNumber,
+						promptId: this._currentPromptId,
+						stepId: `${this._currentPromptId}:${rel}`,
+						relPath: rel,
+						kind: "rename",
+						before,
+						toRelPath: toRel,
+					});
+					this._promptTouchedRelPaths.add(rel);
+					if (toRel) {
+						this._promptTouchedRelPaths.add(toRel);
+					}
+				}
+			}
+		} catch (error) {
+			debugLog("undo", "trek version record failed", { toolName, error: String(error) });
+		}
+	}
+
+	private _idempotencyKey(toolName: string, args: unknown): string {
+		const canonical = JSON.stringify(args ?? {}, Object.keys((args as object) ?? {}).sort());
+		return createHash("sha256")
+			.update(`${this.sessionManager.getSessionId()}:${this._currentPromptNumber}:${toolName}:${canonical}`)
+			.digest("hex");
+	}
+
+	private _lookupIdempotent(toolName: string, args: unknown): { text: string; isError: boolean } | undefined {
+		if (toolName !== "write" && toolName !== "edit" && toolName !== "bash") {
+			return undefined;
+		}
+		const key = this._idempotencyKey(toolName, args);
+		const cached = this._idempotency.get(key);
+		if (cached) {
+			return cached;
+		}
+		if (this._idempotencyInFlight.has(key)) {
+			return { text: "duplicate tool call skipped", isError: false };
+		}
+		this._idempotencyInFlight.add(key);
+		return undefined;
+	}
+
+	private _rememberIdempotent(
+		toolName: string,
+		args: unknown,
+		result: { content: Array<{ type: string; text?: string }> },
+		isError: boolean,
+	): void {
+		if (toolName !== "write" && toolName !== "edit" && toolName !== "bash") {
+			return;
+		}
+		const text = result.content
+			.filter((part) => part.type === "text" && typeof part.text === "string")
+			.map((part) => part.text)
+			.join("\n");
+		const key = this._idempotencyKey(toolName, args);
+		this._idempotency.set(key, { text, isError });
+		this._idempotencyInFlight.delete(key);
 	}
 
 	/** True when there is at least one undoable edit batch. */
@@ -550,6 +742,7 @@ export class AgentSession {
 	/** Undo the most recent `n` edit batches (default 1). */
 	async undoLastEditBatches(n = 1): Promise<UndoResult> {
 		const result = await this._editCheckpoints.undoLastBatches(n);
+		this._persistCheckpoints();
 		debugLog("undo", "undoLastEditBatches", { n, ...result });
 		return result;
 	}
@@ -557,6 +750,7 @@ export class AgentSession {
 	/** Undo back to prompt `#m`, reverting that prompt and everything after it. */
 	async undoToPrompt(m: number): Promise<UndoResult> {
 		const result = await this._editCheckpoints.undoToPrompt(m);
+		this._persistCheckpoints();
 		debugLog("undo", "undoToPrompt", { m, ...result });
 		return result;
 	}
@@ -564,7 +758,17 @@ export class AgentSession {
 	/** Accept all pending edits (Keep All): clear tracked checkpoints without touching disk. */
 	keepAllEdits(): void {
 		this._editCheckpoints.keepAll();
+		this._persistCheckpoints();
 		debugLog("undo", "keepAllEdits", {});
+	}
+
+	/** Enable optional labeled git commits after a mutating prompt (no stash). */
+	setGitCommit(enabled: boolean): void {
+		this._gitCommitEnabled = enabled;
+	}
+
+	getTrekStore(): TrekVersionStore {
+		return this._trekStore;
 	}
 
 	// =========================================================================
@@ -1228,6 +1432,7 @@ export class AgentSession {
 		const preview = expandedText.slice(0, 200);
 		this._currentPromptNumber = promptNumber;
 		this._currentPromptId = promptId;
+		this._promptTouchedRelPaths.clear();
 		// A new user prompt is an explicit resume after operator HALT (Escape / Stop).
 		this.clearHalt();
 		this.sessionManager.appendPromptMeta(promptNumber, promptId, preview);
@@ -1250,6 +1455,17 @@ export class AgentSession {
 			}
 		} finally {
 			this._flushPendingBashMessages();
+			await this._maybeGitCommitPrompt();
+		}
+	}
+
+	private async _maybeGitCommitPrompt(): Promise<void> {
+		if (!this._gitCommitEnabled || this._promptTouchedRelPaths.size === 0) {
+			return;
+		}
+		const ref = await commitPromptFiles(this._cwd, [...this._promptTouchedRelPaths], this._currentPromptNumber);
+		if (ref) {
+			await this._trekStore.recordGitRef(this._currentPromptNumber, ref);
 		}
 	}
 

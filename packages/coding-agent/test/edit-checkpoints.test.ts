@@ -134,6 +134,20 @@ describe("EditCheckpointManager", () => {
 		expect(summaries[1]).toMatchObject({ promptId: "#1", fileCount: 1 });
 	});
 
+	test("serialize + hydrate restores batches", async () => {
+		const fs = createFakeFs({ "/a.txt": "v0" });
+		const mgr = new EditCheckpointManager(fs);
+		await applyBatch(mgr, fs, 1, { "/a.txt": "v1" });
+		const snap = mgr.serialize();
+		expect(snap.batches).toHaveLength(1);
+
+		const restored = new EditCheckpointManager(fs);
+		restored.hydrate(snap);
+		expect(restored.depth).toBe(1);
+		await restored.undoLastBatches(1);
+		expect(fs.state.get("/a.txt")).toBe("v0");
+	});
+
 	test("undoToPrompt with no matching batch is a no-op", async () => {
 		const fs = createFakeFs({ "/a.txt": "v0" });
 		const mgr = new EditCheckpointManager(fs);

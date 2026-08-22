@@ -1097,6 +1097,23 @@ export class SessionManager {
 		return this.appendCustomEntry("trek:system_prompt", data);
 	}
 
+	/** Persist the latest in-memory undo checkpoint snapshot (0.5.0). */
+	appendEditBatchCheckpoint(data: unknown): string {
+		return this.appendCustomEntry("trek:edit_batch_checkpoint", data);
+	}
+
+	/** Latest `trek:edit_batch_checkpoint` payload, if any. */
+	getLatestEditBatchCheckpoint<T = unknown>(): T | undefined {
+		const entries = this.getEntries();
+		for (let i = entries.length - 1; i >= 0; i--) {
+			const entry = entries[i];
+			if (entry.type === "custom" && entry.customType === "trek:edit_batch_checkpoint") {
+				return entry.data as T;
+			}
+		}
+		return undefined;
+	}
+
 	/** Whether a system prompt trace entry already exists. */
 	hasSystemPromptTrace(): boolean {
 		return this.getEntries().some((entry) => entry.type === "custom" && entry.customType === "trek:system_prompt");

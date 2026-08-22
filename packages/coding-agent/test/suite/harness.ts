@@ -66,6 +66,9 @@ export interface HarnessOptions {
 	resourceLoader?: ResourceLoader;
 	extensionFactories?: Array<ExtensionFactory | CreateTestExtensionsResultInput>;
 	withConfiguredAuth?: boolean;
+	sessionManager?: SessionManager;
+	/** Reuse a project directory (do not delete on cleanup). */
+	cwd?: string;
 }
 
 export interface Harness {
@@ -96,7 +99,8 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
 	const previousReflectiveLoopEnv = process.env.TREK_REFLECTIVE_LOOP;
 	process.env.TREK_REFLECTIVE_LOOP = "0";
 
-	const tempDir = createTempDir();
+	const tempDir = options.cwd ?? createTempDir();
+	const ownsTempDir = options.cwd === undefined;
 	const fauxProvider: FauxProviderRegistration = registerFauxProvider({
 		models: options.models,
 	});
@@ -106,7 +110,7 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
 	const withConfiguredAuth = options.withConfiguredAuth ?? true;
 	const extensionRunnerRef: { current?: ExtensionRunner } = {};
 
-	const sessionManager = SessionManager.inMemory();
+	const sessionManager = options.sessionManager ?? SessionManager.inMemory();
 	const settingsManager = SettingsManager.inMemory(options.settings);
 
 	const authStorage = AuthStorage.inMemory();
@@ -214,7 +218,7 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
 			} else {
 				process.env.TREK_REFLECTIVE_LOOP = previousReflectiveLoopEnv;
 			}
-			if (existsSync(tempDir)) {
+			if (ownsTempDir && existsSync(tempDir)) {
 				rmSync(tempDir, { recursive: true });
 			}
 		},

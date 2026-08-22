@@ -34,6 +34,18 @@ interface EditBatch {
 	files: Map<string, PreImage>;
 }
 
+/** JSON-serializable edit batch (session JSONL `trek:edit_batch_checkpoint`). */
+export interface SerializedEditBatch {
+	promptNumber: number;
+	promptId: string;
+	files: Array<{ path: string; pre: PreImage }>;
+}
+
+/** Full checkpoint snapshot persisted after capture / undo / Keep All. */
+export interface SerializedCheckpoints {
+	batches: SerializedEditBatch[];
+}
+
 /** Summary of a batch for UI/selectors. */
 export interface BatchSummary {
 	promptNumber: number;
@@ -74,16 +86,54 @@ export class EditCheckpointManager {
 
 	/**
 	 * Capture the pre-image of `absPath` before a mutation in the given prompt batch.
-	 * The first capture per path per batch wins, so repeated edits within one cycle
-	 * still restore to the content as it was at the start of that cycle.
+	 * Returns true when a new pre-image was recorded (first capture per path per batch).
 	 */
-	async capture(promptNumber: number, promptId: string, absPath: string): Promise<void> {
+	async capture(promptNumber: number, promptId: string, absPath: string): Promise<boolean> {
+		const batch = this.batchFor(promptNumber, promptId);
+		if (batch.files.has(absPath)) {
+			return false;
+		}
+		const content = await this.ops.read(absPath);
+		batch.files.set(absPath, content === null ? { kind: "absent" } : { kind: "content", content });
+		return true;
+	}
+
+	/** Record a pre-image without reading the filesystem (used when hydrating JSONL). */
+	restoreCapture(promptNumber: number, promptId: string, absPath: string, pre: PreImage): void {
 		const batch = this.batchFor(promptNumber, promptId);
 		if (batch.files.has(absPath)) {
 			return;
 		}
-		const content = await this.ops.read(absPath);
-		batch.files.set(absPath, content === null ? { kind: "absent" } : { kind: "content", content });
+		batch.files.set(absPath, pre);
+	}
+
+	/** Replace in-memory batches from a persisted snapshot (latest JSONL state wins). */
+	hydrate(state: SerializedCheckpoints | undefined): void {
+		this.batches = [];
+		if (!state?.batches) {
+			return;
+		}
+		for (const batch of state.batches) {
+			for (const file of batch.files) {
+				this.restoreCapture(batch.promptNumber, batch.promptId, file.path, file.pre);
+			}
+		}
+	}
+
+	/** Serialize current batches for session JSONL. */
+	serialize(): SerializedCheckpoints {
+		return {
+			batches: this.batches.map((b) => ({
+				promptNumber: b.promptNumber,
+				promptId: b.promptId,
+				files: [...b.files.entries()].map(([path, pre]) => ({ path, pre })),
+			})),
+		};
+	}
+
+	/** Look up the captured pre-image for a path in a prompt batch, if any. */
+	getPreImage(promptNumber: number, absPath: string): PreImage | undefined {
+		return this.batches.find((b) => b.promptNumber === promptNumber)?.files.get(absPath);
 	}
 
 	/** True when there is at least one undoable batch. */

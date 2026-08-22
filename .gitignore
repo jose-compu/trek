@@ -12,6 +12,10 @@ packages/*/dist-firefox/
 # Environment
 .env
 
+# Trek 0.5 local file history (labeled git commits are the git undo layer)
+.trek/versions/
+.trek/manifest.json
+
 # Editor files
 .vscode/
 .zed/

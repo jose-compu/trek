@@ -4,6 +4,38 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-22
+
+### Added
+
+- **`.trek` version store:** numbered diffs/snapshots and `manifest.json`.
+- **`trek history` / `trek revert --prompt N|--step ID`.**
+- **JSONL undo persistence** (`trek:edit_batch_checkpoint`) reloaded on session resume.
+- **Bash `rm`/`mv` snapshots** for invertible path ops.
+- **`--git-commit`:** optional labeled `trek: prompt #N` commits; refs stored in the manifest.
+- **Idempotency** for duplicate write/edit/bash in the same prompt.
+
+### Fixed
+
+- Dry-run no longer populates the undo buffer.
+
+## [0.4.0] - 2026-07-02
+
+### Added
+
+- **SafetyChecker + Laws:** pre-flight and post-flight enforcement; read-before-write; HALT honored at tool boundaries.
+- **Reversibility tiers** and **multi-level undo** (Keep All, undo selector UI, `shift+ctrl+z` / `shift+ctrl+k`).
+- **Dry-run** (`shift+ctrl+y`, `--dry-run`) and **sandbox** (`/sandbox`, `--sandbox`) for write/edit/bash.
+- **Honesty protocol:** structured confidence and assumption ledger in final assistant output.
+- **Reflective loop:** laws verdict and O→I→A→R fields on `trek:reflective_cycle` traces.
+- **Output validation:** schema-mismatch notes appended to tool results.
+- **CLI/TUI:** `--verbose` print mode; shortcut bar; ASCII banner.
+- **Tests:** guardrails acceptance checklist (14 cases).
+
+### Changed
+
+- Guardrails run before extension `tool_call` hooks; extensions remain compatible with Pi packages (`trek install npm:<package>`).
+
 ## [0.3.0] - 2026-06-14
 
 ### Added

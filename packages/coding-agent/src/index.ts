@@ -281,6 +281,12 @@ export {
 	type WriteToolOptions,
 	withFileMutationQueue,
 } from "./core/tools/index.ts";
+export {
+	type HistoryRow,
+	parseBashPathOps,
+	type RestoreResult,
+	TrekVersionStore,
+} from "./core/trek-store/index.ts";
 // Main entry point
 export { type MainOptions, main } from "./main.ts";
 // Run modes for programmatic SDK usage
