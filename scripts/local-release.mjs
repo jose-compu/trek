@@ -148,7 +148,7 @@ function buildBunBinaryRelease(targetDirectory, archiveDirectory) {
 	]);
 	rmSync(targetDirectory, { force: true, recursive: true });
 	cpSync(join(binaryBuildDirectory, platform), targetDirectory, { recursive: true });
-	const archiveName = platform.startsWith("windows-") ? `pi-${platform}.zip` : `pi-${platform}.tar.gz`;
+	const archiveName = platform.startsWith("windows-") ? `trek-${platform}.zip` : `trek-${platform}.tar.gz`;
 	cpSync(join(binaryBuildDirectory, archiveName), join(archiveDirectory, archiveName));
 	return platform;
 }
@@ -157,12 +157,12 @@ function createPiShim(installDirectory) {
 	const binDirectory = join(installDirectory, "node_modules", ".bin");
 	if (process.platform === "win32") {
 		if (existsSync(join(binDirectory, "trek.cmd"))) {
-			writeFileSync(join(installDirectory, "trek.cmd"), '@ECHO off\r\n"%~dp0node_modules\\.bin\\pi.cmd" %*\r\n');
-			writeFileSync(join(installDirectory, "pi.ps1"), '& "$PSScriptRoot/node_modules/.bin/pi.ps1" @args\n');
+			writeFileSync(join(installDirectory, "trek.cmd"), '@ECHO off\r\n"%~dp0node_modules\\.bin\\trek.cmd" %*\r\n');
+			writeFileSync(join(installDirectory, "trek.ps1"), '& "$PSScriptRoot/node_modules/.bin/trek.ps1" @args\n');
 			return;
 		}
-		writeFileSync(join(installDirectory, "trek.cmd"), '@ECHO off\r\n"%~dp0node_modules\\.bin\\pi.exe" %*\r\n');
-		writeFileSync(join(installDirectory, "pi.ps1"), '& "$PSScriptRoot/node_modules/.bin/pi.exe" @args\n');
+		writeFileSync(join(installDirectory, "trek.cmd"), '@ECHO off\r\n"%~dp0node_modules\\.bin\\trek.exe" %*\r\n');
+		writeFileSync(join(installDirectory, "trek.ps1"), '& "$PSScriptRoot/node_modules/.bin/trek.exe" @args\n');
 		return;
 	}
 	symlinkSync(join("node_modules", ".bin", "trek"), join(installDirectory, "trek"));
@@ -250,7 +250,7 @@ for (const tarball of tarballs.values()) {
 if (!options.skipInstall) {
 	console.log("\nLocal Bun binary release:");
 	console.log(`  ${binaryDirectory}`);
-	console.log(`  ${join(outDir, `pi-${binaryPlatform}.${String(binaryPlatform).startsWith("windows-") ? "zip" : "tar.gz"}`)}`);
+	console.log(`  ${join(outDir, `trek-${binaryPlatform}.${String(binaryPlatform).startsWith("windows-") ? "zip" : "tar.gz"}`)}`);
 	console.log("\nRun the local Bun binary release from outside the repository:");
 	console.log(`  ${join(binaryDirectory, String(binaryPlatform).startsWith("windows-") ? "trek.exe" : "trek")} --help`);
 
