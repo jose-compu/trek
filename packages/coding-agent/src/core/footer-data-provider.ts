@@ -335,43 +335,50 @@ export class FooterDataProvider {
 			};
 			watchFile(this.headWatchFilePath, { interval: 1000 }, this.headWatchFileListener);
 		}
-		if (!this.headWatcher && !pollGitHead) {
-			return;
-		}
+
+		this.setupReftableWatchers();
+	}
+
+	private setupReftableWatchers(): void {
+		if (!this.gitPaths) return;
 
 		// In reftable repos, branch switches update files in the reftable directory
 		// instead of HEAD. Watch it separately so the footer picks up those changes.
 		const reftableDir = join(this.gitPaths.commonGitDir, "reftable");
-		if (existsSync(reftableDir)) {
-			this.reftableWatcher = watchWithErrorHandler(
-				reftableDir,
-				() => {
-					this.scheduleRefresh();
-				},
-				() => this.handleGitWatcherError(),
-			);
-
-			const tablesListPath = join(reftableDir, "tables.list");
-			if (existsSync(tablesListPath)) {
-				this.reftableTablesListPath = tablesListPath;
-				this.reftableTablesListWatcher = watchWithErrorHandler(
-					tablesListPath,
-					() => {
-						this.scheduleRefresh();
-					},
-					() => this.handleGitWatcherError(),
-				);
-				watchFile(tablesListPath, { interval: 250 }, (current, previous) => {
-					if (
-						current.mtimeMs !== previous.mtimeMs ||
-						current.ctimeMs !== previous.ctimeMs ||
-						current.size !== previous.size
-					) {
-						this.scheduleRefresh();
-					}
-				});
-			}
+		if (!existsSync(reftableDir)) {
+			return;
 		}
+
+		this.reftableWatcher = watchWithErrorHandler(
+			reftableDir,
+			() => {
+				this.scheduleRefresh();
+			},
+			() => this.handleGitWatcherError(),
+		);
+
+		const tablesListPath = join(reftableDir, "tables.list");
+		if (!existsSync(tablesListPath)) {
+			return;
+		}
+
+		this.reftableTablesListPath = tablesListPath;
+		this.reftableTablesListWatcher = watchWithErrorHandler(
+			tablesListPath,
+			() => {
+				this.scheduleRefresh();
+			},
+			() => this.handleGitWatcherError(),
+		);
+		watchFile(tablesListPath, { interval: 250 }, (current, previous) => {
+			if (
+				current.mtimeMs !== previous.mtimeMs ||
+				current.ctimeMs !== previous.ctimeMs ||
+				current.size !== previous.size
+			) {
+				this.scheduleRefresh();
+			}
+		});
 	}
 }
 

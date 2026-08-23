@@ -87,6 +87,14 @@ async function waitFor(condition: () => boolean, timeoutMs = 8000): Promise<void
 	}
 }
 
+function execFileCallCount(): number {
+	return vi.mocked(execFile).mock.calls.length;
+}
+
+async function waitForExecFileCallsSince(baseline: number, timeoutMs = 8000): Promise<void> {
+	await waitFor(() => execFileCallCount() > baseline, timeoutMs);
+}
+
 describe("FooterDataProvider reftable branch detection", () => {
 	let originalCwd: string;
 	let tempDir: string;
@@ -175,11 +183,12 @@ describe("FooterDataProvider reftable branch detection", () => {
 		try {
 			expect(provider.getGitBranch()).toBe("main");
 			vi.mocked(spawnSync).mockClear();
+			vi.mocked(execFile).mockClear();
 			const onBranchChange = vi.fn();
 			provider.onBranchChange(onBranchChange);
 
 			writeFileSync(join(reftableDir, "tables.list"), "1\n");
-			await waitFor(() => vi.mocked(execFile).mock.calls.length === 1);
+			await waitForExecFileCallsSince(0);
 
 			expect(vi.mocked(execFile)).toHaveBeenCalledTimes(1);
 			expect(vi.mocked(spawnSync)).not.toHaveBeenCalled();
@@ -199,10 +208,11 @@ describe("FooterDataProvider reftable branch detection", () => {
 			expect(provider.getGitBranch()).toBe("main");
 			vi.mocked(execFile).mockClear();
 
+			const execFileCallsBefore = execFileCallCount();
 			writeFileSync(join(reftableDir, "tables.list"), "1\n");
 			writeFileSync(join(reftableDir, "tables.list"), "2\n");
 			writeFileSync(join(reftableDir, "tables.list"), "3\n");
-			await waitFor(() => vi.mocked(execFile).mock.calls.length === 1);
+			await waitForExecFileCallsSince(execFileCallsBefore);
 			await new Promise((resolve) => setTimeout(resolve, 650));
 
 			expect(vi.mocked(execFile)).toHaveBeenCalledTimes(1);
@@ -219,11 +229,13 @@ describe("FooterDataProvider reftable branch detection", () => {
 		try {
 			expect(provider.getGitBranch()).toBe("main");
 			resolvedBranch = "foo";
+			vi.mocked(execFile).mockClear();
 			const onBranchChange = vi.fn();
 			provider.onBranchChange(onBranchChange);
 
+			const execFileCallsBefore = execFileCallCount();
 			writeFileSync(join(reftableDir, "tables.list"), "1\n");
-			await waitFor(() => vi.mocked(execFile).mock.calls.length === 1);
+			await waitForExecFileCallsSince(execFileCallsBefore);
 			await waitFor(() => provider.getGitBranch() === "foo");
 
 			expect(vi.mocked(execFile)).toHaveBeenCalledTimes(1);
