@@ -1,5 +1,7 @@
 # Changelog
 
+## [Unreleased]
+
 ## [0.5.1] - 2026-08-23
 
 Lockstep with Trek 0.5.1.
