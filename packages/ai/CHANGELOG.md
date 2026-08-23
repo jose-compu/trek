@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Refreshed models.dev catalog metadata (costs, token limits).
+
 ## [0.5.0] - 2026-08-22
 
 Lockstep with Trek 0.5.0 Undo. Model generator no longer attaches completions-only `compat` fields to `openai-responses` models.

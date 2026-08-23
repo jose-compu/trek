@@ -6,6 +6,18 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Changed
+
+- GitHub release binaries renamed from `pi-*` to `trek-*`.
+
+### Added
+
+- Pi plugin compatibility regression tests ([#41](https://github.com/jose-compu/trek/issues/41)).
+
+### Fixed
+
+- `@trek/ai`: refreshed models.dev catalog metadata.
+
 ## [0.5.0] - 2026-08-22
 
 **Undo** — durable `.trek` file history (ROADMAP 0.5.0).

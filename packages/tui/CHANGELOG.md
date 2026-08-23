@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+Lockstep with Trek 0.5.1.
+
 ## [0.5.0] - 2026-08-22
 
 Lockstep with Trek 0.5.0 Undo.
