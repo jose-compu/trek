@@ -1,4 +1,4 @@
-<img width="863" height="599" alt="image" src="https://github.com/user-attachments/assets/6fed72eb-c40f-4897-af45-f469ba1467a1" />
+<img width="463" height="299" alt="image" src="https://github.com/user-attachments/assets/6fed72eb-c40f-4897-af45-f469ba1467a1" />
 
 # Trek Agent
 
