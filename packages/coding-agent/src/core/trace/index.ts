@@ -5,6 +5,14 @@
  * One record per O→I→A→R cycle. Do not introduce a second loop or custom type.
  */
 
+export {
+	diffIntentionOutcome,
+	findCycleTrace,
+	type IntentionOutcomeDiff,
+	type LocatedCycleTrace,
+	listCycleSummaries,
+	locateCycleTraces,
+} from "./query.ts";
 export type {
 	LawsVerdictPair,
 	LawsVerdictRecord,

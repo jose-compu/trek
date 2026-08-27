@@ -5,6 +5,8 @@ import {
 	appendReflectiveCycleTrace,
 	buildTraceCycleV1,
 	createCycleId,
+	diffIntentionOutcome,
+	findCycleTrace,
 	normalizeLawsVerdict,
 	parseCycleTrace,
 	parseCycleTraceFromEntry,
@@ -102,5 +104,83 @@ describe("trace schema v1", () => {
 		expect(parsed?.schemaVersion).toBe(1);
 		expect(parsed?.cycleId).toBe("c-0001");
 		expect(parsed?.lawsVerdict.pre?.allowed).toBe(true);
+	});
+
+	test("findCycleTrace matches cycleId, cycle number, and prompt id", () => {
+		const manager = SessionManager.inMemory(process.cwd());
+		appendReflectiveCycleTrace(
+			manager,
+			buildTraceCycleV1({
+				cycleNumber: 2,
+				promptId: "#2",
+				startedAt: "2026-08-26T12:00:00.000Z",
+				endedAt: "2026-08-26T12:00:01.000Z",
+				phaseTimestamps: {},
+				depth: 0,
+				taskPreview: "ok",
+				phases,
+				components: [],
+			}),
+		);
+		const entries = manager.getEntries();
+		expect(findCycleTrace(entries, "c-0002")?.trace.cycleId).toBe("c-0002");
+		expect(findCycleTrace(entries, "2")?.trace.promptId).toBe("#2");
+		expect(findCycleTrace(entries, "#2")?.trace.cycleNumber).toBe(2);
+		expect(findCycleTrace(entries, "missing")).toBeUndefined();
+	});
+
+	test("diffIntentionOutcome reports matched, diverged, blocked, skipped", () => {
+		const base = {
+			cycleNumber: 1,
+			startedAt: "2026-08-26T12:00:00.000Z",
+			endedAt: "2026-08-26T12:00:01.000Z",
+			phaseTimestamps: {},
+			depth: 0,
+			taskPreview: "ok",
+			components: [] as [],
+		};
+		const matched = buildTraceCycleV1({
+			...base,
+			phases: {
+				...phases,
+				intend: { phase: "intend", summary: "same" },
+				act: { phase: "act", summary: "same" },
+			},
+		});
+		expect(diffIntentionOutcome(matched).status).toBe("matched");
+
+		const diverged = buildTraceCycleV1({
+			...base,
+			phases: {
+				...phases,
+				intend: { phase: "intend", summary: "plan" },
+				act: { phase: "act", summary: "did something else" },
+			},
+			toolNames: ["edit"],
+		});
+		expect(diffIntentionOutcome(diverged)).toMatchObject({
+			status: "diverged",
+			intend: "plan",
+			act: "did something else",
+			tools: ["edit"],
+		});
+
+		const blocked = buildTraceCycleV1({
+			...base,
+			phases: {
+				...phases,
+				intend: { phase: "intend", summary: "plan", blocked: true },
+			},
+		});
+		expect(diffIntentionOutcome(blocked).status).toBe("blocked");
+
+		const skipped = buildTraceCycleV1({
+			...base,
+			phases: {
+				...phases,
+				act: { phase: "act", summary: "n/a", skipped: true },
+			},
+		});
+		expect(diffIntentionOutcome(skipped).status).toBe("skipped");
 	});
 });

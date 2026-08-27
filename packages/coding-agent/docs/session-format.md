@@ -259,7 +259,7 @@ Use `customType` to identify your extension's entries on reload.
 
 #### Trek reflective cycle (schema v1)
 
-Each O→I→A→R cycle is stored as `customType: "trek:reflective_cycle"`. Same loop as 0.3.0; schema v1 adds timestamps, cycle id, tool names, and laws pre/post. Module: `packages/coding-agent/src/core/trace/`.
+Each O→I→A→R cycle is stored as `customType: "trek:reflective_cycle"`. Same loop as 0.3.0; schema v1 adds timestamps, cycle id, tool names, and laws pre/post. Inspect with `trek trace list`, `trek trace show <cycleId>`, and `trek trace diff <cycleId>`. Module: `packages/coding-agent/src/core/trace/`.
 
 ```json
 {
