@@ -113,6 +113,8 @@ export interface Settings {
 	sessionDir?: string; // Custom session storage directory (same format as --session-dir CLI flag)
 	httpIdleTimeoutMs?: number; // HTTP header/body idle timeout in milliseconds; 0 disables it
 	websocketConnectTimeoutMs?: number; // WebSocket connect/open handshake timeout in milliseconds; 0 disables it
+	/** Diagnostic operator mode (#49): traces on, mutating tools blocked. */
+	diagnostic?: boolean;
 }
 
 /** Deep merge settings: project/overrides take precedence, nested objects merge recursively */
@@ -780,6 +782,10 @@ export class SettingsManager {
 
 	getQuietStartup(): boolean {
 		return this.settings.quietStartup ?? false;
+	}
+
+	getDiagnostic(): boolean {
+		return this.settings.diagnostic === true;
 	}
 
 	setQuietStartup(quiet: boolean): void {

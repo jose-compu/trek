@@ -11,6 +11,7 @@ import { SessionManager } from "../src/core/session-manager.ts";
 import {
 	appendReflectiveCycleTrace,
 	buildTraceCycleV1,
+	COUNTERFACTUAL_OBSERVE_CUSTOM_TYPE,
 	CYCLE_CHECKPOINT_CUSTOM_TYPE,
 	getLatestCycleCheckpoint,
 	getReflectiveCycleTraces,
@@ -205,6 +206,56 @@ describe("trek trace CLI", () => {
 		expect(child.getEntries().some((e) => e.type === "custom" && e.customType === CYCLE_CHECKPOINT_CUSTOM_TYPE)).toBe(
 			true,
 		);
+	});
+
+	it("replays a cycle with a patched observe payload", async () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-trace-replay-"));
+		tempDirs.push(cwd);
+		const sessionDir = join(cwd, "sessions");
+		mkdirSync(sessionDir);
+		const manager = SessionManager.create(cwd, sessionDir);
+		persistAssistant(manager);
+		persistCycleBoundary(
+			manager,
+			buildTraceCycleV1({
+				cycleNumber: 1,
+				promptId: "#1",
+				startedAt: "2026-08-26T12:00:00.000Z",
+				endedAt: "2026-08-26T12:00:01.000Z",
+				phaseTimestamps: {},
+				depth: 0,
+				taskPreview: "first",
+				phases,
+				components: [],
+			}),
+		);
+		const sourcePath = manager.getSessionFile()!;
+		const replayed = captureStdio();
+		try {
+			const ok = await handleTraceCommand([
+				"trace",
+				"replay",
+				"c-0001",
+				"--observe",
+				"patched observation",
+				"--session",
+				sourcePath,
+			]);
+			expect(ok).toBe(true);
+			expect(replayed.logs.join("\n")).toContain("replay c-0001 ->");
+			expect(replayed.logs.join("\n")).toContain("observe: patched observation");
+		} finally {
+			replayed.restore();
+		}
+		const replayLine = replayed.logs.find((line) => line.startsWith("replay c-0001 ->"));
+		const replayPath = replayLine?.split(" -> ")[1]?.trim();
+		expect(replayPath).toBeTruthy();
+		const child = SessionManager.open(replayPath!);
+		const injected = child
+			.getEntries()
+			.find((e) => e.type === "custom" && e.customType === COUNTERFACTUAL_OBSERVE_CUSTOM_TYPE);
+		expect(injected).toBeDefined();
+		expect((injected as { data?: { observe?: string } }).data?.observe).toBe("patched observation");
 	});
 
 	it("returns false for non-trace commands", async () => {

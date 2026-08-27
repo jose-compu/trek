@@ -14,6 +14,11 @@ export {
 	listCycleSummaries,
 	locateCycleTraces,
 } from "./query.ts";
+export {
+	COUNTERFACTUAL_OBSERVE_CUSTOM_TYPE,
+	type CounterfactualObserve,
+	replayCounterfactual,
+} from "./replay.ts";
 export type {
 	LawsVerdictPair,
 	LawsVerdictRecord,

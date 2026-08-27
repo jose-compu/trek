@@ -48,6 +48,8 @@ export interface Args {
 	verbose?: boolean;
 	/** Preview write/edit/bash without mutating (#9). */
 	dryRun?: boolean;
+	/** Diagnostic operator mode: traces on, mutating tools blocked (#49). */
+	diagnostic?: boolean;
 	/** Wrap agent bash in OS sandbox when available (#10). */
 	sandbox?: boolean;
 	/** After a mutating prompt, create a small labeled git commit (0.5.0). */
@@ -187,6 +189,8 @@ export function parseArgs(args: string[]): Args {
 			result.verbose = true;
 		} else if (arg === "--dry-run") {
 			result.dryRun = true;
+		} else if (arg === "--diagnostic") {
+			result.diagnostic = true;
 		} else if (arg === "--git-commit") {
 			result.gitCommit = true;
 		} else if (arg === "--sandbox") {
@@ -266,6 +270,7 @@ ${chalk.bold("Commands:")}
   ${APP_NAME} trace show <cycleId>      Show one cycle (observe/intend/act/reflect)
   ${APP_NAME} trace diff <cycleId>      Intention vs outcome for the Act phase
   ${APP_NAME} trace fork <cycleId>      Branch a new session JSONL from that cycle
+  ${APP_NAME} trace replay <cycleId>    Counterfactual stub: fork and patch observe (#50)
   ${APP_NAME} config                    Open TUI to enable/disable package resources
   ${APP_NAME} <command> --help          Show help for install/remove/uninstall/update/list
 
@@ -307,6 +312,7 @@ ${chalk.bold("Options:")}
   --list-models [search]         List available models (with optional fuzzy search)
   --verbose                      Stream tool calls/results to stderr in print mode; verbose startup in TUI
   --dry-run                      Preview write/edit/bash without applying changes (#9)
+  --diagnostic                   Trace-only: block mutating tools (write/edit/bash) (#49)
   --git-commit                   After mutations, create a labeled git commit (0.5.0)
   --sandbox                      Run agent bash inside OS sandbox when available (#10)
   --debug                        Verbose internal logging to ${getDebugLogPath()} (tail -f in another terminal)

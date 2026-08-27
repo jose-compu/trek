@@ -771,6 +771,9 @@ export async function main(args: string[], options?: MainOptions) {
 	if (parsed.dryRun) {
 		session.setDryRun(true);
 	}
+	if (parsed.diagnostic || isTrekEnvTruthy("DIAGNOSTIC") || session.settingsManager.getDiagnostic()) {
+		session.setDiagnostic(true);
+	}
 	if (parsed.gitCommit) {
 		session.setGitCommit(true);
 	}
