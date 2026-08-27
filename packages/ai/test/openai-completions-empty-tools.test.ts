@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getModel } from "../src/models.ts";
+import { getModel, getModels } from "../src/models.ts";
 import { streamSimple } from "../src/stream.ts";
 
 // Empty tools arrays must NOT be serialized as `tools: []` — some OpenAI-compatible
@@ -53,6 +53,12 @@ vi.mock("openai", () => {
 
 	return { default: FakeOpenAI };
 });
+
+function workersAiGatewayModel() {
+	const model = getModels("cloudflare-ai-gateway").find((entry) => entry.id.startsWith("workers-ai/"));
+	expect(model, "catalog should include a Cloudflare AI Gateway workers-ai/* model").toBeDefined();
+	return model!;
+}
 
 describe("openai-completions empty tools handling", () => {
 	beforeEach(() => {
@@ -130,7 +136,7 @@ describe("openai-completions empty tools handling", () => {
 	it("uses conservative OpenAI-compatible fields for Cloudflare AI Gateway /compat models", async () => {
 		process.env.CLOUDFLARE_ACCOUNT_ID = "account-id";
 		process.env.CLOUDFLARE_GATEWAY_ID = "gateway-id";
-		const model = getModel("cloudflare-ai-gateway", "workers-ai/@cf/moonshotai/kimi-k2.6")!;
+		const model = workersAiGatewayModel();
 
 		await streamSimple(
 			model,
@@ -184,7 +190,7 @@ describe("openai-completions empty tools handling", () => {
 	it("sends session affinity headers for Workers AI through Cloudflare AI Gateway", async () => {
 		process.env.CLOUDFLARE_ACCOUNT_ID = "account-id";
 		process.env.CLOUDFLARE_GATEWAY_ID = "gateway-id";
-		const workersModel = getModel("cloudflare-ai-gateway", "workers-ai/@cf/moonshotai/kimi-k2.6")!;
+		const workersModel = workersAiGatewayModel();
 
 		await streamSimple(
 			workersModel,
