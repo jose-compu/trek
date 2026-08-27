@@ -8,6 +8,7 @@
 export {
 	diffIntentionOutcome,
 	findCycleTrace,
+	forkLeafId,
 	type IntentionOutcomeDiff,
 	type LocatedCycleTrace,
 	listCycleSummaries,
@@ -34,7 +35,12 @@ export {
 	TRACE_SCHEMA_VERSION,
 } from "./schema.ts";
 export {
+	appendCycleCheckpoint,
 	appendReflectiveCycleTrace,
+	CYCLE_CHECKPOINT_CUSTOM_TYPE,
+	type CycleCheckpoint,
+	getLatestCycleCheckpoint,
 	getReflectiveCycleCount,
 	getReflectiveCycleTraces,
+	persistCycleBoundary,
 } from "./writer.ts";

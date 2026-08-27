@@ -71,5 +71,11 @@ describe("live session trek:reflective_cycle schema v1", () => {
 		expect(entry.data.phases.intend.phase).toBe("intend");
 		expect(entry.data.phases.act.phase).toBe("act");
 		expect(entry.data.phases.reflect.phase).toBe("reflect");
+
+		const checkpointLines = raw.split("\n").filter((line) => line.includes('"customType":"trek:cycle_checkpoint"'));
+		expect(checkpointLines.length).toBeGreaterThanOrEqual(1);
+		const checkpoint = JSON.parse(checkpointLines[checkpointLines.length - 1]!);
+		expect(checkpoint.data.cycleId).toBe(entry.data.cycleId);
+		expect(checkpoint.data.promptId).toBe(entry.data.promptId);
 	});
 });

@@ -265,6 +265,7 @@ ${chalk.bold("Commands:")}
   ${APP_NAME} trace list                List sessions and O→I→A→R cycle ids
   ${APP_NAME} trace show <cycleId>      Show one cycle (observe/intend/act/reflect)
   ${APP_NAME} trace diff <cycleId>      Intention vs outcome for the Act phase
+  ${APP_NAME} trace fork <cycleId>      Branch a new session JSONL from that cycle
   ${APP_NAME} config                    Open TUI to enable/disable package resources
   ${APP_NAME} <command> --help          Show help for install/remove/uninstall/update/list
 
