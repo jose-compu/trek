@@ -69,6 +69,8 @@ export interface HarnessOptions {
 	sessionManager?: SessionManager;
 	/** Reuse a project directory (do not delete on cleanup). */
 	cwd?: string;
+	/** Leave the O→I→A→R loop on (default harness sets TREK_REFLECTIVE_LOOP=0). */
+	enableReflectiveLoop?: boolean;
 }
 
 export interface Harness {
@@ -97,7 +99,11 @@ function createTempDir(): string {
 
 export async function createHarness(options: HarnessOptions = {}): Promise<Harness> {
 	const previousReflectiveLoopEnv = process.env.TREK_REFLECTIVE_LOOP;
-	process.env.TREK_REFLECTIVE_LOOP = "0";
+	if (options.enableReflectiveLoop) {
+		delete process.env.TREK_REFLECTIVE_LOOP;
+	} else {
+		process.env.TREK_REFLECTIVE_LOOP = "0";
+	}
 
 	const tempDir = options.cwd ?? createTempDir();
 	const ownsTempDir = options.cwd === undefined;
