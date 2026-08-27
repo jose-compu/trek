@@ -1,7 +1,7 @@
 import type { ReflectiveCycleTrace } from "../reflective-loop/types.ts";
 import type { CustomEntry, SessionEntry } from "../session-manager.ts";
 import { isReflectiveCycleEntry, parseCycleTraceFromEntry } from "./schema.ts";
-import { getReflectiveCycleTraces } from "./writer.ts";
+import { CYCLE_CHECKPOINT_CUSTOM_TYPE, getReflectiveCycleTraces } from "./writer.ts";
 
 export interface LocatedCycleTrace {
 	entry: CustomEntry<unknown>;
@@ -45,6 +45,17 @@ export function findCycleTrace(entries: SessionEntry[], selector: string): Locat
 		return located.find((item) => item.trace.cycleNumber === asNumber);
 	}
 	return undefined;
+}
+
+/** Include the cycle-boundary checkpoint child, if present, so resume keeps the last completed cycle. */
+export function forkLeafId(entries: SessionEntry[], located: LocatedCycleTrace): string {
+	const checkpoint = entries.find(
+		(entry) =>
+			entry.parentId === located.entry.id &&
+			entry.type === "custom" &&
+			entry.customType === CYCLE_CHECKPOINT_CUSTOM_TYPE,
+	);
+	return checkpoint?.id ?? located.entry.id;
 }
 
 export interface IntentionOutcomeDiff {

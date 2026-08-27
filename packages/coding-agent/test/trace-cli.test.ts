@@ -8,7 +8,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { SessionManager } from "../src/core/session-manager.ts";
-import { appendReflectiveCycleTrace, buildTraceCycleV1 } from "../src/core/trace/index.ts";
+import {
+	appendReflectiveCycleTrace,
+	buildTraceCycleV1,
+	CYCLE_CHECKPOINT_CUSTOM_TYPE,
+	getLatestCycleCheckpoint,
+	getReflectiveCycleTraces,
+	persistCycleBoundary,
+} from "../src/core/trace/index.ts";
 import { handleTraceCommand } from "../src/trace-cli.ts";
 
 const phases = {
@@ -135,6 +142,69 @@ describe("trek trace CLI", () => {
 		} finally {
 			process.chdir(prev);
 		}
+	});
+
+	it("forks a branched JSONL at c-0001 without duplicating later prompt ids", async () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-trace-fork-"));
+		tempDirs.push(cwd);
+		const sessionDir = join(cwd, "sessions");
+		mkdirSync(sessionDir);
+		const manager = SessionManager.create(cwd, sessionDir);
+		persistAssistant(manager);
+		manager.appendPromptMeta(1, "#1", "first");
+		persistCycleBoundary(
+			manager,
+			buildTraceCycleV1({
+				cycleNumber: 1,
+				promptId: "#1",
+				startedAt: "2026-08-26T12:00:00.000Z",
+				endedAt: "2026-08-26T12:00:01.000Z",
+				phaseTimestamps: {},
+				depth: 0,
+				taskPreview: "first",
+				phases,
+				components: [],
+			}),
+		);
+		manager.appendPromptMeta(2, "#2", "second");
+		persistCycleBoundary(
+			manager,
+			buildTraceCycleV1({
+				cycleNumber: 2,
+				promptId: "#2",
+				startedAt: "2026-08-26T12:00:02.000Z",
+				endedAt: "2026-08-26T12:00:03.000Z",
+				phaseTimestamps: {},
+				depth: 0,
+				taskPreview: "second",
+				phases,
+				components: [],
+			}),
+		);
+		const sourcePath = manager.getSessionFile()!;
+		expect(getLatestCycleCheckpoint(manager.getEntries())?.cycleId).toBe("c-0002");
+
+		const forked = captureStdio();
+		try {
+			const ok = await handleTraceCommand(["trace", "fork", "c-0001", "--session", sourcePath]);
+			expect(ok).toBe(true);
+			expect(forked.logs.join("\n")).toContain("forked c-0001 ->");
+			expect(forked.logs.join("\n")).toContain("nextPrompt: #2");
+		} finally {
+			forked.restore();
+		}
+
+		const forkLine = forked.logs.find((line) => line.startsWith("forked c-0001 ->"));
+		const forkPath = forkLine?.split(" -> ")[1]?.trim();
+		expect(forkPath).toBeTruthy();
+		const child = SessionManager.open(forkPath!);
+		expect(getReflectiveCycleTraces(child.getEntries()).map((t) => t.cycleId)).toEqual(["c-0001"]);
+		expect(child.getNextPromptNumber()).toBe(2);
+		expect(child.getHeader()?.parentSession).toBe(sourcePath);
+		expect(getLatestCycleCheckpoint(child.getEntries())?.cycleId).toBe("c-0001");
+		expect(child.getEntries().some((e) => e.type === "custom" && e.customType === CYCLE_CHECKPOINT_CUSTOM_TYPE)).toBe(
+			true,
+		);
 	});
 
 	it("returns false for non-trace commands", async () => {

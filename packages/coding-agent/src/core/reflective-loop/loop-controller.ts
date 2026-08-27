@@ -1,11 +1,11 @@
 import { debugLog } from "../../utils/debug-log.ts";
 import type { SessionManager } from "../session-manager.ts";
 import {
-	appendReflectiveCycleTrace,
 	buildTraceCycleV1,
 	createCycleId,
 	getReflectiveCycleCount,
 	nowIso,
+	persistCycleBoundary,
 } from "../trace/index.ts";
 import {
 	buildIntention,
@@ -166,7 +166,7 @@ export class ReflectiveLoopController {
 				startedAt,
 				lawsPre,
 			});
-			appendReflectiveCycleTrace(this.sessionManager, trace);
+			persistCycleBoundary(this.sessionManager, trace);
 			throw new Error(policy.reason ?? "Blocked by policy constraints.");
 		}
 
@@ -189,7 +189,7 @@ export class ReflectiveLoopController {
 				startedAt,
 				lawsPre,
 			});
-			appendReflectiveCycleTrace(this.sessionManager, trace);
+			persistCycleBoundary(this.sessionManager, trace);
 			throw new Error(phases.act.blockReason);
 		}
 
@@ -220,7 +220,7 @@ export class ReflectiveLoopController {
 			lawsPost: options.getPostFlightVerdict?.(),
 			toolNames: options.getToolNames?.() ?? [],
 		});
-		appendReflectiveCycleTrace(this.sessionManager, trace);
+		persistCycleBoundary(this.sessionManager, trace);
 		debugLog("reflective-loop", "cycle complete", { cycleNumber, cycleId, promptId: ctx.promptId });
 		return trace;
 	}

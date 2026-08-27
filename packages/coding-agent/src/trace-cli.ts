@@ -1,12 +1,19 @@
 import chalk from "chalk";
 import { APP_NAME } from "./config.ts";
 import { SessionManager } from "./core/session-manager.ts";
-import { diffIntentionOutcome, findCycleTrace, listCycleSummaries, locateCycleTraces } from "./core/trace/query.ts";
+import {
+	diffIntentionOutcome,
+	findCycleTrace,
+	forkLeafId,
+	listCycleSummaries,
+	locateCycleTraces,
+} from "./core/trace/query.ts";
 
 function printTraceHelp(): void {
 	console.log(`${APP_NAME} trace list`);
 	console.log(`${APP_NAME} trace show <cycleId>`);
 	console.log(`${APP_NAME} trace diff <cycleId>`);
+	console.log(`${APP_NAME} trace fork <cycleId>`);
 	console.log("  Inspect O→I→A→R cycle traces in session JSONL.");
 	console.log("  Options: --session <path>  --session-dir <dir>");
 }
@@ -146,6 +153,37 @@ function runDiff(args: string[], selector: string | undefined): void {
 	}
 }
 
+function runFork(args: string[], selector: string | undefined): void {
+	if (!selector) {
+		console.error(chalk.red(`Usage: ${APP_NAME} trace fork <cycleId>`));
+		process.exitCode = 1;
+		return;
+	}
+	const manager = resolveManager(args);
+	if (!manager) {
+		return;
+	}
+	const located = findCycleTrace(manager.getEntries(), selector);
+	if (!located) {
+		console.error(chalk.red(`Cycle not found: ${selector}`));
+		process.exitCode = 1;
+		return;
+	}
+	const sourcePath = manager.getSessionFile();
+	const forkedPath = manager.createBranchedSession(forkLeafId(manager.getEntries(), located));
+	if (!forkedPath) {
+		console.error(chalk.red("Fork requires a persisted session with an assistant turn."));
+		process.exitCode = 1;
+		return;
+	}
+	const nextPrompt = manager.getNextPromptNumber();
+	console.log(`forked ${located.trace.cycleId} -> ${forkedPath}`);
+	if (sourcePath) {
+		console.log(`  parent: ${sourcePath}`);
+	}
+	console.log(`  nextPrompt: #${nextPrompt}`);
+}
+
 export async function handleTraceCommand(args: string[]): Promise<boolean> {
 	if (args[0] !== "trace") {
 		return false;
@@ -166,6 +204,10 @@ export async function handleTraceCommand(args: string[]): Promise<boolean> {
 	}
 	if (subcommand === "diff") {
 		runDiff(rest, selector);
+		return true;
+	}
+	if (subcommand === "fork") {
+		runFork(rest, selector);
 		return true;
 	}
 	console.error(chalk.red(`Unknown trace command: ${subcommand}`));
