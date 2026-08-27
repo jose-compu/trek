@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getModel, getModels } from "../src/models.ts";
+import { getModel } from "../src/models.ts";
+import { CLOUDFLARE_AI_GATEWAY_COMPAT_BASE_URL } from "../src/providers/cloudflare.ts";
 import { streamSimple } from "../src/stream.ts";
 
 // Empty tools arrays must NOT be serialized as `tools: []` — some OpenAI-compatible
@@ -54,10 +55,16 @@ vi.mock("openai", () => {
 	return { default: FakeOpenAI };
 });
 
-function workersAiGatewayModel() {
-	const model = getModels("cloudflare-ai-gateway").find((entry) => entry.id.startsWith("workers-ai/"));
-	expect(model, "catalog should include a Cloudflare AI Gateway workers-ai/* model").toBeDefined();
-	return model!;
+function gatewayCompatModel() {
+	const { compat: _compat, ...baseModel } = getModel("openai", "gpt-4o-mini")!;
+	return {
+		...baseModel,
+		id: "gateway-compat-fixture",
+		api: "openai-completions" as const,
+		provider: "cloudflare-ai-gateway",
+		baseUrl: CLOUDFLARE_AI_GATEWAY_COMPAT_BASE_URL,
+		compat: { sendSessionAffinityHeaders: true },
+	};
 }
 
 describe("openai-completions empty tools handling", () => {
@@ -136,7 +143,7 @@ describe("openai-completions empty tools handling", () => {
 	it("uses conservative OpenAI-compatible fields for Cloudflare AI Gateway /compat models", async () => {
 		process.env.CLOUDFLARE_ACCOUNT_ID = "account-id";
 		process.env.CLOUDFLARE_GATEWAY_ID = "gateway-id";
-		const model = workersAiGatewayModel();
+		const model = gatewayCompatModel();
 
 		await streamSimple(
 			model,
@@ -190,7 +197,7 @@ describe("openai-completions empty tools handling", () => {
 	it("sends session affinity headers for Workers AI through Cloudflare AI Gateway", async () => {
 		process.env.CLOUDFLARE_ACCOUNT_ID = "account-id";
 		process.env.CLOUDFLARE_GATEWAY_ID = "gateway-id";
-		const workersModel = workersAiGatewayModel();
+		const workersModel = gatewayCompatModel();
 
 		await streamSimple(
 			workersModel,
