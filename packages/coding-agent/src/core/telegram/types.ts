@@ -8,6 +8,8 @@ export interface TelegramMessage {
 	chat: TelegramChat;
 	from?: { id: number };
 	text?: string;
+	message_thread_id?: number;
+	entities?: Array<{ type: string; offset: number; length: number }>;
 }
 
 export interface TelegramUpdate {
@@ -25,4 +27,5 @@ export interface TelegramSessionHost {
 	halt(sessionKey: string): void;
 	reset(sessionKey: string): void;
 	status(sessionKey: string): string;
+	confirm(sessionKey: string): void;
 }

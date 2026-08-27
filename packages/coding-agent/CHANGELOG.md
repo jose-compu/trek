@@ -13,6 +13,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 - **`trek trace replay`** counterfactual stub: fork + patched observe ([#50](https://github.com/jose-compu/trek/issues/50)).
 - **Trace test gate** (faux LLM): fork from cycle 5, laws pre/post, intention vs outcome, counterfactual observe ([#51](https://github.com/jose-compu/trek/issues/51)).
 - **`trek telegram`**: long-poll Bot API, token/allowlists, isolated DM sessions ([#52](https://github.com/jose-compu/trek/issues/52), [#53](https://github.com/jose-compu/trek/issues/53)).
+- **Telegram Groups** (mention/command) and `/confirm` gated destructive ops ([#54](https://github.com/jose-compu/trek/issues/54), [#55](https://github.com/jose-compu/trek/issues/55)).
 
 ## [0.5.1] - 2026-08-23
 

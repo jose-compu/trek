@@ -74,4 +74,9 @@ export class AgentTelegramHost implements TelegramSessionHost {
 		}
 		return `session=${sessionKey} ${session.isHalted() ? "halted" : "running"}`;
 	}
+
+	confirm(sessionKey: string): void {
+		const session = this.sessions.get(sessionKey);
+		session?.setAllowDestructiveOps(true);
+	}
 }

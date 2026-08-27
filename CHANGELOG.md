@@ -15,6 +15,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 - **`trek trace replay`** counterfactual stub: fork a cycle and inject a patched observe payload ([#50](https://github.com/jose-compu/trek/issues/50)).
 - **Trace test gate** (faux LLM): fork from cycle 5, laws pre/post, intention vs outcome, counterfactual observe ([#51](https://github.com/jose-compu/trek/issues/51)).
 - **`trek telegram`**: long-poll Bot API, token/allowlists, isolated DM sessions and `/start|/new|/status|/stop|/help` ([#52](https://github.com/jose-compu/trek/issues/52), [#53](https://github.com/jose-compu/trek/issues/53)).
+- **Telegram Groups** (mention/command, per-chat session) and remote `/confirm` + HALT isolation ([#54](https://github.com/jose-compu/trek/issues/54), [#55](https://github.com/jose-compu/trek/issues/55)).
 
 ## [0.5.1] - 2026-08-23
 

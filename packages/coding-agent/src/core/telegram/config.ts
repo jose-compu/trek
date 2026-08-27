@@ -3,6 +3,7 @@ export interface TelegramConfig {
 	allowedUserIds: number[];
 	allowedChatIds: number[];
 	cwd: string;
+	botUsername?: string;
 }
 
 export interface TelegramConfigFile {
@@ -10,6 +11,7 @@ export interface TelegramConfigFile {
 	allowed_user_ids?: number[];
 	allowed_chat_ids?: number[];
 	cwd?: string;
+	bot_username?: string;
 }
 
 export function parseTelegramConfigFile(raw: unknown, cwd: string, envToken?: string): TelegramConfig {
@@ -30,11 +32,16 @@ export function parseTelegramConfigFile(raw: unknown, cwd: string, envToken?: st
 	if (allowedUserIds.length === 0 && allowedChatIds.length === 0) {
 		throw new Error("Telegram allowlist is empty (set allowed_user_ids or allowed_chat_ids).");
 	}
+	const botUsername =
+		typeof rec.bot_username === "string" && rec.bot_username.trim()
+			? rec.bot_username.trim().replace(/^@/, "")
+			: undefined;
 	return {
 		token,
 		allowedUserIds,
 		allowedChatIds,
 		cwd: typeof rec.cwd === "string" && rec.cwd.trim() ? rec.cwd.trim() : cwd,
+		botUsername,
 	};
 }
 
