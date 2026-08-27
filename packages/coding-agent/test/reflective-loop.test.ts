@@ -65,6 +65,15 @@ describe("reflective loop 0.3.0", () => {
 
 		const persisted = getReflectiveCycleTraces(manager.getEntries());
 		expect(persisted).toHaveLength(1);
+		expect(persisted[0]?.schemaVersion).toBe(1);
+		expect(persisted[0]?.cycleId).toBe("c-0001");
+		expect(persisted[0]?.startedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+		expect(persisted[0]?.endedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+		expect(persisted[0]?.phaseTimestamps.observe?.startedAt).toBeTruthy();
+		expect(persisted[0]?.phaseTimestamps.intend?.startedAt).toBeTruthy();
+		expect(persisted[0]?.phaseTimestamps.act?.startedAt).toBeTruthy();
+		expect(persisted[0]?.phaseTimestamps.reflect?.startedAt).toBeTruthy();
+		expect(persisted[0]?.toolNames).toEqual([]);
 		expect(persisted[0]?.phases.observe.phase).toBe("observe");
 		expect(persisted[0]?.phases.intend.phase).toBe("intend");
 		expect(persisted[0]?.phases.act.phase).toBe("act");
@@ -92,8 +101,9 @@ describe("reflective loop 0.3.0", () => {
 		expect(persisted[0]?.phases.intend.blocked).toBe(true);
 		expect(persisted[0]?.phases.act.skipped).toBeUndefined();
 		// Issue #3: the laws verdict is part of the cycle trace.
-		expect(persisted[0]?.lawsVerdict?.allowed).toBe(false);
-		expect(persisted[0]?.lawsVerdict?.law).toBe(1);
+		expect(persisted[0]?.lawsVerdict?.pre?.allowed).toBe(false);
+		expect(persisted[0]?.lawsVerdict?.pre?.law).toBe(1);
+		expect(persisted[0]?.lawsVerdict?.post).toBeUndefined();
 	});
 
 	test("allowed cycle records an allowed laws verdict in the trace (issue #3)", async () => {
@@ -109,7 +119,27 @@ describe("reflective loop 0.3.0", () => {
 			getMessageCount: () => 1,
 			act: async () => {},
 		});
-		expect(trace.lawsVerdict?.allowed).toBe(true);
-		expect(trace.lawsVerdict?.law).toBeUndefined();
+		expect(trace.lawsVerdict?.pre?.allowed).toBe(true);
+		expect(trace.lawsVerdict?.pre?.law).toBeUndefined();
+		expect(trace.schemaVersion).toBe(1);
+	});
+
+	test("cycle trace records tool names and post-flight laws verdict", async () => {
+		const manager = SessionManager.inMemory(process.cwd());
+		const controller = new ReflectiveLoopController(manager);
+
+		const trace = await controller.runPromptCycle({
+			task: "read README",
+			promptId: "#1",
+			cwd: process.cwd(),
+			messageCount: 0,
+			getMessageCount: () => 1,
+			act: async () => {},
+			getToolNames: () => ["read", "bash"],
+			getPostFlightVerdict: () => ({ allowed: true }),
+		});
+
+		expect(trace.toolNames).toEqual(["read", "bash"]);
+		expect(trace.lawsVerdict.post?.allowed).toBe(true);
 	});
 });
