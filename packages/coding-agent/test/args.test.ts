@@ -311,6 +311,11 @@ describe("parseArgs", () => {
 			const result = parseArgs(["--sandbox", "-p", "hi"]);
 			expect(result.sandbox).toBe(true);
 		});
+
+		test("parses --diagnostic flag", () => {
+			const result = parseArgs(["--diagnostic", "-p", "hi"]);
+			expect(result.diagnostic).toBe(true);
+		});
 	});
 
 	describe("--offline flag", () => {

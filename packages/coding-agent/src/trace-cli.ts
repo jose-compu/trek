@@ -8,14 +8,16 @@ import {
 	listCycleSummaries,
 	locateCycleTraces,
 } from "./core/trace/query.ts";
+import { replayCounterfactual } from "./core/trace/replay.ts";
 
 function printTraceHelp(): void {
 	console.log(`${APP_NAME} trace list`);
 	console.log(`${APP_NAME} trace show <cycleId>`);
 	console.log(`${APP_NAME} trace diff <cycleId>`);
 	console.log(`${APP_NAME} trace fork <cycleId>`);
+	console.log(`${APP_NAME} trace replay <cycleId> --observe <text>`);
 	console.log("  Inspect O→I→A→R cycle traces in session JSONL.");
-	console.log("  Options: --session <path>  --session-dir <dir>");
+	console.log("  Options: --session <path>  --session-dir <dir>  --observe <text>");
 }
 
 function flagValue(args: string[], name: string): string | undefined {
@@ -30,7 +32,7 @@ function positionals(args: string[]): string[] {
 	const out: string[] = [];
 	for (let i = 0; i < args.length; i++) {
 		const arg = args[i]!;
-		if (arg === "--session" || arg === "--session-dir") {
+		if (arg === "--session" || arg === "--session-dir" || arg === "--observe") {
 			i++;
 			continue;
 		}
@@ -184,6 +186,32 @@ function runFork(args: string[], selector: string | undefined): void {
 	console.log(`  nextPrompt: #${nextPrompt}`);
 }
 
+function runReplay(args: string[], selector: string | undefined): void {
+	if (!selector) {
+		console.error(chalk.red(`Usage: ${APP_NAME} trace replay <cycleId> --observe <text>`));
+		process.exitCode = 1;
+		return;
+	}
+	const observe = flagValue(args, "--observe");
+	if (!observe) {
+		console.error(chalk.red(`Usage: ${APP_NAME} trace replay <cycleId> --observe <text>`));
+		process.exitCode = 1;
+		return;
+	}
+	const manager = resolveManager(args);
+	if (!manager) {
+		return;
+	}
+	try {
+		const result = replayCounterfactual(manager, selector, observe);
+		console.log(`replay ${result.cycleId} -> ${result.path}`);
+		console.log(`  observe: ${observe}`);
+	} catch (err) {
+		console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+		process.exitCode = 1;
+	}
+}
+
 export async function handleTraceCommand(args: string[]): Promise<boolean> {
 	if (args[0] !== "trace") {
 		return false;
@@ -208,6 +236,10 @@ export async function handleTraceCommand(args: string[]): Promise<boolean> {
 	}
 	if (subcommand === "fork") {
 		runFork(rest, selector);
+		return true;
+	}
+	if (subcommand === "replay") {
+		runReplay(rest, selector);
 		return true;
 	}
 	console.error(chalk.red(`Unknown trace command: ${subcommand}`));

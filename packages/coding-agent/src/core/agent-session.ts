@@ -32,6 +32,7 @@ import { debugLog } from "../utils/debug-log.ts";
 import { stripFrontmatter } from "../utils/frontmatter.ts";
 import { resolvePath } from "../utils/paths.ts";
 import { sleep } from "../utils/sleep.ts";
+import { isTrekEnvTruthy } from "../utils/trek-env.ts";
 import { formatNoApiKeyFoundMessage, formatNoModelSelectedMessage } from "./auth-guidance.ts";
 import { type BashResult, executeBashWithOperations } from "./bash-executor.ts";
 import {
@@ -377,6 +378,8 @@ export class AgentSession {
 	private _allowDestructiveOps = false;
 	// Dry-run mode (#9): write/edit/bash compute previews and skip mutation.
 	private _dryRunEnabled = false;
+	// Diagnostic mode (#49): mutating tools are blocked; reads allowed.
+	private _diagnosticEnabled = false;
 	// Sandbox mode (#10): agent bash commands run inside an OS-level sandbox.
 	private _sandboxBashEnabled = false;
 
@@ -397,6 +400,7 @@ export class AgentSession {
 		this._sessionStartEvent = config.sessionStartEvent ?? { type: "session_start", reason: "startup" };
 		this._trekStore = new TrekVersionStore(this._cwd, nodeTrekStoreFs);
 		this._editCheckpoints.hydrate(this.sessionManager.getLatestEditBatchCheckpoint<SerializedCheckpoints>());
+		this._diagnosticEnabled = isTrekEnvTruthy("DIAGNOSTIC") || this.settingsManager.getDiagnostic();
 
 		if (isReflectiveLoopEnabled()) {
 			this._reflectiveLoop = new ReflectiveLoopController(this.sessionManager);
@@ -785,6 +789,15 @@ export class AgentSession {
 		toolName: string,
 		args: unknown,
 	): Promise<{ allowed: boolean; law?: number; reason?: string }> {
+		if (this._diagnosticEnabled) {
+			const tier = resolveReversibilityTier(this._baseToolDefinitions.get(toolName)?.reversibilityTier);
+			if (tier !== "free") {
+				return {
+					allowed: false,
+					reason: `Diagnostic mode: ${toolName} is blocked (mutating tools are not allowed).`,
+				};
+			}
+		}
 		const tier = resolveReversibilityTier(this._baseToolDefinitions.get(toolName)?.reversibilityTier);
 		const env: SafetyEnv = {
 			halted: this._halted,
@@ -911,6 +924,17 @@ export class AgentSession {
 	/** Whether dry-run mode is currently enabled. */
 	isDryRun(): boolean {
 		return this._dryRunEnabled;
+	}
+
+	/** Enable diagnostic operator mode (#49): traces on, mutating tools blocked. */
+	setDiagnostic(enabled: boolean): void {
+		this._diagnosticEnabled = enabled;
+		debugLog("safety", "diagnostic mode", { enabled });
+	}
+
+	/** Whether diagnostic mode is currently enabled. */
+	isDiagnostic(): boolean {
+		return this._diagnosticEnabled;
 	}
 
 	/**
