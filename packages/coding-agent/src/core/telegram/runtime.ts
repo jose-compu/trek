@@ -1,7 +1,48 @@
 import { isAllowedTelegramSender, type TelegramConfig } from "./config.ts";
-import type { TelegramApi, TelegramSessionHost, TelegramUpdate } from "./types.ts";
+import type { TelegramApi, TelegramMessage, TelegramSessionHost, TelegramUpdate } from "./types.ts";
 
-const HELP = ["/start", "/help", "/new", "/status", "/stop"].join("  ");
+const HELP = ["/start", "/help", "/new", "/status", "/stop", "/confirm"].join("  ");
+
+function isGroupChat(type: string): boolean {
+	return type === "group" || type === "supergroup";
+}
+
+function firstToken(text: string): string {
+	return text.trim().split(/\s+/, 1)[0] ?? "";
+}
+
+function commandName(text: string): string {
+	const token = firstToken(text);
+	if (!token.startsWith("/")) {
+		return "";
+	}
+	return token.split("@", 1)[0] ?? token;
+}
+
+function isAddressed(config: TelegramConfig, message: TelegramMessage, text: string): boolean {
+	if (!isGroupChat(message.chat.type)) {
+		return true;
+	}
+	if (commandName(text).startsWith("/")) {
+		return true;
+	}
+	const username = config.botUsername;
+	if (!username) {
+		return false;
+	}
+	if (text.includes(`@${username}`)) {
+		return true;
+	}
+	return Boolean(message.entities?.some((entity) => entity.type === "mention"));
+}
+
+function promptText(config: TelegramConfig, text: string): string {
+	const username = config.botUsername;
+	if (!username) {
+		return text;
+	}
+	return text.replaceAll(`@${username}`, "").replace(/\s+/g, " ").trim();
+}
 
 export class TelegramRuntime {
 	private offset = 0;
@@ -16,14 +57,22 @@ export class TelegramRuntime {
 		this.host = host;
 	}
 
-	sessionKey(chatId: number): string {
-		return `dm-${chatId}`;
+	sessionKey(chatId: number, threadId?: number, chatType = "private"): string {
+		const prefix = isGroupChat(chatType) ? "grp" : "dm";
+		if (threadId !== undefined) {
+			return `${prefix}-${chatId}-t${threadId}`;
+		}
+		return `${prefix}-${chatId}`;
 	}
 
 	async handleUpdate(update: TelegramUpdate): Promise<void> {
 		this.offset = Math.max(this.offset, update.update_id + 1);
 		const message = update.message;
-		if (!message?.text || message.chat.type !== "private") {
+		if (!message?.text) {
+			return;
+		}
+		const text = message.text.trim();
+		if (!isAddressed(this.config, message, text)) {
 			return;
 		}
 		const chatId = message.chat.id;
@@ -31,28 +80,33 @@ export class TelegramRuntime {
 		if (!isAllowedTelegramSender(this.config, userId, chatId)) {
 			return;
 		}
-		const key = this.sessionKey(chatId);
+		const key = this.sessionKey(chatId, message.message_thread_id, message.chat.type);
 		this.sessions.add(key);
-		const text = message.text.trim();
-		if (text === "/start" || text === "/help") {
+		const command = commandName(text);
+		if (command === "/start" || command === "/help") {
 			await this.api.sendMessage(chatId, `Trek remote agent. Commands: ${HELP}`);
 			return;
 		}
-		if (text === "/new") {
+		if (command === "/new") {
 			this.host.reset(key);
 			await this.api.sendMessage(chatId, "New session started.");
 			return;
 		}
-		if (text === "/status") {
+		if (command === "/status") {
 			await this.api.sendMessage(chatId, this.host.status(key));
 			return;
 		}
-		if (text === "/stop") {
+		if (command === "/stop") {
 			this.host.halt(key);
 			await this.api.sendMessage(chatId, "HALT.");
 			return;
 		}
-		const reply = await this.host.prompt(key, text);
+		if (command === "/confirm") {
+			this.host.confirm(key);
+			await this.api.sendMessage(chatId, "Destructive ops confirmed for this session.");
+			return;
+		}
+		const reply = await this.host.prompt(key, promptText(this.config, text));
 		await this.api.sendMessage(chatId, reply.slice(0, 4000));
 	}
 
