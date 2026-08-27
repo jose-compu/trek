@@ -33,16 +33,39 @@ export interface LawsVerdictRecord {
 	reason?: string;
 }
 
-/** Persisted once per user prompt cycle in session JSONL. */
+/** Pre-flight (Intend→Act) and post-flight (after Act tools) laws results. */
+export interface LawsVerdictPair {
+	pre?: LawsVerdictRecord;
+	post?: LawsVerdictRecord;
+}
+
+export interface TracePhaseTimestamps {
+	startedAt: string;
+	endedAt?: string;
+}
+
+/** JSONL payload schema version for `trek:reflective_cycle` (0.6.0 Trace). */
+export const TRACE_SCHEMA_VERSION = 1 as const;
+export type TraceSchemaVersion = typeof TRACE_SCHEMA_VERSION;
+
+/**
+ * Persisted once per user prompt cycle in session JSONL (`customType: trek:reflective_cycle`).
+ * Schema v1: timestamps, cycle id, tool names, laws pre/post.
+ */
 export interface ReflectiveCycleTrace {
+	schemaVersion: TraceSchemaVersion;
+	cycleId: string;
 	cycleNumber: number;
 	promptId?: string;
+	startedAt: string;
+	endedAt: string;
+	phaseTimestamps: Partial<Record<ReflectivePhase, TracePhaseTimestamps>>;
 	depth: number;
 	taskPreview: string;
 	phases: Record<ReflectivePhase, ReflectivePhaseRecord>;
 	components: ReflectiveComponentRecord[];
-	/** Pre-flight laws verdict for the task (gate between Intend and Act). */
-	lawsVerdict?: LawsVerdictRecord;
+	toolNames: string[];
+	lawsVerdict: LawsVerdictPair;
 }
 
 export interface ReflectiveObservation {

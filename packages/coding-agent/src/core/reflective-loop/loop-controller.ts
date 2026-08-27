@@ -1,6 +1,13 @@
 import { debugLog } from "../../utils/debug-log.ts";
 import type { SessionManager } from "../session-manager.ts";
 import {
+	appendReflectiveCycleTrace,
+	buildTraceCycleV1,
+	createCycleId,
+	getReflectiveCycleCount,
+	nowIso,
+} from "../trace/index.ts";
+import {
 	buildIntention,
 	effortComponent,
 	policyComponent,
@@ -14,7 +21,6 @@ import {
 } from "./components.ts";
 import { EffortRegulator } from "./effort-regulator.ts";
 import { checkPolicyConstraints } from "./policy-constraints.ts";
-import { appendReflectiveCycleTrace, getReflectiveCycleCount } from "./session-trace.ts";
 import { SubtaskStack } from "./subtask-stack.ts";
 import type {
 	LawsVerdictRecord,
@@ -25,6 +31,7 @@ import type {
 	ReflectivePhase,
 	ReflectivePhaseRecord,
 	ReflectiveReflection,
+	TracePhaseTimestamps,
 } from "./types.ts";
 
 export interface RunPromptCycleOptions {
@@ -36,6 +43,10 @@ export interface RunPromptCycleOptions {
 	act: () => Promise<void>;
 	getMessageCount: () => number;
 	requireDestructiveConfirm?: boolean;
+	/** Tool names invoked during Act (filled by AgentSession afterToolCall). */
+	getToolNames?: () => string[];
+	/** Aggregated post-flight laws verdict after Act tools. */
+	getPostFlightVerdict?: () => LawsVerdictRecord | undefined;
 }
 
 export class ReflectiveLoopController {
@@ -78,6 +89,9 @@ export class ReflectiveLoopController {
 
 	async runPromptCycle(options: RunPromptCycleOptions): Promise<ReflectiveCycleTrace> {
 		const cycleNumber = getReflectiveCycleCount(this.sessionManager) + 1;
+		const cycleId = createCycleId(cycleNumber);
+		const startedAt = nowIso();
+		const phaseTimestamps: Partial<Record<ReflectivePhase, TracePhaseTimestamps>> = {};
 		const ctx: ReflectiveLoopContext = {
 			task: options.task,
 			promptId: options.promptId,
@@ -94,13 +108,25 @@ export class ReflectiveLoopController {
 			reflect: { phase: "reflect", summary: "" },
 		};
 
+		const markPhase = (phase: ReflectivePhase): { end: () => void } => {
+			const phaseStarted = nowIso();
+			return {
+				end: () => {
+					phaseTimestamps[phase] = { startedAt: phaseStarted, endedAt: nowIso() };
+				},
+			};
+		};
+
 		// O — Observe (mandatory before act)
+		const observeMark = markPhase("observe");
 		const { observation, components: observerComponents } = runObserver(ctx);
 		this.effortRegulator.recordObservation(true);
 		components.push(...observerComponents);
 		phases.observe = { phase: "observe", summary: observation.summary };
+		observeMark.end();
 
 		// World model + focus (part of intend prep)
+		const intendMark = markPhase("intend");
 		const { modelSummary, components: worldComponents } = runWorldModel(ctx);
 		components.push(...worldComponents);
 		const { focusSummary, components: focusComponents } = runFocusManager(ctx, modelSummary);
@@ -121,15 +147,25 @@ export class ReflectiveLoopController {
 
 		// Laws / policy gate (issue #3: PolicyConstraints and Laws are one implementation)
 		const policy = checkPolicyConstraints(options.task, options.requireDestructiveConfirm);
-		const lawsVerdict = { allowed: policy.allowed, law: policy.law, reason: policy.reason };
+		const lawsPre: LawsVerdictRecord = { allowed: policy.allowed, law: policy.law, reason: policy.reason };
 		components.push(policyComponent(policy.allowed ? undefined : policy.reason));
+		intendMark.end();
 		if (!policy.allowed) {
 			phases.intend = {
 				...phases.intend,
 				blocked: true,
 				blockReason: policy.reason,
 			};
-			const trace = this.buildTrace(cycleNumber, ctx, phases, components, lawsVerdict);
+			const trace = this.buildTrace({
+				cycleNumber,
+				cycleId,
+				ctx,
+				phases,
+				components,
+				phaseTimestamps,
+				startedAt,
+				lawsPre,
+			});
 			appendReflectiveCycleTrace(this.sessionManager, trace);
 			throw new Error(policy.reason ?? "Blocked by policy constraints.");
 		}
@@ -143,43 +179,78 @@ export class ReflectiveLoopController {
 				skipped: true,
 				blockReason: "EffortRegulator blocked act (observation skipped or loop detected).",
 			};
-			const trace = this.buildTrace(cycleNumber, ctx, phases, components, lawsVerdict);
+			const trace = this.buildTrace({
+				cycleNumber,
+				cycleId,
+				ctx,
+				phases,
+				components,
+				phaseTimestamps,
+				startedAt,
+				lawsPre,
+			});
 			appendReflectiveCycleTrace(this.sessionManager, trace);
 			throw new Error(phases.act.blockReason);
 		}
 
 		// A — Act (delegate to existing agent loop)
+		const actMark = markPhase("act");
 		await options.act();
 		const actResult = summarizeAct(ctx, options.getMessageCount());
 		this.effortRegulator.updateProgress(intention.summary, actResult.messageCountAfter > ctx.messageCount);
 		phases.act = { phase: "act", summary: actResult.summary };
+		actMark.end();
 
 		// R — Reflect
+		const reflectMark = markPhase("reflect");
 		const { reflection, components: reflectComponents } = runReflect(ctx, "cycle", actResult.summary);
 		components.push(...reflectComponents);
 		phases.reflect = { phase: "reflect", summary: reflection.summary };
+		reflectMark.end();
 
-		const trace = this.buildTrace(cycleNumber, ctx, phases, components, lawsVerdict);
+		const trace = this.buildTrace({
+			cycleNumber,
+			cycleId,
+			ctx,
+			phases,
+			components,
+			phaseTimestamps,
+			startedAt,
+			lawsPre,
+			lawsPost: options.getPostFlightVerdict?.(),
+			toolNames: options.getToolNames?.() ?? [],
+		});
 		appendReflectiveCycleTrace(this.sessionManager, trace);
-		debugLog("reflective-loop", "cycle complete", { cycleNumber, promptId: ctx.promptId });
+		debugLog("reflective-loop", "cycle complete", { cycleNumber, cycleId, promptId: ctx.promptId });
 		return trace;
 	}
 
-	private buildTrace(
-		cycleNumber: number,
-		ctx: ReflectiveLoopContext,
-		phases: Record<ReflectivePhase, ReflectivePhaseRecord>,
-		components: ReflectiveComponentRecord[],
-		lawsVerdict?: LawsVerdictRecord,
-	): ReflectiveCycleTrace {
-		return {
-			cycleNumber,
-			promptId: ctx.promptId,
-			depth: ctx.depth,
-			taskPreview: ctx.task.slice(0, 200),
-			phases,
-			components,
-			lawsVerdict,
-		};
+	private buildTrace(args: {
+		cycleNumber: number;
+		cycleId: string;
+		ctx: ReflectiveLoopContext;
+		phases: Record<ReflectivePhase, ReflectivePhaseRecord>;
+		components: ReflectiveComponentRecord[];
+		phaseTimestamps: Partial<Record<ReflectivePhase, TracePhaseTimestamps>>;
+		startedAt: string;
+		lawsPre?: LawsVerdictRecord;
+		lawsPost?: LawsVerdictRecord;
+		toolNames?: string[];
+	}): ReflectiveCycleTrace {
+		return buildTraceCycleV1({
+			cycleNumber: args.cycleNumber,
+			cycleId: args.cycleId,
+			promptId: args.ctx.promptId,
+			startedAt: args.startedAt,
+			endedAt: nowIso(),
+			phaseTimestamps: args.phaseTimestamps,
+			depth: args.ctx.depth,
+			taskPreview: args.ctx.task.slice(0, 200),
+			phases: args.phases,
+			components: args.components,
+			toolNames: args.toolNames ?? [],
+			lawsPre: args.lawsPre,
+			lawsPost: args.lawsPost,
+		});
 	}
 }

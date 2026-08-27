@@ -257,6 +257,47 @@ Extension state persistence. Does NOT participate in LLM context.
 
 Use `customType` to identify your extension's entries on reload.
 
+#### Trek reflective cycle (schema v1)
+
+Each O→I→A→R cycle is stored as `customType: "trek:reflective_cycle"`. Same loop as 0.3.0; schema v1 adds timestamps, cycle id, tool names, and laws pre/post. Module: `packages/coding-agent/src/core/trace/`.
+
+```json
+{
+  "type": "custom",
+  "customType": "trek:reflective_cycle",
+  "data": {
+    "schemaVersion": 1,
+    "cycleId": "c-0001",
+    "cycleNumber": 1,
+    "promptId": "#1",
+    "startedAt": "2026-08-26T12:00:00.000Z",
+    "endedAt": "2026-08-26T12:00:02.000Z",
+    "phaseTimestamps": {
+      "observe": { "startedAt": "2026-08-26T12:00:00.000Z", "endedAt": "2026-08-26T12:00:00.050Z" },
+      "intend": { "startedAt": "2026-08-26T12:00:00.050Z", "endedAt": "2026-08-26T12:00:00.080Z" },
+      "act": { "startedAt": "2026-08-26T12:00:00.080Z", "endedAt": "2026-08-26T12:00:01.800Z" },
+      "reflect": { "startedAt": "2026-08-26T12:00:01.800Z", "endedAt": "2026-08-26T12:00:02.000Z" }
+    },
+    "depth": 0,
+    "taskPreview": "read README",
+    "phases": {
+      "observe": { "phase": "observe", "summary": "Observed 0 messages..." },
+      "intend": { "phase": "intend", "summary": "Intend: read README" },
+      "act": { "phase": "act", "summary": "Act phase completed" },
+      "reflect": { "phase": "reflect", "summary": "Reflect: cycle" }
+    },
+    "components": [],
+    "toolNames": ["read"],
+    "lawsVerdict": {
+      "pre": { "allowed": true },
+      "post": { "allowed": true }
+    }
+  }
+}
+```
+
+Unversioned 0.3/0.4 payloads (flat `lawsVerdict: { allowed, law, reason }`) are upgraded in memory by `parseCycleTrace()`.
+
 ### CustomMessageEntry
 
 Extension-injected messages that DO participate in LLM context.

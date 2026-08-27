@@ -355,6 +355,10 @@ export class AgentSession {
 	private _loadedPrologue: LoadedPrologue = { content: undefined, sources: [] };
 	private _reflectiveLoop: ReflectiveLoopController | undefined;
 	private _lastPromptTask = "";
+	/** Tools executed during the current reflective cycle (trace schema v1). */
+	private _cycleToolNames: string[] = [];
+	/** First failing post-flight laws verdict for the current cycle, else last allowed. */
+	private _cyclePostFlight: { allowed: boolean; law?: number; reason?: string } | undefined;
 
 	// Edit-batch checkpoints for multi-level Undo (issue #16 / 0.5.0).
 	private _editCheckpoints = new EditCheckpointManager(nodeCheckpointFsOps);
@@ -496,6 +500,7 @@ export class AgentSession {
 		};
 
 		this.agent.afterToolCall = async ({ toolCall, args, result, isError }) => {
+			this._cycleToolNames.push(toolCall.name);
 			this._recordFileAccessForSafety(toolCall.name, args, isError);
 			this._rememberIdempotent(toolCall.name, args, result, isError);
 			if (!isError && !this._dryRunEnabled) {
@@ -844,6 +849,7 @@ export class AgentSession {
 					{ toolName, args: (args ?? {}) as Record<string, unknown>, tier },
 					resultText,
 				);
+				this._recordPostFlightVerdict(verdict);
 				if (!verdict.allowed && verdict.reason) {
 					notes.push(verdict.reason);
 					debugLog("safety", "post-flight violation", {
@@ -857,6 +863,21 @@ export class AgentSession {
 			debugLog("safety", "post-flight check failed", { tool: toolName, error: String(error) });
 		}
 		return notes;
+	}
+
+	private _recordPostFlightVerdict(verdict: { allowed: boolean; law?: number; reason?: string }): void {
+		if (!verdict.allowed) {
+			this._cyclePostFlight = { allowed: false, law: verdict.law, reason: verdict.reason };
+			return;
+		}
+		if (!this._cyclePostFlight || this._cyclePostFlight.allowed) {
+			this._cyclePostFlight = { allowed: true };
+		}
+	}
+
+	private _resetCycleTraceCollectors(): void {
+		this._cycleToolNames = [];
+		this._cyclePostFlight = undefined;
 	}
 
 	/** Engage the operator HALT/off-switch: blocks tool calls at the next boundary (#7). */
@@ -1714,6 +1735,7 @@ export class AgentSession {
 			provider: this.model?.provider,
 		});
 		if (this._reflectiveLoop) {
+			this._resetCycleTraceCollectors();
 			await this._reflectiveLoop.runPromptCycle({
 				task: this._lastPromptTask,
 				promptId,
@@ -1721,6 +1743,8 @@ export class AgentSession {
 				messageCount: this.agent.state.messages.length,
 				getMessageCount: () => this.agent.state.messages.length,
 				act: () => this._runAgentPrompt(messages),
+				getToolNames: () => this._cycleToolNames.slice(),
+				getPostFlightVerdict: () => this._cyclePostFlight,
 			});
 		} else {
 			await this._runAgentPrompt(messages);

@@ -11,6 +11,7 @@ export {
 } from "./session-trace.ts";
 export { SubtaskStack } from "./subtask-stack.ts";
 export type {
+	LawsVerdictPair,
 	LawsVerdictRecord,
 	PolicyCheckResult,
 	ReflectiveActResult,
@@ -23,5 +24,7 @@ export type {
 	ReflectivePhase,
 	ReflectivePhaseRecord,
 	ReflectiveReflection,
+	TracePhaseTimestamps,
+	TraceSchemaVersion,
 } from "./types.ts";
-export { DEFAULT_MAX_SUBTASK_DEPTH, REFLECTIVE_CYCLE_CUSTOM_TYPE } from "./types.ts";
+export { DEFAULT_MAX_SUBTASK_DEPTH, REFLECTIVE_CYCLE_CUSTOM_TYPE, TRACE_SCHEMA_VERSION } from "./types.ts";

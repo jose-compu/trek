@@ -2,6 +2,12 @@
 
 Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent repo `UPSTREAM.md` / Pi monorepo.
 
+## [Unreleased]
+
+### Added
+
+- **Trace schema v1** (`trek:reflective_cycle`): timestamps, cycle id, tool names, laws pre/post ([#45](https://github.com/jose-compu/trek/issues/45)).
+
 ## [0.5.1] - 2026-08-23
 
 ### Changed
