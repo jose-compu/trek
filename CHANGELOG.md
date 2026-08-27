@@ -9,6 +9,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 ### Added
 
 - **Trace schema v1** on `trek:reflective_cycle`: `schemaVersion`, `cycleId`, timestamps (cycle + per phase), `toolNames`, `lawsVerdict.pre` / `lawsVerdict.post` ([#45](https://github.com/jose-compu/trek/issues/45)).
+- **`trek trace list|show|diff`**: inspect session cycle traces and intention vs outcome ([#46](https://github.com/jose-compu/trek/issues/46), [#48](https://github.com/jose-compu/trek/issues/48)).
 
 ## [0.5.1] - 2026-08-23
 

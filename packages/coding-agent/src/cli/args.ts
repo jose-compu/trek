@@ -262,6 +262,9 @@ ${chalk.bold("Commands:")}
   ${APP_NAME} history                   List .trek file versions for this project
   ${APP_NAME} revert --prompt N         Restore files from .trek history
   ${APP_NAME} revert --step ID          Restore files from a recorded step id
+  ${APP_NAME} trace list                List sessions and O→I→A→R cycle ids
+  ${APP_NAME} trace show <cycleId>      Show one cycle (observe/intend/act/reflect)
+  ${APP_NAME} trace diff <cycleId>      Intention vs outcome for the Act phase
   ${APP_NAME} config                    Open TUI to enable/disable package resources
   ${APP_NAME} <command> --help          Show help for install/remove/uninstall/update/list
 
