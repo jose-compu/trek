@@ -271,6 +271,7 @@ ${chalk.bold("Commands:")}
   ${APP_NAME} trace diff <cycleId>      Intention vs outcome for the Act phase
   ${APP_NAME} trace fork <cycleId>      Branch a new session JSONL from that cycle
   ${APP_NAME} trace replay <cycleId>    Counterfactual stub: fork and patch observe (#50)
+  ${APP_NAME} telegram                  Long-poll Telegram Bot API for allowlisted DMs
   ${APP_NAME} config                    Open TUI to enable/disable package resources
   ${APP_NAME} <command> --help          Show help for install/remove/uninstall/update/list
 

@@ -14,6 +14,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 - **Diagnostic mode** (`--diagnostic` / `TREK_DIAGNOSTIC=1` / settings `diagnostic`) blocks mutating tools ([#49](https://github.com/jose-compu/trek/issues/49)).
 - **`trek trace replay`** counterfactual stub: fork a cycle and inject a patched observe payload ([#50](https://github.com/jose-compu/trek/issues/50)).
 - **Trace test gate** (faux LLM): fork from cycle 5, laws pre/post, intention vs outcome, counterfactual observe ([#51](https://github.com/jose-compu/trek/issues/51)).
+- **`trek telegram`**: long-poll Bot API, token/allowlists, isolated DM sessions and `/start|/new|/status|/stop|/help` ([#52](https://github.com/jose-compu/trek/issues/52), [#53](https://github.com/jose-compu/trek/issues/53)).
 
 ## [0.5.1] - 2026-08-23
 

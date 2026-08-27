@@ -47,6 +47,7 @@ import { InteractiveMode, runBatchMode, runPrintMode, runRpcMode } from "./modes
 import { ExtensionSelectorComponent } from "./modes/interactive/components/extension-selector.ts";
 import { initTheme, stopThemeWatcher } from "./modes/interactive/theme/theme.ts";
 import { handleConfigCommand, handlePackageCommand } from "./package-manager-cli.ts";
+import { handleTelegramCommand } from "./telegram-cli.ts";
 import { handleTraceCommand } from "./trace-cli.ts";
 import { debugLog, getActiveDebugLogPath, setDebugEnabled } from "./utils/debug-log.ts";
 import { isLocalPath, normalizePath, resolvePath } from "./utils/paths.ts";
@@ -501,6 +502,10 @@ export async function main(args: string[], options?: MainOptions) {
 	}
 
 	if (await handleTraceCommand(args)) {
+		return;
+	}
+
+	if (await handleTelegramCommand(args)) {
 		return;
 	}
 
