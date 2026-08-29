@@ -1,6 +1,6 @@
-<img width="463" height="299" alt="image" src="https://github.com/user-attachments/assets/6fed72eb-c40f-4897-af45-f469ba1467a1" />
+<img width="1983" height="793" alt="image" src="https://github.com/user-attachments/assets/f48bedce-d4a1-4569-a128-2fdefcfcc012" />
 
-# Trek Agent
+# Trek Agent v0.6.0
 
 Trek is a **hard fork of the [Pi Coding Agent](https://pi.dev/)** — the minimal terminal coding agent with read, bash, edit, write tools, sessions, and a TypeScript extension ecosystem.
 
