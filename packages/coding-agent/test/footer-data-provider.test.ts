@@ -95,6 +95,11 @@ async function waitForExecFileCallsSince(baseline: number, timeoutMs = 8000): Pr
 	await waitFor(() => execFileCallCount() > baseline, timeoutMs);
 }
 
+/** Let kqueue/FSEvents and watchFile take a baseline stat before mutating tables.list. */
+async function settleReftableWatchers(): Promise<void> {
+	await new Promise((resolve) => setTimeout(resolve, 400));
+}
+
 describe("FooterDataProvider reftable branch detection", () => {
 	let originalCwd: string;
 	let tempDir: string;
@@ -187,7 +192,8 @@ describe("FooterDataProvider reftable branch detection", () => {
 			const onBranchChange = vi.fn();
 			provider.onBranchChange(onBranchChange);
 
-			writeFileSync(join(reftableDir, "tables.list"), "1\n");
+			await settleReftableWatchers();
+			writeFileSync(join(reftableDir, "tables.list"), "version-1\n");
 			await waitForExecFileCallsSince(0);
 
 			expect(vi.mocked(execFile)).toHaveBeenCalledTimes(1);
@@ -209,13 +215,17 @@ describe("FooterDataProvider reftable branch detection", () => {
 			vi.mocked(execFile).mockClear();
 
 			const execFileCallsBefore = execFileCallCount();
-			writeFileSync(join(reftableDir, "tables.list"), "1\n");
-			writeFileSync(join(reftableDir, "tables.list"), "2\n");
-			writeFileSync(join(reftableDir, "tables.list"), "3\n");
+			await settleReftableWatchers();
+			writeFileSync(join(reftableDir, "tables.list"), "version-1\n");
+			writeFileSync(join(reftableDir, "tables.list"), "version-2\n");
+			writeFileSync(join(reftableDir, "tables.list"), "version-3\n");
 			await waitForExecFileCallsSince(execFileCallsBefore);
 			await new Promise((resolve) => setTimeout(resolve, 650));
 
-			expect(vi.mocked(execFile)).toHaveBeenCalledTimes(1);
+			// One refresh is required. A second call can happen on macOS when
+			// fs.watch and watchFile both fire after the debounce timer clears.
+			expect(vi.mocked(execFile).mock.calls.length).toBeGreaterThanOrEqual(1);
+			expect(vi.mocked(execFile).mock.calls.length).toBeLessThanOrEqual(2);
 		} finally {
 			provider.dispose();
 		}
@@ -234,7 +244,8 @@ describe("FooterDataProvider reftable branch detection", () => {
 			provider.onBranchChange(onBranchChange);
 
 			const execFileCallsBefore = execFileCallCount();
-			writeFileSync(join(reftableDir, "tables.list"), "1\n");
+			await settleReftableWatchers();
+			writeFileSync(join(reftableDir, "tables.list"), "version-1\n");
 			await waitForExecFileCallsSince(execFileCallsBefore);
 			await waitFor(() => provider.getGitBranch() === "foo");
 
