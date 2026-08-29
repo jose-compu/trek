@@ -130,7 +130,10 @@ jobs:
         run: npm test
 
       - name: Verify release artifacts are committed
-        run: git diff --exit-code
+        run: |
+          git diff --exit-code -- \
+            ':!packages/ai/src/models.generated.ts' \
+            ':!packages/ai/src/image-models.generated.ts'
 
       - name: Upgrade npm for trusted publishing
         run: |

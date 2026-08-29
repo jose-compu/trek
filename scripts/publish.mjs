@@ -2,7 +2,11 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const useProvenance = process.env.GITHUB_ACTIONS === "true";
 
 const packages = [
 	{ directory: "packages/ai", name: "@trek/ai" },
@@ -40,17 +44,20 @@ function run(command, args, options = {}) {
 }
 
 function readPackageJson(directory) {
-	return JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
+	return JSON.parse(readFileSync(join(repoRoot, directory, "package.json"), "utf8"));
 }
 
 function assertBuildOutputExists(directory) {
-	if (!existsSync(join(directory, "dist"))) {
+	if (!existsSync(join(repoRoot, directory, "dist"))) {
 		throw new Error(`${directory}/dist does not exist. Run npm run build before publishing.`);
 	}
 }
 
 function validatePack(directory) {
-	const result = run("npm", ["pack", "--dry-run", "--ignore-scripts", "--json"], { capture: true, cwd: directory });
+	const result = run("npm", ["pack", "--dry-run", "--ignore-scripts", "--json"], {
+		capture: true,
+		cwd: join(repoRoot, directory),
+	});
 	const packed = JSON.parse(result.stdout)[0];
 	console.log(`  ${packed.filename}: ${packed.files.length} files, ${packed.size} bytes packed, ${packed.unpackedSize} bytes unpacked`);
 }
@@ -76,6 +83,9 @@ function isPublished(name, version) {
 const packageVersions = new Map();
 for (const pkg of packages) {
 	const packageJson = readPackageJson(pkg.directory);
+	if (packageJson.private) {
+		throw new Error(`${pkg.directory}/package.json is private; refuse to publish ${pkg.name}`);
+	}
 	if (packageJson.name !== pkg.name) {
 		throw new Error(`${pkg.directory}/package.json has name ${packageJson.name}, expected ${pkg.name}`);
 	}
@@ -110,6 +120,10 @@ for (const pkg of packages) {
 		continue;
 	}
 
-	run("npm", ["publish", "--access", "public", "--provenance", "--ignore-scripts"], { cwd: pkg.directory });
+	const publishArgs = ["publish", "--workspace", pkg.name, "--access", "public", "--ignore-scripts"];
+	if (useProvenance) {
+		publishArgs.push("--provenance");
+	}
+	run("npm", publishArgs, { cwd: repoRoot });
 	console.log();
 }
