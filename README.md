@@ -25,7 +25,7 @@ Pi compatibility is preserved: community packages from [pi.dev/packages](https:/
 
 ## Status
 
-**0.6.0 Trace + Telegram** shipped — O→I→A→R JSONL traces (`trek trace`), diagnostic mode, and `trek telegram` for allowlisted DMs/groups. Next: **0.7.0 Audit**. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
+**0.6.0 Trace + Telegram** shipped — O→I→A→R JSONL traces (`trek trace`), diagnostic mode, and `trek telegram` for allowlisted DMs/groups. Git tag `v0.6.0` is the remaining release chore. Next: **0.7.0 Audit**. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
 
 ## Trace CLI
 

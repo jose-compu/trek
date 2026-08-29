@@ -25,6 +25,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 ### Changed
 
 - README/ROADMAP current version is 0.6.0; CLI help documents `trek trace` and `trek telegram` allowlists and group safety ([#58](https://github.com/jose-compu/trek/issues/58)).
+- Milestone product work is complete on `main` ([#43](https://github.com/jose-compu/trek/issues/43), [#44](https://github.com/jose-compu/trek/issues/44)); remaining release chore is the `v0.6.0` git tag.
 
 ## [0.5.1] - 2026-08-23
 
