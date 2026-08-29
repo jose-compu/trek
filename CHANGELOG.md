@@ -1,10 +1,14 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.5.1`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.6.0`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.6.0] - 2026-08-27
+
+**Trace + Telegram** — O→I→A→R traces and a remote Telegram channel (ROADMAP 0.6.0).
 
 ### Added
 
@@ -16,6 +20,11 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 - **Trace test gate** (faux LLM): fork from cycle 5, laws pre/post, intention vs outcome, counterfactual observe ([#51](https://github.com/jose-compu/trek/issues/51)).
 - **`trek telegram`**: long-poll Bot API, token/allowlists, isolated DM sessions and `/start|/new|/status|/stop|/help` ([#52](https://github.com/jose-compu/trek/issues/52), [#53](https://github.com/jose-compu/trek/issues/53)).
 - **Telegram Groups** (mention/command, per-chat session) and remote `/confirm` + HALT isolation ([#54](https://github.com/jose-compu/trek/issues/54), [#55](https://github.com/jose-compu/trek/issues/55)).
+- **Telegram media**: inbound photos/documents staged under `.trek/telegram/inbox/`; long replies split or sent as a file; group traces omitted; stickers/voice ack unsupported ([#56](https://github.com/jose-compu/trek/issues/56)).
+
+### Changed
+
+- README/ROADMAP current version is 0.6.0; CLI help documents `trek trace` and `trek telegram` allowlists and group safety ([#58](https://github.com/jose-compu/trek/issues/58)).
 
 ## [0.5.1] - 2026-08-23
 

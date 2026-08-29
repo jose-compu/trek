@@ -17,6 +17,8 @@ function printTraceHelp(): void {
 	console.log(`${APP_NAME} trace fork <cycleId>`);
 	console.log(`${APP_NAME} trace replay <cycleId> --observe <text>`);
 	console.log("  Inspect O→I→A→R cycle traces in session JSONL.");
+	console.log("  list: sessions and cycle ids; show: one cycle; diff: intention vs outcome.");
+	console.log("  fork: branch JSONL from a cycle checkpoint; replay: counterfactual observe stub.");
 	console.log("  Options: --session <path>  --session-dir <dir>  --observe <text>");
 }
 

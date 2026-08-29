@@ -1,7 +1,17 @@
+import { mkdirSync } from "node:fs";
+import { basename, join } from "node:path";
 import { isAllowedTelegramSender, type TelegramConfig } from "./config.ts";
-import type { TelegramApi, TelegramMessage, TelegramSessionHost, TelegramUpdate } from "./types.ts";
+import { planOutboundReply, telegramInboxDir } from "./media.ts";
+import type {
+	TelegramApi,
+	TelegramMessage,
+	TelegramPromptAttachment,
+	TelegramSessionHost,
+	TelegramUpdate,
+} from "./types.ts";
 
 const HELP = ["/start", "/help", "/new", "/status", "/stop", "/confirm"].join("  ");
+const UNSUPPORTED = "Unsupported media (stickers/voice). Send text, a photo, or a document.";
 
 function isGroupChat(type: string): boolean {
 	return type === "group" || type === "supergroup";
@@ -19,6 +29,14 @@ function commandName(text: string): string {
 	return token.split("@", 1)[0] ?? token;
 }
 
+function messageText(message: TelegramMessage): string {
+	return (message.text ?? message.caption ?? "").trim();
+}
+
+function isUnsupportedMedia(message: TelegramMessage): boolean {
+	return Boolean(message.sticker || message.voice || message.audio || message.video_note);
+}
+
 function isAddressed(config: TelegramConfig, message: TelegramMessage, text: string): boolean {
 	if (!isGroupChat(message.chat.type)) {
 		return true;
@@ -33,7 +51,8 @@ function isAddressed(config: TelegramConfig, message: TelegramMessage, text: str
 	if (text.includes(`@${username}`)) {
 		return true;
 	}
-	return Boolean(message.entities?.some((entity) => entity.type === "mention"));
+	const entities = [...(message.entities ?? []), ...(message.caption_entities ?? [])];
+	return entities.some((entity) => entity.type === "mention");
 }
 
 function promptText(config: TelegramConfig, text: string): string {
@@ -42,6 +61,14 @@ function promptText(config: TelegramConfig, text: string): string {
 		return text;
 	}
 	return text.replaceAll(`@${username}`, "").replace(/\s+/g, " ").trim();
+}
+
+function largestPhoto(message: TelegramMessage): { file_id: string } | undefined {
+	const photos = message.photo;
+	if (!photos || photos.length === 0) {
+		return undefined;
+	}
+	return photos.reduce((best, size) => (size.width * size.height > best.width * best.height ? size : best));
 }
 
 export class TelegramRuntime {
@@ -65,19 +92,60 @@ export class TelegramRuntime {
 		return `${prefix}-${chatId}`;
 	}
 
+	private async sendReply(chatId: number, chatType: string, text: string): Promise<void> {
+		const plan = planOutboundReply(text, isGroupChat(chatType));
+		for (const chunk of plan.chunks) {
+			if (chunk.length > 0) {
+				await this.api.sendMessage(chatId, chunk);
+			}
+		}
+		if (plan.document) {
+			await this.api.sendDocument(chatId, plan.document.filename, plan.document.content);
+		}
+	}
+
+	private async stageAttachments(message: TelegramMessage): Promise<TelegramPromptAttachment[]> {
+		const attachments: TelegramPromptAttachment[] = [];
+		const inbox = telegramInboxDir(this.config.cwd);
+		mkdirSync(inbox, { recursive: true });
+		const photo = largestPhoto(message);
+		if (photo) {
+			const dest = join(inbox, `${message.message_id}.jpg`);
+			await this.api.downloadFile(photo.file_id, dest);
+			attachments.push({ kind: "image", path: dest, mimeType: "image/jpeg" });
+		}
+		if (message.document) {
+			const raw = message.document.file_name ? basename(message.document.file_name) : "";
+			const cleaned = raw.replace(/[^A-Za-z0-9._-]/g, "_").replace(/^\.+/, "");
+			const name = cleaned.length > 0 ? cleaned : `${message.message_id}.bin`;
+			const dest = join(inbox, name);
+			await this.api.downloadFile(message.document.file_id, dest);
+			attachments.push({ kind: "file", path: dest, mimeType: message.document.mime_type });
+		}
+		return attachments;
+	}
+
 	async handleUpdate(update: TelegramUpdate): Promise<void> {
 		this.offset = Math.max(this.offset, update.update_id + 1);
 		const message = update.message;
-		if (!message?.text) {
+		if (!message) {
 			return;
 		}
-		const text = message.text.trim();
+		const text = messageText(message);
+		const hasMedia = Boolean(largestPhoto(message) || message.document);
+		if (!text && !hasMedia && !isUnsupportedMedia(message)) {
+			return;
+		}
 		if (!isAddressed(this.config, message, text)) {
 			return;
 		}
 		const chatId = message.chat.id;
 		const userId = message.from?.id;
 		if (!isAllowedTelegramSender(this.config, userId, chatId)) {
+			return;
+		}
+		if (isUnsupportedMedia(message)) {
+			await this.api.sendMessage(chatId, UNSUPPORTED);
 			return;
 		}
 		const key = this.sessionKey(chatId, message.message_thread_id, message.chat.type);
@@ -106,8 +174,13 @@ export class TelegramRuntime {
 			await this.api.sendMessage(chatId, "Destructive ops confirmed for this session.");
 			return;
 		}
-		const reply = await this.host.prompt(key, promptText(this.config, text));
-		await this.api.sendMessage(chatId, reply.slice(0, 4000));
+		const attachments = hasMedia ? await this.stageAttachments(message) : [];
+		const prompt = promptText(this.config, text) || (hasMedia ? "See attached media." : "");
+		if (!prompt && attachments.length === 0) {
+			return;
+		}
+		const reply = await this.host.prompt(key, prompt, attachments);
+		await this.sendReply(chatId, message.chat.type, reply);
 	}
 
 	async pollOnce(): Promise<number> {

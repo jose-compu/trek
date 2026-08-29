@@ -4,6 +4,8 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-27
+
 ### Added
 
 - **Trace schema v1** (`trek:reflective_cycle`): timestamps, cycle id, tool names, laws pre/post ([#45](https://github.com/jose-compu/trek/issues/45)).
@@ -14,6 +16,11 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 - **Trace test gate** (faux LLM): fork from cycle 5, laws pre/post, intention vs outcome, counterfactual observe ([#51](https://github.com/jose-compu/trek/issues/51)).
 - **`trek telegram`**: long-poll Bot API, token/allowlists, isolated DM sessions ([#52](https://github.com/jose-compu/trek/issues/52), [#53](https://github.com/jose-compu/trek/issues/53)).
 - **Telegram Groups** (mention/command) and `/confirm` gated destructive ops ([#54](https://github.com/jose-compu/trek/issues/54), [#55](https://github.com/jose-compu/trek/issues/55)).
+- **Telegram media**: inbound photos/documents staged under `.trek/telegram/inbox/`; long replies split or sent as a file; group traces omitted; stickers/voice ack unsupported ([#56](https://github.com/jose-compu/trek/issues/56)).
+
+### Changed
+
+- README/CLI help document `trek trace` and `trek telegram` allowlists and group safety; package version 0.6.0 ([#58](https://github.com/jose-compu/trek/issues/58)).
 
 ## [0.5.1] - 2026-08-23
 

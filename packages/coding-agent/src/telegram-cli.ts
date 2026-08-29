@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import chalk from "chalk";
 import { APP_NAME } from "./config.ts";
 import { parseTelegramConfigFile, type TelegramConfig } from "./core/telegram/config.ts";
@@ -11,9 +11,12 @@ import { trekEnv } from "./utils/trek-env.ts";
 
 function printTelegramHelp(): void {
 	console.log(`${APP_NAME} telegram`);
-	console.log("  Long-poll Telegram Bot API and drive AgentSession for allowlisted DMs.");
+	console.log("  Long-poll Telegram Bot API and drive AgentSession (DMs and groups).");
 	console.log("  Token: TREK_TELEGRAM_BOT_TOKEN or ~/.trek/telegram.json");
-	console.log("  Allowlists: allowed_user_ids / allowed_chat_ids (required, non-empty)");
+	console.log("  Allowlists: allowed_user_ids / allowed_chat_ids (required, non-empty).");
+	console.log("  Groups: reply only on /command or @bot mention; sessions isolated per chat/topic.");
+	console.log("  Safety: /stop HALTs; gated tools need /confirm; traces are omitted in groups.");
+	console.log("  Photos/documents stage to cwd/.trek/telegram/inbox/. Stickers/voice are unsupported.");
 }
 
 export function defaultTelegramConfigPath(): string {
@@ -49,6 +52,28 @@ export function createTelegramApi(token: string, fetchImpl: typeof fetch = fetch
 			if (!response.ok) {
 				throw new Error(`Telegram sendMessage failed (${response.status}).`);
 			}
+		},
+		async sendDocument(chatId: number, filename: string, content: string): Promise<void> {
+			const form = new FormData();
+			form.append("chat_id", String(chatId));
+			form.append("document", new Blob([content], { type: "text/plain" }), filename);
+			const response = await fetchImpl(`${base}/sendDocument`, { method: "POST", body: form });
+			if (!response.ok) {
+				throw new Error(`Telegram sendDocument failed (${response.status}).`);
+			}
+		},
+		async downloadFile(fileId: string, destPath: string): Promise<void> {
+			const metaResponse = await fetchImpl(`${base}/getFile?file_id=${encodeURIComponent(fileId)}`);
+			const meta = (await metaResponse.json()) as { ok?: boolean; result?: { file_path?: string } };
+			if (!meta.ok || !meta.result?.file_path) {
+				throw new Error("Telegram getFile failed.");
+			}
+			const fileResponse = await fetchImpl(`https://api.telegram.org/file/bot${token}/${meta.result.file_path}`);
+			if (!fileResponse.ok) {
+				throw new Error(`Telegram file download failed (${fileResponse.status}).`);
+			}
+			mkdirSync(dirname(destPath), { recursive: true });
+			writeFileSync(destPath, Buffer.from(await fileResponse.arrayBuffer()));
 		},
 	};
 }

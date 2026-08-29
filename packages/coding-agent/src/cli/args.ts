@@ -271,7 +271,7 @@ ${chalk.bold("Commands:")}
   ${APP_NAME} trace diff <cycleId>      Intention vs outcome for the Act phase
   ${APP_NAME} trace fork <cycleId>      Branch a new session JSONL from that cycle
   ${APP_NAME} trace replay <cycleId>    Counterfactual stub: fork and patch observe (#50)
-  ${APP_NAME} telegram                  Long-poll Telegram Bot API for allowlisted DMs
+  ${APP_NAME} telegram                  Long-poll Telegram (allowlisted DMs/groups)
   ${APP_NAME} config                    Open TUI to enable/disable package resources
   ${APP_NAME} <command> --help          Show help for install/remove/uninstall/update/list
 
@@ -378,6 +378,14 @@ ${chalk.bold("Examples:")}
   ${APP_NAME} --export ~/${CONFIG_DIR_NAME}/agent/sessions/--path--/session.jsonl
   ${APP_NAME} --export session.jsonl output.html
 
+  # Inspect O→I→A→R traces
+  ${APP_NAME} trace list
+  ${APP_NAME} trace show c-0001
+  ${APP_NAME} trace diff c-0001
+
+  # Telegram remote channel (allowlists required)
+  ${APP_NAME} telegram
+
 ${chalk.bold("Environment Variables:")}
   ANTHROPIC_API_KEY                - Anthropic Claude API key
   ANTHROPIC_OAUTH_TOKEN            - Anthropic OAuth token (alternative to API key)
@@ -425,6 +433,8 @@ ${chalk.bold("Environment Variables:")}
   TREK_SHARE_VIEWER_URL            - Base URL for /share command (default: https://pi.dev/session/)
   TREK_SKIP_VERSION_CHECK          - Skip version update check at startup
   TREK_DEBUG                       - Verbose internal logging (same as --debug)
+  TREK_DIAGNOSTIC                  - Trace-only: block mutating tools (same as --diagnostic)
+  TREK_TELEGRAM_BOT_TOKEN          - Telegram bot token for ${APP_NAME} telegram
   TREK_ALLOW_LOCKFILE_CHANGE       - Allow committing package-lock.json changes (pre-commit hook)
   TREK_TIMING                      - Print startup timing breakdown to stderr
   TREK_STARTUP_BENCHMARK           - Run interactive startup benchmark and exit
