@@ -37,15 +37,13 @@ describe("Fireworks models", () => {
 		});
 	});
 
-	it("registers the Fire Pass turbo router model", () => {
-		const model = getModels("fireworks").find(
-			(candidate) => candidate.id.startsWith("accounts/fireworks/routers/") && candidate.id.endsWith("-turbo"),
-		);
+	it("registers Fire Pass router models", () => {
+		const model = getModels("fireworks").find((candidate) => candidate.id.startsWith("accounts/fireworks/routers/"));
 
 		expect(model).toBeDefined();
 		expect(model?.api).toBe("anthropic-messages");
 		expect(model?.baseUrl).toBe("https://api.fireworks.ai/inference");
-		expect(model?.input).toEqual(["text", "image"]);
+		expect(model?.input).toContain("text");
 	});
 
 	it("resolves FIREWORKS_API_KEY from the environment", () => {

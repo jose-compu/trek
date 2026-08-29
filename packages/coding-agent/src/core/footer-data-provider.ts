@@ -300,7 +300,15 @@ export class FooterDataProvider {
 	}
 
 	private handleGitWatcherError(): void {
-		this.clearGitWatchers();
+		// Keep watchFile polling. On macOS, fs.watch under /var/folders often
+		// errors or never fires; tearing down the poller made tests and the
+		// footer miss reftable updates until a later retry.
+		closeWatcher(this.headWatcher);
+		this.headWatcher = null;
+		closeWatcher(this.reftableWatcher);
+		this.reftableWatcher = null;
+		closeWatcher(this.reftableTablesListWatcher);
+		this.reftableTablesListWatcher = null;
 		this.scheduleGitWatcherRetry();
 	}
 

@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
+import type { ImageContent } from "@trek/ai";
 import type { AgentSession } from "../agent-session.ts";
 import { createAgentSession } from "../sdk.ts";
 import { SessionManager } from "../session-manager.ts";
-import type { TelegramSessionHost } from "./types.ts";
+import type { TelegramPromptAttachment, TelegramSessionHost } from "./types.ts";
 
 function lastAssistantText(session: AgentSession): string {
 	for (let i = session.messages.length - 1; i >= 0; i--) {
@@ -47,12 +49,25 @@ export class AgentTelegramHost implements TelegramSessionHost {
 		return created.session;
 	}
 
-	async prompt(sessionKey: string, text: string): Promise<string> {
+	async prompt(sessionKey: string, text: string, attachments: TelegramPromptAttachment[] = []): Promise<string> {
 		const session = await this.get(sessionKey);
 		if (session.isHalted()) {
 			return "HALT is engaged. Send /new to resume.";
 		}
-		await session.prompt(text);
+		const files = attachments.filter((item) => item.kind === "file");
+		let prompt = text;
+		if (files.length > 0) {
+			const listed = files.map((item) => `Attached file: ${item.path}`).join("\n");
+			prompt = prompt ? `${prompt}\n\n${listed}` : listed;
+		}
+		const images: ImageContent[] = attachments
+			.filter((item) => item.kind === "image")
+			.map((item) => ({
+				type: "image",
+				data: readFileSync(item.path).toString("base64"),
+				mimeType: item.mimeType ?? "image/jpeg",
+			}));
+		await session.prompt(prompt, images.length > 0 ? { images, source: "rpc" } : { source: "rpc" });
 		return lastAssistantText(session) || "(no reply)";
 	}
 

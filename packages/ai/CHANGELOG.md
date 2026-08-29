@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-27
+
+Lockstep with Trek 0.6.0 Trace + Telegram.
+
 ## [0.5.1] - 2026-08-23
 
 ### Changed

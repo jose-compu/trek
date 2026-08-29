@@ -26,9 +26,10 @@
 ## Commands
 
 - After code changes (not docs): `npm run check` (full output, no tail). Fix all errors, warnings, and infos before committing. Does not run tests.
-- Never run `npm run build` or `npm test` unless requested by the user.
-- Never run the full vitest suite directly: it includes e2e tests that activate when endpoint/auth env vars are present. For all non-e2e tests, run `./test.sh` from the repo root. Otherwise run specific tests from the package root: `node ../../node_modules/vitest/dist/cli.js --run test/specific.test.ts`.
-- If you create or modify a test file, run it and iterate on test or implementation until it passes.
+- Before every commit (code or tests, not docs-only): run the **full** test suite from the repo root and wait for it to finish. Do not commit if it fails. Prefer `./test.sh` (same workspace tests as `npm test`, but unsets API keys / auth so live e2e stays skipped). `npm test` is acceptable when matching CI and no provider keys are set. Show the full output; do not tail or hide failures.
+- Never run `npm run build` unless requested by the user.
+- Never run a package vitest suite as a substitute for the full root run before commit. During iteration, targeted tests from the package root are fine: `node ../../node_modules/vitest/dist/cli.js --run test/specific.test.ts`.
+- If you create or modify a test file, run it and iterate on test or implementation until it passes. Then still run the full suite before committing.
 - For `packages/coding-agent/test/suite/`, use `test/suite/harness.ts` + the faux provider. No real provider APIs, keys, or paid tokens.
 - Put issue-specific regressions under `packages/coding-agent/test/suite/regressions/` named `<issue-number>-<short-slug>.test.ts`.
 - For ad-hoc scripts, `write` them to a temp file (e.g. `/tmp`), run, edit if needed, remove when done. Don't embed multi-line scripts in `bash` commands.
@@ -51,6 +52,7 @@ Committing:
 - Only commit files YOU changed in THIS session.
 - Stage explicit paths (`git add <path1> <path2>`); never `git add -A` / `git add .`.
 - Before committing, run `git status` and verify you are only staging your files.
+- Before committing, the full root test suite must have passed in this session (`./test.sh`, or `npm test` with no live provider keys). See Commands.
 - `packages/ai/src/models.generated.ts` may always be included alongside your files.
 
 Never run (destroys other agents' work or bypasses checks):
