@@ -1,10 +1,14 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.6.0`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.7.0`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.7.0] - 2026-09-01
+
+**Audit** — honest best-effort determinism (ROADMAP 0.7.0).
 
 ### Added
 
@@ -14,6 +18,10 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 - **`trek config reproducibility`**: show/set mode and seed ([#74](https://github.com/jose-compu/trek/issues/74)).
 - **Per-step audit record** `trek:audit_step` on session JSONL (model, seed, hashes, `system_fingerprint`) ([#73](https://github.com/jose-compu/trek/issues/73)).
 - **0.7.0 Audit acceptance gate** (same seed → same tool intent, fingerprint, warnings, schema) ([#76](https://github.com/jose-compu/trek/issues/76)).
+
+### Changed
+
+- README/CLI help document reproducibility modes, seed honesty, and `TREK_SEED`; lockstep package versions are 0.7.0 ([#77](https://github.com/jose-compu/trek/issues/77)).
 
 ## [0.6.0] - 2026-08-27
 

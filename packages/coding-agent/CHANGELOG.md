@@ -4,6 +4,8 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-01
+
 ### Added
 
 - **Reproducibility policy** (`default` / `strict_audit`), session seed (default `42`, D5), and `trek:reproducibility` session JSONL record ([#70](https://github.com/jose-compu/trek/issues/70), [#75](https://github.com/jose-compu/trek/issues/75)).
@@ -11,6 +13,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 - **Startup determinism warning** and `trek config reproducibility` ([#72](https://github.com/jose-compu/trek/issues/72), [#74](https://github.com/jose-compu/trek/issues/74)).
 - **`trek:audit_step`** per LLM completion, including `system_fingerprint` when present ([#73](https://github.com/jose-compu/trek/issues/73)).
 - **Audit acceptance gate** for same-seed tool intent, fingerprint, and `strict_audit` ([#76](https://github.com/jose-compu/trek/issues/76)).
+
+### Changed
+
+- Package version 0.7.0; CLI help documents `trek config reproducibility` and `TREK_SEED` ([#77](https://github.com/jose-compu/trek/issues/77)).
 
 ## [0.6.0] - 2026-08-27
 

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-01
+
+Lockstep with Trek 0.7.0 Audit. Seed / `top_p` on stream options; OpenAI completions copy `system_fingerprint`.
+
 ## [0.6.0] - 2026-08-27
 
 Lockstep with Trek 0.6.0 Trace + Telegram.
