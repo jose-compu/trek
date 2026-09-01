@@ -98,6 +98,14 @@ import {
 	isReflectiveLoopEnabled,
 	ReflectiveLoopController,
 } from "./reflective-loop/index.ts";
+import {
+	assertStrictAuditProvider,
+	parseSessionRecord,
+	type ResolvedReproducibility,
+	readReproducibilityEnv,
+	resolveReproducibility,
+	toSessionRecord,
+} from "./reproducibility/index.ts";
 import type { ResourceExtensionPaths, ResourceLoader } from "./resource-loader.ts";
 import {
 	formatSchemaMismatchNote,
@@ -380,6 +388,8 @@ export class AgentSession {
 	private _dryRunEnabled = false;
 	// Diagnostic mode (#49): mutating tools are blocked; reads allowed.
 	private _diagnosticEnabled = false;
+	// Session seed and audit mode (#70). Resolved once at construction.
+	private _reproducibility: ResolvedReproducibility;
 	// Sandbox mode (#10): agent bash commands run inside an OS-level sandbox.
 	private _sandboxBashEnabled = false;
 
@@ -401,6 +411,20 @@ export class AgentSession {
 		this._trekStore = new TrekVersionStore(this._cwd, nodeTrekStoreFs);
 		this._editCheckpoints.hydrate(this.sessionManager.getLatestEditBatchCheckpoint<SerializedCheckpoints>());
 		this._diagnosticEnabled = isTrekEnvTruthy("DIAGNOSTIC") || this.settingsManager.getDiagnostic();
+		const existingRepro = parseSessionRecord(this.sessionManager.getReproducibilityTrace());
+		this._reproducibility = existingRepro
+			? {
+					mode: existingRepro.mode,
+					seed: existingRepro.seed,
+					seedSource: existingRepro.seedSource,
+					temperature: existingRepro.temperature,
+					topP: existingRepro.topP,
+					cpaSeed: existingRepro.cpaSeed,
+				}
+			: resolveReproducibility({
+					settings: this.settingsManager.getReproducibilitySettings(),
+					env: readReproducibilityEnv(),
+				});
 
 		if (isReflectiveLoopEnabled()) {
 			this._reflectiveLoop = new ReflectiveLoopController(this.sessionManager);
@@ -1471,6 +1495,42 @@ export class AgentSession {
 		debugLog("prologue", "system prompt trace recorded", trace);
 	}
 
+	/** Session seed + mode, logged once (D5). */
+	getReproducibility(): ResolvedReproducibility {
+		return this._reproducibility;
+	}
+
+	private _ensureReproducibilityTrace(): void {
+		if (this.sessionManager.hasReproducibilityTrace()) {
+			const existing = parseSessionRecord(this.sessionManager.getReproducibilityTrace());
+			if (existing) {
+				this._reproducibility = {
+					mode: existing.mode,
+					seed: existing.seed,
+					seedSource: existing.seedSource,
+					temperature: existing.temperature,
+					topP: existing.topP,
+					cpaSeed: existing.cpaSeed,
+				};
+			}
+			return;
+		}
+		const record = toSessionRecord(this._reproducibility);
+		this.sessionManager.appendReproducibilityTrace(record);
+		debugLog("reproducibility", "session seed recorded", record);
+	}
+
+	private _assertStrictAuditModel(): void {
+		if (this._reproducibility.mode !== "strict_audit") {
+			return;
+		}
+		const model = this.model;
+		if (!model) {
+			return;
+		}
+		assertStrictAuditProvider(model.provider);
+	}
+
 	private _assignPromptNumber(expandedText: string): { promptNumber: number; promptId: string } {
 		const promptNumber = this.sessionManager.getNextPromptNumber();
 		const promptId = `#${promptNumber}`;
@@ -1665,6 +1725,8 @@ export class AgentSession {
 				throw new Error(formatNoModelSelectedMessage());
 			}
 
+			this._assertStrictAuditModel();
+
 			if (!this._modelRegistry.hasConfiguredAuth(this.model)) {
 				const isOAuth = this._modelRegistry.isUsingOAuth(this.model);
 				if (isOAuth) {
@@ -1714,6 +1776,7 @@ export class AgentSession {
 			this._pendingNextTurnMessages = [];
 
 			this._ensureSystemPromptTrace();
+			this._ensureReproducibilityTrace();
 			({ promptId } = this._assignPromptNumber(expandedText));
 			this._lastPromptTask = expandedText;
 

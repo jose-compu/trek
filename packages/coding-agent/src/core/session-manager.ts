@@ -1119,6 +1119,24 @@ export class SessionManager {
 		return this.getEntries().some((entry) => entry.type === "custom" && entry.customType === "trek:system_prompt");
 	}
 
+	/** Persist the session seed and reproducibility mode once (0.7.0, #70). */
+	appendReproducibilityTrace(data: unknown): string {
+		return this.appendCustomEntry("trek:reproducibility", data);
+	}
+
+	hasReproducibilityTrace(): boolean {
+		return this.getEntries().some((entry) => entry.type === "custom" && entry.customType === "trek:reproducibility");
+	}
+
+	getReproducibilityTrace<T = unknown>(): T | undefined {
+		for (const entry of this.getEntries()) {
+			if (entry.type === "custom" && entry.customType === "trek:reproducibility") {
+				return entry.data as T;
+			}
+		}
+		return undefined;
+	}
+
 	/** Get the current session name from the latest session_info entry, if any. */
 	getSessionName(): string | undefined {
 		// Walk entries in reverse to find the latest session_info entry.
