@@ -8,6 +8,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 - **Reproducibility policy** (`default` / `strict_audit`), session seed (default `42`, D5), and `trek:reproducibility` session JSONL record ([#70](https://github.com/jose-compu/trek/issues/70), [#75](https://github.com/jose-compu/trek/issues/75)).
 - **Seed propagation** to seed-capable providers; Anthropic omits seed ([#71](https://github.com/jose-compu/trek/issues/71)).
+- **Startup determinism warning** and `trek config reproducibility` ([#72](https://github.com/jose-compu/trek/issues/72), [#74](https://github.com/jose-compu/trek/issues/74)).
 
 ## [0.6.0] - 2026-08-27
 

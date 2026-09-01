@@ -273,6 +273,7 @@ ${chalk.bold("Commands:")}
   ${APP_NAME} trace replay <cycleId>    Counterfactual stub: fork and patch observe (#50)
   ${APP_NAME} telegram                  Long-poll Telegram (allowlisted DMs/groups)
   ${APP_NAME} config                    Open TUI to enable/disable package resources
+  ${APP_NAME} config reproducibility    Show or set audit seed and mode (#74)
   ${APP_NAME} <command> --help          Show help for install/remove/uninstall/update/list
 
 ${chalk.bold("Options:")}
@@ -434,6 +435,8 @@ ${chalk.bold("Environment Variables:")}
   TREK_SKIP_VERSION_CHECK          - Skip version update check at startup
   TREK_DEBUG                       - Verbose internal logging (same as --debug)
   TREK_DIAGNOSTIC                  - Trace-only: block mutating tools (same as --diagnostic)
+  TREK_SEED                        - Session sampling seed (integer or random)
+  TREK_REPRODUCIBILITY_MODE        - default or strict_audit
   TREK_TELEGRAM_BOT_TOKEN          - Telegram bot token for ${APP_NAME} telegram
   TREK_ALLOW_LOCKFILE_CHANGE       - Allow committing package-lock.json changes (pre-commit hook)
   TREK_TIMING                      - Print startup timing breakdown to stderr
