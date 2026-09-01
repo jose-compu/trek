@@ -1,6 +1,6 @@
 <img width="1983" height="793" alt="image" src="https://github.com/user-attachments/assets/f48bedce-d4a1-4569-a128-2fdefcfcc012" />
 
-# Trek Agent v0.6.0
+# Trek Agent v0.7.0
 
 Trek is a **hard fork of the [Pi Coding Agent](https://pi.dev/)** — the minimal terminal coding agent with read, bash, edit, write tools, sessions, and a TypeScript extension ecosystem.
 
@@ -12,7 +12,7 @@ Pi optimizes for simplicity and adaptability: you extend it with plugins rather 
 |---|---|---|
 | **Safety** | Laws hierarchy, HALT, read-before-write, honesty protocol, dry-run, sandbox, undo | **0.4.0 Guardrails** → 0.13.0 Guardrails+ |
 | **Undo** | `.trek` file versions, `trek history` / `trek revert`, labeled git commits | **0.5.0 Undo** |
-| **Determinism** | Full O→I→A→R traces, replay, seed logging, honest reproducibility limits | **0.6.0 Trace** (current) → 0.7.0 Audit |
+| **Determinism** | Full O→I→A→R traces, replay, seed logging, honest reproducibility limits | 0.6.0 Trace → **0.7.0 Audit** (current) |
 | **Memory** | Session / project / global layers with incremental indexing | 0.11.0 Memory |
 | **Domain workflows** | Per-domain skills and predictable [Archon](https://github.com/coleam00/Archon) workflows (Meta, AI, Security always on; optional domains toggled in config); auto-selection during **Intend**; `trek domains` / `trek workflows` | 0.12.0 Domains |
 | **Local model hierarchy** | Tooling → work-horse → planning tiers, llama.cpp runtime, per-component routing | 0.8.0 Runtime → 0.9.0 Routing |
@@ -21,11 +21,11 @@ Every user turn follows **Observe → Intend → Act → Reflect** (O→I→A→
 
 Pi compatibility is preserved: community packages from [pi.dev/packages](https://pi.dev/packages) install with `trek install npm:<package>`. See [Pi Coding Agent plugins](#pi-coding-agent-plugins) below.
 
-**Version:** 0.6.0 — see [CHANGELOG.md](./CHANGELOG.md). Full plan: [ROADMAP.md](../ROADMAP.md).
+**Version:** 0.7.0 — see [CHANGELOG.md](./CHANGELOG.md). Full plan: [ROADMAP.md](../ROADMAP.md).
 
 ## Status
 
-**0.6.0 Trace + Telegram** shipped — O→I→A→R JSONL traces (`trek trace`), diagnostic mode, and `trek telegram` for allowlisted DMs/groups. Git tag `v0.6.0` is the remaining release chore. Next: **0.7.0 Audit**. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
+**0.7.0 Audit** shipped — session seed (default `42`), `default` / `strict_audit` modes, per-step `trek:audit_step` records, and honest warnings when a provider cannot honor seed. Bit-exact replay is not claimed on closed APIs. Next: **0.8.0 Runtime**. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
 
 ## Trace CLI
 
@@ -40,6 +40,22 @@ trek trace replay c-0001 --observe "patched observation"
 ```
 
 `--diagnostic` / `TREK_DIAGNOSTIC=1` records traces and blocks mutating tools (write/edit/bash).
+
+## Reproducibility
+
+Honest best-effort: the session seed is always logged. Closed APIs may still drift.
+
+```bash
+trek config reproducibility
+trek config reproducibility --mode default|strict_audit
+trek config reproducibility --seed 42
+trek config reproducibility --seed random
+```
+
+- **default:** log seed, temperature, and `trek:audit_step` hashes; send seed when the provider accepts it.
+- **strict_audit:** refuse providers that cannot honor seed (local / faux only).
+- **`TREK_SEED`:** integer or `random`. **`TREK_REPRODUCIBILITY_MODE`:** `default` or `strict_audit`.
+- Startup warns when the active provider cannot honor determinism (suppressed by `quietStartup`; still written to the debug log).
 
 ## Telegram
 
