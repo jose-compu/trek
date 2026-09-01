@@ -57,3 +57,29 @@ export interface ProviderDeterminism {
 	support: DeterminismSupport;
 	notes: string;
 }
+
+/** Session JSONL customType for one LLM completion (#73). */
+export const AUDIT_STEP_CUSTOM_TYPE = "trek:audit_step";
+export const AUDIT_STEP_SCHEMA_VERSION = 1;
+
+/**
+ * Audit trail per LLM step (REFLECTIVE §12.4).
+ * Hashes are 16-char sha256 prefixes. `retrievedLessonIds` stays empty until 0.11.0 Memory.
+ */
+export interface AuditStepRecord {
+	schemaVersion: typeof AUDIT_STEP_SCHEMA_VERSION;
+	stepId: string;
+	model: string;
+	modelVersion?: string;
+	seed: number;
+	temperature: number;
+	topP: number;
+	systemFingerprint?: string;
+	providerRequestId?: string;
+	inputHash: string;
+	outputHash: string;
+	toolsAvailableHash: string;
+	skillsActiveHash: string;
+	retrievedLessonIds: string[];
+	timestamp: string;
+}

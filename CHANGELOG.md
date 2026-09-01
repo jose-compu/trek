@@ -12,6 +12,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 - **Seed propagation** to OpenAI, Gemini, Vertex, Azure, and llama.cpp-compatible completions; Anthropic omits seed. OpenAI completions copy `system_fingerprint` when present ([#71](https://github.com/jose-compu/trek/issues/71)).
 - **Startup determinism warning** when the active provider cannot honor seed ([#72](https://github.com/jose-compu/trek/issues/72)).
 - **`trek config reproducibility`**: show/set mode and seed ([#74](https://github.com/jose-compu/trek/issues/74)).
+- **Per-step audit record** `trek:audit_step` on session JSONL (model, seed, hashes, `system_fingerprint`) ([#73](https://github.com/jose-compu/trek/issues/73)).
 
 ## [0.6.0] - 2026-08-27
 
