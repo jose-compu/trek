@@ -113,6 +113,9 @@ export interface AgentOptions {
 	transport?: Transport;
 	maxRetryDelayMs?: number;
 	toolExecution?: ToolExecutionMode;
+	temperature?: number;
+	topP?: number;
+	seed?: number;
 }
 
 class PendingMessageQueue {
@@ -197,6 +200,12 @@ export class Agent {
 	public maxRetryDelayMs?: number;
 	/** Tool execution strategy for assistant messages that contain multiple tool calls. */
 	public toolExecution: ToolExecutionMode;
+	/** Sampling temperature forwarded to providers (#71). */
+	public temperature?: number;
+	/** Nucleus sampling forwarded to providers (#71). */
+	public topP?: number;
+	/** Session sampling seed forwarded to providers that honor it (#71). */
+	public seed?: number;
 
 	constructor(options: AgentOptions = {}) {
 		this._state = createMutableAgentState(options.initialState);
@@ -216,6 +225,9 @@ export class Agent {
 		this.transport = options.transport ?? "auto";
 		this.maxRetryDelayMs = options.maxRetryDelayMs;
 		this.toolExecution = options.toolExecution ?? "parallel";
+		this.temperature = options.temperature;
+		this.topP = options.topP;
+		this.seed = options.seed;
 	}
 
 	/**
@@ -432,6 +444,9 @@ export class Agent {
 			transport: this.transport,
 			thinkingBudgets: this.thinkingBudgets,
 			maxRetryDelayMs: this.maxRetryDelayMs,
+			temperature: this.temperature,
+			topP: this.topP,
+			seed: this.seed,
 			toolExecution: this.toolExecution,
 			beforeToolCall: this.beforeToolCall,
 			afterToolCall: this.afterToolCall,

@@ -131,6 +131,9 @@ describe("session JSONL trek:reproducibility (#70)", () => {
 			cpaSeed: 42,
 		});
 		expect(harness.session.getReproducibility().seed).toBe(42);
+		expect(harness.session.agent.seed).toBe(42);
+		expect(harness.session.agent.temperature).toBe(0);
+		expect(harness.session.agent.topP).toBe(1);
 
 		harness.setResponses([fauxAssistantMessage("again")]);
 		await harness.session.prompt("second");

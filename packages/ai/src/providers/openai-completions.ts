@@ -271,6 +271,9 @@ export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenA
 				// OpenAI documents ChatCompletionChunk.id as the unique chat completion identifier,
 				// and each chunk in a streamed completion carries the same id.
 				output.responseId ||= chunk.id;
+				if (typeof chunk.system_fingerprint === "string" && chunk.system_fingerprint.length > 0) {
+					output.systemFingerprint ||= chunk.system_fingerprint;
+				}
 				if (typeof chunk.model === "string" && chunk.model.length > 0 && chunk.model !== model.id) {
 					output.responseModel ||= chunk.model;
 				}
@@ -534,6 +537,14 @@ function buildParams(
 
 	if (options?.temperature !== undefined) {
 		params.temperature = options.temperature;
+	}
+
+	if (options?.topP !== undefined) {
+		params.top_p = options.topP;
+	}
+
+	if (options?.seed !== undefined) {
+		params.seed = options.seed;
 	}
 
 	if (context.tools && context.tools.length > 0) {

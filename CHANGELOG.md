@@ -9,6 +9,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 ### Added
 
 - **Reproducibility policy** (`default` / `strict_audit`), session seed (default `42`, D5), and `trek:reproducibility` session JSONL record ([#70](https://github.com/jose-compu/trek/issues/70), [#75](https://github.com/jose-compu/trek/issues/75)).
+- **Seed propagation** to OpenAI, Gemini, Vertex, Azure, and llama.cpp-compatible completions; Anthropic omits seed. OpenAI completions copy `system_fingerprint` when present ([#71](https://github.com/jose-compu/trek/issues/71)).
 
 ## [0.6.0] - 2026-08-27
 

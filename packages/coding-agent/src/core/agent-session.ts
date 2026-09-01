@@ -425,6 +425,7 @@ export class AgentSession {
 					settings: this.settingsManager.getReproducibilitySettings(),
 					env: readReproducibilityEnv(),
 				});
+		this._applyReproducibilityToAgent();
 
 		if (isReflectiveLoopEnabled()) {
 			this._reflectiveLoop = new ReflectiveLoopController(this.sessionManager);
@@ -1500,6 +1501,12 @@ export class AgentSession {
 		return this._reproducibility;
 	}
 
+	private _applyReproducibilityToAgent(): void {
+		this.agent.seed = this._reproducibility.seed;
+		this.agent.temperature = this._reproducibility.temperature;
+		this.agent.topP = this._reproducibility.topP;
+	}
+
 	private _ensureReproducibilityTrace(): void {
 		if (this.sessionManager.hasReproducibilityTrace()) {
 			const existing = parseSessionRecord(this.sessionManager.getReproducibilityTrace());
@@ -1512,6 +1519,7 @@ export class AgentSession {
 					topP: existing.topP,
 					cpaSeed: existing.cpaSeed,
 				};
+				this._applyReproducibilityToAgent();
 			}
 			return;
 		}

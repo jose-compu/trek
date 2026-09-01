@@ -26,6 +26,8 @@ vi.mock("openai", () => {
 					const stream = {
 						async *[Symbol.asyncIterator]() {
 							yield {
+								id: "chatcmpl-test",
+								system_fingerprint: "fp_abc123",
 								choices: [{ delta: {}, finish_reason: "stop" }],
 								usage: {
 									prompt_tokens: 1,
@@ -263,5 +265,24 @@ describe("openai-completions empty tools handling", () => {
 		const params = mockState.lastParams as { tools?: unknown[] };
 		expect(Array.isArray(params.tools)).toBe(true);
 		expect(params.tools).toEqual([]);
+	});
+
+	it("sends seed and top_p and captures system_fingerprint (#71)", async () => {
+		const { compat: _compat, ...baseModel } = getModel("openai", "gpt-4o-mini")!;
+		const model = { ...baseModel, api: "openai-completions" } as const;
+
+		const message = await streamSimple(
+			model,
+			{
+				messages: [{ role: "user", content: "hi", timestamp: Date.now() }],
+			},
+			{ apiKey: "test", seed: 42, topP: 1, temperature: 0 },
+		).result();
+
+		const params = mockState.lastParams as { seed?: number; top_p?: number; temperature?: number };
+		expect(params.seed).toBe(42);
+		expect(params.top_p).toBe(1);
+		expect(params.temperature).toBe(0);
+		expect(message.systemFingerprint).toBe("fp_abc123");
 	});
 });

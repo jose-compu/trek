@@ -93,6 +93,9 @@ export interface AgentHarnessStreamOptions {
 	metadata?: SimpleStreamOptions["metadata"];
 	/** Provider cache retention hint. */
 	cacheRetention?: SimpleStreamOptions["cacheRetention"];
+	temperature?: SimpleStreamOptions["temperature"];
+	topP?: SimpleStreamOptions["topP"];
+	seed?: SimpleStreamOptions["seed"];
 }
 
 /** Per-request stream option patch returned by provider hooks. */
