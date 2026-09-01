@@ -162,12 +162,18 @@ describe("AgentSession bash and persistence characterization", () => {
 		expect(entries.map((entry) => entry.type)).toEqual([
 			"custom_message",
 			"custom",
+			"custom",
 			"prompt_meta",
 			"message",
 			"message",
 			"message",
 			"message",
 		]);
+		expect(
+			entries
+				.filter((entry) => entry.type === "custom")
+				.map((entry) => (entry as { customType?: string }).customType),
+		).toEqual(["trek:system_prompt", "trek:reproducibility"]);
 		expect(harness.session.messages.map((message) => message.role)).toEqual([
 			"custom",
 			"user",
