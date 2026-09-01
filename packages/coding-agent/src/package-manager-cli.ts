@@ -394,6 +394,11 @@ export async function handleConfigCommand(args: string[]): Promise<boolean> {
 		return false;
 	}
 
+	if (args[1] === "reproducibility") {
+		const { handleReproducibilityConfig } = await import("./reproducibility-cli.ts");
+		return await handleReproducibilityConfig(args);
+	}
+
 	const cwd = process.cwd();
 	const agentDir = getAgentDir();
 	const settingsManager = SettingsManager.create(cwd, agentDir);

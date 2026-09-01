@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import type { ImageContent } from "@trek/ai";
+import chalk from "chalk";
+import { debugLog } from "../../utils/debug-log.ts";
 import type { AgentSession } from "../agent-session.ts";
+import { formatDeterminismWarning } from "../reproducibility/index.ts";
 import { createAgentSession } from "../sdk.ts";
 import { SessionManager } from "../session-manager.ts";
 import type { TelegramPromptAttachment, TelegramSessionHost } from "./types.ts";
@@ -46,7 +49,17 @@ export class AgentTelegramHost implements TelegramSessionHost {
 			sessionManager: SessionManager.create(this.cwd, undefined, { id: sessionKey }),
 		});
 		this.sessions.set(sessionKey, created.session);
-		return created.session;
+		const session = created.session;
+		if (session.model) {
+			const warning = formatDeterminismWarning(session.model.provider, session.getReproducibility());
+			if (warning) {
+				debugLog("reproducibility", warning);
+				if (!session.settingsManager.getQuietStartup()) {
+					console.error(chalk.yellow(warning));
+				}
+			}
+		}
+		return session;
 	}
 
 	async prompt(sessionKey: string, text: string, attachments: TelegramPromptAttachment[] = []): Promise<string> {

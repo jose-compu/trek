@@ -31,6 +31,7 @@ import { KeybindingsManager } from "./core/keybindings.ts";
 import type { ModelRegistry } from "./core/model-registry.ts";
 import { resolveCliModel, resolveModelScope, type ScopedModel } from "./core/model-resolver.ts";
 import { restoreStdout, takeOverStdout } from "./core/output-guard.ts";
+import { formatDeterminismWarning } from "./core/reproducibility/index.ts";
 import type { CreateAgentSessionOptions } from "./core/sdk.ts";
 import {
 	formatMissingSessionCwdPrompt,
@@ -784,6 +785,16 @@ export async function main(args: string[], options?: MainOptions) {
 	}
 	if (parsed.sandbox) {
 		session.setSandboxBash(true);
+	}
+
+	if (session.model) {
+		const warning = formatDeterminismWarning(session.model.provider, session.getReproducibility());
+		if (warning) {
+			debugLog("reproducibility", warning);
+			if (!session.settingsManager.getQuietStartup()) {
+				console.error(chalk.yellow(warning));
+			}
+		}
 	}
 
 	const startupBenchmark = isTrekEnvTruthy("STARTUP_BENCHMARK");
