@@ -59,6 +59,8 @@ export type ProxyAssistantMessageEvent =
 type ProxySerializableStreamOptions = Pick<
 	SimpleStreamOptions,
 	| "temperature"
+	| "topP"
+	| "seed"
 	| "maxTokens"
 	| "reasoning"
 	| "cacheRetention"
@@ -101,6 +103,8 @@ export interface ProxyStreamOptions extends ProxySerializableStreamOptions {
 function buildProxyRequestOptions(options: ProxyStreamOptions): ProxySerializableStreamOptions {
 	return {
 		temperature: options.temperature,
+		topP: options.topP,
+		seed: options.seed,
 		maxTokens: options.maxTokens,
 		reasoning: options.reasoning,
 		cacheRetention: options.cacheRetention,

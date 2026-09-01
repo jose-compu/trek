@@ -86,6 +86,13 @@ export interface ProviderResponse {
 
 export interface StreamOptions {
 	temperature?: number;
+	/** Nucleus sampling. Providers that do not support `top_p` ignore this. */
+	topP?: number;
+	/**
+	 * Sampling seed for providers that accept one (OpenAI, Gemini, llama.cpp).
+	 * Anthropic and other non-seed APIs ignore this field.
+	 */
+	seed?: number;
 	maxTokens?: number;
 	signal?: AbortSignal;
 	apiKey?: string;
@@ -293,6 +300,8 @@ export interface AssistantMessage {
 	model: string;
 	responseModel?: string; // Concrete `chunk.model` when different from the requested `model` (e.g. OpenRouter `auto` -> `anthropic/...`)
 	responseId?: string; // Provider-specific response/message identifier when the upstream API exposes one
+	/** OpenAI `system_fingerprint` when the upstream completion reports one (#71). */
+	systemFingerprint?: string;
 	diagnostics?: AssistantMessageDiagnostic[]; // Redacted provider/runtime diagnostics for failures and recoveries.
 	usage: Usage;
 	stopReason: StopReason;

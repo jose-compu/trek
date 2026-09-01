@@ -248,6 +248,14 @@ function buildParams(model: Model<"openai-responses">, context: Context, options
 		params.temperature = options?.temperature;
 	}
 
+	if (options?.topP !== undefined) {
+		params.top_p = options.topP;
+	}
+
+	if (options?.seed !== undefined) {
+		(params as { seed?: number }).seed = options.seed;
+	}
+
 	if (options?.serviceTier !== undefined) {
 		params.service_tier = options.serviceTier;
 	}

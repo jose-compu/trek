@@ -102,6 +102,9 @@ function applyStreamOptionsPatch(
 	if (Object.hasOwn(patch, "maxRetries")) result.maxRetries = patch.maxRetries;
 	if (Object.hasOwn(patch, "maxRetryDelayMs")) result.maxRetryDelayMs = patch.maxRetryDelayMs;
 	if (Object.hasOwn(patch, "cacheRetention")) result.cacheRetention = patch.cacheRetention;
+	if (Object.hasOwn(patch, "temperature")) result.temperature = patch.temperature;
+	if (Object.hasOwn(patch, "topP")) result.topP = patch.topP;
+	if (Object.hasOwn(patch, "seed")) result.seed = patch.seed;
 
 	if (Object.hasOwn(patch, "headers")) {
 		if (patch.headers === undefined) {
@@ -396,6 +399,9 @@ export class AgentHarness<
 				timeoutMs: requestOptions.timeoutMs,
 				transport: requestOptions.transport,
 				apiKey: auth?.apiKey,
+				temperature: streamOptions?.temperature ?? requestOptions.temperature,
+				topP: streamOptions?.topP ?? requestOptions.topP,
+				seed: streamOptions?.seed ?? requestOptions.seed,
 			});
 		};
 	}
