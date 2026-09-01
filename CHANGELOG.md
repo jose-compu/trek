@@ -13,6 +13,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 - **Startup determinism warning** when the active provider cannot honor seed ([#72](https://github.com/jose-compu/trek/issues/72)).
 - **`trek config reproducibility`**: show/set mode and seed ([#74](https://github.com/jose-compu/trek/issues/74)).
 - **Per-step audit record** `trek:audit_step` on session JSONL (model, seed, hashes, `system_fingerprint`) ([#73](https://github.com/jose-compu/trek/issues/73)).
+- **0.7.0 Audit acceptance gate** (same seed → same tool intent, fingerprint, warnings, schema) ([#76](https://github.com/jose-compu/trek/issues/76)).
 
 ## [0.6.0] - 2026-08-27
 
