@@ -76,6 +76,7 @@ export function fauxAssistantMessage(
 		stopReason?: AssistantMessage["stopReason"];
 		errorMessage?: string;
 		responseId?: string;
+		systemFingerprint?: string;
 		timestamp?: number;
 	} = {},
 ): AssistantMessage {
@@ -89,6 +90,7 @@ export function fauxAssistantMessage(
 		stopReason: options.stopReason ?? "stop",
 		errorMessage: options.errorMessage,
 		responseId: options.responseId,
+		systemFingerprint: options.systemFingerprint,
 		timestamp: options.timestamp ?? Date.now(),
 	};
 }

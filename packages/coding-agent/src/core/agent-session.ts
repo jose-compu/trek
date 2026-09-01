@@ -100,6 +100,7 @@ import {
 } from "./reflective-loop/index.ts";
 import {
 	assertStrictAuditProvider,
+	buildAuditStep,
 	parseSessionRecord,
 	type ResolvedReproducibility,
 	readReproducibilityEnv,
@@ -1074,6 +1075,7 @@ export class AgentSession {
 				this._lastAssistantMessage = event.message;
 
 				const assistantMsg = event.message as AssistantMessage;
+				this._appendAuditStep(assistantMsg);
 				if (assistantMsg.stopReason !== "error") {
 					this._overflowRecoveryAttempted = false;
 				}
@@ -1526,6 +1528,20 @@ export class AgentSession {
 		const record = toSessionRecord(this._reproducibility);
 		this.sessionManager.appendReproducibilityTrace(record);
 		debugLog("reproducibility", "session seed recorded", record);
+	}
+
+	private _appendAuditStep(assistant: AssistantMessage): void {
+		const prior = this.agent.state.messages.filter((message) => message !== assistant);
+		const record = buildAuditStep({
+			stepNumber: this.sessionManager.getAuditSteps().length + 1,
+			assistant,
+			priorMessages: prior,
+			reproducibility: this._reproducibility,
+			toolNames: this.getActiveToolNames(),
+			skillNames: this._resourceLoader.getSkills().skills.map((skill) => skill.name),
+		});
+		this.sessionManager.appendAuditStep(record);
+		debugLog("reproducibility", "audit step recorded", record);
 	}
 
 	private _assertStrictAuditModel(): void {

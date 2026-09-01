@@ -1137,6 +1137,21 @@ export class SessionManager {
 		return undefined;
 	}
 
+	/** Persist one LLM-step audit record (0.7.0, #73). */
+	appendAuditStep(data: unknown): string {
+		return this.appendCustomEntry("trek:audit_step", data);
+	}
+
+	getAuditSteps<T = unknown>(): T[] {
+		const steps: T[] = [];
+		for (const entry of this.getEntries()) {
+			if (entry.type === "custom" && entry.customType === "trek:audit_step" && entry.data !== undefined) {
+				steps.push(entry.data as T);
+			}
+		}
+		return steps;
+	}
+
 	/** Get the current session name from the latest session_info entry, if any. */
 	getSessionName(): string | undefined {
 		// Walk entries in reverse to find the latest session_info entry.
