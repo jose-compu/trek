@@ -5,6 +5,7 @@ import lockfile from "proper-lockfile";
 import { CONFIG_DIR_NAME, getAgentDir, isTrekEnvTruthy } from "../config.ts";
 import { normalizePath, resolvePath } from "../utils/paths.ts";
 import { DEFAULT_HTTP_IDLE_TIMEOUT_MS, parseHttpIdleTimeoutMs } from "./http-dispatcher.ts";
+import type { ReproducibilitySettings } from "./reproducibility/types.ts";
 
 export interface CompactionSettings {
 	enabled?: boolean; // default: true
@@ -115,6 +116,8 @@ export interface Settings {
 	websocketConnectTimeoutMs?: number; // WebSocket connect/open handshake timeout in milliseconds; 0 disables it
 	/** Diagnostic operator mode (#49): traces on, mutating tools blocked. */
 	diagnostic?: boolean;
+	/** Audit / reproducibility policy (#70). */
+	reproducibility?: ReproducibilitySettings;
 }
 
 /** Deep merge settings: project/overrides take precedence, nested objects merge recursively */
@@ -786,6 +789,16 @@ export class SettingsManager {
 
 	getDiagnostic(): boolean {
 		return this.settings.diagnostic === true;
+	}
+
+	getReproducibilitySettings(): ReproducibilitySettings {
+		return { ...(this.settings.reproducibility ?? {}) };
+	}
+
+	setReproducibilitySettings(next: ReproducibilitySettings): void {
+		this.globalSettings.reproducibility = { ...next };
+		this.markModified("reproducibility");
+		this.save();
 	}
 
 	setQuietStartup(quiet: boolean): void {
