@@ -369,6 +369,75 @@ describe("agentLoop with AgentMessage", () => {
 		expect(executed).toEqual([123]);
 	});
 
+	it("can emit a non-error blocked tool result from beforeToolCall", async () => {
+		const toolSchema = Type.Object({ value: Type.String() });
+		let executed = 0;
+		const tool: AgentTool<typeof toolSchema, { value: string }> = {
+			name: "echo",
+			label: "Echo",
+			description: "Echo tool",
+			parameters: toolSchema,
+			async execute() {
+				executed += 1;
+				return {
+					content: [{ type: "text", text: "should not run" }],
+					details: { value: "no" },
+				};
+			},
+		};
+
+		const context: AgentContext = {
+			systemPrompt: "",
+			messages: [],
+			tools: [tool],
+		};
+
+		const config: AgentLoopConfig = {
+			model: createModel(),
+			convertToLlm: identityConverter,
+			beforeToolCall: async () => ({
+				block: true,
+				reason: "Already completed earlier in this prompt with the same arguments.",
+				isError: false,
+			}),
+		};
+
+		let callIndex = 0;
+		const streamFn = () => {
+			const stream = new MockAssistantStream();
+			queueMicrotask(() => {
+				if (callIndex === 0) {
+					const message = createAssistantMessage(
+						[{ type: "toolCall", id: "tool-1", name: "echo", arguments: { value: "hello" } }],
+						"toolUse",
+					);
+					stream.push({ type: "done", reason: "toolUse", message });
+				} else {
+					const message = createAssistantMessage([{ type: "text", text: "done" }]);
+					stream.push({ type: "done", reason: "stop", message });
+				}
+				callIndex++;
+			});
+			return stream;
+		};
+
+		const events: AgentEvent[] = [];
+		const stream = agentLoop([createUserMessage("echo something")], context, config, undefined, streamFn);
+		for await (const event of stream) {
+			events.push(event);
+		}
+
+		expect(executed).toBe(0);
+		const toolEnd = events.find((event) => event.type === "tool_execution_end");
+		expect(toolEnd?.type).toBe("tool_execution_end");
+		if (toolEnd?.type === "tool_execution_end") {
+			expect(toolEnd.isError).toBe(false);
+			expect(toolEnd.result.content).toEqual([
+				{ type: "text", text: "Already completed earlier in this prompt with the same arguments." },
+			]);
+		}
+	});
+
 	it("should prepare tool arguments for validation", async () => {
 		const replaceSchema = Type.Object({ oldText: Type.String(), newText: Type.String() });
 		const toolSchema = Type.Object({ edits: Type.Array(replaceSchema) });

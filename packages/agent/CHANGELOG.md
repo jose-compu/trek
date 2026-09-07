@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `beforeToolCall` can set `isError: false` on a blocked tool so a cached replay is not marked as a tool error ([#96](https://github.com/jose-compu/trek/issues/96)).
+
 ## [0.7.1] - 2026-09-07
 
 ## [0.7.0] - 2026-09-01

@@ -6,6 +6,10 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Fixed
+
+- Drop the `[idempotent]` prefix from duplicate write/edit/bash tool results so models see plain language, not a wrapper tag ([#96](https://github.com/jose-compu/trek/issues/96)).
+
 ## [0.7.1] - 2026-09-07
 
 ### Fixed

@@ -603,7 +603,7 @@ async function prepareToolCall(
 				return {
 					kind: "immediate",
 					result: createErrorToolResult(beforeResult.reason || "Tool execution was blocked"),
-					isError: true,
+					isError: beforeResult.isError ?? true,
 				};
 			}
 		}

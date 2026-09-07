@@ -504,7 +504,13 @@ export class AgentSession {
 
 			const idem = this._lookupIdempotent(toolCall.name, args);
 			if (idem) {
-				return { block: true, reason: `[idempotent] ${idem.text}` };
+				return idem.inFlight
+					? {
+							block: true,
+							reason: "Same write, edit, or bash is already running in this prompt; this duplicate was skipped.",
+							isError: false,
+						}
+					: this._blockedIdempotentResult(idem);
 			}
 
 			await this._captureEditCheckpoint(toolCall.name, args);
@@ -730,7 +736,23 @@ export class AgentSession {
 			.digest("hex");
 	}
 
-	private _lookupIdempotent(toolName: string, args: unknown): { text: string; isError: boolean } | undefined {
+	private _blockedIdempotentResult(cached: { text: string; isError: boolean }): {
+		block: true;
+		reason: string;
+		isError: boolean;
+	} {
+		const text = cached.text.trim();
+		const reason =
+			text.length > 0
+				? `Already completed earlier in this prompt with the same arguments. Previous result:\n${text}`
+				: "Already completed earlier in this prompt with the same arguments.";
+		return { block: true, reason, isError: cached.isError };
+	}
+
+	private _lookupIdempotent(
+		toolName: string,
+		args: unknown,
+	): { text: string; isError: boolean; inFlight?: boolean } | undefined {
 		if (toolName !== "write" && toolName !== "edit" && toolName !== "bash") {
 			return undefined;
 		}
@@ -740,7 +762,7 @@ export class AgentSession {
 			return cached;
 		}
 		if (this._idempotencyInFlight.has(key)) {
-			return { text: "duplicate tool call skipped", isError: false };
+			return { text: "", isError: false, inFlight: true };
 		}
 		this._idempotencyInFlight.add(key);
 		return undefined;

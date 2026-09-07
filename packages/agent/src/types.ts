@@ -49,12 +49,15 @@ export type AgentToolCall = Extract<AssistantMessage["content"][number], { type:
 /**
  * Result returned from `beforeToolCall`.
  *
- * Returning `{ block: true }` prevents the tool from executing. The loop emits an error tool result instead.
- * `reason` becomes the text shown in that error result. If omitted, a default blocked message is used.
+ * Returning `{ block: true }` prevents the tool from executing. The loop emits a tool result instead.
+ * `reason` becomes the text shown in that result. If omitted, a default blocked message is used.
+ * `isError` defaults to true when `block` is set. Set it false to replay a non-error result
+ * (for example a cached duplicate write/edit/bash).
  */
 export interface BeforeToolCallResult {
 	block?: boolean;
 	reason?: string;
+	isError?: boolean;
 }
 
 /**
@@ -256,7 +259,7 @@ export interface AgentLoopConfig extends SimpleStreamOptions {
 	/**
 	 * Called before a tool is executed, after arguments have been validated.
 	 *
-	 * Return `{ block: true }` to prevent execution. The loop emits an error tool result instead.
+	 * Return `{ block: true }` to prevent execution. The loop emits a tool result instead.
 	 * The hook receives the agent abort signal and is responsible for honoring it.
 	 */
 	beforeToolCall?: (context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult | undefined>;

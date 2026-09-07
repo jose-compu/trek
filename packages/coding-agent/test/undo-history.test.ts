@@ -98,9 +98,10 @@ describe("0.5.0 Undo history gate", () => {
 		await harness.session.prompt("write twice");
 		expect(readFileSync(join(harness.tempDir, "once.ts"), "utf-8")).toBe("a");
 		const results = harness.session.messages.filter((m) => m.role === "toolResult");
-		expect(results.some((m) => m.content.some((c) => c.type === "text" && c.text.includes("[idempotent]")))).toBe(
-			true,
-		);
+		const texts = results.flatMap((m) => m.content.filter((c) => c.type === "text").map((c) => c.text));
+		expect(texts.some((text) => text.includes("[idempotent]"))).toBe(false);
+		expect(texts.some((text) => text.includes("Already completed earlier in this prompt"))).toBe(true);
+		expect(results.some((m) => m.isError)).toBe(false);
 	});
 
 	it("fixture CLI history and revert (no LLM)", async () => {
