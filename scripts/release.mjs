@@ -99,9 +99,10 @@ function bumpOrSetVersion(target) {
 function getChangelogs() {
 	const packagesDir = "packages";
 	const packages = readdirSync(packagesDir);
-	return packages
+	const packageChangelogs = packages
 		.map((pkg) => join(packagesDir, pkg, "CHANGELOG.md"))
 		.filter((path) => existsSync(path));
+	return existsSync("CHANGELOG.md") ? ["CHANGELOG.md", ...packageChangelogs] : packageChangelogs;
 }
 
 function updateChangelogsForRelease(version) {
@@ -131,12 +132,15 @@ function addUnreleasedSection() {
 
 	for (const changelog of changelogs) {
 		const content = readFileSync(changelog, "utf-8");
-
-		// Insert after "# Changelog\n\n"
-		const updated = content.replace(
-			/^(# Changelog\n\n)/,
-			`$1${unreleasedSection}`
-		);
+		if (content.includes("## [Unreleased]")) {
+			console.log(`  Skipping ${changelog}: already has [Unreleased]`);
+			continue;
+		}
+		if (!/^## \[/m.test(content)) {
+			console.log(`  Skipping ${changelog}: no version heading`);
+			continue;
+		}
+		const updated = content.replace(/^## \[/m, `${unreleasedSection}## [`);
 		writeFileSync(changelog, updated);
 		console.log(`  Added [Unreleased] to ${changelog}`);
 	}
