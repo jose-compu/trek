@@ -33,6 +33,7 @@ import { AssistantMessageEventStream } from "../utils/event-stream.ts";
 import { headersToRecord } from "../utils/headers.ts";
 import { parseStreamingJson } from "../utils/json-parse.ts";
 import { sanitizeSurrogates } from "../utils/sanitize-unicode.ts";
+import { REPETITIVE_STREAM_ERROR, StreamRepetitionGuard } from "../utils/stream-repetition.ts";
 import { trekEnv } from "../utils/trek-env.ts";
 import { isCloudflareProvider, resolveCloudflareBaseUrl } from "./cloudflare.ts";
 import { buildCopilotDynamicHeaders, hasCopilotVisionInput } from "./github-copilot-headers.ts";
@@ -170,6 +171,13 @@ export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenA
 			let textBlock: TextContent | null = null;
 			let thinkingBlock: ThinkingContent | null = null;
 			let hasFinishReason = false;
+			const textRepetition = new StreamRepetitionGuard();
+			const thinkingRepetition = new StreamRepetitionGuard();
+			const assertNotRepetitive = (guard: StreamRepetitionGuard, delta: string) => {
+				if (guard.append(delta)) {
+					throw new Error(REPETITIVE_STREAM_ERROR);
+				}
+			};
 			const toolCallBlocksByIndex = new Map<number, StreamingToolCallBlock>();
 			const toolCallBlocksById = new Map<string, StreamingToolCallBlock>();
 			const blocks = output.content as StreamingBlock[];
@@ -307,6 +315,7 @@ export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenA
 					) {
 						const block = ensureTextBlock();
 						block.text += choice.delta.content;
+						assertNotRepetitive(textRepetition, choice.delta.content);
 						stream.push({
 							type: "text_delta",
 							contentIndex: getContentIndex(block),
@@ -339,6 +348,7 @@ export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenA
 									: foundReasoningField;
 							const block = ensureThinkingBlock(thinkingSignature);
 							block.thinking += delta;
+							assertNotRepetitive(thinkingRepetition, delta);
 							stream.push({
 								type: "thinking_delta",
 								contentIndex: getContentIndex(block),
@@ -1080,6 +1090,14 @@ function mapStopReason(reason: ChatCompletionChunk.Choice["finish_reason"] | str
 }
 
 /**
+ * Chat Completions `reasoning_effort` is documented for grok-4.5 and grok-4.6.
+ * Older Grok 4 / Grok 3 IDs reject or ignore the field.
+ */
+export function grokModelSupportsReasoningEffort(modelId: string): boolean {
+	return /(?:^|[/.])grok-4\.(5|6)(?:$|[.-])/.test(modelId.toLowerCase());
+}
+
+/**
  * Detect compatibility settings from provider and baseUrl for known providers.
  * Provider takes precedence over URL-based detection since it's explicitly configured.
  * Returns a fully resolved OpenAICompletionsCompat object with all fields set.
@@ -1132,7 +1150,8 @@ function detectCompat(model: Model<"openai-completions">): ResolvedOpenAIComplet
 		supportsStore: !isNonStandard,
 		supportsDeveloperRole: isOpenRouterDeveloperRoleModel || (!isNonStandard && !isOpenRouter),
 		supportsReasoningEffort:
-			!isGrok && !isZai && !isMoonshot && !isTogether && !isCloudflareAiGateway && !isNvidia && !isAntLing,
+			(isGrok && grokModelSupportsReasoningEffort(model.id)) ||
+			(!isGrok && !isZai && !isMoonshot && !isTogether && !isCloudflareAiGateway && !isNvidia && !isAntLing),
 		supportsUsageInStreaming: true,
 		maxTokensField: useMaxTokens ? "max_tokens" : "max_completion_tokens",
 		requiresToolResultName: false,

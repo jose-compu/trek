@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Send `reasoning_effort` for xAI Grok 4.5/4.6, and abort OpenAI-compatible streams that repeat the same thinking/text suffix ([#95](https://github.com/jose-compu/trek/issues/95)).
+
 ## [0.7.0] - 2026-09-01
 
 Lockstep with Trek 0.7.0 Audit. Seed / `top_p` on stream options; OpenAI completions copy `system_fingerprint`.

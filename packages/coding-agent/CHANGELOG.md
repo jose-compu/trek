@@ -4,6 +4,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Fixed
+
+- Stop Grok 4.6 reasoning loops: honor thinking level via `reasoning_effort`, abort repeated thinking, and do not auto-retry that error ([#95](https://github.com/jose-compu/trek/issues/95)).
+
 ## [0.7.0] - 2026-09-01
 
 ### Added
