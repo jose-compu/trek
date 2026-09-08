@@ -76,4 +76,46 @@ describe("regression #98: edit must not trigger a full rewrite", () => {
 		expect(texts[1]).toMatch(/Could not find the exact text/);
 		expect(texts.some((text) => /already applied|already completed|skipped|idempotent/i.test(text))).toBe(false);
 	});
+
+	it("re-runs a cached edit when oldText is still in the file", async () => {
+		const harness = await createHarness();
+		harnesses.push(harness);
+		const models = [
+			".model DBODY D(Is=8e-12 Rs=6m N=1.1 Cjo=700p Tt=40n BV=40 Ibv=50m)",
+			".model DPULSE D(Is=3e-12 Rs=12m N=1.08 Cjo=150p Tt=18n BV=120 Ibv=10m)",
+			"",
+		].join("\n");
+		const restored = `* restored\n${models}`;
+		const editArgs = {
+			path: "models.inc",
+			edits: [
+				{
+					oldText: ".model DBODY D(Is=8e-12 Rs=6m N=1.1 Cjo=700p Tt=40n BV=40 Ibv=50m)",
+					newText: ".model DSICbody D(Is=8e-12 Rs=6m N=1.1 Cjo=700p Tt=40n BV=80 Ibv=50m)",
+				},
+			],
+		};
+		harness.setResponses([
+			fauxAssistantMessage([fauxToolCall("write", { path: "models.inc", content: models })], {
+				stopReason: "toolUse",
+			}),
+			fauxAssistantMessage([fauxToolCall("edit", editArgs)], { stopReason: "toolUse" }),
+			fauxAssistantMessage([fauxToolCall("write", { path: "models.inc", content: restored })], {
+				stopReason: "toolUse",
+			}),
+			fauxAssistantMessage([fauxToolCall("edit", editArgs)], { stopReason: "toolUse" }),
+			fauxAssistantMessage("done"),
+		]);
+
+		await harness.session.prompt("remove DBODY");
+
+		const content = readFileSync(join(harness.tempDir, "models.inc"), "utf-8");
+		expect(content).toContain(".model DSICbody");
+		expect(content).not.toContain(".model DBODY");
+		const texts = toolTexts(harness, "edit");
+		expect(texts).toHaveLength(2);
+		expect(texts[0]).toMatch(/Successfully replaced/);
+		expect(texts[1]).toMatch(/Successfully replaced/);
+		expect(texts.some((text) => /already applied/i.test(text))).toBe(false);
+	});
 });

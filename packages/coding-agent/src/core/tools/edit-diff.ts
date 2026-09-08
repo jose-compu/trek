@@ -75,6 +75,7 @@ export interface FuzzyMatchResult {
 export interface Edit {
 	oldText: string;
 	newText: string;
+	replaceAll?: boolean;
 }
 
 interface MatchedEdit {
@@ -150,7 +151,9 @@ export function fuzzyFindText(content: string, oldText: string): FuzzyMatchResul
 }
 
 function lineMatchKey(line: string): string {
-	return normalizeForFuzzyMatch(line).trimStart();
+	return normalizeForFuzzyMatch(line)
+		.trimStart()
+		.replace(/[ \t]+/g, " ");
 }
 
 function needleLineKeys(oldText: string): string[] {
@@ -216,19 +219,69 @@ function findUniqueLineSpan(content: string, oldText: string): { index: number; 
 	return spans[0];
 }
 
-/** True when newText is already uniquely in the file, so a missed oldText is a no-op. */
-function isAlreadyPresent(content: string, newText: string): boolean {
-	const trimmed = newText.trim();
-	if (trimmed.length < 16 || (trimmed.length < 24 && !newText.includes("\n"))) {
-		return false;
+/** True when at least one oldText is still in the file, so a cached edit must run again. */
+export function editStillNeeded(content: string, edits: Edit[]): boolean {
+	const normalized = normalizeToLF(stripBom(content).text);
+	for (const edit of edits) {
+		if (typeof edit.oldText !== "string" || edit.oldText.length === 0) {
+			return true;
+		}
+		if (fuzzyFindText(normalized, normalizeToLF(edit.oldText)).found) {
+			return true;
+		}
 	}
-	const match = fuzzyFindText(content, newText);
-	if (!match.found) {
-		return false;
+	return false;
+}
+
+function collectAllMatches(
+	content: string,
+	oldText: string,
+	kind: "exact" | "fuzzy" | "lineSpan" | undefined,
+): Array<{ index: number; matchLength: number }> {
+	if (kind === "lineSpan") {
+		return collectLineSpans(content, oldText);
 	}
-	const occurrences =
-		match.kind === "lineSpan" ? collectLineSpans(content, newText).length : countOccurrences(content, newText);
-	return occurrences === 1;
+	const haystack = kind === "fuzzy" ? normalizeForFuzzyMatch(content) : content;
+	const needle = kind === "fuzzy" ? normalizeForFuzzyMatch(oldText) : oldText;
+	if (needle.length === 0) {
+		return [];
+	}
+	const spans: Array<{ index: number; matchLength: number }> = [];
+	let from = 0;
+	while (from <= haystack.length - needle.length) {
+		const index = haystack.indexOf(needle, from);
+		if (index === -1) {
+			break;
+		}
+		spans.push({ index, matchLength: needle.length });
+		from = index + needle.length;
+	}
+	return spans;
+}
+
+function similarLineHint(content: string, oldText: string): string {
+	const token = oldText
+		.split(/\s+/)
+		.filter((part) => part.length >= 4)
+		.sort((left, right) => right.length - left.length)[0];
+	if (!token) {
+		return "";
+	}
+	const hits: string[] = [];
+	const lines = content.split("\n");
+	for (let i = 0; i < lines.length; i++) {
+		if (!lines[i].includes(token)) {
+			continue;
+		}
+		hits.push(`  ${i + 1}: ${lines[i]}`);
+		if (hits.length >= 5) {
+			break;
+		}
+	}
+	if (hits.length === 0) {
+		return "";
+	}
+	return ` Lines still containing ${JSON.stringify(token)}:\n${hits.join("\n")}`;
 }
 
 /** Strip UTF-8 BOM if present, return both the BOM (if any) and the text without it */
@@ -242,23 +295,29 @@ function countOccurrences(content: string, oldText: string): number {
 	return fuzzyContent.split(fuzzyOldText).length - 1;
 }
 
-function getNotFoundError(path: string, editIndex: number, totalEdits: number): Error {
+function getNotFoundError(
+	path: string,
+	editIndex: number,
+	totalEdits: number,
+	content: string,
+	oldText: string,
+): Error {
 	const hint = "Re-read the file and retry edit with the current text. Do not rewrite the entire file.";
-	if (totalEdits === 1) {
-		return new Error(`Could not find the exact text in ${path}. The old text must match the current file. ${hint}`);
-	}
-	return new Error(`Could not find edits[${editIndex}] in ${path}. The oldText must match the current file. ${hint}`);
+	const similar = similarLineHint(content, oldText);
+	const prefix =
+		totalEdits === 1
+			? `Could not find the exact text in ${path}. The old text must match the current file. ${hint}`
+			: `Could not find edits[${editIndex}] in ${path}. The oldText must match the current file. ${hint}`;
+	return new Error(similar.length > 0 ? `${prefix}${similar}` : prefix);
 }
 
 function getDuplicateError(path: string, editIndex: number, totalEdits: number, occurrences: number): Error {
+	const hint =
+		"Add more context to oldText, or set replaceAll true to change every occurrence. Do not rewrite the file.";
 	if (totalEdits === 1) {
-		return new Error(
-			`Found ${occurrences} occurrences of the text in ${path}. The text must be unique. Please provide more context to make it unique.`,
-		);
+		return new Error(`Found ${occurrences} occurrences of the text in ${path}. ${hint}`);
 	}
-	return new Error(
-		`Found ${occurrences} occurrences of edits[${editIndex}] in ${path}. Each oldText must be unique. Please provide more context to make it unique.`,
-	);
+	return new Error(`Found ${occurrences} occurrences of edits[${editIndex}] in ${path}. ${hint}`);
 }
 
 function getEmptyOldTextError(path: string, editIndex: number, totalEdits: number): Error {
@@ -293,6 +352,7 @@ export function applyEditsToNormalizedContent(
 	const normalizedEdits = edits.map((edit) => ({
 		oldText: normalizeToLF(edit.oldText),
 		newText: normalizeToLF(edit.newText),
+		replaceAll: edit.replaceAll === true,
 	}));
 
 	for (let i = 0; i < normalizedEdits.length; i++) {
@@ -307,32 +367,37 @@ export function applyEditsToNormalizedContent(
 		: normalizedContent;
 
 	const matchedEdits: MatchedEdit[] = [];
-	let skippedAlreadyPresent = 0;
 	for (let i = 0; i < normalizedEdits.length; i++) {
 		const edit = normalizedEdits[i];
 		const matchResult = fuzzyFindText(baseContent, edit.oldText);
 		if (!matchResult.found) {
-			if (isAlreadyPresent(baseContent, edit.newText)) {
-				skippedAlreadyPresent += 1;
-				continue;
-			}
-			throw getNotFoundError(path, i, normalizedEdits.length);
+			throw getNotFoundError(path, i, normalizedEdits.length, baseContent, edit.oldText);
 		}
 
+		const spans = edit.replaceAll
+			? collectAllMatches(baseContent, edit.oldText, matchResult.kind)
+			: [
+					{
+						index: matchResult.index,
+						matchLength: matchResult.matchLength,
+					},
+				];
 		const occurrences =
 			matchResult.kind === "lineSpan"
 				? collectLineSpans(baseContent, edit.oldText).length
 				: countOccurrences(baseContent, edit.oldText);
-		if (occurrences > 1) {
+		if (!edit.replaceAll && occurrences > 1) {
 			throw getDuplicateError(path, i, normalizedEdits.length, occurrences);
 		}
 
-		matchedEdits.push({
-			editIndex: i,
-			matchIndex: matchResult.index,
-			matchLength: matchResult.matchLength,
-			newText: edit.newText,
-		});
+		for (const span of spans) {
+			matchedEdits.push({
+				editIndex: i,
+				matchIndex: span.index,
+				matchLength: span.matchLength,
+				newText: edit.newText,
+			});
+		}
 	}
 
 	matchedEdits.sort((a, b) => a.matchIndex - b.matchIndex);
@@ -356,9 +421,6 @@ export function applyEditsToNormalizedContent(
 	}
 
 	if (baseContent === newContent) {
-		if (skippedAlreadyPresent > 0) {
-			return { baseContent, newContent };
-		}
 		throw getNoChangeError(path, normalizedEdits.length);
 	}
 

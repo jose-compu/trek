@@ -122,6 +122,7 @@ import type { SlashCommandInfo } from "./slash-commands.ts";
 import { createSyntheticSourceInfo, type SourceInfo } from "./source-info.ts";
 import { type BuildSystemPromptOptions, buildSystemPrompt } from "./system-prompt.ts";
 import { type BashOperations, createLocalBashOperations } from "./tools/bash.ts";
+import { type Edit, editStillNeeded } from "./tools/edit-diff.ts";
 import { createAllToolDefinitions } from "./tools/index.ts";
 import { resolveToCwd } from "./tools/path-utils.ts";
 import { createToolDefinitionFromAgentTool } from "./tools/tool-definition-wrapper.ts";
@@ -504,13 +505,18 @@ export class AgentSession {
 
 			const idem = this._lookupIdempotent(toolCall.name, args);
 			if (idem) {
-				return idem.inFlight
-					? {
-							block: true,
-							reason: this._inFlightIdempotentReason(toolCall.name),
-							isError: false,
-						}
-					: this._blockedIdempotentResult(toolCall.name, idem);
+				if (idem.inFlight) {
+					return {
+						block: true,
+						reason: this._inFlightIdempotentReason(toolCall.name),
+						isError: false,
+					};
+				}
+				if (toolCall.name === "edit" && this._cachedEditStillNeeded(args)) {
+					this._forgetIdempotent(toolCall.name, args);
+				} else {
+					return this._blockedIdempotentResult(toolCall.name, idem);
+				}
 			}
 
 			await this._captureEditCheckpoint(toolCall.name, args);
@@ -780,6 +786,30 @@ export class AgentSession {
 		}
 		this._idempotencyInFlight.add(key);
 		return undefined;
+	}
+
+	private _forgetIdempotent(toolName: string, args: unknown): void {
+		const key = this._idempotencyKey(toolName, args);
+		this._idempotency.delete(key);
+		this._idempotencyInFlight.delete(key);
+	}
+
+	private _cachedEditStillNeeded(args: unknown): boolean {
+		if (!args || typeof args !== "object") {
+			return true;
+		}
+		const path = (args as { path?: unknown }).path;
+		const edits = (args as { edits?: unknown }).edits;
+		if (typeof path !== "string" || !Array.isArray(edits)) {
+			return true;
+		}
+		try {
+			const absolutePath = resolveToCwd(path, this._cwd);
+			const raw = readFileSync(absolutePath, "utf-8");
+			return editStillNeeded(raw, edits as Edit[]);
+		} catch {
+			return true;
+		}
 	}
 
 	private _rememberIdempotent(

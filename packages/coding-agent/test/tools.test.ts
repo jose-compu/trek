@@ -965,23 +965,74 @@ describe("edit tool fuzzy matching", () => {
 		).rejects.toThrow(/Do not rewrite the entire file/);
 	});
 
-	it("should treat a missed oldText as already applied when newText is uniquely present", async () => {
-		const testFile = join(testDir, "already-present.py");
-		writeFileSync(testFile, "def plot_d2():\n    return Vds_max\n");
+	it("must not claim already applied when oldText is still in the file", async () => {
+		const testFile = join(testDir, "models.inc");
+		writeFileSync(
+			testFile,
+			[
+				".model DFAST D(Is=3e-12 Rs=10m N=1.08 Cjo=180p Tt=25n BV=60 Ibv=20m)",
+				".model DBODY D(Is=8e-12 Rs=6m N=1.1 Cjo=700p Tt=40n BV=40 Ibv=50m)",
+				"* Pulse FETs need BV well above the 48 V rail so the freewheel diode",
+				"* can take inductor current. DBODY BV=40 avalanches first and holds",
+				".model DPULSE D(Is=3e-12 Rs=12m N=1.08 Cjo=150p Tt=18n BV=120 Ibv=10m)",
+				"",
+			].join("\n"),
+		);
 
-		const result = await editTool.execute("test-already-present", {
+		await expect(
+			editTool.execute("test-dbody-false-already-applied", {
+				path: testFile,
+				edits: [
+					{
+						oldText: ".model DBODY D(Is=8e-12 Rs=6m N=1.1 Cjo=700p Tt=40n BV=60 Ibv=50m)",
+						newText: ".model DPULSE D(Is=3e-12 Rs=12m N=1.08 Cjo=150p Tt=18n BV=120 Ibv=10m)",
+					},
+				],
+			}),
+		).rejects.toThrow(/Could not find the exact text[\s\S]*DBODY/);
+
+		const content = readFileSync(testFile, "utf-8");
+		expect(content).toContain("DBODY");
+		expect(content).not.toMatch(/already present|already applied/i);
+	});
+
+	it("replaces a unique DBODY model line without rewriting the file", async () => {
+		const testFile = join(testDir, "models-ok.inc");
+		writeFileSync(
+			testFile,
+			".model DBODY D(Is=8e-12 Rs=6m N=1.1 Cjo=700p Tt=40n BV=40 Ibv=50m)\n.model DPULSE D(Is=3e-12 Rs=12m N=1.08 Cjo=150p Tt=18n BV=120 Ibv=10m)\n",
+		);
+
+		const result = await editTool.execute("test-dbody-unique-edit", {
 			path: testFile,
 			edits: [
 				{
-					oldText: "def plot_d1():\n    return Vdrain_max\n",
-					newText: "def plot_d2():\n    return Vds_max\n",
+					oldText: ".model DBODY D(Is=8e-12 Rs=6m N=1.1 Cjo=700p Tt=40n BV=40 Ibv=50m)",
+					newText: ".model DSICbody D(Is=8e-12 Rs=6m N=1.1 Cjo=700p Tt=40n BV=80 Ibv=50m)",
 				},
 			],
 		});
 
-		expect(getTextOutput(result)).toMatch(/already present/);
-		expect(getTextOutput(result)).toMatch(/Do not rewrite the file/);
-		expect(readFileSync(testFile, "utf-8")).toBe("def plot_d2():\n    return Vds_max\n");
+		expect(getTextOutput(result)).toContain("Successfully replaced");
+		const content = readFileSync(testFile, "utf-8");
+		expect(content).not.toContain(".model DBODY");
+		expect(content).toContain(".model DSICbody");
+		expect(content).toContain(".model DPULSE");
+	});
+
+	it("replaces every DBODY occurrence when replaceAll is set", async () => {
+		const testFile = join(testDir, "d2_buck_injector.cir");
+		writeFileSync(testFile, "Dhs sw vin_in DBODY\nSls sw 0 gls 0 SWPWR\nDls 0 sw DBODY\nDph nph vin_in DPULSE\n");
+
+		const result = await editTool.execute("test-dbody-replace-all", {
+			path: testFile,
+			edits: [{ oldText: "DBODY", newText: "DPULSE", replaceAll: true }],
+		});
+
+		expect(getTextOutput(result)).toContain("Successfully replaced");
+		expect(readFileSync(testFile, "utf-8")).toBe(
+			"Dhs sw vin_in DPULSE\nSls sw 0 gls 0 SWPWR\nDls 0 sw DPULSE\nDph nph vin_in DPULSE\n",
+		);
 	});
 
 	it("should match when only leading indentation differs", async () => {

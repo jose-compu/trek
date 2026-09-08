@@ -4,6 +4,11 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Fixed
+
+- Do not treat a missed oldText as already applied just because newText exists elsewhere. If DBODY is still in the file, retry edit.
+- Re-run a cached edit when oldText is still on disk. Set replaceAll to change every occurrence instead of rewriting the file.
+
 ## [0.7.4] - 2026-09-08
 
 ### Fixed
