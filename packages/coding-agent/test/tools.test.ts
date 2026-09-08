@@ -953,6 +953,44 @@ describe("edit tool fuzzy matching", () => {
 		).rejects.toThrow(/Could not find the exact text/);
 	});
 
+	it("should tell the model to retry edit instead of rewriting the file", async () => {
+		const testFile = join(testDir, "retry-hint.txt");
+		writeFileSync(testFile, "hello\n");
+
+		await expect(
+			editTool.execute("test-fuzzy-retry-hint", {
+				path: testFile,
+				edits: [{ oldText: "missing", newText: "replacement" }],
+			}),
+		).rejects.toThrow(/Do not rewrite the entire file/);
+	});
+
+	it("should match when only leading indentation differs", async () => {
+		const testFile = join(testDir, "indent-mismatch.py");
+		writeFileSync(testFile, "def run():\n    print('a')\n    print('b')\n");
+
+		const result = await editTool.execute("test-indent-mismatch", {
+			path: testFile,
+			edits: [{ oldText: "print('a')\nprint('b')\n", newText: "print('c')\nprint('d')\n" }],
+		});
+
+		expect(getTextOutput(result)).toContain("Successfully replaced");
+		expect(readFileSync(testFile, "utf-8")).toBe("def run():\nprint('c')\nprint('d')\n");
+	});
+
+	it("should match tab-indented file against space-indented oldText", async () => {
+		const testFile = join(testDir, "tab-indent.py");
+		writeFileSync(testFile, "def run():\n\tprint('a')\n\tprint('b')\n");
+
+		const result = await editTool.execute("test-tab-indent", {
+			path: testFile,
+			edits: [{ oldText: "    print('a')\n    print('b')\n", newText: "    print('c')\n    print('d')\n" }],
+		});
+
+		expect(getTextOutput(result)).toContain("Successfully replaced");
+		expect(readFileSync(testFile, "utf-8")).toBe("def run():\n    print('c')\n    print('d')\n");
+	});
+
 	it("should detect duplicates after fuzzy normalization", async () => {
 		const testFile = join(testDir, "fuzzy-dups.txt");
 		// Two lines that are identical after trailing whitespace is stripped

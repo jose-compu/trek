@@ -89,7 +89,7 @@ import {
 	isHonestyProtocolEnabled,
 	parseHonestyReport,
 } from "./honesty/index.ts";
-import type { BashExecutionMessage, CustomMessage } from "./messages.ts";
+import { type BashExecutionMessage, type CustomMessage, stripIdempotentPrefix } from "./messages.ts";
 import type { ModelRegistry } from "./model-registry.ts";
 import { hashContent, type LoadedPrologue, loadPrologue } from "./prologue.ts";
 import { expandPromptTemplate, type PromptTemplate } from "./prompt-templates.ts";
@@ -507,7 +507,7 @@ export class AgentSession {
 				return idem.inFlight
 					? {
 							block: true,
-							reason: "Same write, edit, or bash is already running in this prompt; this duplicate was skipped.",
+							reason: "Same write or edit is already running in this prompt; this duplicate was skipped.",
 							isError: false,
 						}
 					: this._blockedIdempotentResult(idem);
@@ -741,7 +741,7 @@ export class AgentSession {
 		reason: string;
 		isError: boolean;
 	} {
-		const text = cached.text.trim();
+		const text = stripIdempotentPrefix(cached.text).trim();
 		const reason =
 			text.length > 0
 				? `Already completed earlier in this prompt with the same arguments. Previous result:\n${text}`

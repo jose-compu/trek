@@ -6,6 +6,11 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Fixed
+
+- Edit matches when only indentation or tabs/spaces differ, and failed edits tell the model to retry instead of rewriting the file.
+- Strip leftover `[idempotent]` prefixes from old tool results before they reach the model ([#96](https://github.com/jose-compu/trek/issues/96)).
+
 ## [0.7.2] - 2026-09-07
 
 ### Fixed

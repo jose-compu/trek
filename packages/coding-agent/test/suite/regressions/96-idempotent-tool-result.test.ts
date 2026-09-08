@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fauxAssistantMessage, fauxToolCall } from "@trek/ai";
 import { afterEach, describe, expect, it } from "vitest";
+import { convertToLlm } from "../../../src/core/messages.ts";
 import { createHarness, type Harness } from "../harness.ts";
 
 describe("regression #96: idempotent tool results are plain language", () => {
@@ -36,5 +37,33 @@ describe("regression #96: idempotent tool results are plain language", () => {
 		expect(texts.some((text) => text.includes("[idempotent]"))).toBe(false);
 		expect(texts.some((text) => /Already completed earlier in this prompt/.test(text))).toBe(true);
 		expect(results.every((message) => message.isError !== true)).toBe(true);
+	});
+
+	it("strips historical [idempotent] tags before they reach the model", () => {
+		const converted = convertToLlm([
+			{
+				role: "toolResult",
+				toolCallId: "1",
+				toolName: "edit",
+				content: [
+					{
+						type: "text",
+						text: "[idempotent] Successfully replaced 1 block(s) in run_spice.py.",
+					},
+				],
+				isError: false,
+				timestamp: 1,
+			},
+		]);
+		expect(converted).toEqual([
+			{
+				role: "toolResult",
+				toolCallId: "1",
+				toolName: "edit",
+				content: [{ type: "text", text: "Successfully replaced 1 block(s) in run_spice.py." }],
+				isError: false,
+				timestamp: 1,
+			},
+		]);
 	});
 });

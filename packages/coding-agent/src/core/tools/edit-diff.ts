@@ -61,13 +61,15 @@ export interface FuzzyMatchResult {
 	index: number;
 	/** Length of the matched text */
 	matchLength: number;
-	/** Whether fuzzy matching was used (false = exact match) */
+	/** Whether unicode/trailing-whitespace fuzzy matching was used (false = exact or line-span) */
 	usedFuzzyMatch: boolean;
 	/**
 	 * The content to use for replacement operations.
-	 * When exact match: original content. When fuzzy match: normalized content.
+	 * When exact or line-span match: original content. When fuzzy match: normalized content.
 	 */
 	contentForReplacement: string;
+	/** How the match was found. `lineSpan` stays in original content space. */
+	kind?: "exact" | "fuzzy" | "lineSpan";
 }
 
 export interface Edit {
@@ -103,6 +105,7 @@ export function fuzzyFindText(content: string, oldText: string): FuzzyMatchResul
 			matchLength: oldText.length,
 			usedFuzzyMatch: false,
 			contentForReplacement: content,
+			kind: "exact",
 		};
 	}
 
@@ -111,26 +114,106 @@ export function fuzzyFindText(content: string, oldText: string): FuzzyMatchResul
 	const fuzzyOldText = normalizeForFuzzyMatch(oldText);
 	const fuzzyIndex = fuzzyContent.indexOf(fuzzyOldText);
 
-	if (fuzzyIndex === -1) {
+	if (fuzzyIndex !== -1) {
+		// When fuzzy matching, we work in the normalized space for replacement.
+		// This means the output will have normalized whitespace/quotes/dashes,
+		// which is acceptable since we're fixing minor formatting differences anyway.
 		return {
-			found: false,
-			index: -1,
-			matchLength: 0,
-			usedFuzzyMatch: false,
-			contentForReplacement: content,
+			found: true,
+			index: fuzzyIndex,
+			matchLength: fuzzyOldText.length,
+			usedFuzzyMatch: true,
+			contentForReplacement: fuzzyContent,
+			kind: "fuzzy",
 		};
 	}
 
-	// When fuzzy matching, we work in the normalized space for replacement.
-	// This means the output will have normalized whitespace/quotes/dashes,
-	// which is acceptable since we're fixing minor formatting differences anyway.
+	const lineSpan = findUniqueLineSpan(content, oldText);
+	if (lineSpan) {
+		return {
+			found: true,
+			index: lineSpan.index,
+			matchLength: lineSpan.matchLength,
+			usedFuzzyMatch: false,
+			contentForReplacement: content,
+			kind: "lineSpan",
+		};
+	}
+
 	return {
-		found: true,
-		index: fuzzyIndex,
-		matchLength: fuzzyOldText.length,
-		usedFuzzyMatch: true,
-		contentForReplacement: fuzzyContent,
+		found: false,
+		index: -1,
+		matchLength: 0,
+		usedFuzzyMatch: false,
+		contentForReplacement: content,
 	};
+}
+
+function lineMatchKey(line: string): string {
+	return normalizeForFuzzyMatch(line).trimStart();
+}
+
+function needleLineKeys(oldText: string): string[] {
+	const lines = oldText.split("\n").map(lineMatchKey);
+	if (lines.length > 1 && lines[lines.length - 1] === "") {
+		lines.pop();
+	}
+	return lines;
+}
+
+function lineStartOffsets(content: string): { lines: string[]; starts: number[] } {
+	const lines = content.split("\n");
+	const starts: number[] = [];
+	let offset = 0;
+	for (let i = 0; i < lines.length; i++) {
+		starts.push(offset);
+		offset += lines[i].length;
+		if (i < lines.length - 1) {
+			offset += 1;
+		}
+	}
+	return { lines, starts };
+}
+
+function collectLineSpans(content: string, oldText: string): Array<{ index: number; matchLength: number }> {
+	const needle = needleLineKeys(oldText);
+	if (needle.length === 0 || needle.every((line) => line.length === 0)) {
+		return [];
+	}
+
+	const { lines, starts } = lineStartOffsets(content);
+	const keys = lines.map(lineMatchKey);
+	const spans: Array<{ index: number; matchLength: number }> = [];
+
+	for (let i = 0; i <= keys.length - needle.length; i++) {
+		let matched = true;
+		for (let j = 0; j < needle.length; j++) {
+			if (keys[i + j] !== needle[j]) {
+				matched = false;
+				break;
+			}
+		}
+		if (!matched) {
+			continue;
+		}
+
+		const last = i + needle.length - 1;
+		let end = starts[last] + lines[last].length;
+		if (last < lines.length - 1) {
+			end += 1;
+		}
+		spans.push({ index: starts[i], matchLength: end - starts[i] });
+	}
+
+	return spans;
+}
+
+function findUniqueLineSpan(content: string, oldText: string): { index: number; matchLength: number } | undefined {
+	const spans = collectLineSpans(content, oldText);
+	if (spans.length !== 1) {
+		return undefined;
+	}
+	return spans[0];
 }
 
 /** Strip UTF-8 BOM if present, return both the BOM (if any) and the text without it */
@@ -145,14 +228,11 @@ function countOccurrences(content: string, oldText: string): number {
 }
 
 function getNotFoundError(path: string, editIndex: number, totalEdits: number): Error {
+	const hint = "Re-read the file and retry edit with the current text. Do not rewrite the entire file.";
 	if (totalEdits === 1) {
-		return new Error(
-			`Could not find the exact text in ${path}. The old text must match exactly including all whitespace and newlines.`,
-		);
+		return new Error(`Could not find the exact text in ${path}. The old text must match the current file. ${hint}`);
 	}
-	return new Error(
-		`Could not find edits[${editIndex}] in ${path}. The oldText must match exactly including all whitespace and newlines.`,
-	);
+	return new Error(`Could not find edits[${editIndex}] in ${path}. The oldText must match the current file. ${hint}`);
 }
 
 function getDuplicateError(path: string, editIndex: number, totalEdits: number, occurrences: number): Error {
@@ -219,7 +299,10 @@ export function applyEditsToNormalizedContent(
 			throw getNotFoundError(path, i, normalizedEdits.length);
 		}
 
-		const occurrences = countOccurrences(baseContent, edit.oldText);
+		const occurrences =
+			matchResult.kind === "lineSpan"
+				? collectLineSpans(baseContent, edit.oldText).length
+				: countOccurrences(baseContent, edit.oldText);
 		if (occurrences > 1) {
 			throw getDuplicateError(path, i, normalizedEdits.length, occurrences);
 		}

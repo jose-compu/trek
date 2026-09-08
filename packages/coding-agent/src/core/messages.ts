@@ -6,7 +6,30 @@
  */
 
 import type { AgentMessage } from "@trek/agent-core";
-import type { ImageContent, Message, TextContent } from "@trek/ai";
+import type { ImageContent, Message, TextContent, ToolResultMessage } from "@trek/ai";
+
+const IDEMPOTENT_RESULT_PREFIX = /^\[idempotent\]\s*/i;
+
+/** Old sessions stored this machine tag in tool results; do not send it to the model. */
+export function stripIdempotentPrefix(text: string): string {
+	return text.replace(IDEMPOTENT_RESULT_PREFIX, "");
+}
+
+function stripIdempotentToolResult(message: ToolResultMessage): ToolResultMessage {
+	let changed = false;
+	const content = message.content.map((part) => {
+		if (part.type !== "text" || typeof part.text !== "string") {
+			return part;
+		}
+		const text = stripIdempotentPrefix(part.text);
+		if (text === part.text) {
+			return part;
+		}
+		changed = true;
+		return { ...part, text };
+	});
+	return changed ? { ...message, content } : message;
+}
 
 export const COMPACTION_SUMMARY_PREFIX = `The conversation history before this point was compacted into the following summary:
 
@@ -183,8 +206,9 @@ export function convertToLlm(messages: AgentMessage[]): Message[] {
 					};
 				case "user":
 				case "assistant":
-				case "toolResult":
 					return m;
+				case "toolResult":
+					return stripIdempotentToolResult(m);
 				default:
 					// biome-ignore lint/correctness/noSwitchDeclarations: fine
 					const _exhaustiveCheck: never = m;
