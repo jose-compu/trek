@@ -965,6 +965,25 @@ describe("edit tool fuzzy matching", () => {
 		).rejects.toThrow(/Do not rewrite the entire file/);
 	});
 
+	it("should treat a missed oldText as already applied when newText is uniquely present", async () => {
+		const testFile = join(testDir, "already-present.py");
+		writeFileSync(testFile, "def plot_d2():\n    return Vds_max\n");
+
+		const result = await editTool.execute("test-already-present", {
+			path: testFile,
+			edits: [
+				{
+					oldText: "def plot_d1():\n    return Vdrain_max\n",
+					newText: "def plot_d2():\n    return Vds_max\n",
+				},
+			],
+		});
+
+		expect(getTextOutput(result)).toMatch(/already present/);
+		expect(getTextOutput(result)).toMatch(/Do not rewrite the file/);
+		expect(readFileSync(testFile, "utf-8")).toBe("def plot_d2():\n    return Vds_max\n");
+	});
+
 	it("should match when only leading indentation differs", async () => {
 		const testFile = join(testDir, "indent-mismatch.py");
 		writeFileSync(testFile, "def run():\n    print('a')\n    print('b')\n");

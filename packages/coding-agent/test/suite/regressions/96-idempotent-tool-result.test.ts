@@ -35,7 +35,9 @@ describe("regression #96: idempotent tool results are plain language", () => {
 			message.content.filter((part) => part.type === "text").map((part) => part.text),
 		);
 		expect(texts.some((text) => text.includes("[idempotent]"))).toBe(false);
-		expect(texts.some((text) => /Already completed earlier in this prompt/.test(text))).toBe(true);
+		expect(texts.some((text) => /already completed in this prompt/i.test(text))).toBe(true);
+		expect(texts.some((text) => /Do not rewrite the file/.test(text))).toBe(true);
+		expect(texts.every((text) => !/idempotent|skipped/i.test(text))).toBe(true);
 		expect(results.every((message) => message.isError !== true)).toBe(true);
 	});
 

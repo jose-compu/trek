@@ -216,6 +216,21 @@ function findUniqueLineSpan(content: string, oldText: string): { index: number; 
 	return spans[0];
 }
 
+/** True when newText is already uniquely in the file, so a missed oldText is a no-op. */
+function isAlreadyPresent(content: string, newText: string): boolean {
+	const trimmed = newText.trim();
+	if (trimmed.length < 16 || (trimmed.length < 24 && !newText.includes("\n"))) {
+		return false;
+	}
+	const match = fuzzyFindText(content, newText);
+	if (!match.found) {
+		return false;
+	}
+	const occurrences =
+		match.kind === "lineSpan" ? collectLineSpans(content, newText).length : countOccurrences(content, newText);
+	return occurrences === 1;
+}
+
 /** Strip UTF-8 BOM if present, return both the BOM (if any) and the text without it */
 export function stripBom(content: string): { bom: string; text: string } {
 	return content.startsWith("\uFEFF") ? { bom: "\uFEFF", text: content.slice(1) } : { bom: "", text: content };
@@ -292,10 +307,15 @@ export function applyEditsToNormalizedContent(
 		: normalizedContent;
 
 	const matchedEdits: MatchedEdit[] = [];
+	let skippedAlreadyPresent = 0;
 	for (let i = 0; i < normalizedEdits.length; i++) {
 		const edit = normalizedEdits[i];
 		const matchResult = fuzzyFindText(baseContent, edit.oldText);
 		if (!matchResult.found) {
+			if (isAlreadyPresent(baseContent, edit.newText)) {
+				skippedAlreadyPresent += 1;
+				continue;
+			}
 			throw getNotFoundError(path, i, normalizedEdits.length);
 		}
 
@@ -336,6 +356,9 @@ export function applyEditsToNormalizedContent(
 	}
 
 	if (baseContent === newContent) {
+		if (skippedAlreadyPresent > 0) {
+			return { baseContent, newContent };
+		}
 		throw getNoChangeError(path, normalizedEdits.length);
 	}
 

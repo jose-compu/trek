@@ -507,10 +507,10 @@ export class AgentSession {
 				return idem.inFlight
 					? {
 							block: true,
-							reason: "Same write or edit is already running in this prompt; this duplicate was skipped.",
+							reason: this._inFlightIdempotentReason(toolCall.name),
 							isError: false,
 						}
-					: this._blockedIdempotentResult(idem);
+					: this._blockedIdempotentResult(toolCall.name, idem);
 			}
 
 			await this._captureEditCheckpoint(toolCall.name, args);
@@ -736,16 +736,30 @@ export class AgentSession {
 			.digest("hex");
 	}
 
-	private _blockedIdempotentResult(cached: { text: string; isError: boolean }): {
+	private _mutationNoun(toolName: string): "edit" | "write" {
+		return toolName === "edit" ? "edit" : "write";
+	}
+
+	private _inFlightIdempotentReason(toolName: string): string {
+		const noun = this._mutationNoun(toolName);
+		return `This exact ${noun} is already running in this prompt. Use that result. If it failed, re-read the file and retry with the current text. Do not rewrite the file.`;
+	}
+
+	private _blockedIdempotentResult(
+		toolName: string,
+		cached: { text: string; isError: boolean },
+	): {
 		block: true;
 		reason: string;
 		isError: boolean;
 	} {
 		const text = stripIdempotentPrefix(cached.text).trim();
-		const reason =
-			text.length > 0
-				? `Already completed earlier in this prompt with the same arguments. Previous result:\n${text}`
-				: "Already completed earlier in this prompt with the same arguments.";
+		const noun = this._mutationNoun(toolName);
+		const head =
+			noun === "edit"
+				? "This exact edit already applied in this prompt. The file already has this change. Continue with the next step. Do not rewrite the file."
+				: "This exact write already completed in this prompt. The file already has this content. Continue with the next step. Do not rewrite the file.";
+		const reason = text.length > 0 ? `${head}\nPrevious result:\n${text}` : head;
 		return { block: true, reason, isError: cached.isError };
 	}
 
@@ -777,13 +791,16 @@ export class AgentSession {
 		if (toolName !== "write" && toolName !== "edit") {
 			return;
 		}
+		const key = this._idempotencyKey(toolName, args);
+		this._idempotencyInFlight.delete(key);
+		if (isError) {
+			return;
+		}
 		const text = result.content
 			.filter((part) => part.type === "text" && typeof part.text === "string")
 			.map((part) => part.text)
 			.join("\n");
-		const key = this._idempotencyKey(toolName, args);
-		this._idempotency.set(key, { text, isError });
-		this._idempotencyInFlight.delete(key);
+		this._idempotency.set(key, { text, isError: false });
 	}
 
 	/** True when there is at least one undoable edit batch. */

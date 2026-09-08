@@ -307,7 +307,8 @@ export function createEditToolDefinition(
 			"When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls",
 			"Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.",
 			"Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.",
-			"If edit cannot find the text, re-read the file and retry edit. Do not rewrite the entire file.",
+			"If edit cannot find the text, re-read the file and retry edit with the current text. Do not rewrite the entire file.",
+			"If a result says this edit already applied or is already running, the file is already being updated. Continue. Do not rewrite the file.",
 		],
 		parameters: editSchema,
 		renderShell: "self",
@@ -349,6 +350,18 @@ export function createEditToolDefinition(
 				const normalizedContent = normalizeToLF(content);
 				const { baseContent, newContent } = applyEditsToNormalizedContent(normalizedContent, edits, path);
 				throwIfAborted();
+
+				if (baseContent === newContent) {
+					return {
+						content: [
+							{
+								type: "text",
+								text: `This change is already present in ${path}. Do not rewrite the file.`,
+							},
+						],
+						details: { diff: "", patch: "", firstChangedLine: undefined },
+					};
+				}
 
 				const finalContent = bom + restoreLineEndings(newContent, originalEnding);
 				const diffResult = generateDiffString(baseContent, newContent);

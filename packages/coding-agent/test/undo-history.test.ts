@@ -100,7 +100,8 @@ describe("0.5.0 Undo history gate", () => {
 		const results = harness.session.messages.filter((m) => m.role === "toolResult");
 		const texts = results.flatMap((m) => m.content.filter((c) => c.type === "text").map((c) => c.text));
 		expect(texts.some((text) => text.includes("[idempotent]"))).toBe(false);
-		expect(texts.some((text) => text.includes("Already completed earlier in this prompt"))).toBe(true);
+		expect(texts.some((text) => /already completed in this prompt/i.test(text))).toBe(true);
+		expect(texts.some((text) => text.includes("Do not rewrite the file"))).toBe(true);
 		expect(results.some((m) => m.isError)).toBe(false);
 	});
 

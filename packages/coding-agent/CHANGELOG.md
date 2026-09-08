@@ -4,6 +4,11 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Fixed
+
+- Failed edits are not cached, so a retry can run. Duplicate success says the change is already applied and must not be rewritten.
+- If oldText misses but newText is already uniquely in the file, edit reports that and does not rewrite.
+
 ## [0.7.3] - 2026-09-08
 
 ### Fixed
