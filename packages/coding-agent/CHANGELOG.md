@@ -2,6 +2,8 @@
 
 Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent repo `UPSTREAM.md` / Pi monorepo.
 
+## [Unreleased]
+
 ## [0.7.5] - 2026-09-08
 
 ### Fixed
