@@ -1,17 +1,17 @@
 {
 	"name": "@trek/coding-agent",
-	"version": "0.7.3",
+	"version": "0.7.4",
 	"lockfileVersion": 3,
 	"requires": true,
 	"packages": {
 		"": {
 			"name": "@trek/coding-agent",
-			"version": "0.7.3",
+			"version": "0.7.4",
 			"license": "MIT",
 			"dependencies": {
-				"@trek/agent-core": "^0.7.3",
-				"@trek/ai": "^0.7.3",
-				"@trek/tui": "^0.7.3",
+				"@trek/agent-core": "^0.7.4",
+				"@trek/ai": "^0.7.4",
+				"@trek/tui": "^0.7.4",
 				"@silvia-odwyer/photon-node": "0.3.4",
 				"chalk": "5.6.2",
 				"cross-spawn": "7.0.6",
@@ -931,11 +931,11 @@
 			}
 		},
 		"node_modules/@trek/agent-core": {
-			"version": "0.7.3",
-			"resolved": "https://registry.npmjs.org/@trek/agent-core/-/agent-core-0.7.3.tgz",
+			"version": "0.7.4",
+			"resolved": "https://registry.npmjs.org/@trek/agent-core/-/agent-core-0.7.4.tgz",
 			"license": "MIT",
 			"dependencies": {
-				"@trek/ai": "^0.7.3",
+				"@trek/ai": "^0.7.4",
 				"ignore": "7.0.5",
 				"typebox": "1.1.38",
 				"yaml": "2.9.0"
@@ -945,8 +945,8 @@
 			}
 		},
 		"node_modules/@trek/ai": {
-			"version": "0.7.3",
-			"resolved": "https://registry.npmjs.org/@trek/ai/-/ai-0.7.3.tgz",
+			"version": "0.7.4",
+			"resolved": "https://registry.npmjs.org/@trek/ai/-/ai-0.7.4.tgz",
 			"license": "MIT",
 			"dependencies": {
 				"@anthropic-ai/sdk": "0.91.1",
@@ -968,8 +968,8 @@
 			}
 		},
 		"node_modules/@trek/tui": {
-			"version": "0.7.3",
-			"resolved": "https://registry.npmjs.org/@trek/tui/-/tui-0.7.3.tgz",
+			"version": "0.7.4",
+			"resolved": "https://registry.npmjs.org/@trek/tui/-/tui-0.7.4.tgz",
 			"license": "MIT",
 			"dependencies": {
 				"get-east-asian-width": "1.6.0",
