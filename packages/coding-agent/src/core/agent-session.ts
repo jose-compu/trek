@@ -753,7 +753,7 @@ export class AgentSession {
 		toolName: string,
 		args: unknown,
 	): { text: string; isError: boolean; inFlight?: boolean } | undefined {
-		if (toolName !== "write" && toolName !== "edit" && toolName !== "bash") {
+		if (toolName !== "write" && toolName !== "edit") {
 			return undefined;
 		}
 		const key = this._idempotencyKey(toolName, args);
@@ -774,7 +774,7 @@ export class AgentSession {
 		result: { content: Array<{ type: string; text?: string }> },
 		isError: boolean,
 	): void {
-		if (toolName !== "write" && toolName !== "edit" && toolName !== "bash") {
+		if (toolName !== "write" && toolName !== "edit") {
 			return;
 		}
 		const text = result.content

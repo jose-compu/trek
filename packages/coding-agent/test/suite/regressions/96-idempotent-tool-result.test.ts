@@ -1,5 +1,5 @@
 /**
- * Duplicate write/edit/bash must not leak [idempotent] to the model (#96).
+ * Duplicate write/edit must not leak [idempotent] to the model (#96).
  * Run: node ../../node_modules/vitest/dist/cli.js --run test/suite/regressions/96-idempotent-tool-result.test.ts --reporter=verbose
  */
 

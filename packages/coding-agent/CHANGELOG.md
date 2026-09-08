@@ -8,6 +8,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 - Edit matches when only indentation or tabs/spaces differ, and failed edits tell the model to retry instead of rewriting the file.
 - Strip leftover `[idempotent]` prefixes from old tool results before they reach the model ([#96](https://github.com/jose-compu/trek/issues/96)).
+- Do not cache bash in the same prompt. Re-running the same command after an edit must execute again.
 
 ## [0.7.2] - 2026-09-07
 
