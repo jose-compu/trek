@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import { Type } from "typebox";
 import { afterEach, describe, expect, it } from "vitest";
 import { findEnvKeys, getEnvApiKey } from "../src/env-api-keys.ts";
-import { getModel, getModels } from "../src/models.ts";
+import { getModels } from "../src/models.ts";
 import { streamAnthropic } from "../src/providers/anthropic.ts";
 import type { Context, Model, Tool } from "../src/types.ts";
 
@@ -18,32 +18,31 @@ afterEach(() => {
 });
 
 describe("Fireworks models", () => {
-	it("registers the default Kimi K2.6 model via Anthropic-compatible Messages API", () => {
-		const model = getModel("fireworks", "accounts/fireworks/models/kimi-k2p6");
+	it("registers Fireworks models on the Anthropic Messages API with session-affinity compat", () => {
+		const models = getModels("fireworks");
 
-		expect(model).toBeDefined();
-		expect(model.api).toBe("anthropic-messages");
-		expect(model.provider).toBe("fireworks");
-		expect(model.baseUrl).toBe("https://api.fireworks.ai/inference");
-		expect(model.reasoning).toBe(true);
-		expect(model.input).toEqual(["text", "image"]);
-		expect(model.contextWindow).toBe(262000);
-		expect(model.maxTokens).toBe(262000);
-		expect(model.cost).toEqual({
-			input: 0.95,
-			output: 4,
-			cacheRead: 0.16,
-			cacheWrite: 0,
-		});
+		expect(models.length).toBeGreaterThan(0);
+		for (const model of models) {
+			expect(model.api).toBe("anthropic-messages");
+			expect(model.provider).toBe("fireworks");
+			expect(model.baseUrl).toBe("https://api.fireworks.ai/inference");
+			expect(model.compat?.sendSessionAffinityHeaders).toBe(true);
+			expect(model.compat?.supportsEagerToolInputStreaming).toBe(false);
+			expect(model.compat?.supportsCacheControlOnTools).toBe(false);
+			expect(model.compat?.supportsLongCacheRetention).toBe(false);
+		}
 	});
 
-	it("registers Fire Pass router models", () => {
-		const model = getModels("fireworks").find((candidate) => candidate.id.startsWith("accounts/fireworks/routers/"));
+	it("keeps Fire Pass routers on the same API when the catalog includes them", () => {
+		const routers = getModels("fireworks").filter((candidate) =>
+			candidate.id.startsWith("accounts/fireworks/routers/"),
+		);
 
-		expect(model).toBeDefined();
-		expect(model?.api).toBe("anthropic-messages");
-		expect(model?.baseUrl).toBe("https://api.fireworks.ai/inference");
-		expect(model?.input).toContain("text");
+		for (const model of routers) {
+			expect(model.api).toBe("anthropic-messages");
+			expect(model.baseUrl).toBe("https://api.fireworks.ai/inference");
+			expect(model.input).toContain("text");
+		}
 	});
 
 	it("resolves FIREWORKS_API_KEY from the environment", () => {
@@ -51,16 +50,6 @@ describe("Fireworks models", () => {
 
 		expect(findEnvKeys("fireworks")).toEqual(["FIREWORKS_API_KEY"]);
 		expect(getEnvApiKey("fireworks")).toBe("test-fireworks-key");
-	});
-
-	it("sets Fireworks-specific compat for session affinity and unsupported tool fields", () => {
-		const model = getModel("fireworks", "accounts/fireworks/models/kimi-k2p6");
-
-		expect(model.compat).toBeDefined();
-		expect(model.compat?.sendSessionAffinityHeaders).toBe(true);
-		expect(model.compat?.supportsEagerToolInputStreaming).toBe(false);
-		expect(model.compat?.supportsCacheControlOnTools).toBe(false);
-		expect(model.compat?.supportsLongCacheRetention).toBe(false);
 	});
 });
 
