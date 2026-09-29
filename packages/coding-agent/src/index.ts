@@ -162,6 +162,19 @@ export type {
 export { DefaultPackageManager } from "./core/package-manager.ts";
 export type { ResourceCollision, ResourceDiagnostic, ResourceLoader } from "./core/resource-loader.ts";
 export { DefaultResourceLoader, loadProjectContextFiles } from "./core/resource-loader.ts";
+export {
+	defaultRuntimeConfig,
+	type HierarchyMode,
+	LlamaProcessManager,
+	loadRuntimeConfig,
+	type ResolvedRuntime,
+	type RoleSelection,
+	type RuntimeConfig,
+	type RuntimeRole,
+	resolveRuntime,
+	type SuiteId,
+	selectSessionRole,
+} from "./core/runtime/index.ts";
 // SDK for programmatic usage
 export {
 	AgentSessionRuntime,

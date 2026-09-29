@@ -44,6 +44,7 @@ import { SettingsManager } from "./core/settings-manager.ts";
 import { printTimings, resetTimings, time } from "./core/timings.ts";
 import { handleHistoryCommand, handleRevertCommand } from "./history-cli.ts";
 import { runMigrations, showDeprecationWarnings } from "./migrations.ts";
+import { handleModelsCommand } from "./models-cli.ts";
 import { InteractiveMode, runBatchMode, runPrintMode, runRpcMode } from "./modes/index.ts";
 import { ExtensionSelectorComponent } from "./modes/interactive/components/extension-selector.ts";
 import { initTheme, stopThemeWatcher } from "./modes/interactive/theme/theme.ts";
@@ -507,6 +508,10 @@ export async function main(args: string[], options?: MainOptions) {
 	}
 
 	if (await handleTelegramCommand(args)) {
+		return;
+	}
+
+	if (await handleModelsCommand(args)) {
 		return;
 	}
 

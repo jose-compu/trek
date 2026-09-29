@@ -27,6 +27,7 @@ import {
 	resetApiProviders,
 	streamSimple,
 } from "@trek/ai";
+import { getAgentDir } from "../config.ts";
 import { theme } from "../modes/interactive/theme/theme.ts";
 import { debugLog } from "../utils/debug-log.ts";
 import { stripFrontmatter } from "../utils/frontmatter.ts";
@@ -108,6 +109,14 @@ import {
 	toSessionRecord,
 } from "./reproducibility/index.ts";
 import type { ResourceExtensionPaths, ResourceLoader } from "./resource-loader.ts";
+import {
+	createDefaultLlamaProcessManager,
+	type LlamaProcessManager,
+	latestUserPrompt,
+	loadRuntimeConfig,
+	resolveRuntime,
+	selectSessionRole,
+} from "./runtime/index.ts";
 import {
 	formatSchemaMismatchNote,
 	SafetyChecker,
@@ -1601,6 +1610,7 @@ export class AgentSession {
 
 	private _appendAuditStep(assistant: AssistantMessage): void {
 		const prior = this.agent.state.messages.filter((message) => message !== assistant);
+		const runtimeFields = this._runtimeAuditFields(prior);
 		const record = buildAuditStep({
 			stepNumber: this.sessionManager.getAuditSteps().length + 1,
 			assistant,
@@ -1608,9 +1618,51 @@ export class AgentSession {
 			reproducibility: this._reproducibility,
 			toolNames: this.getActiveToolNames(),
 			skillNames: this._resourceLoader.getSkills().skills.map((skill) => skill.name),
+			role: runtimeFields.role,
+			source: runtimeFields.source,
 		});
 		this.sessionManager.appendAuditStep(record);
 		debugLog("reproducibility", "audit step recorded", record);
+	}
+
+	/** Role and source for trek:audit_step. api mode stays on the session model. */
+	private _llama?: LlamaProcessManager;
+
+	private _llamaManager(): LlamaProcessManager {
+		if (!this._llama) {
+			this._llama = createDefaultLlamaProcessManager();
+		}
+		return this._llama;
+	}
+
+	private _runtimeAuditFields(prior: readonly { role: string; content?: unknown }[]): {
+		role?: "tooling" | "workhorse" | "planning" | "frontier";
+		source?: "local" | "api";
+	} {
+		try {
+			const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+			const resolved = resolveRuntime(config);
+			const selection = selectSessionRole({
+				text: latestUserPrompt(prior),
+				resolved,
+			});
+			if (selection.source === "local") {
+				try {
+					this._llamaManager().ensure(selection.role, resolved);
+				} catch (error) {
+					debugLog("runtime", "llama-server not started", {
+						role: selection.role,
+						error: error instanceof Error ? error.message : String(error),
+					});
+				}
+			}
+			return { role: selection.role, source: selection.source };
+		} catch (error) {
+			debugLog("runtime", "role annotation skipped", {
+				error: error instanceof Error ? error.message : String(error),
+			});
+			return {};
+		}
 	}
 
 	private _assertStrictAuditModel(): void {

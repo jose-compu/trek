@@ -6,6 +6,10 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Added
+
+- 0.8.0 Runtime registry: `trek models` (`list`, `set-mode`, `set-suite`, `set-role`, `benchmark`). Default mode is remote API. Local llama.cpp is opt-in. Each `trek:audit_step` records `role` and `source`.
+
 ## [0.7.5] - 2026-09-08
 
 ### Fixed

@@ -1,0 +1,315 @@
+/**
+ * 0.8.0 Runtime acceptance (issues #85–#92).
+ * Run: npx vitest run test/runtime-0.8.test.ts --reporter=verbose
+ */
+
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { ENV_AGENT_DIR } from "../src/config.ts";
+import { isValidAuditStep } from "../src/core/reproducibility/index.ts";
+import {
+	benchmarkRuntime,
+	createDefaultLlamaProcessManager,
+	createPortAllocator,
+	defaultRuntimeConfig,
+	detectFrontier,
+	formatBenchmark,
+	LlamaProcessManager,
+	loadRuntimeConfig,
+	projectModelsYamlPath,
+	requiresHuggingFaceToken,
+	resolveRuntime,
+	selectSessionRole,
+	sessionLocalRoles,
+	withHierarchy,
+	writeRuntimeConfigFile,
+} from "../src/core/runtime/index.ts";
+import { handleModelsCommand } from "../src/models-cli.ts";
+import { createHarness, type Harness } from "./suite/harness.ts";
+
+function captureStdio(): { logs: string[]; errors: string[]; restore: () => void } {
+	const logs: string[] = [];
+	const errors: string[] = [];
+	const log = console.log;
+	const err = console.error;
+	console.log = (...args: unknown[]) => {
+		logs.push(args.map(String).join(" "));
+	};
+	console.error = (...args: unknown[]) => {
+		errors.push(args.map(String).join(" "));
+	};
+	return {
+		logs,
+		errors,
+		restore: () => {
+			console.log = log;
+			console.error = err;
+		},
+	};
+}
+
+function localConfig(suite: "mistral" | "mistral-pro" | "qwen" | "lfm" = "mistral") {
+	return withHierarchy(defaultRuntimeConfig(), { mode: "local", suite });
+}
+
+describe("0.8.0 runtime gate (#92)", () => {
+	it("default manager does not spawn without a binary and weights directory", () => {
+		const previousServer = process.env.TREK_LLAMA_SERVER;
+		const previousDir = process.env.TREK_MODELS_DIR;
+		delete process.env.TREK_LLAMA_SERVER;
+		delete process.env.TREK_MODELS_DIR;
+		try {
+			const resolved = resolveRuntime(localConfig(), { frontier: null });
+			const manager = createDefaultLlamaProcessManager();
+			expect(() => manager.ensure("workhorse", resolved)).toThrow(/llama-server binary not found/);
+			expect(manager.list()).toEqual([]);
+		} finally {
+			if (previousServer === undefined) {
+				delete process.env.TREK_LLAMA_SERVER;
+			} else {
+				process.env.TREK_LLAMA_SERVER = previousServer;
+			}
+			if (previousDir === undefined) {
+				delete process.env.TREK_MODELS_DIR;
+			} else {
+				process.env.TREK_MODELS_DIR = previousDir;
+			}
+		}
+	});
+
+	it("default settings spawn no llama-server and do not require an HF token", () => {
+		const resolved = resolveRuntime(defaultRuntimeConfig(), { frontier: null });
+		expect(resolved.mode).toBe("api");
+		expect(resolved.effectiveMode).toBe("api");
+		expect(sessionLocalRoles(resolved)).toEqual([]);
+		expect(requiresHuggingFaceToken("api")).toBe(false);
+		expect(resolved.requiresHuggingFaceToken).toBe(false);
+		const spawn = () => {
+			throw new Error("spawned");
+		};
+		const manager = new LlamaProcessManager({
+			spawn,
+			allocatePort: createPortAllocator(),
+			binaryAvailable: () => true,
+			weightsAvailable: () => true,
+		});
+		expect(() => manager.ensure("planning", resolved)).toThrow(/api mode does not start llama-server/);
+		expect(manager.list()).toEqual([]);
+	});
+
+	it("set-mode local with mocked ports starts three roles once each", () => {
+		const resolved = resolveRuntime(localConfig(), { frontier: null });
+		expect(resolved.effectiveMode).toBe("local");
+		expect(sessionLocalRoles(resolved)).toEqual(["tooling", "workhorse", "planning"]);
+		const calls: string[] = [];
+		let pid = 100;
+		const manager = new LlamaProcessManager({
+			spawn: (request) => {
+				calls.push(`${request.role}:${request.port}`);
+				pid += 1;
+				return { pid };
+			},
+			allocatePort: createPortAllocator(18080),
+			binaryAvailable: () => true,
+			weightsAvailable: () => true,
+		});
+		for (const role of sessionLocalRoles(resolved)) {
+			manager.ensure(role, resolved);
+			manager.ensure(role, resolved);
+		}
+		expect(calls).toEqual(["tooling:18080", "workhorse:18081", "planning:18082"]);
+		expect(manager.list()).toHaveLength(3);
+		expect(resolved.roles.workhorse?.thinking).toBe(false);
+		expect(resolved.roles.planning?.thinking).toBe(true);
+	});
+
+	it("refuses a second Planning model id", () => {
+		const resolved = resolveRuntime(localConfig(), { frontier: null });
+		const manager = new LlamaProcessManager({
+			spawn: () => ({ pid: 1 }),
+			allocatePort: createPortAllocator(),
+			binaryAvailable: () => true,
+			weightsAvailable: () => true,
+		});
+		manager.ensure("planning", resolved);
+		const other = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "qwen" }), {
+			frontier: null,
+		});
+		expect(() => manager.ensure("planning", other)).toThrow(/already loaded/);
+	});
+
+	it("names a missing binary and missing GGUF without downloading", () => {
+		const resolved = resolveRuntime(localConfig(), { frontier: null });
+		const noBinary = new LlamaProcessManager({
+			spawn: () => ({ pid: 1 }),
+			allocatePort: createPortAllocator(),
+			binaryAvailable: () => false,
+			weightsAvailable: () => true,
+		});
+		expect(() => noBinary.ensure("workhorse", resolved)).toThrow(/llama-server binary not found/);
+		const noWeights = new LlamaProcessManager({
+			spawn: () => ({ pid: 1 }),
+			allocatePort: createPortAllocator(),
+			binaryAvailable: () => true,
+			weightsAvailable: () => false,
+		});
+		expect(() => noWeights.ensure("workhorse", resolved)).toThrow(/0\.16\.0/);
+	});
+
+	it("promotes local to hybrid when a Frontier key exists", () => {
+		const resolved = resolveRuntime(localConfig(), { env: { OPENAI_API_KEY: "test-key", XAI_API_KEY: "" } });
+		expect(resolved.effectiveMode).toBe("hybrid");
+		expect(resolved.roles.frontier?.source).toBe("api");
+		expect(resolved.roles.frontier?.provider).toBe("openai");
+		expect(resolved.roles.tooling?.source).toBe("local");
+		expect(sessionLocalRoles(resolved)).toEqual(["tooling", "workhorse", "planning"]);
+		expect(detectFrontier({ XAI_API_KEY: "x", OPENAI_API_KEY: "o" })?.provider).toBe("xai");
+	});
+
+	it("switches Mistral, Qwen, and LFM without a download", () => {
+		const mistral = resolveRuntime(localConfig("mistral"), { frontier: null });
+		const qwen = resolveRuntime(localConfig("qwen"), { frontier: null });
+		const lfm = resolveRuntime(localConfig("lfm"), { frontier: null });
+		const pro = resolveRuntime(localConfig("mistral-pro"), { frontier: null });
+		expect(mistral.roles.tooling?.id).toBe("Cactus-Compute/needle");
+		expect(mistral.roles.workhorse?.id).toBe("Ministral-3-3B-Instruct-2512");
+		expect(mistral.roles.planning?.id).toBe("Ministral-3-8B-Reasoning-2512");
+		expect(mistral.rerank).toBe(true);
+		expect(qwen.roles.workhorse?.id).toBe("Qwen3.5-4B");
+		expect(qwen.roles.workhorse?.thinking).toBe(false);
+		expect(qwen.roles.planning?.thinking).toBe(true);
+		expect(lfm.roles.embedding?.id).toBe("LFM2-ColBERT-350M");
+		expect(lfm.roles.reranker).toBeUndefined();
+		expect(lfm.rerank).toBe(false);
+		expect(lfm.roles.planning?.thinking).toBe(true);
+		expect(pro.roles.workhorse?.id).toBe("Devstral-Small-2507");
+		expect(pro.roles.workhorse?.thinking).toBe(false);
+		expect(pro.roles.planning?.id).toBe("Ministral-3-8B-Reasoning-2512");
+	});
+
+	it("selects Work-horse, Planning, and Frontier without a component router", () => {
+		const local = resolveRuntime(localConfig(), { frontier: null });
+		const hybrid = resolveRuntime(localConfig(), { frontier: { provider: "anthropic", modelId: "frontier" } });
+		expect(selectSessionRole({ text: "fix the typo", resolved: local }).role).toBe("workhorse");
+		expect(selectSessionRole({ text: "fix the typo", resolved: local }).thinking).toBe(false);
+		expect(selectSessionRole({ text: "plan the research", resolved: local })).toMatchObject({
+			role: "planning",
+			thinking: true,
+			source: "local",
+		});
+		expect(selectSessionRole({ text: "/frontier dig in", resolved: hybrid }).role).toBe("frontier");
+		expect(selectSessionRole({ text: "fix", resolved: hybrid, complexity: 0.8 }).source).toBe("api");
+		expect(selectSessionRole({ text: "/frontier", resolved: local }).reason).toMatch(/not available in local mode/);
+		const api = resolveRuntime(defaultRuntimeConfig(), { frontier: null });
+		expect(selectSessionRole({ text: "plan the research", resolved: api })).toMatchObject({
+			role: "frontier",
+			source: "api",
+		});
+	});
+
+	it("skips benchmark rows when weights are absent", () => {
+		const api = resolveRuntime(defaultRuntimeConfig(), { frontier: null });
+		expect(formatBenchmark(benchmarkRuntime(api, { weightsAvailable: () => true }))).toMatch(/api mode/);
+		const local = resolveRuntime(localConfig(), { frontier: null });
+		const rows = benchmarkRuntime(local, { weightsAvailable: () => false });
+		expect(rows).toHaveLength(3);
+		expect(rows.every((row) => row.status === "skipped")).toBe(true);
+	});
+
+	it("lets a project file override one role and rejects a private id", () => {
+		const root = mkdtempSync(join(tmpdir(), "trek-runtime-"));
+		const agentDir = join(root, "agent");
+		const cwd = join(root, "project");
+		try {
+			const globalConfig = localConfig();
+			writeRuntimeConfigFile(join(root, "models.yaml"), globalConfig);
+			writeRuntimeConfigFile(projectModelsYamlPath(cwd), {
+				hierarchy: { mode: "local", suite: "mistral", quant: "q4_k_m" },
+				roles: {
+					tooling: { source: "local", id: "Qwen3.5-0.8B", thinking: false },
+				},
+			});
+			const loaded = loadRuntimeConfig({ agentDir, cwd });
+			const resolved = resolveRuntime(loaded, { frontier: null });
+			expect(resolved.roles.tooling?.id).toBe("Qwen3.5-0.8B");
+			expect(resolved.roles.workhorse?.id).toBe("Ministral-3-3B-Instruct-2512");
+			expect(() =>
+				writeRuntimeConfigFile(join(root, "models.yaml"), {
+					...globalConfig,
+					roles: { tooling: { source: "local", id: "@private/needle", thinking: false } },
+				}),
+			).toThrow(/private or unpublished/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("trek models CLI (#89)", () => {
+	const previous = process.env[ENV_AGENT_DIR];
+	const dirs: string[] = [];
+
+	afterEach(() => {
+		if (previous === undefined) {
+			delete process.env[ENV_AGENT_DIR];
+		} else {
+			process.env[ENV_AGENT_DIR] = previous;
+		}
+		while (dirs.length > 0) {
+			rmSync(dirs.pop()!, { recursive: true, force: true });
+		}
+	});
+
+	it("persists set-mode and set-suite", async () => {
+		process.exitCode = undefined;
+		const root = mkdtempSync(join(tmpdir(), "trek-models-cli-"));
+		dirs.push(root);
+		process.env[ENV_AGENT_DIR] = join(root, "agent");
+		const stdio = captureStdio();
+		expect(await handleModelsCommand(["models", "set-mode", "local"])).toBe(true);
+		expect(await handleModelsCommand(["models", "set-suite", "qwen"])).toBe(true);
+		stdio.restore();
+		const text = stdio.logs.join("\n");
+		expect(text).toContain("hierarchy.mode: local");
+		expect(text).toContain("suite: qwen");
+		expect(text).toContain("thinking off");
+		expect(text).toContain("Qwen3.5-9B");
+	});
+});
+
+describe("audit step role annotation (#90)", () => {
+	const harnesses: Harness[] = [];
+	const previous = process.env[ENV_AGENT_DIR];
+	const dirs: string[] = [];
+
+	afterEach(() => {
+		while (harnesses.length > 0) {
+			harnesses.pop()?.cleanup();
+		}
+		if (previous === undefined) {
+			delete process.env[ENV_AGENT_DIR];
+		} else {
+			process.env[ENV_AGENT_DIR] = previous;
+		}
+		while (dirs.length > 0) {
+			rmSync(dirs.pop()!, { recursive: true, force: true });
+		}
+	});
+
+	it("records frontier/api on the default session", async () => {
+		const root = mkdtempSync(join(tmpdir(), "trek-runtime-audit-"));
+		dirs.push(root);
+		process.env[ENV_AGENT_DIR] = join(root, "agent");
+		const harness = await createHarness();
+		harnesses.push(harness);
+		const { fauxAssistantMessage } = await import("@trek/ai");
+		harness.setResponses([fauxAssistantMessage("ok")]);
+		await harness.session.prompt("hello");
+		const steps = harness.sessionManager.getAuditSteps<{ role?: string; source?: string }>();
+		expect(steps).toHaveLength(1);
+		expect(isValidAuditStep(steps[0])).toBe(true);
+		expect(steps[0]).toMatchObject({ role: "frontier", source: "api" });
+	});
+});

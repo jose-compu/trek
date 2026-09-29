@@ -4,6 +4,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Added
+
+- `trek models` for the 0.8.0 hierarchy. Default is `api` (no llama-server). `local` and `hybrid` opt in. Audit steps record the role and source.
+
 ## [0.7.5] - 2026-09-08
 
 ### Fixed
