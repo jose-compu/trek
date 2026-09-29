@@ -331,8 +331,8 @@ function applyThinkingLevelMetadata(model: Model<any>): void {
 		// Pi's low/medium/high pass through verbatim; OpenRouter normalizes to Mercury's vocabulary.
 		mergeThinkingLevelMap(model, { off: null });
 	}
-	if (model.provider === "opencode-go" && model.id === "kimi-k2.6") {
-		// OpenCode Go exposes Kimi K2.6 thinking as on/off, not distinct effort tiers.
+	if (model.provider === "opencode-go" && model.id.startsWith("kimi-k")) {
+		// OpenCode Go exposes Kimi thinking as on/off, not distinct effort tiers.
 		mergeThinkingLevelMap(model, { minimal: null, low: null, medium: null });
 	}
 	if (model.provider === "opencode" && model.id === "grok-build-0.1") {
@@ -1039,10 +1039,10 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 				if (
 					api === "openai-completions" &&
 					(variant.provider === "opencode" || variant.provider === "opencode-go") &&
-					modelId === "kimi-k2.6"
+					modelId.startsWith("kimi-k")
 				) {
-					// OpenCode Kimi K2.6 accepts Anthropic-style thinking objects
-					// and rejects string thinking values or combined reasoning_effort.
+					// OpenCode Kimi models accept Anthropic-style thinking objects
+					// and reject string thinking values or combined reasoning_effort.
 					compat = { ...(compat ?? {}), thinkingFormat: "deepseek", supportsReasoningEffort: false };
 				}
 

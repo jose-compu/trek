@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { getModel, getSupportedThinkingLevels } from "../src/models.ts";
 
+function openCodeGoKimiModel() {
+	const ids = ["kimi-k2.6", "kimi-k2.7-code", "kimi-k3"] as const;
+	for (const id of ids) {
+		const model = getModel("opencode-go", id);
+		if (model?.id === id) return model;
+	}
+	throw new Error("OpenCode Go Kimi model missing from catalog");
+}
+
 describe("getSupportedThinkingLevels", () => {
 	it("includes xhigh for Anthropic Opus 4.6 on anthropic-messages API", () => {
 		const model = getModel("anthropic", "claude-opus-4-6");
@@ -56,10 +65,9 @@ describe("getSupportedThinkingLevels", () => {
 		expect(getSupportedThinkingLevels(model!)).toEqual(["off", "high", "xhigh"]);
 	});
 
-	it("includes only high plus off for OpenCode Go Kimi K2.6", () => {
-		const model = getModel("opencode-go", "kimi-k2.6");
-		expect(model).toBeDefined();
-		expect(getSupportedThinkingLevels(model!)).toEqual(["off", "high"]);
+	it("includes only high plus off for OpenCode Go Kimi", () => {
+		const model = openCodeGoKimiModel();
+		expect(getSupportedThinkingLevels(model)).toEqual(["off", "high"]);
 	});
 
 	it("includes only high for OpenCode Grok Build", () => {

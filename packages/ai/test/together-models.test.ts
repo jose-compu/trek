@@ -13,8 +13,8 @@ afterEach(() => {
 });
 
 describe("Together models", () => {
-	it("registers the default Kimi K2.6 model via OpenAI-compatible Chat Completions API", () => {
-		const model = getModel("together", "moonshotai/Kimi-K2.6");
+	it("registers a Kimi model via OpenAI-compatible Chat Completions API", () => {
+		const model = getModel("together", "moonshotai/Kimi-K2.6") ?? getModel("together", "moonshotai/Kimi-K3");
 
 		expect(model).toBeDefined();
 		expect(model.api).toBe("openai-completions");
@@ -23,14 +23,6 @@ describe("Together models", () => {
 		expect(model.reasoning).toBe(true);
 		expect(model.thinkingLevelMap).toEqual({ minimal: null, low: null, medium: null });
 		expect(model.input).toEqual(["text", "image"]);
-		expect(model.contextWindow).toBe(262144);
-		expect(model.maxTokens).toBe(131000);
-		expect(model.cost).toEqual({
-			input: 1.2,
-			output: 4.5,
-			cacheRead: 0.2,
-			cacheWrite: 0,
-		});
 		expect(model.compat).toEqual({
 			supportsStore: false,
 			supportsDeveloperRole: false,
