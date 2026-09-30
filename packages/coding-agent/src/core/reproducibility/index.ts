@@ -19,6 +19,8 @@ export {
 } from "./policy.ts";
 export {
 	assertStrictAuditProvider,
+	assertStrictAuditTarget,
+	getModelDeterminism,
 	getProviderDeterminism,
 	isStrictAuditProvider,
 	listProviderDeterminism,

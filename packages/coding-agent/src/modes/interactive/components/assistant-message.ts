@@ -1,5 +1,6 @@
 import type { AssistantMessage } from "@trek/ai";
 import { Container, Markdown, type MarkdownTheme, Spacer, Text } from "@trek/tui";
+import { honestyDisplay, stripHonestyFooter } from "../../../core/honesty/index.ts";
 import { getMarkdownTheme, theme } from "../theme/theme.ts";
 
 const OSC133_ZONE_START = "\x1b]133;A\x07";
@@ -18,7 +19,7 @@ export function shouldRenderAssistantTextBlock(text: string, allTextBlocks: read
 function collectTrimmedTextBlocks(content: AssistantMessage["content"]): string[] {
 	return content
 		.filter((block) => block.type === "text" && block.text.trim())
-		.map((block) => (block.type === "text" ? block.text.trim() : ""));
+		.map((block) => (block.type === "text" ? stripHonestyFooter(block.text).trim() : ""));
 }
 
 /**
@@ -105,12 +106,18 @@ export class AssistantMessageComponent extends Container {
 		for (let i = 0; i < message.content.length; i++) {
 			const content = message.content[i];
 			if (content.type === "text" && content.text.trim()) {
-				if (!shouldRenderAssistantTextBlock(content.text, trimmedTextBlocks)) {
+				const visible = stripHonestyFooter(content.text).trim();
+				if (!visible || !shouldRenderAssistantTextBlock(visible, trimmedTextBlocks)) {
 					continue;
 				}
-				// Assistant text messages with no background - trim the text
-				// Set paddingY=0 to avoid extra spacing before tool executions
-				this.contentContainer.addChild(new Markdown(content.text.trim(), 1, 0, this.markdownTheme));
+				this.contentContainer.addChild(new Markdown(visible, 1, 0, this.markdownTheme));
+				const status = honestyDisplay(content.text);
+				if (status) {
+					const color =
+						status.confidence === "high" ? "success" : status.confidence === "low" ? "error" : "warning";
+					const details = status.details.length > 0 ? `   ${theme.fg("dim", status.details.join("   "))}` : "";
+					this.contentContainer.addChild(new Text(theme.fg(color, status.headline) + details, 1, 0));
+				}
 			} else if (content.type === "thinking" && content.thinking.trim()) {
 				// Add spacing only when another visible assistant content block follows.
 				// This avoids a superfluous blank line before separately-rendered tool execution blocks.

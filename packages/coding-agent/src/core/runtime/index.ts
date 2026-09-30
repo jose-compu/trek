@@ -1,11 +1,31 @@
 export { type BenchmarkProbe, type BenchmarkRow, benchmarkRuntime, formatBenchmark } from "./benchmark.ts";
+export { LOCAL_LLAMA_PROVIDER, LOCAL_LLAMA_TIMEOUT_MS, localLlamaChatModel } from "./local-model.ts";
+export {
+	LOCAL_SUITE_WORK_SECTION,
+	LOCAL_WORK_TOOL_NUDGE,
+	localSuiteToolChoice,
+	nudgeLocalWorkMessages,
+} from "./local-work.ts";
+export {
+	formatPerformance,
+	HIERARCHY_PROBES,
+	type HierarchyProbe,
+	type PerformanceReport,
+	type ProbeScore,
+	scoreProbeText,
+	summarizePerformance,
+	tokensPerSecond,
+} from "./performance.ts";
 export {
 	createDefaultLlamaProcessManager,
 	createPortAllocator,
 	LlamaProcessManager,
 	type LlamaProcessManagerOptions,
 	type LlamaServerHandle,
+	llamaServerLogPath,
+	resolveWeightPath,
 	type SpawnRequest,
+	weightFileExists,
 } from "./process-manager.ts";
 export {
 	globalModelsYamlPath,

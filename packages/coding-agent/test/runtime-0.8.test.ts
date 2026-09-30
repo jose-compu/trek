@@ -3,7 +3,7 @@
  * Run: npx vitest run test/runtime-0.8.test.ts --reporter=verbose
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -16,13 +16,24 @@ import {
 	defaultRuntimeConfig,
 	detectFrontier,
 	formatBenchmark,
+	HIERARCHY_PROBES,
 	LlamaProcessManager,
+	LOCAL_LLAMA_TIMEOUT_MS,
+	LOCAL_SUITE_WORK_SECTION,
+	LOCAL_WORK_TOOL_NUDGE,
+	llamaServerLogPath,
 	loadRuntimeConfig,
+	localLlamaChatModel,
+	localSuiteToolChoice,
+	nudgeLocalWorkMessages,
 	projectModelsYamlPath,
 	requiresHuggingFaceToken,
 	resolveRuntime,
+	resolveWeightPath,
+	scoreProbeText,
 	selectSessionRole,
 	sessionLocalRoles,
+	summarizePerformance,
 	withHierarchy,
 	writeRuntimeConfigFile,
 } from "../src/core/runtime/index.ts";
@@ -55,6 +66,21 @@ function localConfig(suite: "mistral" | "mistral-pro" | "qwen" | "lfm" = "mistra
 }
 
 describe("0.8.0 runtime gate (#92)", () => {
+	it("scores the hierarchy probes without calling a model", () => {
+		expect(HIERARCHY_PROBES).toHaveLength(3);
+		expect(scoreProbeText("42", HIERARCHY_PROBES[0]!)).toBe(true);
+		expect(scoreProbeText("use read", HIERARCHY_PROBES[1]!)).toBe(true);
+		expect(scoreProbeText("Yes.", HIERARCHY_PROBES[2]!)).toBe(true);
+		expect(scoreProbeText("no", HIERARCHY_PROBES[2]!)).toBe(false);
+		const report = summarizePerformance("mistral workhorse", "Ministral-3-3B-Instruct-2512", [
+			{ id: "arithmetic", correct: true, elapsedMs: 1000, outputTokens: 10, tokensPerSecond: 10 },
+			{ id: "tool", correct: false, elapsedMs: 1000, outputTokens: 10, tokensPerSecond: 10 },
+		]);
+		expect(report.correct).toBe(1);
+		expect(report.total).toBe(2);
+		expect(report.tokensPerSecond).toBe(10);
+	});
+
 	it("default manager does not spawn without a binary and weights directory", () => {
 		const previousServer = process.env.TREK_LLAMA_SERVER;
 		const previousDir = process.env.TREK_MODELS_DIR;
@@ -76,6 +102,64 @@ describe("0.8.0 runtime gate (#92)", () => {
 			} else {
 				process.env.TREK_MODELS_DIR = previousDir;
 			}
+		}
+	});
+
+	it("resolves a GGUF path under TREK_MODELS_DIR", () => {
+		const root = mkdtempSync(join(tmpdir(), "trek-weights-"));
+		try {
+			writeFileSync(join(root, "Ministral-3-3B-Instruct-2512.gguf"), "");
+			expect(resolveWeightPath("Ministral-3-3B-Instruct-2512", root)).toBe(
+				join(root, "Ministral-3-3B-Instruct-2512.gguf"),
+			);
+			expect(resolveWeightPath("missing", root)).toBe("missing");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it("tells a pure local suite to build in the folder", () => {
+		expect(LOCAL_SUITE_WORK_SECTION).toMatch(/write and edit tools/);
+		expect(LOCAL_SUITE_WORK_SECTION).toMatch(/Do not answer with a tutorial/);
+	});
+
+	it("requires a tool call for a local build request until files and a command exist", () => {
+		const ask = {
+			role: "user",
+			content: "please build a web calculator in flask python and js and open it in chrome pls",
+		};
+		expect(localSuiteToolChoice([ask])).toBe("required");
+		const nudged = nudgeLocalWorkMessages([ask]);
+		expect(String(nudged[0]?.content)).toContain(LOCAL_WORK_TOOL_NUDGE);
+		expect(ask.content).not.toContain(LOCAL_WORK_TOOL_NUDGE);
+		expect(nudgeLocalWorkMessages([{ role: "user", content: "what is flask" }])[0]?.content).toBe("what is flask");
+		expect(localSuiteToolChoice([{ role: "user", content: "what is flask" }])).toBeUndefined();
+		expect(
+			localSuiteToolChoice([
+				ask,
+				{ role: "assistant", content: [{ type: "toolCall", name: "read" }] },
+				{ role: "toolResult", toolName: "read" },
+			]),
+		).toBe("required");
+		expect(
+			localSuiteToolChoice([
+				ask,
+				{ role: "assistant", content: [{ type: "toolCall", name: "write" }] },
+				{ role: "toolResult", toolName: "write" },
+				{ role: "assistant", content: [{ type: "toolCall", name: "bash" }] },
+				{ role: "toolResult", toolName: "bash" },
+			]),
+		).toBeUndefined();
+	});
+
+	it("keeps llama-server logs off the terminal", () => {
+		const previous = process.env.TREK_LLAMA_LOG;
+		process.env.TREK_LLAMA_LOG = "/tmp/trek-llama-server.log";
+		expect(llamaServerLogPath()).toBe("/tmp/trek-llama-server.log");
+		delete process.env.TREK_LLAMA_LOG;
+		expect(llamaServerLogPath()).toMatch(/[/\\]\.trek[/\\]logs[/\\]llama-server\.log$/);
+		if (previous !== undefined) {
+			process.env.TREK_LLAMA_LOG = previous;
 		}
 	});
 
@@ -121,6 +205,20 @@ describe("0.8.0 runtime gate (#92)", () => {
 		}
 		expect(calls).toEqual(["tooling:18080", "workhorse:18081", "planning:18082"]);
 		expect(manager.list()).toHaveLength(3);
+		const stopped: number[] = [];
+		const stopping = new LlamaProcessManager({
+			spawn: () => ({ pid: 4242 }),
+			allocatePort: createPortAllocator(18080),
+			binaryAvailable: () => true,
+			weightsAvailable: () => true,
+			signal: (pid) => {
+				stopped.push(pid);
+			},
+		});
+		stopping.ensure("workhorse", resolved);
+		stopping.stop();
+		expect(stopped).toEqual([4242]);
+		expect(stopping.list()).toEqual([]);
 		expect(resolved.roles.workhorse?.thinking).toBe(false);
 		expect(resolved.roles.planning?.thinking).toBe(true);
 	});
@@ -173,7 +271,7 @@ describe("0.8.0 runtime gate (#92)", () => {
 		const qwen = resolveRuntime(localConfig("qwen"), { frontier: null });
 		const lfm = resolveRuntime(localConfig("lfm"), { frontier: null });
 		const pro = resolveRuntime(localConfig("mistral-pro"), { frontier: null });
-		expect(mistral.roles.tooling?.id).toBe("Cactus-Compute/needle");
+		expect(mistral.roles.tooling?.id).toBe("Qwen3.5-0.8B");
 		expect(mistral.roles.workhorse?.id).toBe("Ministral-3-3B-Instruct-2512");
 		expect(mistral.roles.planning?.id).toBe("Ministral-3-8B-Reasoning-2512");
 		expect(mistral.rerank).toBe(true);
@@ -187,6 +285,30 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(pro.roles.workhorse?.id).toBe("Devstral-Small-2507");
 		expect(pro.roles.workhorse?.thinking).toBe(false);
 		expect(pro.roles.planning?.id).toBe("Ministral-3-8B-Reasoning-2512");
+	});
+
+	it("points a local chat model at llama-server", () => {
+		const previous = process.env.TREK_LLAMA_CTX;
+		process.env.TREK_LLAMA_CTX = "8192";
+		const model = localLlamaChatModel({
+			modelId: "LFM2.5-1.2B-Instruct",
+			endpoint: "http://127.0.0.1:18080/v1",
+		});
+		if (previous === undefined) {
+			delete process.env.TREK_LLAMA_CTX;
+		} else {
+			process.env.TREK_LLAMA_CTX = previous;
+		}
+		expect(model.provider).toBe("local");
+		expect(model.api).toBe("openai-completions");
+		expect(model.name).toBe("LFM2.5-1.2B-Instruct");
+		expect(model.baseUrl).toBe("http://127.0.0.1:18080/v1");
+		expect(model.contextWindow).toBe(8192);
+		expect(model.maxTokens).toBe(4096);
+		expect(LOCAL_LLAMA_TIMEOUT_MS).toBe(120_000);
+		expect(model.reasoning).toBe(false);
+		expect(model.compat?.maxTokensField).toBe("max_tokens");
+		expect(model.compat?.supportsReasoningEffort).toBe(false);
 	});
 
 	it("selects Work-horse, Planning, and Frontier without a component router", () => {

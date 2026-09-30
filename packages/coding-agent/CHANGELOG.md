@@ -8,6 +8,13 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 - `trek models` for the 0.8.0 hierarchy. Default is `api` (no llama-server). `local` and `hybrid` opt in. Audit steps record the role and source.
 
+### Changed
+
+- A local role completes on `llama-server`. The saved API model is left unchanged. A missing GGUF does not fall back to the API.
+- Pure local mode requires a tool for a build, run, or open request until a file tool and `bash` have both run.
+- Honesty status is `honesty confidence=<level> assumptions=<n> unverified=<n>`. Trailing status chatter is omitted.
+- `llama-server` stderr goes to `~/.trek/logs/llama-server.log`. The session stops the server on exit. A local completion stops after 120 seconds or 4,096 tokens.
+
 ## [0.7.5] - 2026-09-08
 
 ### Fixed

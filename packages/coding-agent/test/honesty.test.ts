@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parseHonestyReport, stripHonestyFooter } from "../src/core/honesty/index.ts";
+import { honestyStatusLine, parseHonestyReport, stripHonestyFooter } from "../src/core/honesty/index.ts";
 
 describe("honesty protocol (#4/#6)", () => {
 	test("parses confidence, assumption ledger, and unverified claims", () => {
@@ -39,5 +39,35 @@ unverified: none
 	test("stripHonestyFooter removes the footer for display", () => {
 		const text = "Answer body.\n\n<honesty>\nconfidence: low\n</honesty>";
 		expect(stripHonestyFooter(text)).toBe("Answer body.");
+	});
+
+	test("hides an echoed template and an unclosed tag", () => {
+		const echoed = "Hello.\n\n<honesty>confidence: high|medium|low</honesty>";
+		expect(stripHonestyFooter(echoed)).toBe("Hello.");
+		expect(parseHonestyReport(echoed).confidence).toBeUndefined();
+		expect(honestyStatusLine(echoed)).toBeUndefined();
+		expect(stripHonestyFooter("Hello.\n<honesty>confidence: med")).toBe("Hello.");
+		expect(honestyStatusLine("Done.\n<honesty>\nconfidence: low\nassumption: none\n</honesty>")).toBe(
+			"honesty confidence=low assumptions=0 unverified=0",
+		);
+		expect(
+			honestyStatusLine(
+				"<honesty>\nconfidence: medium\nassumption: guessed the path\nunverified: the tests pass\n</honesty>",
+			),
+		).toBe(
+			"honesty confidence=medium assumptions=1 unverified=1   assumption: guessed the path   unverified: the tests pass",
+		);
+	});
+
+	test("drops trailing honesty chatter from the answer", () => {
+		const text = [
+			"Created app.py.",
+			"",
+			"High. Excited!",
+			"Your request is fulfilled.",
+			"The end is approaching. Good luck! 💪",
+			"</Task is complete. Let's build!>",
+		].join("\n");
+		expect(stripHonestyFooter(text)).toBe("Created app.py.");
 	});
 });

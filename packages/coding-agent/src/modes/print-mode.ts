@@ -9,6 +9,7 @@
 import type { AssistantMessage, ImageContent, ToolResultMessage } from "@trek/ai";
 import type { AgentSessionEvent } from "../core/agent-session.ts";
 import type { AgentSessionRuntime } from "../core/agent-session-runtime.ts";
+import { stripHonestyFooter } from "../core/honesty/index.ts";
 import { flushRawStdout, writeRawStdout } from "../core/output-guard.ts";
 import { killTrackedDetachedChildren } from "../utils/shell.ts";
 
@@ -201,8 +202,11 @@ export async function runPrintMode(runtimeHost: AgentSessionRuntime, options: Pr
 				} else {
 					for (const content of assistantMsg.content) {
 						if (content.type === "text" && content.text.trim()) {
-							writeRawStdout(`${content.text}\n`);
-							printed = true;
+							const visible = stripHonestyFooter(content.text).trim();
+							if (visible) {
+								writeRawStdout(`${visible}\n`);
+								printed = true;
+							}
 						}
 					}
 				}

@@ -1,12 +1,18 @@
-import { getProviderDeterminism, listProviderDeterminism, supportLabel } from "./providers.ts";
+import { formatLocalDeterminismTable } from "../runtime/determinism.ts";
+import { getModelDeterminism, listProviderDeterminism, supportLabel } from "./providers.ts";
 import type { ResolvedReproducibility } from "./types.ts";
 
-export function formatDeterminismWarning(provider: string, resolved: ResolvedReproducibility): string | undefined {
-	const info = getProviderDeterminism(provider);
+export function formatDeterminismWarning(
+	provider: string,
+	resolved: ResolvedReproducibility,
+	modelId?: string,
+): string | undefined {
+	const info = getModelDeterminism(provider, modelId);
 	if (info.support === "seed") {
 		return undefined;
 	}
-	return `Warning: provider "${provider}" cannot honor determinism (${supportLabel(info.support)}). ${info.notes} Session seed ${resolved.seed} is logged for audit, not bit-exact replay. Use strict_audit with a local seed-capable model for audit-grade determinism.`;
+	const who = info.provider === "local" && modelId ? `local model "${modelId}"` : `provider "${provider}"`;
+	return `Warning: ${who} cannot honor determinism (${supportLabel(info.support)}). ${info.notes} Session seed ${resolved.seed} is logged for audit, not bit-exact replay. Use strict_audit with a dense local model and TREK_LLAMA_NGL=0 for audit-grade determinism.`;
 }
 
 export function formatProviderSupportTable(): string {
@@ -14,6 +20,8 @@ export function formatProviderSupportTable(): string {
 	for (const row of listProviderDeterminism()) {
 		lines.push(`  ${row.provider.padEnd(24)} ${supportLabel(row.support).padEnd(18)} ${row.notes}`);
 	}
+	lines.push("");
+	lines.push(formatLocalDeterminismTable());
 	return lines.join("\n");
 }
 
@@ -26,7 +34,7 @@ export function formatReproducibilityStatus(resolved: ResolvedReproducibility, p
 		`cpaSeed: ${resolved.cpaSeed}`,
 	];
 	if (provider) {
-		const info = getProviderDeterminism(provider);
+		const info = getModelDeterminism(provider);
 		lines.push(`provider: ${provider} (${supportLabel(info.support)})`);
 		const warning = formatDeterminismWarning(provider, resolved);
 		if (warning) {

@@ -9,8 +9,9 @@ packages/*/dist-chrome/
 packages/*/dist-firefox/
 *.cpuprofile
 
-# Environment
+# Environment. .env.example is the template. .env is local and must stay untracked.
 .env
+*-key.txt
 
 # Trek 0.5 local file history (labeled git commits are the git undo layer)
 .trek/versions/

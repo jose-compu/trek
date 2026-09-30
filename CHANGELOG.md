@@ -1,6 +1,6 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.7.5`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.8.0`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
@@ -9,6 +9,13 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 ### Added
 
 - 0.8.0 Runtime registry: `trek models` (`list`, `set-mode`, `set-suite`, `set-role`, `benchmark`). Default mode is remote API. Local llama.cpp is opt-in. Each `trek:audit_step` records `role` and `source`.
+
+### Changed
+
+- A local or hybrid local role completes on `llama-server`. The saved API model is not called and is not overwritten. A missing GGUF fails the turn instead of falling back to the API.
+- In pure local mode, a request to build, run, or open something keeps requiring a tool until a file tool and `bash` have both run.
+- The honesty footer is one line: `honesty confidence=<level> assumptions=<n> unverified=<n>`. Trailing status chatter is omitted from the answer.
+- `llama-server` logs go to `~/.trek/logs/llama-server.log`. The session stops those processes on exit, including `trek --print`. A local completion stops after 120 seconds or 4,096 tokens.
 
 ## [0.7.5] - 2026-09-08
 

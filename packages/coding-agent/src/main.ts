@@ -792,8 +792,19 @@ export async function main(args: string[], options?: MainOptions) {
 		session.setSandboxBash(true);
 	}
 
+	try {
+		await session.activateLocalModel();
+	} catch (error) {
+		console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+		process.exit(1);
+	}
+
 	if (session.model) {
-		const warning = formatDeterminismWarning(session.model.provider, session.getReproducibility());
+		const warning = formatDeterminismWarning(
+			session.model.provider,
+			session.getReproducibility(),
+			session.model.name || session.model.id,
+		);
 		if (warning) {
 			debugLog("reproducibility", warning);
 			if (!session.settingsManager.getQuietStartup()) {

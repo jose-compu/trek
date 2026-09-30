@@ -30,7 +30,7 @@ function local(id: string, thinking: boolean, repo?: string): RoleAssignment {
 const mistralRoles = {
 	embedding: local("sentence-transformers/all-MiniLM-L6-v2", false),
 	reranker: local("cross-encoder/ms-marco-MiniLM-L-6-v2", false),
-	tooling: local("Cactus-Compute/needle", false),
+	tooling: local("Qwen3.5-0.8B", false, "Qwen/Qwen3.5-0.8B"),
 	workhorse: local("Ministral-3-3B-Instruct-2512", false),
 	planning: local("Ministral-3-8B-Reasoning-2512", true),
 };

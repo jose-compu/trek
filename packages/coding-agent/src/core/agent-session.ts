@@ -100,7 +100,7 @@ import {
 	ReflectiveLoopController,
 } from "./reflective-loop/index.ts";
 import {
-	assertStrictAuditProvider,
+	assertStrictAuditTarget,
 	buildAuditStep,
 	parseSessionRecord,
 	type ResolvedReproducibility,
@@ -112,8 +112,11 @@ import type { ResourceExtensionPaths, ResourceLoader } from "./resource-loader.t
 import {
 	createDefaultLlamaProcessManager,
 	type LlamaProcessManager,
+	LOCAL_LLAMA_PROVIDER,
+	LOCAL_SUITE_WORK_SECTION,
 	latestUserPrompt,
 	loadRuntimeConfig,
+	localLlamaChatModel,
 	resolveRuntime,
 	selectSessionRole,
 } from "./runtime/index.ts";
@@ -1343,6 +1346,11 @@ export class AgentSession {
 	 */
 	dispose(): void {
 		try {
+			this._llama?.stop();
+		} catch {
+			// Dispose must succeed even if a local server is already gone.
+		}
+		try {
 			this.abortRetry();
 			this.abortCompaction();
 			this.abortBranchSummary();
@@ -1559,7 +1567,22 @@ export class AgentSession {
 			toolSnippets,
 			promptGuidelines,
 		};
-		return buildSystemPrompt(this._baseSystemPromptOptions);
+		const built = buildSystemPrompt(this._baseSystemPromptOptions);
+		// Small GGUFs ignore a late instruction and answer like a web chat.
+		if (this._localSuiteShouldBuildHere()) {
+			return `${LOCAL_SUITE_WORK_SECTION}\n\n${built}`;
+		}
+		return built;
+	}
+
+	/** Pure local mode works in the folder. API mode keeps the normal chat prompt. */
+	private _localSuiteShouldBuildHere(): boolean {
+		try {
+			const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+			return resolved.effectiveMode === "local";
+		} catch {
+			return false;
+		}
 	}
 
 	private _ensureSystemPromptTrace(): void {
@@ -1625,14 +1648,99 @@ export class AgentSession {
 		debugLog("reproducibility", "audit step recorded", record);
 	}
 
-	/** Role and source for trek:audit_step. api mode stays on the session model. */
+	/** Role and source for trek:audit_step. A local role also replaces the chat model. */
 	private _llama?: LlamaProcessManager;
+	/** Session model before a local role took the chat call. Not written to settings. */
+	private _apiSessionModel?: Model<any>;
+	private _apiThinkingLevel?: ThinkingLevel;
 
 	private _llamaManager(): LlamaProcessManager {
 		if (!this._llama) {
 			this._llama = createDefaultLlamaProcessManager();
 		}
 		return this._llama;
+	}
+
+	/** Start the local work-horse before the first prompt when the hierarchy is local. */
+	async activateLocalModel(): Promise<void> {
+		await this._bindLocalCompletion("");
+	}
+
+	/**
+	 * Pure local, and local roles in hybrid, complete on llama-server.
+	 * The saved API model is restored for an API role and is not written back over settings.
+	 * PI_NO_LOCAL_LLM=1 keeps the session model, so the CI suite does not spawn llama.cpp.
+	 */
+	private async _bindLocalCompletion(text: string): Promise<void> {
+		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			return;
+		}
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const resolved = resolveRuntime(config);
+		const selection = selectSessionRole({ text, resolved });
+		if (selection.source !== "local") {
+			this._restoreApiSessionModel();
+			return;
+		}
+		this._rememberApiSessionModel();
+		let handle: ReturnType<LlamaProcessManager["ensure"]>;
+		try {
+			handle = this._llamaManager().ensure(selection.role, resolved);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(`Local mode did not call the API model. ${message}`);
+		}
+		const draft = localLlamaChatModel({ modelId: selection.modelId, endpoint: handle.endpoint });
+		this._modelRegistry.registerProvider(LOCAL_LLAMA_PROVIDER, {
+			baseUrl: draft.baseUrl,
+			apiKey: "local",
+			api: "openai-completions",
+			models: [
+				{
+					id: draft.id,
+					name: draft.name,
+					api: "openai-completions",
+					baseUrl: draft.baseUrl,
+					reasoning: false,
+					input: ["text"],
+					cost: draft.cost,
+					contextWindow: draft.contextWindow,
+					maxTokens: draft.maxTokens,
+					compat: draft.compat,
+				},
+			],
+		});
+		const registered = this._modelRegistry.find(LOCAL_LLAMA_PROVIDER, draft.id);
+		if (!registered) {
+			throw new Error(`Local model ${draft.name} was not registered.`);
+		}
+		const previous = this.model;
+		this.agent.state.model = registered;
+		if (!selection.thinking) {
+			this.agent.state.thinkingLevel = "off";
+		}
+		if (!modelsAreEqual(previous, registered)) {
+			this.sessionManager.appendModelChange(registered.provider, registered.id);
+			await this._emitModelSelect(registered, previous, "set");
+		}
+	}
+
+	private _rememberApiSessionModel(): void {
+		if (this.model?.provider === LOCAL_LLAMA_PROVIDER) {
+			return;
+		}
+		this._apiSessionModel = this.model;
+		this._apiThinkingLevel = this.thinkingLevel;
+	}
+
+	private _restoreApiSessionModel(): void {
+		if (!this._apiSessionModel || this.model?.provider !== LOCAL_LLAMA_PROVIDER) {
+			return;
+		}
+		this.agent.state.model = this._apiSessionModel;
+		if (this._apiThinkingLevel) {
+			this.agent.state.thinkingLevel = this._apiThinkingLevel;
+		}
 	}
 
 	private _runtimeAuditFields(prior: readonly { role: string; content?: unknown }[]): {
@@ -1673,7 +1781,7 @@ export class AgentSession {
 		if (!model) {
 			return;
 		}
-		assertStrictAuditProvider(model.provider);
+		assertStrictAuditTarget(model.provider, model.name || model.id);
 	}
 
 	private _assignPromptNumber(expandedText: string): { promptNumber: number; promptId: string } {
@@ -1870,6 +1978,7 @@ export class AgentSession {
 				throw new Error(formatNoModelSelectedMessage());
 			}
 
+			await this._bindLocalCompletion(expandedText);
 			this._assertStrictAuditModel();
 
 			if (!this._modelRegistry.hasConfiguredAuth(this.model)) {
