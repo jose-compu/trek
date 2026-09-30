@@ -15,6 +15,8 @@ import { mergeProviderAttributionHeaders } from "./provider-attribution.ts";
 import { REFLECTIVE_META_TOOL_NAMES } from "./reflective-loop/meta-tools.ts";
 import type { ResourceLoader } from "./resource-loader.ts";
 import { DefaultResourceLoader } from "./resource-loader.ts";
+import { LOCAL_LLAMA_PROVIDER, LOCAL_LLAMA_TIMEOUT_MS } from "./runtime/local-model.ts";
+import { localSuiteToolChoice, nudgeLocalWorkMessages } from "./runtime/local-work.ts";
 import { getDefaultSessionDir, SessionManager } from "./session-manager.ts";
 import { SettingsManager } from "./settings-manager.ts";
 import { time } from "./timings.ts";
@@ -312,15 +314,30 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			// SDKs treat timeout=0 as 0ms (immediate timeout), not "no timeout".
 			// Use max int32 to effectively disable the timeout.
 			const effectiveTimeoutMs = httpIdleTimeoutMs === 0 ? 2147483647 : httpIdleTimeoutMs;
-			const timeoutMs = options?.timeoutMs ?? providerRetrySettings.timeoutMs ?? effectiveTimeoutMs;
+			const local = model.provider === LOCAL_LLAMA_PROVIDER;
+			const timeoutMs = local
+				? LOCAL_LLAMA_TIMEOUT_MS
+				: (options?.timeoutMs ?? providerRetrySettings.timeoutMs ?? effectiveTimeoutMs);
+			const signal = local
+				? AbortSignal.any([
+						...(options?.signal ? [options.signal] : []),
+						AbortSignal.timeout(LOCAL_LLAMA_TIMEOUT_MS),
+					])
+				: options?.signal;
 			const websocketConnectTimeoutMs =
 				options?.websocketConnectTimeoutMs ?? settingsManager.getWebSocketConnectTimeoutMs();
-			return streamSimple(model, context, {
+			const localToolChoice =
+				model.provider === LOCAL_LLAMA_PROVIDER && context.tools && context.tools.length > 0
+					? localSuiteToolChoice(context.messages)
+					: undefined;
+			const requestContext = local ? { ...context, messages: nudgeLocalWorkMessages(context.messages) } : context;
+			return streamSimple(model, requestContext, {
 				...options,
 				apiKey: auth.apiKey,
 				timeoutMs,
+				...(signal ? { signal } : {}),
 				websocketConnectTimeoutMs,
-				maxRetries: options?.maxRetries ?? providerRetrySettings.maxRetries,
+				maxRetries: local ? 0 : (options?.maxRetries ?? providerRetrySettings.maxRetries),
 				maxRetryDelayMs: options?.maxRetryDelayMs ?? providerRetrySettings.maxRetryDelayMs,
 				headers: mergeProviderAttributionHeaders(
 					model,
@@ -329,6 +346,8 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 					auth.headers,
 					options?.headers,
 				),
+				...(localToolChoice ? { toolChoice: localToolChoice } : {}),
+				...(model.provider === LOCAL_LLAMA_PROVIDER && model.maxTokens > 0 ? { maxTokens: model.maxTokens } : {}),
 			});
 		},
 		onPayload: async (payload, _model) => {

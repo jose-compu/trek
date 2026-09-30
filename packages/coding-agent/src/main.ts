@@ -44,6 +44,7 @@ import { SettingsManager } from "./core/settings-manager.ts";
 import { printTimings, resetTimings, time } from "./core/timings.ts";
 import { handleHistoryCommand, handleRevertCommand } from "./history-cli.ts";
 import { runMigrations, showDeprecationWarnings } from "./migrations.ts";
+import { handleModelsCommand } from "./models-cli.ts";
 import { InteractiveMode, runBatchMode, runPrintMode, runRpcMode } from "./modes/index.ts";
 import { ExtensionSelectorComponent } from "./modes/interactive/components/extension-selector.ts";
 import { initTheme, stopThemeWatcher } from "./modes/interactive/theme/theme.ts";
@@ -510,6 +511,10 @@ export async function main(args: string[], options?: MainOptions) {
 		return;
 	}
 
+	if (await handleModelsCommand(args)) {
+		return;
+	}
+
 	if (await handleConfigCommand(args)) {
 		return;
 	}
@@ -787,8 +792,19 @@ export async function main(args: string[], options?: MainOptions) {
 		session.setSandboxBash(true);
 	}
 
+	try {
+		await session.activateLocalModel();
+	} catch (error) {
+		console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+		process.exit(1);
+	}
+
 	if (session.model) {
-		const warning = formatDeterminismWarning(session.model.provider, session.getReproducibility());
+		const warning = formatDeterminismWarning(
+			session.model.provider,
+			session.getReproducibility(),
+			session.model.name || session.model.id,
+		);
 		if (warning) {
 			debugLog("reproducibility", warning);
 			if (!session.settingsManager.getQuietStartup()) {

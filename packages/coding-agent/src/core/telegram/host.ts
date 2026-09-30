@@ -51,7 +51,11 @@ export class AgentTelegramHost implements TelegramSessionHost {
 		this.sessions.set(sessionKey, created.session);
 		const session = created.session;
 		if (session.model) {
-			const warning = formatDeterminismWarning(session.model.provider, session.getReproducibility());
+			const warning = formatDeterminismWarning(
+				session.model.provider,
+				session.getReproducibility(),
+				session.model.name || session.model.id,
+			);
 			if (warning) {
 				debugLog("reproducibility", warning);
 				if (!session.settingsManager.getQuietStartup()) {

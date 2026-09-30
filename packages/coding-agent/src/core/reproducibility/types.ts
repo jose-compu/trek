@@ -82,4 +82,7 @@ export interface AuditStepRecord {
 	skillsActiveHash: string;
 	retrievedLessonIds: string[];
 	timestamp: string;
+	/** 0.8.0 Runtime. Absent on records written before the hierarchy existed. */
+	role?: "tooling" | "workhorse" | "planning" | "frontier";
+	source?: "local" | "api";
 }

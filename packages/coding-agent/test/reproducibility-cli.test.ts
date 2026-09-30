@@ -49,6 +49,10 @@ describe("determinism warnings (#72)", () => {
 		expect(table).toContain("anthropic");
 		expect(table).toContain("no seed");
 		expect(table).toContain("openai");
+		expect(table).toContain("LFM2.5-1.2B-Instruct");
+		expect(table).toContain("LFM2.5-8B-A1B");
+		expect(table).toContain("CPU seed honored");
+		expect(table).toContain("CPU best-effort");
 	});
 });
 

@@ -274,6 +274,11 @@ ${chalk.bold("Commands:")}
   ${APP_NAME} telegram                  Long-poll Telegram (allowlisted DMs/groups)
   ${APP_NAME} config                    Open TUI to enable/disable package resources
   ${APP_NAME} config reproducibility    Show or set audit seed and mode (#74)
+  ${APP_NAME} models                    Show the 0.8.0 hierarchy (api by default)
+  ${APP_NAME} models set-mode <mode>    api, local, or hybrid
+  ${APP_NAME} models set-suite <suite>  mistral, mistral-pro, qwen, or lfm
+  ${APP_NAME} models set-role <role>    Override one role (--id, --thinking)
+  ${APP_NAME} models benchmark          Tokens/s per local role; skips missing weights
   ${APP_NAME} <command> --help          Show help for install/remove/uninstall/update/list
 
 ${chalk.bold("Options:")}

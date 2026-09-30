@@ -7,8 +7,11 @@ import { fauxAssistantMessage } from "@trek/ai";
 import { afterEach, describe, expect, it } from "vitest";
 import {
 	assertStrictAuditProvider,
+	assertStrictAuditTarget,
 	DEFAULT_SESSION_SEED,
+	formatDeterminismWarning,
 	getCpaPrngSeed,
+	getModelDeterminism,
 	getProviderDeterminism,
 	isStrictAuditProvider,
 	parseSessionRecord,
@@ -89,8 +92,34 @@ describe("strict_audit provider gate (#70)", () => {
 	it("allows faux and refuses anthropic / openai", () => {
 		expect(isStrictAuditProvider("faux")).toBe(true);
 		expect(isStrictAuditProvider("anthropic")).toBe(false);
+		expect(isStrictAuditProvider("local")).toBe(false);
 		expect(getProviderDeterminism("openai").support).toBe("best-effort");
 		expect(() => assertStrictAuditProvider("anthropic")).toThrow(/strict_audit refuses/);
+	});
+
+	it("classifies local GGUFs and warns unless a dense model is on CPU", () => {
+		const previous = process.env.TREK_LLAMA_NGL;
+		delete process.env.TREK_LLAMA_NGL;
+		const resolved = resolveReproducibility({ settings: { seed: 42 } });
+		expect(getModelDeterminism("local", "LFM2.5-1.2B-Instruct").support).toBe("best-effort");
+		expect(getModelDeterminism("local", "LFM2.5-8B-A1B").support).toBe("best-effort");
+		expect(getModelDeterminism("local", "LFM2-ColBERT-350M").support).toBe("unsupported");
+		expect(formatDeterminismWarning("local", resolved, "LFM2.5-1.2B-Instruct")).toMatch(/GPU/);
+		expect(() => assertStrictAuditTarget("local", "LFM2.5-1.2B-Instruct")).toThrow(/strict_audit refuses/);
+		expect(() => assertStrictAuditTarget("local", "LFM2.5-8B-A1B")).toThrow(/Mixture-of-experts/);
+
+		process.env.TREK_LLAMA_NGL = "0";
+		expect(getModelDeterminism("local", "/Users/me/.trek/models/LFM2.5-1.2B-Instruct.gguf").support).toBe("seed");
+		expect(formatDeterminismWarning("local", resolved, "LFM2.5-350M")).toBeUndefined();
+		expect(() => assertStrictAuditTarget("local", "Qwen3.5-0.8B")).not.toThrow();
+		expect(getModelDeterminism("local", "LFM2.5-8B-A1B").support).toBe("best-effort");
+		expect(formatDeterminismWarning("local", resolved, "LFM2.5-8B-A1B")).toMatch(/Mixture-of-experts/);
+
+		if (previous === undefined) {
+			delete process.env.TREK_LLAMA_NGL;
+		} else {
+			process.env.TREK_LLAMA_NGL = previous;
+		}
 	});
 });
 

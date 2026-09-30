@@ -31,6 +31,15 @@ export const AuditStepSchema = Type.Object({
 	skillsActiveHash: Type.String({ minLength: 1 }),
 	retrievedLessonIds: Type.Array(Type.String()),
 	timestamp: Type.String({ minLength: 1 }),
+	role: Type.Optional(
+		Type.Union([
+			Type.Literal("tooling"),
+			Type.Literal("workhorse"),
+			Type.Literal("planning"),
+			Type.Literal("frontier"),
+		]),
+	),
+	source: Type.Optional(Type.Union([Type.Literal("local"), Type.Literal("api")])),
 });
 
 export type AuditStepSchemaType = Static<typeof AuditStepSchema>;
@@ -104,6 +113,9 @@ export interface BuildAuditStepInput {
 	/** Empty until 0.11.0 Memory. */
 	retrievedLessonIds?: string[];
 	clock?: () => Date;
+	/** 0.8.0 coarse role. Omitted when the runtime config cannot be read. */
+	role?: AuditStepRecord["role"];
+	source?: AuditStepRecord["source"];
 }
 
 export function buildAuditStep(input: BuildAuditStepInput): AuditStepRecord {
@@ -131,6 +143,12 @@ export function buildAuditStep(input: BuildAuditStepInput): AuditStepRecord {
 	}
 	if (input.assistant.responseId) {
 		record.providerRequestId = input.assistant.responseId;
+	}
+	if (input.role) {
+		record.role = input.role;
+	}
+	if (input.source) {
+		record.source = input.source;
 	}
 	return record;
 }

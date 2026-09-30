@@ -26,20 +26,19 @@ export function isHonestyProtocolEnabled(): boolean {
 }
 
 /** System prompt section instructing the model to emit the honesty footer. */
-export const HONESTY_PROMPT_SECTION = `## Honesty protocol
+export const HONESTY_PROMPT_SECTION = `## Honesty
 
-End the FINAL message of every turn with this footer (after your normal answer):
+End the final message with exactly this block. No emoji. No other tag. Do not write confidence, assumptions, or task status in the answer.
 
 <honesty>
-confidence: high|medium|low
-assumption: <one line per assumption you made without verifying it; write "none" if none>
-unverified: <one line per factual claim not backed by tool evidence from this session; write "none" if none>
+confidence: medium
+assumption: none
+unverified: none
 </honesty>
 
-Rules:
-- confidence reflects how certain you are that your work is correct and complete.
-- Verify before assert: statements about files, commands, or system state must come from tool output you observed this session. Anything recalled from training or guessed belongs under "unverified".
-- Repeat the "assumption:" and "unverified:" lines as needed, one item per line.`;
+confidence is high, medium, or low.
+assumption is one line each, or none.
+unverified is one line each, or none.`;
 
 const FOOTER_PATTERN = /<honesty>([\s\S]*?)<\/honesty>/i;
 
@@ -82,7 +81,65 @@ export function parseHonestyReport(text: string): HonestyReport {
 	return report;
 }
 
-/** Remove the honesty footer from a message text (for display contexts that render it separately). */
+const EMOJI = /(?:[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]|\u{FE0F}|\u{200D})/u;
+
+/** Trailing lines a small model invents instead of the fixed footer. */
+function isHonestyChatterLine(line: string): boolean {
+	const plain = line.trim();
+	if (!plain) {
+		return true;
+	}
+	if (plain.length > 180 && !EMOJI.test(plain)) {
+		return false;
+	}
+	if (EMOJI.test(plain) && plain.length <= 180) {
+		return true;
+	}
+	return (
+		/^(high|medium|low)\b[.!:\s]/i.test(plain) ||
+		/^(confidence|assumption|assumptions|unverified|footer)\b/i.test(plain) ||
+		/\btask (is )?complet/i.test(plain) ||
+		/^<\/?[a-z][^>]*>$/i.test(plain) ||
+		/^(your (request|path|command|turn|success|final)|let me know|i'm here|i am here)\b/i.test(plain) ||
+		/\b(let's|lets) (build|go|make|do|celebrate|proceed|open)\b/i.test(plain)
+	);
+}
+
+/** Remove the honesty footer, including a tag the model has not closed yet. */
 export function stripHonestyFooter(text: string): string {
-	return text.replace(FOOTER_PATTERN, "").trimEnd();
+	let next = text.replace(FOOTER_PATTERN, "");
+	const open = next.toLowerCase().lastIndexOf("<honesty");
+	if (open !== -1) {
+		next = next.slice(0, open);
+	}
+	const lines = next.split("\n");
+	while (lines.length > 0 && isHonestyChatterLine(lines[lines.length - 1] ?? "")) {
+		lines.pop();
+	}
+	return lines.join("\n").trimEnd();
+}
+
+/** Fixed status line. The raw tag stays off screen. */
+export function honestyDisplay(
+	text: string,
+): { confidence: ConfidenceLevel; headline: string; details: string[] } | undefined {
+	const report = parseHonestyReport(text);
+	if (!report.confidence) {
+		return undefined;
+	}
+	const headline = `honesty confidence=${report.confidence} assumptions=${report.assumptions.length} unverified=${report.unverified.length}`;
+	const details = [
+		...report.assumptions.map((item) => `assumption: ${item}`),
+		...report.unverified.map((item) => `unverified: ${item}`),
+	];
+	return { confidence: report.confidence, headline, details };
+}
+
+/** One display line when the footer has a real confidence. The raw tag stays off screen. */
+export function honestyStatusLine(text: string): string | undefined {
+	const display = honestyDisplay(text);
+	if (!display) {
+		return undefined;
+	}
+	return [display.headline, ...display.details].join("   ");
 }

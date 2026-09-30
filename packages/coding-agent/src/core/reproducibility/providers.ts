@@ -1,3 +1,4 @@
+import { localModelDeterminism, matchLocalModelId } from "../runtime/determinism.ts";
 import type { DeterminismSupport, ProviderDeterminism } from "./types.ts";
 
 const TABLE: Record<string, Omit<ProviderDeterminism, "provider">> = {
@@ -15,6 +16,10 @@ const TABLE: Record<string, Omit<ProviderDeterminism, "provider">> = {
 		notes: "OpenAI Responses path; treat like OpenAI seed.",
 	},
 	xai: { support: "best-effort", notes: "Grok seed is best-effort when the API accepts it." },
+	local: {
+		support: "best-effort",
+		notes: "Depends on the GGUF and TREK_LLAMA_NGL. Default GPU offload is not bit-exact.",
+	},
 	mistral: { support: "unsupported", notes: "Hosted Mistral API does not expose a binding seed." },
 };
 
@@ -35,8 +40,27 @@ export function listProviderDeterminism(): ProviderDeterminism[] {
 	return Object.entries(TABLE).map(([provider, rest]) => ({ provider, ...rest }));
 }
 
+export function getModelDeterminism(provider: string, modelId?: string): ProviderDeterminism {
+	if (provider.trim().toLowerCase() === "local") {
+		const local = localModelDeterminism(modelId);
+		return { provider: "local", support: local.support, notes: local.notes };
+	}
+	return getProviderDeterminism(provider);
+}
+
 export function isStrictAuditProvider(provider: string): boolean {
 	return getProviderDeterminism(provider).support === "seed";
+}
+
+export function assertStrictAuditTarget(provider: string, modelId?: string): void {
+	const info = getModelDeterminism(provider, modelId);
+	if (info.support !== "seed") {
+		const id = matchLocalModelId(modelId) ?? modelId;
+		const label = info.provider === "local" && id ? `local model "${id}"` : `provider "${provider}"`;
+		throw new Error(
+			`strict_audit refuses ${label} (${info.support}): ${info.notes} Use a dense local model with TREK_LLAMA_NGL=0, or faux, or switch to mode default.`,
+		);
+	}
 }
 
 export function assertStrictAuditProvider(provider: string): void {
