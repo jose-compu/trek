@@ -1,4 +1,4 @@
-![Trek Agent 0.7.5 Audit](./assets/banner.png)
+![Trek Agent 0.8.0 Runtime](./assets/banner-0.8.0.png)
 
 # Trek Agent v0.8.0
 

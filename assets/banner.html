@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Trek Agent 0.7.5</title>
+<title>Trek Agent 0.8.0</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 1983px; height: 793px; overflow: hidden; background: #070b16; }
@@ -118,77 +118,75 @@
         <div class="brand">
           <div class="brand-row">
             <div class="name">Trek Agent</div>
-            <div class="badge">v0.7.5</div>
+            <div class="badge">v0.8.0</div>
           </div>
           <div class="tagline">AI agents should be powerful. And reversible.</div>
         </div>
       </header>
       <div class="main">
         <div>
-          <h1>Trek 0.7.5<span>Audit</span></h1>
-          <p class="sub">Honest seed and audit records. Edits retry instead of rewriting the file.</p>
+          <h1>Trek 0.8.0<span>Runtime</span></h1>
+          <p class="sub">API by default. llama.cpp starts only when you opt in.</p>
         </div>
         <div class="cols">
           <div class="col">
             <div class="icon">
               <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <circle cx="32" cy="32" r="22" stroke="#c4b5fd" stroke-width="2.4"/>
-                <path d="M32 16 v8 M32 40 v8 M18 32 h6 M40 32 h6" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round"/>
-                <text x="32" y="37" text-anchor="middle" fill="#e9d5ff" font-family="Helvetica Neue, sans-serif" font-size="16" font-weight="700">42</text>
+                <circle cx="32" cy="32" r="20" stroke="#c4b5fd" stroke-width="2.4"/>
+                <path d="M32 14 a18 18 0 0 1 0 36" stroke="#a78bfa" stroke-width="2.2"/>
+                <path d="M14 32 h36" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round"/>
               </svg>
             </div>
-            <h2>Session seed</h2>
-            <p>Default 42, logged every session. TREK_SEED, or one random seed.</p>
+            <h2>API first</h2>
+            <p>Default mode is remote API. llama-server stays off.</p>
           </div>
           <div class="col">
             <div class="icon">
               <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <rect x="10" y="16" width="28" height="14" rx="7" stroke="#c4b5fd" stroke-width="2.4"/>
-                <circle cx="18" cy="23" r="3" fill="#e9d5ff"/>
-                <rect x="26" y="34" width="28" height="14" rx="7" stroke="#a78bfa" stroke-width="2.4"/>
-                <circle cx="46" cy="41" r="3" fill="#ddd6fe"/>
+                <rect x="14" y="12" width="36" height="40" rx="4" stroke="#c4b5fd" stroke-width="2.4"/>
+                <path d="M22 26 h20 M22 34 h20 M22 42 h12" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round"/>
               </svg>
             </div>
-            <h2>Two modes</h2>
-            <p>default keeps the trail. strict_audit stays on local and faux models.</p>
+            <h2>trek models</h2>
+            <p>list, set-mode, set-suite, set-role, and benchmark.</p>
           </div>
           <div class="col">
             <div class="icon">
               <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <rect x="16" y="10" width="32" height="44" rx="4" stroke="#c4b5fd" stroke-width="2.4"/>
-                <path d="M24 24 h16 M24 32 h16 M24 40 h10" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round"/>
+                <path d="M10 46 L20 28 L30 46 Z" stroke="#c4b5fd" stroke-width="2.2" stroke-linejoin="round"/>
+                <path d="M22 46 L32 18 L42 46 Z" stroke="#e9d5ff" stroke-width="2.2" stroke-linejoin="round"/>
+                <path d="M34 46 L44 30 L54 46 Z" stroke="#a78bfa" stroke-width="2.2" stroke-linejoin="round"/>
               </svg>
             </div>
-            <h2>Audit step</h2>
-            <p>trek:audit_step stores model, seed, hashes, and fingerprint.</p>
+            <h2>Suites</h2>
+            <p>Mistral is the default. Qwen and LFM are the alternates.</p>
           </div>
           <div class="col">
             <div class="icon">
               <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <circle cx="32" cy="32" r="22" fill="#7c3aed"/>
-                <path d="M32 18 v16" stroke="white" stroke-width="3" stroke-linecap="round"/>
-                <circle cx="32" cy="44" r="2.2" fill="white"/>
+                <circle cx="32" cy="32" r="8" fill="#7c3aed"/>
+                <circle cx="32" cy="32" r="18" stroke="#c4b5fd" stroke-width="2.2"/>
+                <path d="M32 8 v6 M32 50 v6 M8 32 h6 M50 32 h6" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round"/>
               </svg>
             </div>
-            <h2>Honest limits</h2>
-            <p>Startup warns when a provider cannot honor the seed.</p>
+            <h2>Frontier</h2>
+            <p>Hybrid adds a fourth layer for /frontier and heavier steps.</p>
           </div>
           <div class="col">
             <div class="icon">
               <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <path d="M38 14 l12 12 -22 22 H16 V36 Z" stroke="#ddd6fe" stroke-width="2.4" stroke-linejoin="round"/>
-                <path d="M34 18 l12 12" stroke="#a78bfa" stroke-width="2.4" stroke-linecap="round"/>
-                <path d="M18 46 h12" stroke="#c4b5fd" stroke-width="2.4" stroke-linecap="round"/>
+                <circle cx="32" cy="32" r="20" stroke="#c4b5fd" stroke-width="2.4"/>
+                <path d="M20 20 l24 24" stroke="#e9d5ff" stroke-width="2.6" stroke-linecap="round"/>
               </svg>
             </div>
-            <h2>Edit retry</h2>
-            <p>A missed oldText is not already applied. Retry while it is still on disk.</p>
+            <h2>No fallback</h2>
+            <p>A missing GGUF fails the turn.</p>
           </div>
         </div>
       </div>
       <div class="upgrade">
         <div class="prompt">&gt;_</div>
-        <div><span class="up-label">Upgrade</span> <span class="cmd">npm install -g @trek/coding-agent@0.7.5</span></div>
+        <div><span class="up-label">Upgrade</span> <span class="cmd">npm install -g @trek/coding-agent@0.8.0</span></div>
       </div>
     </div>
   </div>
