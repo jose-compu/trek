@@ -1,10 +1,14 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.8.0`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.8.1`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
-## [Unreleased]
+## [0.8.1] - 2026-10-01
+
+### Fixed
+
+- Production dependencies: `brace-expansion` 5.0.12, `protobufjs` 7.6.6, `shell-quote` 1.11.0, `undici` 8.11.2, and Gondolin's `undici` 6.29.0.
 
 ## [0.8.0] - 2026-09-30
 

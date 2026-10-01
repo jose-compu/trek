@@ -1,6 +1,6 @@
 ![Trek Agent 0.8.0 Runtime](./assets/banner-0.8.0.png)
 
-# Trek Agent v0.8.0
+# Trek Agent v0.8.1
 
 Trek is a **hard fork of the [Pi Coding Agent](https://pi.dev/)** — the minimal terminal coding agent with read, bash, edit, write tools, sessions, and a TypeScript extension ecosystem.
 
@@ -21,11 +21,11 @@ Every user turn follows **Observe → Intend → Act → Reflect** (O→I→A→
 
 Pi compatibility is preserved: community packages from [pi.dev/packages](https://pi.dev/packages) install with `trek install npm:<package>`. See [Pi Coding Agent plugins](#pi-coding-agent-plugins) below.
 
-**Version:** 0.8.0 — see [CHANGELOG.md](./CHANGELOG.md). Full plan: [ROADMAP.md](../ROADMAP.md).
+**Version:** 0.8.1 — see [CHANGELOG.md](./CHANGELOG.md). Full plan: [ROADMAP.md](../ROADMAP.md).
 
 ## Status
 
-**0.8.0** is current. Default mode is remote API. `local` and `hybrid` opt in to llama.cpp. A local role completes on `llama-server` and does not call the saved API model. **0.7.0 Audit** shipped the session seed (default `42`), `default` / `strict_audit` modes, per-step `trek:audit_step` records, and honest warnings when a provider cannot honor seed. Bit-exact replay is not claimed on closed APIs or on GPU llama.cpp. Next: **0.9.0 Routing**. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
+**0.8.1** is current. It updates production dependencies flagged by `npm audit`. **0.8.0** made remote API the default and kept llama.cpp opt-in. **0.7.0 Audit** shipped the session seed (default `42`), `default` / `strict_audit` modes, per-step `trek:audit_step` records, and honest warnings when a provider cannot honor seed. Bit-exact replay is not claimed on closed APIs or on GPU llama.cpp. Next: **0.9.0 Routing**. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
 
 ## Models
 

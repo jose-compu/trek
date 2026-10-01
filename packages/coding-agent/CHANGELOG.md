@@ -2,7 +2,11 @@
 
 Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent repo `UPSTREAM.md` / Pi monorepo.
 
-## [Unreleased]
+## [0.8.1] - 2026-10-01
+
+### Fixed
+
+- Production dependencies: `brace-expansion` 5.0.12, `protobufjs` 7.6.6, `shell-quote` 1.11.0, and `undici` 8.11.2.
 
 ## [0.8.0] - 2026-09-30
 
