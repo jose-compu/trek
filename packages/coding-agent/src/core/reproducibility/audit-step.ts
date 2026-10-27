@@ -40,6 +40,7 @@ export const AuditStepSchema = Type.Object({
 		]),
 	),
 	source: Type.Optional(Type.Union([Type.Literal("local"), Type.Literal("api")])),
+	routeReason: Type.Optional(Type.String({ minLength: 1 })),
 });
 
 export type AuditStepSchemaType = Static<typeof AuditStepSchema>;
@@ -116,6 +117,7 @@ export interface BuildAuditStepInput {
 	/** 0.8.0 coarse role. Omitted when the runtime config cannot be read. */
 	role?: AuditStepRecord["role"];
 	source?: AuditStepRecord["source"];
+	routeReason?: string;
 }
 
 export function buildAuditStep(input: BuildAuditStepInput): AuditStepRecord {
@@ -149,6 +151,9 @@ export function buildAuditStep(input: BuildAuditStepInput): AuditStepRecord {
 	}
 	if (input.source) {
 		record.source = input.source;
+	}
+	if (input.routeReason) {
+		record.routeReason = input.routeReason;
 	}
 	return record;
 }

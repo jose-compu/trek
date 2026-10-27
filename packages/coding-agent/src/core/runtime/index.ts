@@ -1,4 +1,5 @@
 export { type BenchmarkProbe, type BenchmarkRow, benchmarkRuntime, formatBenchmark } from "./benchmark.ts";
+export { type ComponentRouteInput, routeComponent } from "./component-router.ts";
 export { LOCAL_LLAMA_PROVIDER, LOCAL_LLAMA_TIMEOUT_MS, localLlamaChatModel } from "./local-model.ts";
 export {
 	LOCAL_SUITE_WORK_SECTION,
@@ -81,8 +82,11 @@ export {
 	isSuiteId,
 	LOCAL_SERVER_ROLES,
 	type LocalServerRole,
+	ROUTE_COMPONENTS,
 	type RoleAssignment,
 	type RoleSource,
+	type RouteComponent,
+	type RouteRole,
 	RUNTIME_ROLES,
 	type RuntimeConfig,
 	type RuntimeRole,

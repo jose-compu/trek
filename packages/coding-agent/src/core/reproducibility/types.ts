@@ -85,4 +85,6 @@ export interface AuditStepRecord {
 	/** 0.8.0 Runtime. Absent on records written before the hierarchy existed. */
 	role?: "tooling" | "workhorse" | "planning" | "frontier";
 	source?: "local" | "api";
+	/** Why this model was chosen. Absent on records written before 0.9.0 routing. */
+	routeReason?: string;
 }

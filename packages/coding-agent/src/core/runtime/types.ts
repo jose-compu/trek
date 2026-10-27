@@ -36,10 +36,31 @@ export interface HierarchySettings {
 	quant: string;
 }
 
+export const ROUTE_COMPONENTS = ["worldModel", "toolIntent", "mechanical", "intend"] as const;
+export type RouteComponent = (typeof ROUTE_COMPONENTS)[number];
+
+/** Session roles a component may be pinned to. Embedding and reranker are not chat routes. */
+export type RouteRole = "tooling" | "workhorse" | "planning" | "frontier";
+
+export interface RoutingPolicy {
+	/** Static role per component. Absent components use the dynamic policy. */
+	components?: Partial<Record<RouteComponent, RouteRole>>;
+}
+
 export interface RuntimeConfig {
 	hierarchy: HierarchySettings;
 	/** Overrides on top of the suite preset. */
 	roles: Partial<Record<RuntimeRole, RoleAssignment>>;
+	/** Optional pins. Dynamic routing is the default. */
+	routing?: RoutingPolicy;
+}
+
+export function isRouteComponent(value: string): value is RouteComponent {
+	return (ROUTE_COMPONENTS as readonly string[]).includes(value);
+}
+
+export function isRouteRole(value: string): value is RouteRole {
+	return value === "tooling" || value === "workhorse" || value === "planning" || value === "frontier";
 }
 
 export const DEFAULT_QUANT = "q4_k_m";
