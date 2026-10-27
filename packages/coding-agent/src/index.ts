@@ -232,6 +232,7 @@ export {
 	type PackageSource,
 	type RetrySettings,
 	SettingsManager,
+	type SettingsManagerCreateOptions,
 } from "./core/settings-manager.ts";
 // Skills
 export {
@@ -300,6 +301,7 @@ export {
 	type RestoreResult,
 	TrekVersionStore,
 } from "./core/trek-store/index.ts";
+export { hasProjectTrustInputs, type ProjectTrustDecision, ProjectTrustStore } from "./core/trust-manager.ts";
 // Main entry point
 export { type MainOptions, main } from "./main.ts";
 // Run modes for programmatic SDK usage

@@ -6,6 +6,10 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Security
+
+- Project trust gate from Pi 0.79.0 (GHSA-mqxh-6gq7-558m / CVE-2026-54325). See `UPSTREAM.md`. Pi 0.78.1 fixes for the extension temp path, HTML export URLs, and `auth.json` mode were already in this tree. Dependency pins stay at the 0.8.1 versions.
+
 ## [0.8.1] - 2026-10-01
 
 ### Fixed

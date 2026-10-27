@@ -2279,54 +2279,56 @@ export class DefaultPackageManager implements PackageManager {
 			}
 		};
 
-		// Project extensions from .pi/
-		addResources(
-			"extensions",
-			collectAutoExtensionEntries(projectDirs.extensions),
-			projectMetadata,
-			projectOverrides.extensions,
-			projectBaseDir,
-		);
+		if (this.settingsManager.isProjectTrusted()) {
+			// Project extensions from .trek/
+			addResources(
+				"extensions",
+				collectAutoExtensionEntries(projectDirs.extensions),
+				projectMetadata,
+				projectOverrides.extensions,
+				projectBaseDir,
+			);
 
-		// Project skills from .pi/
-		addResources(
-			"skills",
-			collectAutoSkillEntries(projectDirs.skills, "trek"),
-			projectMetadata,
-			projectOverrides.skills,
-			projectBaseDir,
-		);
-
-		// Project skills from .agents/ (each with its own baseDir)
-		for (const agentsSkillsDir of projectAgentsSkillDirs) {
-			const agentsBaseDir = dirname(agentsSkillsDir); // the .agents directory
-			const agentsMetadata: PathMetadata = {
-				...projectMetadata,
-				baseDir: agentsBaseDir,
-			};
+			// Project skills from .pi/
 			addResources(
 				"skills",
-				collectAutoSkillEntries(agentsSkillsDir, "agents"),
-				agentsMetadata,
+				collectAutoSkillEntries(projectDirs.skills, "trek"),
+				projectMetadata,
 				projectOverrides.skills,
-				agentsBaseDir,
+				projectBaseDir,
+			);
+
+			// Project skills from .agents/ (each with its own baseDir)
+			for (const agentsSkillsDir of projectAgentsSkillDirs) {
+				const agentsBaseDir = dirname(agentsSkillsDir); // the .agents directory
+				const agentsMetadata: PathMetadata = {
+					...projectMetadata,
+					baseDir: agentsBaseDir,
+				};
+				addResources(
+					"skills",
+					collectAutoSkillEntries(agentsSkillsDir, "agents"),
+					agentsMetadata,
+					projectOverrides.skills,
+					agentsBaseDir,
+				);
+			}
+
+			addResources(
+				"prompts",
+				collectAutoPromptEntries(projectDirs.prompts),
+				projectMetadata,
+				projectOverrides.prompts,
+				projectBaseDir,
+			);
+			addResources(
+				"themes",
+				collectAutoThemeEntries(projectDirs.themes),
+				projectMetadata,
+				projectOverrides.themes,
+				projectBaseDir,
 			);
 		}
-
-		addResources(
-			"prompts",
-			collectAutoPromptEntries(projectDirs.prompts),
-			projectMetadata,
-			projectOverrides.prompts,
-			projectBaseDir,
-		);
-		addResources(
-			"themes",
-			collectAutoThemeEntries(projectDirs.themes),
-			projectMetadata,
-			projectOverrides.themes,
-			projectBaseDir,
-		);
 
 		// User extensions from ~/.trek/agent/
 		addResources(

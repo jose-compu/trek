@@ -4,6 +4,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Security
+
+- `--approve` / `--no-approve` gate project `.trek` resources and ancestor `AGENTS.md` / `CLAUDE.md` files (GHSA-mqxh-6gq7-558m). Non-interactive runs do not load those files until a saved decision or `--approve`. Recorded in `UPSTREAM.md`.
+
 ## [0.8.1] - 2026-10-01
 
 ### Fixed
