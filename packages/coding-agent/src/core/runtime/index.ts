@@ -52,6 +52,21 @@ export {
 	type RoleSelection,
 	selectSessionRole,
 } from "./select-role.ts";
+export {
+	apiShortTraceFixture,
+	applyShortTraceContext,
+	applyShortTraceOptions,
+	estimateTokens,
+	localShortTraceFixture,
+	SHORT_TRACE_MAX_SENTENCES,
+	SHORT_TRACE_MAX_TOKENS,
+	SHORT_TRACE_SECTION,
+	SHORT_TRACE_THINKING_BUDGETS,
+	sentenceCount,
+	spanWithinCap,
+	type TraceSpanEvent,
+	tokensBeforeTool,
+} from "./short-trace.ts";
 export { SUITE_PRESETS, type SuitePreset, suitePreset } from "./suites.ts";
 export {
 	assertPublicModelId,
