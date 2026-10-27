@@ -6,6 +6,10 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Added
+
+- Short thinking traces (#108). A tool-using turn asks for `reasoning` `minimal` and a 128-token thinking budget. Local models get the same cap in the prompt.
+
 ### Security
 
 - Project trust gate from Pi 0.79.0 (GHSA-mqxh-6gq7-558m / CVE-2026-54325). See `UPSTREAM.md`. Pi 0.78.1 fixes for the extension temp path, HTML export URLs, and `auth.json` mode were already in this tree. Dependency pins stay at the 0.8.1 versions.

@@ -4,6 +4,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Added
+
+- Short thinking traces (#108). Tool turns use reasoning effort `minimal` and a 128-token thinking budget. Local GGUFs get the cap in the prompt.
+
 ### Security
 
 - `--approve` / `--no-approve` gate project `.trek` resources and ancestor `AGENTS.md` / `CLAUDE.md` files (GHSA-mqxh-6gq7-558m). Non-interactive runs do not load those files until a saved decision or `--approve`. Recorded in `UPSTREAM.md`.
