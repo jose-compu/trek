@@ -29,7 +29,7 @@ Pi compatibility is preserved: community packages from [pi.dev/packages](https:/
 
 ## Models
 
-The hierarchy is `api` (default), `local`, or `hybrid`. `trek models` prints the saved mode and the effective mode. `~/.trek/models.yaml` is the registry. A project `.trek/models.yaml` overrides it. Launch `trek` from the project you want the agent to edit. `--provider` and `--model` choose the chat model in `api` mode, and for the Frontier role in `hybrid`. A local role completes on `llama-server` for that GGUF. The saved API model in settings is not called and is not overwritten. Per-component routing remains 0.9.0.
+The hierarchy is `api` (default), `local`, or `hybrid`. `trek models` prints the saved mode and the effective mode. `~/.trek/models.yaml` is the registry. A project `.trek/models.yaml` overrides it. Launch `trek` from the project you want the agent to edit. `--provider` and `--model` choose the chat model in `api` mode, and for the Frontier role in `hybrid`. A local role completes on `llama-server` for that GGUF. The saved API model in settings is not called and is not overwritten. Component routing is dynamic unless `routing.components` pins a role: WorldModel uses Planning, a tool step uses Tooling, and a mechanical subtask uses Workhorse. Complexity above 0.7, a second retry, or a depth-0 Intend step escalates. A low remaining budget de-escalates to Workhorse. API mode records the session model as Frontier. The role stays Workhorse. A later release can put a Decision model such as Jev on that same slot for cheap structured JSON. 0.9.0 does not download or require Jev.
 
 ```bash
 trek models
@@ -39,14 +39,14 @@ trek models set-role workhorse --id <id> --thinking off
 trek models benchmark
 ```
 
-| Suite | Tooling | Work-horse | Planning |
+| Suite | Tooling | Workhorse | Planning |
 |---|---|---|---|
 | `mistral` (default) | Qwen3.5-0.8B | Ministral-3-3B-Instruct-2512 | Ministral-3-8B-Reasoning-2512 |
 | `mistral-pro` | Qwen3.5-0.8B | Devstral-Small-2507 | Ministral-3-8B-Reasoning-2512 |
 | `qwen` | Qwen3.5-0.8B | Qwen3.5-4B | Qwen3.5-9B |
 | `lfm` | LFM2.5-350M | LFM2.5-1.2B-Instruct | LFM2.5-8B-A1B |
 
-A normal prompt selects Work-horse. A prompt that says plan, planning, or research selects Planning. `/frontier`, or a step above the complexity threshold, selects Frontier in `hybrid` and Planning in pure `local`. Embedding and reranker rows are registered for 0.11.0 and are not started.
+A normal prompt selects Workhorse. A prompt that says plan, planning, or research selects Planning. `/frontier`, or a step above the complexity threshold, selects Frontier in `hybrid` and Planning in pure `local`. Embedding and reranker rows are registered for 0.11.0 and are not started. Workhorse remains the name of that role. A later Decision model such as Jev can fill the same slot when a step only needs cheap structured JSON.
 
 ### Pure API
 
@@ -70,7 +70,7 @@ trek models set-suite lfm
 trek models
 ```
 
-`effective: local` is the check. A normal reply then comes from the Work-horse GGUF. Grok and the other Frontier APIs are not called. The local suite is told to build in the current folder with the tools, not to paste a tutorial. A request to build, run, or open something requires a tool call until a file has been written and a command has been run. Each local completion stops after 120 seconds or 4,096 tokens. A Planning prompt uses the Planning GGUF and fails if that file is absent, instead of falling back to the API. Then install a llama.cpp build that can load the suite and the Q4_K_M weights that fit the budget:
+`effective: local` is the check. A normal reply then comes from the Workhorse GGUF. Grok and the other Frontier APIs are not called. The local suite is told to build in the current folder with the tools, not to paste a tutorial. A request to build, run, or open something requires a tool call until a file has been written and a command has been run. Each local completion stops after 120 seconds or 4,096 tokens. A Planning prompt uses the Planning GGUF and fails if that file is absent, instead of falling back to the API. Then install a llama.cpp build that can load the suite and the Q4_K_M weights that fit the budget:
 
 ```bash
 ./scripts/bootstrap-llama.sh lfm
@@ -84,7 +84,7 @@ trek
 
 ### Hybrid
 
-Frontier is a fourth layer for `/frontier` and for heavier steps, and that layer uses the session API model. Local Tooling, Work-horse, and Planning complete on llama.cpp when their weights exist.
+Frontier is a fourth layer for `/frontier` and for heavier steps, and that layer uses the session API model. Local Tooling, Workhorse, and Planning complete on llama.cpp when their weights exist.
 
 ```bash
 trek models set-mode hybrid

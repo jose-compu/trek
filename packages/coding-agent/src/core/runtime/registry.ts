@@ -12,10 +12,14 @@ import {
 	defaultRuntimeConfig,
 	type HierarchySettings,
 	isHierarchyMode,
+	isRouteComponent,
+	isRouteRole,
 	isRuntimeRole,
 	isSuiteId,
 	type RoleAssignment,
 	type RoleSource,
+	type RouteComponent,
+	type RouteRole,
 	type RuntimeConfig,
 	type RuntimeRole,
 } from "./types.ts";
@@ -51,6 +55,7 @@ export function writeRuntimeConfigFile(path: string, config: RuntimeConfig): voi
 	const body = stringify({
 		hierarchy: config.hierarchy,
 		roles: config.roles,
+		...(config.routing ? { routing: config.routing } : {}),
 	});
 	writeFileSync(path, body.endsWith("\n") ? body : `${body}\n`);
 }
@@ -82,6 +87,33 @@ function applyFile(config: RuntimeConfig, path: string): void {
 			...parseRoles(record.roles, path),
 		};
 	}
+	if (record.routing !== undefined) {
+		config.routing = parseRouting(record.routing, path);
+	}
+}
+
+function parseRouting(value: unknown, path: string): RuntimeConfig["routing"] {
+	if (!value || typeof value !== "object" || Array.isArray(value)) {
+		throw new Error(`${path}: routing must be a mapping.`);
+	}
+	const record = value as Record<string, unknown>;
+	if (record.components === undefined) {
+		return {};
+	}
+	if (!record.components || typeof record.components !== "object" || Array.isArray(record.components)) {
+		throw new Error(`${path}: routing.components must be a mapping.`);
+	}
+	const components: Partial<Record<RouteComponent, RouteRole>> = {};
+	for (const [name, role] of Object.entries(record.components as Record<string, unknown>)) {
+		if (!isRouteComponent(name)) {
+			throw new Error(`${path}: unknown routing component ${name}.`);
+		}
+		if (typeof role !== "string" || !isRouteRole(role)) {
+			throw new Error(`${path}: routing.components.${name} must be a chat role.`);
+		}
+		components[name] = role;
+	}
+	return { components };
 }
 
 function parseHierarchy(value: unknown, path: string, current: HierarchySettings): HierarchySettings {

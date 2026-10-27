@@ -1,7 +1,7 @@
 /**
- * Coarse session role (issue #90). ComponentRouter is 0.9.0.
+ * Coarse session role (issue #90). Per-component assignment is routeComponent.
  * api: the configured session model, recorded as frontier.
- * local / hybrid: Act uses Work-horse. Plan/research uses Planning.
+ * local / hybrid: Act uses Workhorse. Plan/research uses Planning.
  * Frontier is the fourth layer only in hybrid.
  */
 

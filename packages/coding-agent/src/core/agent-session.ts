@@ -1643,6 +1643,7 @@ export class AgentSession {
 			skillNames: this._resourceLoader.getSkills().skills.map((skill) => skill.name),
 			role: runtimeFields.role,
 			source: runtimeFields.source,
+			routeReason: runtimeFields.routeReason,
 		});
 		this.sessionManager.appendAuditStep(record);
 		debugLog("reproducibility", "audit step recorded", record);
@@ -1746,6 +1747,7 @@ export class AgentSession {
 	private _runtimeAuditFields(prior: readonly { role: string; content?: unknown }[]): {
 		role?: "tooling" | "workhorse" | "planning" | "frontier";
 		source?: "local" | "api";
+		routeReason?: string;
 	} {
 		try {
 			const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
@@ -1764,7 +1766,7 @@ export class AgentSession {
 					});
 				}
 			}
-			return { role: selection.role, source: selection.source };
+			return { role: selection.role, source: selection.source, routeReason: selection.reason };
 		} catch (error) {
 			debugLog("runtime", "role annotation skipped", {
 				error: error instanceof Error ? error.message : String(error),
