@@ -3411,6 +3411,7 @@ export class AgentSession {
 				this._cwd,
 				() => this.agent.state.messages.length,
 				() => this._lastPromptTask,
+				() => resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd })),
 			)) {
 				this._baseToolDefinitions.set(definition.name, definition);
 			}
