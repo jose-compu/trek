@@ -1,4 +1,10 @@
-export { EffortRegulator } from "./effort-regulator.ts";
+export {
+	appendEffortReason,
+	EFFORT_BUDGET_RATIO,
+	EFFORT_COST_BUDGET,
+	EffortRegulator,
+	effortActionKey,
+} from "./effort-regulator.ts";
 export { isReflectiveLoopEnabled } from "./enabled.ts";
 export { ReflectiveLoopController, type RunPromptCycleOptions } from "./loop-controller.ts";
 export { createReflectiveMetaToolDefinitions, createReflectiveMetaTools } from "./meta-tools.ts";

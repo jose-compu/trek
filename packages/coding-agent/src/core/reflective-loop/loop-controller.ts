@@ -19,7 +19,7 @@ import {
 	runWorldModel,
 	summarizeAct,
 } from "./components.ts";
-import { EffortRegulator } from "./effort-regulator.ts";
+import { EFFORT_COST_BUDGET, EffortRegulator } from "./effort-regulator.ts";
 import { checkPolicyConstraints } from "./policy-constraints.ts";
 import { SubtaskStack } from "./subtask-stack.ts";
 import type {
@@ -88,6 +88,7 @@ export class ReflectiveLoopController {
 	}
 
 	async runPromptCycle(options: RunPromptCycleOptions): Promise<ReflectiveCycleTrace> {
+		this.effortRegulator.beginPrompt(EFFORT_COST_BUDGET);
 		const cycleNumber = getReflectiveCycleCount(this.sessionManager) + 1;
 		const cycleId = createCycleId(cycleNumber);
 		const startedAt = nowIso();
@@ -172,12 +173,13 @@ export class ReflectiveLoopController {
 
 		// Effort regulator gate
 		components.push(effortComponent());
-		if (!this.effortRegulator.shouldContinue()) {
+		const effortStop = this.effortRegulator.stopReason();
+		if (effortStop) {
 			phases.act = {
 				phase: "act",
 				summary: "Act skipped",
 				skipped: true,
-				blockReason: "EffortRegulator blocked act (observation skipped or loop detected).",
+				blockReason: effortStop,
 			};
 			const trace = this.buildTrace({
 				cycleNumber,

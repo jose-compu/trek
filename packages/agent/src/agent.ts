@@ -22,6 +22,7 @@ import type {
 	BeforeToolCallContext,
 	BeforeToolCallResult,
 	QueueMode,
+	ShouldStopAfterTurnContext,
 	StreamFn,
 	ToolExecutionMode,
 } from "./types.ts";
@@ -189,6 +190,8 @@ export class Agent {
 	public prepareNextTurn?: (
 		signal?: AbortSignal,
 	) => Promise<AgentLoopTurnUpdate | undefined> | AgentLoopTurnUpdate | undefined;
+	/** When true after a turn, the loop ends before another model call. */
+	public shouldStopAfterTurn?: (context: ShouldStopAfterTurnContext) => boolean | Promise<boolean>;
 	private activeRun?: ActiveRun;
 	/** Session identifier forwarded to providers for cache-aware backends. */
 	public sessionId?: string;
@@ -454,6 +457,7 @@ export class Agent {
 			convertToLlm: this.convertToLlm,
 			transformContext: this.transformContext,
 			getApiKey: this.getApiKey,
+			shouldStopAfterTurn: this.shouldStopAfterTurn,
 			getSteeringMessages: async () => {
 				if (skipInitialSteeringPoll) {
 					skipInitialSteeringPoll = false;
