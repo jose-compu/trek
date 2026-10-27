@@ -15,6 +15,7 @@ export {
 	getReflectiveCycleTraces,
 	isReflectiveCycleEntry,
 } from "./session-trace.ts";
+export { type DepthFirstSubtaskInput, type DepthFirstSubtaskResult, runDepthFirstSubtask } from "./spawn-subtask.ts";
 export { SubtaskStack } from "./subtask-stack.ts";
 export type {
 	LawsVerdictPair,

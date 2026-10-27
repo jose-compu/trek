@@ -38,16 +38,33 @@ export function runObserver(
 	};
 }
 
+const NEXT_ACTION = /\b(read|write|edit|bash|observe|reflect|spawn_subtask|next action)\b/i;
+
+/** An intention names a next action when it mentions a tool or an explicit next action. */
+export function intentionNamesNextAction(summary: string): boolean {
+	return NEXT_ACTION.test(summary);
+}
+
 export function runIntentionFilter(intention: ReflectiveIntention): {
 	intention: ReflectiveIntention;
 	components: ReflectiveComponentRecord[];
 } {
-	const valid = intention.summary.trim().length > 0;
+	const summary = intention.summary.trim();
+	if (summary.length === 0) {
+		return {
+			intention: { ...intention, summary: `Repair: respond to user request (${intention.task.slice(0, 80)})` },
+			components: [component("intentionFilter", "repaired empty intention")],
+		};
+	}
+	if (!intentionNamesNextAction(summary)) {
+		return {
+			intention: { ...intention, summary: `${summary} Next action: use a tool.` },
+			components: [component("intentionFilter", "repaired intention with no next action")],
+		};
+	}
 	return {
-		intention: valid
-			? intention
-			: { ...intention, summary: `Repair: respond to user request (${intention.task.slice(0, 80)})` },
-		components: [component("intentionFilter", valid ? undefined : "repaired empty intention")],
+		intention,
+		components: [component("intentionFilter")],
 	};
 }
 
