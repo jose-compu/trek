@@ -6,6 +6,17 @@ export const EFFORT_BUDGET_RATIO = 0.9;
 /** Tool-call budget for one prompt. The live loop spends 1 per tool. */
 export const EFFORT_COST_BUDGET = 24;
 
+export function appendEffortReason<T extends { type: string; text?: string }>(content: T[], reason: string): T[] {
+	const last = content[content.length - 1];
+	if (last?.type === "text" && typeof last.text === "string") {
+		if (last.text.includes(reason)) {
+			return content;
+		}
+		return [...content.slice(0, -1), { ...last, text: `${last.text}\n${reason}` }];
+	}
+	return [...content, { type: "text", text: reason } as T];
+}
+
 export function effortActionKey(name: string, args: unknown): string {
 	return `${name}:${canonical(args)}`;
 }
@@ -42,6 +53,15 @@ export class EffortRegulator {
 	setCostBudget(budget: number): void {
 		this.costBudget = budget;
 		this.costUsed = 0;
+	}
+
+	/** A new user prompt starts a new effort window. */
+	beginPrompt(budget: number = EFFORT_COST_BUDGET): void {
+		this.consecutiveNoProgress = 0;
+		this.identicalActionCount = 0;
+		this.lastActionKey = undefined;
+		this.observationSkipped = false;
+		this.setCostBudget(budget);
 	}
 
 	recordCost(amount: number): void {

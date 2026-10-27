@@ -95,6 +95,7 @@ import type { ModelRegistry } from "./model-registry.ts";
 import { hashContent, type LoadedPrologue, loadPrologue } from "./prologue.ts";
 import { expandPromptTemplate, type PromptTemplate } from "./prompt-templates.ts";
 import {
+	appendEffortReason,
 	createReflectiveMetaToolDefinitions,
 	EFFORT_COST_BUDGET,
 	EffortRegulator,
@@ -576,7 +577,7 @@ export class AgentSession {
 			}
 			const effortStop = this._noteLiveEffort(toolCall.name, args, isError);
 			if (effortStop) {
-				content = [...content, { type: "text" as const, text: effortStop }];
+				content = appendEffortReason(content, effortStop);
 			}
 
 			const runner = this._extensionRunner;
@@ -605,10 +606,7 @@ export class AgentSession {
 			}
 
 			const hooked = hookResult.content ?? content;
-			const withReason =
-				effortStop && !hooked.some((part) => part.type === "text" && part.text === effortStop)
-					? [...hooked, { type: "text" as const, text: effortStop }]
-					: hooked;
+			const withReason = effortStop ? appendEffortReason(hooked, effortStop) : hooked;
 			return {
 				content: withReason,
 				details: hookResult.details,
@@ -1837,7 +1835,7 @@ export class AgentSession {
 
 	private async _runAgentPrompt(messages: AgentMessage | AgentMessage[]): Promise<void> {
 		try {
-			this._effort.setCostBudget(EFFORT_COST_BUDGET);
+			this._effort.beginPrompt(EFFORT_COST_BUDGET);
 			await this.agent.prompt(messages);
 			while (await this._handlePostAgentRun()) {
 				if (!(await this._safeAgentContinue())) {

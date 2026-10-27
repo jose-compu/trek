@@ -1,4 +1,5 @@
 export {
+	appendEffortReason,
 	EFFORT_BUDGET_RATIO,
 	EFFORT_COST_BUDGET,
 	EffortRegulator,

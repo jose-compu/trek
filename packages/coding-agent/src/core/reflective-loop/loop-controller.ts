@@ -88,7 +88,7 @@ export class ReflectiveLoopController {
 	}
 
 	async runPromptCycle(options: RunPromptCycleOptions): Promise<ReflectiveCycleTrace> {
-		this.effortRegulator.setCostBudget(EFFORT_COST_BUDGET);
+		this.effortRegulator.beginPrompt(EFFORT_COST_BUDGET);
 		const cycleNumber = getReflectiveCycleCount(this.sessionManager) + 1;
 		const cycleId = createCycleId(cycleNumber);
 		const startedAt = nowIso();
