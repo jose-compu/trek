@@ -46,6 +46,7 @@ export interface Args {
 	listModels?: string | true;
 	offline?: boolean;
 	verbose?: boolean;
+	projectTrustOverride?: boolean;
 	/** Preview write/edit/bash without mutating (#9). */
 	dryRun?: boolean;
 	/** Diagnostic operator mode: traces on, mutating tools blocked (#49). */
@@ -187,6 +188,10 @@ export function parseArgs(args: string[]): Args {
 			}
 		} else if (arg === "--verbose") {
 			result.verbose = true;
+		} else if (arg === "--approve" || arg === "-a") {
+			result.projectTrustOverride = true;
+		} else if (arg === "--no-approve" || arg === "-na") {
+			result.projectTrustOverride = false;
 		} else if (arg === "--dry-run") {
 			result.dryRun = true;
 		} else if (arg === "--diagnostic") {
@@ -317,6 +322,8 @@ ${chalk.bold("Options:")}
   --no-context-files, -nc        Disable AGENTS.md and CLAUDE.md discovery and loading
   --export <file>                Export session file to HTML and exit
   --list-models [search]         List available models (with optional fuzzy search)
+  --approve, -a                  Trust project-local files for this run
+  --no-approve, -na              Ignore project-local files for this run
   --verbose                      Stream tool calls/results to stderr in print mode; verbose startup in TUI
   --dry-run                      Preview write/edit/bash without applying changes (#9)
   --diagnostic                   Trace-only: block mutating tools (write/edit/bash) (#49)

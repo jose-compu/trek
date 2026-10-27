@@ -300,6 +300,15 @@ describe("parseArgs", () => {
 		});
 	});
 
+	describe("project trust flags", () => {
+		test("parses --approve and --no-approve", () => {
+			expect(parseArgs(["--approve"]).projectTrustOverride).toBe(true);
+			expect(parseArgs(["-a"]).projectTrustOverride).toBe(true);
+			expect(parseArgs(["--no-approve"]).projectTrustOverride).toBe(false);
+			expect(parseArgs(["-na"]).projectTrustOverride).toBe(false);
+		});
+	});
+
 	describe("guardrails CLI flags", () => {
 		test("parses --dry-run flag", () => {
 			const result = parseArgs(["--dry-run", "-p", "hi"]);

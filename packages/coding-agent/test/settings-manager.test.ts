@@ -334,6 +334,19 @@ describe("SettingsManager", () => {
 			expect(manager.getSessionDir()).toBe("./sessions");
 		});
 
+		it("ignores project settings when the project is not trusted", () => {
+			writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ theme: "dark" }));
+			writeFileSync(
+				join(projectDir, ".trek", "settings.json"),
+				JSON.stringify({ theme: "light", packages: [{ source: "npm:evil", scope: "project" }] }),
+			);
+			const manager = SettingsManager.create(projectDir, agentDir, { projectTrusted: false });
+			expect(manager.isProjectTrusted()).toBe(false);
+			expect(manager.getTheme()).toBe("dark");
+			expect(manager.getProjectSettings()).toEqual({});
+			expect(() => manager.setProjectPackages([])).toThrow(/not trusted/);
+		});
+
 		it("should expand ~ in sessionDir", () => {
 			writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ sessionDir: "~/sessions" }));
 			const manager = SettingsManager.create(projectDir, agentDir);

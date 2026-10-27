@@ -42,6 +42,7 @@ import {
 import { assertValidSessionId, SessionManager } from "./core/session-manager.ts";
 import { SettingsManager } from "./core/settings-manager.ts";
 import { printTimings, resetTimings, time } from "./core/timings.ts";
+import { hasProjectTrustInputs, ProjectTrustStore } from "./core/trust-manager.ts";
 import { handleHistoryCommand, handleRevertCommand } from "./history-cli.ts";
 import { runMigrations, showDeprecationWarnings } from "./migrations.ts";
 import { handleModelsCommand } from "./models-cli.ts";
@@ -475,6 +476,83 @@ async function promptForMissingSessionCwd(
 	});
 }
 
+interface ProjectTrustPromptResult {
+	trusted: boolean;
+	remember: boolean;
+}
+
+async function promptForProjectTrust(
+	cwd: string,
+	settingsManager: SettingsManager,
+): Promise<ProjectTrustPromptResult | undefined> {
+	initTheme(settingsManager.getTheme());
+	setKeybindings(KeybindingsManager.create());
+
+	return new Promise((resolve) => {
+		const ui = new TUI(new ProcessTerminal(), settingsManager.getShowHardwareCursor());
+		ui.setClearOnShrink(settingsManager.getClearOnShrink());
+
+		let settled = false;
+		const finish = (result: ProjectTrustPromptResult | undefined) => {
+			if (settled) {
+				return;
+			}
+			settled = true;
+			ui.stop();
+			resolve(result);
+		};
+
+		const options: Array<{ label: string; value: ProjectTrustPromptResult }> = [
+			{ label: "Trust", value: { trusted: true, remember: true } },
+			{ label: "Trust (this session only)", value: { trusted: true, remember: false } },
+			{ label: "Do not trust", value: { trusted: false, remember: true } },
+			{ label: "Do not trust (this session only)", value: { trusted: false, remember: false } },
+		];
+		const selector = new ExtensionSelectorComponent(
+			`Trust project folder?\n${cwd}\n\nThis allows trek to read project instructions (AGENTS.md/CLAUDE.md), load .trek settings and resources, and execute project extensions.`,
+			options.map((option) => option.label),
+			(option) => finish(options.find((entry) => entry.label === option)?.value),
+			() => finish(undefined),
+			{ tui: ui },
+		);
+		ui.addChild(selector);
+		ui.setFocus(selector);
+		ui.start();
+	});
+}
+
+async function resolveProjectTrusted(options: {
+	cwd: string;
+	trustStore: ProjectTrustStore;
+	trustOverride?: boolean;
+	appMode: AppMode;
+	settingsManagerForPrompt: SettingsManager;
+}): Promise<boolean> {
+	if (options.trustOverride !== undefined) {
+		return options.trustOverride;
+	}
+	if (!hasProjectTrustInputs(options.cwd)) {
+		return true;
+	}
+
+	const decision = options.trustStore.get(options.cwd);
+	if (decision !== null) {
+		return decision;
+	}
+	if (options.appMode !== "interactive") {
+		return false;
+	}
+
+	const selected = await promptForProjectTrust(options.cwd, options.settingsManagerForPrompt);
+	if (selected !== undefined) {
+		if (selected.remember) {
+			options.trustStore.set(options.cwd, selected.trusted);
+		}
+		return selected.trusted;
+	}
+	return false;
+}
+
 export interface MainOptions {
 	extensionFactories?: ExtensionFactory[];
 }
@@ -627,6 +705,16 @@ export async function main(args: string[], options?: MainOptions) {
 	}
 	time("createSessionManager");
 
+	const trustStore = new ProjectTrustStore(agentDir);
+	const trustPromptMode: AppMode = parsed.help || parsed.listModels !== undefined ? "print" : appMode;
+	const projectTrustedForSession = await resolveProjectTrusted({
+		cwd: sessionManager.getCwd(),
+		trustStore,
+		trustOverride: parsed.projectTrustOverride,
+		appMode: trustPromptMode,
+		settingsManagerForPrompt: startupSettingsManager,
+	});
+
 	const resolvedExtensionPaths = resolveCliPaths(cwd, parsed.extensions);
 	const resolvedSkillPaths = resolveCliPaths(cwd, parsed.skills);
 	const resolvedPromptTemplatePaths = resolveCliPaths(cwd, parsed.promptTemplates);
@@ -638,10 +726,16 @@ export async function main(args: string[], options?: MainOptions) {
 		sessionManager,
 		sessionStartEvent,
 	}) => {
+		const projectTrusted =
+			cwd === sessionManager.getCwd()
+				? projectTrustedForSession
+				: (parsed.projectTrustOverride ?? (!hasProjectTrustInputs(cwd) || trustStore.get(cwd) === true));
+		const runtimeSettingsManager = SettingsManager.create(cwd, agentDir, { projectTrusted });
 		const services = await createAgentSessionServices({
 			cwd,
 			agentDir,
 			authStorage,
+			settingsManager: runtimeSettingsManager,
 			extensionFlagValues: parsed.unknownFlags,
 			resourceLoaderOptions: {
 				additionalExtensionPaths: resolvedExtensionPaths,
