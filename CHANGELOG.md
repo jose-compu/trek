@@ -8,6 +8,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ### Added
 
+- The live tool loop stops when the same action repeats, three steps make no progress, or the prompt budget is spent. The tool result names the EffortRegulator reason.
 - Component routing. A tool step names the Tooling model. Retry 2 uses the next tier. `trek:audit_step` stores `routeReason`. The role stays Workhorse. A later Decision model such as Jev can fill that slot.
 - Short thinking traces (#108). A tool-using turn asks for `reasoning` `minimal` and a 128-token thinking budget. Local models get the same cap in the prompt.
 

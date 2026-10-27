@@ -6,6 +6,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ### Added
 
+- The live tool loop stops on a repeated action, three steps with no progress, or a spent prompt budget. The result includes the EffortRegulator reason.
 - Component routing from `routing.components` or the dynamic policy. Audit steps record the route reason. Workhorse is unchanged. A later Decision model such as Jev can use that slot.
 - Short thinking traces (#108). Tool turns use reasoning effort `minimal` and a 128-token thinking budget. Local GGUFs get the cap in the prompt.
 

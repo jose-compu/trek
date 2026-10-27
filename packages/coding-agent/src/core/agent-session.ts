@@ -96,6 +96,9 @@ import { hashContent, type LoadedPrologue, loadPrologue } from "./prologue.ts";
 import { expandPromptTemplate, type PromptTemplate } from "./prompt-templates.ts";
 import {
 	createReflectiveMetaToolDefinitions,
+	EFFORT_COST_BUDGET,
+	EffortRegulator,
+	effortActionKey,
 	isReflectiveLoopEnabled,
 	ReflectiveLoopController,
 } from "./reflective-loop/index.ts";
@@ -377,6 +380,7 @@ export class AgentSession {
 	private _baseSystemPromptOptions!: BuildSystemPromptOptions;
 	private _loadedPrologue: LoadedPrologue = { content: undefined, sources: [] };
 	private _reflectiveLoop: ReflectiveLoopController | undefined;
+	private _effort = new EffortRegulator();
 	private _lastPromptTask = "";
 	/** Tools executed during the current reflective cycle (trace schema v1). */
 	private _cycleToolNames: string[] = [];
@@ -443,6 +447,7 @@ export class AgentSession {
 
 		if (isReflectiveLoopEnabled()) {
 			this._reflectiveLoop = new ReflectiveLoopController(this.sessionManager);
+			this._effort = this._reflectiveLoop.effort;
 		}
 
 		// Always subscribe to agent events for internal handling
@@ -508,6 +513,8 @@ export class AgentSession {
 	 * happens here instead of in wrappers.
 	 */
 	private _installAgentToolHooks(): void {
+		this.agent.shouldStopAfterTurn = () => this._effort.stopReason() !== undefined;
+
 		this.agent.beforeToolCall = async ({ toolCall, args }) => {
 			const verdict = await this._checkToolSafety(toolCall.name, args);
 			if (!verdict.allowed) {
@@ -567,10 +574,17 @@ export class AgentSession {
 			if (safetyNotes.length > 0) {
 				content = [...content, ...safetyNotes.map((text) => ({ type: "text" as const, text }))];
 			}
+			const effortStop = this._noteLiveEffort(toolCall.name, args, isError);
+			if (effortStop) {
+				content = [...content, { type: "text" as const, text: effortStop }];
+			}
 
 			const runner = this._extensionRunner;
 			if (!runner.hasHandlers("tool_result")) {
-				return safetyNotes.length > 0 ? { content, details: result.details, isError } : undefined;
+				if (safetyNotes.length === 0 && !effortStop) {
+					return undefined;
+				}
+				return { content, details: result.details, isError, ...(effortStop ? { terminate: true } : {}) };
 			}
 
 			const hookResult = await runner.emitToolResult({
@@ -584,15 +598,31 @@ export class AgentSession {
 			});
 
 			if (!hookResult) {
-				return safetyNotes.length > 0 ? { content, details: result.details, isError } : undefined;
+				if (safetyNotes.length === 0 && !effortStop) {
+					return undefined;
+				}
+				return { content, details: result.details, isError, ...(effortStop ? { terminate: true } : {}) };
 			}
 
+			const hooked = hookResult.content ?? content;
+			const withReason =
+				effortStop && !hooked.some((part) => part.type === "text" && part.text === effortStop)
+					? [...hooked, { type: "text" as const, text: effortStop }]
+					: hooked;
 			return {
-				content: hookResult.content,
+				content: withReason,
 				details: hookResult.details,
 				isError: hookResult.isError ?? isError,
+				...(effortStop ? { terminate: true } : {}),
 			};
 		};
+	}
+
+	/** Record the tool on the live loop and return the stop reason when the turn must end. */
+	private _noteLiveEffort(name: string, args: unknown, isError: boolean): string | undefined {
+		this._effort.recordCost(1);
+		this._effort.updateProgress(effortActionKey(name, args), !isError);
+		return this._effort.stopReason();
 	}
 
 	// =========================================================================
@@ -1807,6 +1837,7 @@ export class AgentSession {
 
 	private async _runAgentPrompt(messages: AgentMessage | AgentMessage[]): Promise<void> {
 		try {
+			this._effort.setCostBudget(EFFORT_COST_BUDGET);
 			await this.agent.prompt(messages);
 			while (await this._handlePostAgentRun()) {
 				if (!(await this._safeAgentContinue())) {
