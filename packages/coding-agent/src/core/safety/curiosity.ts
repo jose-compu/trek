@@ -3,9 +3,8 @@
  * A later turn in the same process is the answer and is not asked again.
  */
 
-const AMBIGUOUS = /^(?:please\s+)?(?:fix|change|update|do|make|handle)\s+(?:it|this|that)\b[.!?\s]*$/i;
-const DESTRUCTIVE =
-	/\brm\s+-rf\b|\bdrop\s+(?:the\s+)?database\b|\bdelete\s+everything\b|\bgit\s+push\b[^\n]*--force\b/i;
+const AMBIGUOUS = /^(?:please\s+)?(?:fix|change|update|make|handle)\s+(?:it|this|that)\b[.!?\s]*$/i;
+const DESTRUCTIVE = /\brm\s+-rf\b|\bdrop\s+(?:the\s+)?database\b|\bgit\s+push\b[^\n]*--force\b/i;
 const LOW_CONFIDENCE = /\b(not sure|i guess|low confidence)\b/i;
 
 export function curiosityQuestion(text: string): string | undefined {
