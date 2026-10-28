@@ -2,7 +2,16 @@
 
 Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent repo `UPSTREAM.md` / Pi monorepo.
 
-## [Unreleased]
+## [0.11.0] - 2026-10-28
+
+### Added
+
+- Memory release. Local memory on LogosDB. `remember`, `recall`, and `forget` use three stores: session, project (`.trek/memory/`), and global (off unless enabled). A project lesson is recalled by a later session in that repo. File chunks and thinking traces are embedded with a situating header. `/memory` shows the layers and the live chunk count in each store. `memory.enabled: false` or `--memory off` skips indexing, the watcher, and embeddings.
+- `/memory add <path>` indexes a file or folder, including one that gitignore skipped. `/memory remove <path>` drops those chunks and leaves them out of later reindexes. `/memory` lists the included and excluded paths.
+
+### Changed
+
+- A recall card colors the layer, kind, tag, and file span. The passage stays in the tool-output color. The text sent to the model stays plain.
 
 ## [0.10.3] - 2026-10-28
 

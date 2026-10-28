@@ -16,7 +16,7 @@ export type RuntimeRole = (typeof RUNTIME_ROLES)[number];
 export const LOCAL_SERVER_ROLES = ["tooling", "workhorse", "planning", "embedding", "reranker"] as const;
 export type LocalServerRole = (typeof LOCAL_SERVER_ROLES)[number];
 
-/** The three roles a local session actually starts. Embedding and reranker stay registered for 0.11.0. */
+/** The three roles a local session actually starts. Embedding and reranker stay registered and are not started. */
 export const SESSION_LOCAL_ROLES = ["tooling", "workhorse", "planning"] as const;
 export type SessionLocalRole = (typeof SESSION_LOCAL_ROLES)[number];
 
