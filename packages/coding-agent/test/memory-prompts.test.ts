@@ -74,10 +74,7 @@ describe("memory prompts", () => {
 		harnesses.push(first);
 		const thinking = "The billing export must stay in integer cents because floating currency drifts.";
 		first.setResponses([
-			fauxAssistantMessage([
-				fauxThinking(thinking),
-				fauxText("Use integer cents in the export."),
-			]),
+			fauxAssistantMessage([fauxThinking(thinking), fauxText("Use integer cents in the export.")]),
 		]);
 		await first.session.prompt("Why keep the billing export in integer cents?");
 		const hits = await first.session.searchMemory(thinking);
