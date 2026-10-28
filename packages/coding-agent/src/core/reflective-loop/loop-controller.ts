@@ -1,6 +1,7 @@
 import { debugLog } from "../../utils/debug-log.ts";
 import { loadDomainCatalog } from "../domains/catalog.ts";
 import { type DomainSelection, formatSelection, selectDomain } from "../domains/select.ts";
+import { CHECKPOINT_ACT_REASON } from "../safety/operator-mode.ts";
 import type { SessionManager } from "../session-manager.ts";
 import {
 	buildTraceCycleV1,
@@ -51,6 +52,8 @@ export interface RunPromptCycleOptions {
 	getPostFlightVerdict?: () => LawsVerdictRecord | undefined;
 	/** Called after domain selection and before Act, so the tooling prompt can see one workflow. */
 	onDomainSelected?: (selection: DomainSelection) => void;
+	/** Checkpoint mode closes act until this returns true. Other modes omit it. */
+	phaseAllowed?: (phase: ReflectivePhase) => boolean;
 }
 
 export class ReflectiveLoopController {
@@ -201,6 +204,28 @@ export class ReflectiveLoopController {
 			});
 			persistCycleBoundary(this.sessionManager, trace);
 			throw new Error(phases.act.blockReason);
+		}
+
+		if (options.phaseAllowed && !options.phaseAllowed("act")) {
+			phases.act = {
+				phase: "act",
+				summary: "Act closed",
+				blocked: true,
+				blockReason: CHECKPOINT_ACT_REASON,
+			};
+			const trace = this.buildTrace({
+				cycleNumber,
+				cycleId,
+				ctx,
+				phases,
+				components,
+				phaseTimestamps,
+				startedAt,
+				lawsPre,
+				selection,
+			});
+			persistCycleBoundary(this.sessionManager, trace);
+			throw new Error(CHECKPOINT_ACT_REASON);
 		}
 
 		// A — Act (delegate to existing agent loop)

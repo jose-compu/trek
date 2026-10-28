@@ -12,8 +12,13 @@ export type ArchonNodeKind = (typeof ARCHON_NODE_KINDS)[number];
 export interface ArchonNode {
 	id: string;
 	kind: ArchonNodeKind;
+	/** Prompt text, bash script, command name, or the loop prompt. */
 	body: string;
 	dependsOn: string[];
+	/** Archon `allowed_tools`. An empty list means the node may not call tools. */
+	allowedTools?: string[];
+	/** Present when `kind` is `loop`. Archon stores this as an object, not a string. */
+	loop?: { until: string; maxIterations: number };
 }
 
 export interface ArchonWorkflow {
@@ -78,20 +83,79 @@ function parseNode(value: unknown, index: number): ArchonNode {
 	if (typeof record.id !== "string" || record.id.trim().length === 0) {
 		throw new Error(`node ${index} id is required`);
 	}
-	const present = ARCHON_NODE_KINDS.filter(
-		(kind) => typeof record[kind] === "string" && (record[kind] as string).trim().length > 0,
-	);
+	const id = record.id.trim();
+	const present = presentKinds(record);
 	if (present.length !== 1) {
-		throw new Error(`node ${record.id} needs one of prompt, command, bash, script, or loop`);
+		throw new Error(`node ${id} needs one of prompt, command, bash, script, or loop`);
 	}
 	const kind = present[0];
-	const dependsOn = record.depends_on === undefined ? [] : stringList(record.depends_on, record.id);
+	const dependsOn = record.depends_on === undefined ? [] : stringList(record.depends_on, id);
+	const allowedTools = readAllowedTools(record.allowed_tools, id);
+	if (kind === "loop") {
+		const loop = readLoop(record.loop, id);
+		return {
+			id,
+			kind,
+			body: loop.prompt,
+			dependsOn,
+			allowedTools,
+			loop: { until: loop.until, maxIterations: loop.maxIterations },
+		};
+	}
+	if (kind === "script" && record.runtime !== "bun" && record.runtime !== "uv") {
+		throw new Error(`node ${id} script requires runtime bun or uv`);
+	}
 	return {
-		id: record.id.trim(),
+		id,
 		kind,
 		body: (record[kind] as string).trim(),
 		dependsOn,
+		allowedTools,
 	};
+}
+
+function presentKinds(record: Record<string, unknown>): ArchonNodeKind[] {
+	const kinds: ArchonNodeKind[] = [];
+	for (const kind of ARCHON_NODE_KINDS) {
+		const value = record[kind];
+		if (value === undefined) continue;
+		if (kind === "loop") {
+			kinds.push("loop");
+			continue;
+		}
+		if (typeof value === "string" && value.trim().length > 0) {
+			kinds.push(kind);
+		}
+	}
+	return kinds;
+}
+
+function readLoop(value: unknown, nodeId: string): { prompt: string; until: string; maxIterations: number } {
+	if (typeof value === "string") {
+		throw new Error(`node ${nodeId} loop is an object with prompt, until, and max_iterations`);
+	}
+	if (!value || typeof value !== "object" || Array.isArray(value)) {
+		throw new Error(`node ${nodeId} loop is an object with prompt, until, and max_iterations`);
+	}
+	const loop = value as Record<string, unknown>;
+	if (typeof loop.prompt !== "string" || loop.prompt.trim().length === 0) {
+		throw new Error(`node ${nodeId} loop.prompt is required`);
+	}
+	if (typeof loop.until !== "string" || loop.until.trim().length === 0) {
+		throw new Error(`node ${nodeId} loop.until is required`);
+	}
+	if (typeof loop.max_iterations !== "number" || !Number.isInteger(loop.max_iterations) || loop.max_iterations < 1) {
+		throw new Error(`node ${nodeId} loop.max_iterations must be a positive integer`);
+	}
+	return { prompt: loop.prompt.trim(), until: loop.until.trim(), maxIterations: loop.max_iterations };
+}
+
+function readAllowedTools(value: unknown, nodeId: string): string[] | undefined {
+	if (value === undefined) return undefined;
+	if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+		throw new Error(`node ${nodeId} allowed_tools must be a list of tool names`);
+	}
+	return value;
 }
 
 function stringList(value: unknown, nodeId: string): string[] {

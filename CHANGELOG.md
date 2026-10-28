@@ -6,6 +6,11 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Added
+
+- Operator modes for 0.13. `supervised` waits on a gated tool. `delegated` runs a gated tool named in `--operator-grant`. `checkpoint` keeps the act phase closed until it is opened. `diagnostic` remains trace-only. The laws are unchanged.
+- A selected Archon workflow is called node by node. A prompt node is one model step. `$USER_MESSAGE` and `$id.output` are substituted once. A `loop` node is an object with `prompt`, `until`, and `max_iterations`. `command`, `script`, and `loop` still do not run.
+
 ## [0.12.0] - 2026-10-28
 
 ### Added

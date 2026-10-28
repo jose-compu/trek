@@ -51,6 +51,10 @@ export interface Args {
 	dryRun?: boolean;
 	/** Diagnostic operator mode: traces on, mutating tools blocked (#49). */
 	diagnostic?: boolean;
+	/** 0.13 operator mode. Diagnostic matches --diagnostic. */
+	operatorMode?: "supervised" | "delegated" | "checkpoint" | "diagnostic";
+	/** Gated tools pre-authorized for delegated mode. */
+	operatorGrant?: string[];
 	/** Live effort stop for this process. Overrides settings. */
 	effort?: "off" | "normal" | "loose";
 	/** Process-wide memory switch. `off` skips indexing and embeddings. */
@@ -200,6 +204,21 @@ export function parseArgs(args: string[]): Args {
 			result.dryRun = true;
 		} else if (arg === "--diagnostic") {
 			result.diagnostic = true;
+		} else if (arg === "--operator-mode" && i + 1 < args.length) {
+			const mode = args[++i];
+			if (mode === "supervised" || mode === "delegated" || mode === "checkpoint" || mode === "diagnostic") {
+				result.operatorMode = mode;
+			} else {
+				result.diagnostics.push({
+					type: "error",
+					message: "--operator-mode must be supervised, delegated, checkpoint, or diagnostic",
+				});
+			}
+		} else if (arg === "--operator-grant" && i + 1 < args.length) {
+			result.operatorGrant = args[++i]
+				.split(",")
+				.map((name) => name.trim())
+				.filter((name) => name.length > 0);
 		} else if (arg === "--effort" && i + 1 < args.length) {
 			const effort = args[++i];
 			if (effort === "off" || effort === "normal" || effort === "loose") {
@@ -358,6 +377,8 @@ ${chalk.bold("Options:")}
   --verbose                      Stream tool calls/results to stderr in print mode; verbose startup in TUI
   --dry-run                      Preview write/edit/bash without applying changes (#9)
   --diagnostic                   Trace-only: block mutating tools (write/edit/bash) (#49)
+  --operator-mode <mode>         supervised, delegated, checkpoint, or diagnostic
+  --operator-grant <tools>       Comma-separated gated tools for delegated mode
   --effort <off|normal|loose>    Effort stop for this run. loose is 10x normal. off disables it
   --memory <off|on>              Memory for this run. off skips indexing and embeddings
   --git-commit                   After mutations, create a labeled git commit (0.5.0)

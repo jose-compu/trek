@@ -8,6 +8,16 @@ export {
 	getFilePath,
 } from "./laws.ts";
 export {
+	CHECKPOINT_ACT_REASON,
+	decideTool,
+	isOperatorMode,
+	OPERATOR_MODES,
+	type OperatorDecision,
+	type OperatorMode,
+	operatorBlockReason,
+	phaseIsOpen,
+} from "./operator-mode.ts";
+export {
 	formatSchemaMismatchNote,
 	type OutputValidationIssue,
 	validateToolResultShape,

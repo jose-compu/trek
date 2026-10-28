@@ -893,6 +893,12 @@ export async function main(args: string[], options?: MainOptions) {
 	if (parsed.diagnostic || isTrekEnvTruthy("DIAGNOSTIC") || session.settingsManager.getDiagnostic()) {
 		session.setDiagnostic(true);
 	}
+	if (parsed.operatorMode) {
+		session.setOperatorMode(parsed.operatorMode);
+		for (const toolName of parsed.operatorGrant ?? []) {
+			session.grantTool(toolName);
+		}
+	}
 	if (parsed.effort) {
 		session.setEffort(parsed.effort);
 	}
