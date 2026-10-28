@@ -1,10 +1,14 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.10.2`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.10.3`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
-## [Unreleased]
+## [0.10.3] - 2026-10-28
+
+### Added
+
+- `/memory add <path>` indexes a file or folder, including one that gitignore skipped. `/memory remove <path>` drops those chunks and leaves them out of later reindexes. `/memory` lists the included and excluded paths.
 
 ## [0.10.2] - 2026-10-28
 

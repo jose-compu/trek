@@ -3,9 +3,9 @@
  * Home, `/`, and hidden dependency trees are not indexed.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, relative, sep } from "node:path";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { chunk } from "logosdb-mcp-server/dist/chunker.js";
 import {
 	buildGitignoreContext,
@@ -114,6 +114,97 @@ function walk(dir: string, stack: readonly IgnoreFrame[], cwd: string, out: stri
 		}
 		out.push(abs);
 	}
+}
+
+const BLOCKED = new Set([".git", "node_modules", ".trek", "dist"]);
+
+export interface IndexPathLists {
+	include: string[];
+	exclude: string[];
+}
+
+export function indexPathsFile(cwd: string): string {
+	return join(cwd, ".trek", "memory", "paths.json");
+}
+
+export function loadIndexPaths(cwd: string): IndexPathLists {
+	try {
+		const raw = JSON.parse(readFileSync(indexPathsFile(cwd), "utf8")) as { include?: unknown; exclude?: unknown };
+		return { include: pathList(raw.include), exclude: pathList(raw.exclude) };
+	} catch {
+		return { include: [], exclude: [] };
+	}
+}
+
+export function saveIndexPaths(cwd: string, lists: IndexPathLists): void {
+	const file = indexPathsFile(cwd);
+	mkdirSync(join(cwd, ".trek", "memory"), { recursive: true });
+	writeFileSync(
+		file,
+		`${JSON.stringify({ include: uniquePaths(lists.include), exclude: uniquePaths(lists.exclude) }, null, 2)}\n`,
+	);
+}
+
+/** A project-relative path, or an error when it leaves the project or enters a blocked directory. */
+export function resolveProjectPath(cwd: string, input: string): { rel: string; abs: string } | { error: string } {
+	const trimmed = input.trim();
+	if (!trimmed) return { error: "path required" };
+	const abs = resolve(cwd, trimmed);
+	const rel = relative(cwd, abs);
+	if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+		return { error: "path must stay inside the project" };
+	}
+	const parts = rel.split(sep);
+	if (parts.some((part) => BLOCKED.has(part))) return { error: "that path is not indexed" };
+	return { rel: parts.join("/"), abs };
+}
+
+export function coversPath(root: string, file: string): boolean {
+	return file === root || file.startsWith(`${root}/`);
+}
+
+/** Exclude wins on a tie. A longer path wins over a shorter one. */
+export function pathIsExcluded(rel: string, lists: IndexPathLists): boolean {
+	let best: { path: string; exclude: boolean } | undefined;
+	for (const path of lists.include) {
+		if (coversPath(path, rel) && (!best || path.length > best.path.length)) best = { path, exclude: false };
+	}
+	for (const path of lists.exclude) {
+		if (coversPath(path, rel) && (!best || path.length >= best.path.length)) best = { path, exclude: true };
+	}
+	return best?.exclude === true;
+}
+
+/** Text files under an explicit file or folder. Gitignore does not apply. */
+export function filesAt(cwd: string, abs: string): string[] {
+	let st: ReturnType<typeof statSync>;
+	try {
+		st = statSync(abs);
+	} catch {
+		return [];
+	}
+	if (st.isFile()) {
+		if (!isTextName(basename(abs)) || st.size > MAX_BYTES) return [];
+		try {
+			if (readFileSync(abs).subarray(0, 8192).includes(0)) return [];
+		} catch {
+			return [];
+		}
+		return [abs];
+	}
+	if (!st.isDirectory()) return [];
+	const out: string[] = [];
+	walk(abs, [], cwd, out);
+	return out;
+}
+
+function pathList(value: unknown): string[] {
+	if (!Array.isArray(value)) return [];
+	return uniquePaths(value.filter((item): item is string => typeof item === "string"));
+}
+
+function uniquePaths(paths: string[]): string[] {
+	return [...new Set(paths.map((path) => path.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/$/, "")).filter(Boolean))].sort();
 }
 
 function isTextName(name: string): boolean {

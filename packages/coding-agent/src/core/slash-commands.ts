@@ -36,7 +36,7 @@ export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
 	{ name: "compact", description: "Manually compact the session context" },
 	{ name: "undo", description: "Undo agent edits back to a specific prompt (opens selector)" },
 	{ name: "processes", description: "Show this prompt's parallel, sequence, guarded choice, and inversion tree" },
-	{ name: "memory", description: "Show memory layers and chunk counts, or /memory index to reindex the project" },
+	{ name: "memory", description: "Show memory, /memory index, /memory add <path>, or /memory remove <path>" },
 	{ name: "sandbox", description: "Toggle OS-level sandbox for agent bash commands" },
 	{ name: "resume", description: "Resume a different session" },
 	{ name: "reload", description: "Reload keybindings, extensions, skills, prompts, and themes" },

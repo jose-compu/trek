@@ -241,6 +241,38 @@ describe("memory counts", () => {
 	});
 });
 
+describe("index paths", () => {
+	it("indexes a file or folder on request and keeps a removal out of later reindexes", async () => {
+		const cwd = project("pin");
+		writeFileSync(join(cwd, "secret.txt"), "secret token HIDDENPHRASE\n");
+		mkdirSync(join(cwd, "notes"));
+		writeFileSync(join(cwd, "notes", "a.txt"), "folder token ALPHA_NOTE\n");
+		writeFileSync(join(cwd, "notes", "b.txt"), "folder token BETA_NOTE\n");
+		const mem = manager(cwd, "s");
+		await mem.indexProject();
+		expect((await mem.recall("HIDDENPHRASE")).some((hit) => hit.text.includes("HIDDENPHRASE"))).toBe(false);
+
+		expect(await mem.addIndexedPath("secret.txt")).toMatch(/^indexed 1 secret.txt/);
+		expect(await mem.addIndexedPath("notes")).toMatch(/^indexed 2 notes/);
+		expect((await mem.recall("HIDDENPHRASE")).some((hit) => hit.text.includes("HIDDENPHRASE"))).toBe(true);
+		expect((await mem.recall("ALPHA_NOTE")).some((hit) => hit.text.includes("ALPHA_NOTE"))).toBe(true);
+		expect(mem.status()).toContain("include: notes, secret.txt");
+
+		expect(await mem.removeIndexedPath("notes")).toMatch(/^removed notes chunks=/);
+		expect((await mem.recall("ALPHA_NOTE")).some((hit) => hit.text.includes("ALPHA_NOTE"))).toBe(false);
+		expect((await mem.recall("BETA_NOTE")).some((hit) => hit.text.includes("BETA_NOTE"))).toBe(false);
+		expect((await mem.recall("HIDDENPHRASE")).some((hit) => hit.text.includes("HIDDENPHRASE"))).toBe(true);
+		expect(mem.status()).toContain("exclude: notes");
+
+		await mem.indexProject();
+		expect((await mem.recall("ALPHA_NOTE")).some((hit) => hit.text.includes("ALPHA_NOTE"))).toBe(false);
+		expect((await mem.recall("HIDDENPHRASE")).some((hit) => hit.text.includes("HIDDENPHRASE"))).toBe(true);
+		expect(await mem.addIndexedPath("../outside")).toBe("path must stay inside the project");
+		expect(await mem.removeIndexedPath(".trek/memory")).toBe("that path is not indexed");
+		mem.close();
+	});
+});
+
 describe("memory disabled", () => {
 	it("skips embeddings and indexing when memory is off or every layer is off", async () => {
 		const cwd = project("off");

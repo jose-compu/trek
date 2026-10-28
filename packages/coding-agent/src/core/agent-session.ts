@@ -1894,6 +1894,18 @@ export class AgentSession {
 		return this.memory().status();
 	}
 
+	async addMemoryPath(path: string): Promise<string> {
+		if (!this.memoryActive()) return "memory=off";
+		const result = await this.memory().addIndexedPath(path);
+		return `${result}\n${this.memory().status()}`;
+	}
+
+	async removeMemoryPath(path: string): Promise<string> {
+		if (!this.memoryActive()) return "memory=off";
+		const result = await this.memory().removeIndexedPath(path);
+		return `${result}\n${this.memory().status()}`;
+	}
+
 	/** Start project indexing when memory is on. Safe to call more than once. */
 	startMemory(): void {
 		if (!this.memoryActive() || this._memoryStarted) return;

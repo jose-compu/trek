@@ -2755,7 +2755,7 @@ export class InteractiveMode {
 			if (text === "/memory" || text.startsWith("/memory ")) {
 				const arg = text.slice("/memory".length).trim();
 				this.editor.setText("");
-				await this.showMemory(arg === "index");
+				await this.showMemory(arg);
 				return;
 			}
 			if (text === "/sandbox") {
@@ -3840,8 +3840,13 @@ export class InteractiveMode {
 		this.ui.requestRender();
 	}
 
-	async showMemory(reindex: boolean): Promise<void> {
-		const text = reindex ? await this.session.reindexMemory() : this.session.formatMemoryStatus();
+	async showMemory(command: string): Promise<void> {
+		let text: string;
+		if (command === "index") text = await this.session.reindexMemory();
+		else if (command.startsWith("add ")) text = await this.session.addMemoryPath(command.slice(4).trim());
+		else if (command.startsWith("remove ")) text = await this.session.removeMemoryPath(command.slice(7).trim());
+		else if (command === "") text = this.session.formatMemoryStatus();
+		else text = "usage: /memory | /memory index | /memory add <path> | /memory remove <path>";
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new Text(theme.fg("muted", text), 1, 0));
 		this.ui.requestRender();

@@ -2,7 +2,11 @@
 
 Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent repo `UPSTREAM.md` / Pi monorepo.
 
-## [Unreleased]
+## [0.10.3] - 2026-10-28
+
+### Added
+
+- `/memory add <path>` indexes a file or folder, including one that gitignore skipped. `/memory remove <path>` drops those chunks and leaves them out of later reindexes. `/memory` lists the included and excluded paths.
 
 ## [0.10.2] - 2026-10-28
 

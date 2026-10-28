@@ -6,7 +6,7 @@
 
 import { existsSync, mkdirSync, statSync, watch, type FSWatcher } from "node:fs";
 import { homedir } from "node:os";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import type { AgentMessage } from "@trek/agent-core";
 import { loadManifest, manifestPath, saveManifest } from "logosdb-mcp-server/dist/file-index-manifest.js";
 import { hybridRerank } from "logosdb-mcp-server/dist/hybrid.js";
@@ -14,7 +14,18 @@ import { NamespaceStore } from "logosdb-mcp-server/dist/store.js";
 import { memoryIsActive, type MemorySettings } from "../settings-manager.ts";
 import { annotateHandoff, annotateLesson, annotateThinking, annotateTurn, kindOf, type MemoryKind } from "./annotate.ts";
 import type { Embedder } from "./embedder.ts";
-import { chunksForFile, isIndexableProject, listProjectFiles } from "./index-files.ts";
+import {
+	chunksForFile,
+	coversPath,
+	filesAt,
+	isIndexableProject,
+	listProjectFiles,
+	loadIndexPaths,
+	pathIsExcluded,
+	resolveProjectPath,
+	saveIndexPaths,
+	type IndexPathLists,
+} from "./index-files.ts";
 import type { Reranker } from "./rerank.ts";
 import { captureTurn, handoffNote } from "./turns.ts";
 
@@ -71,7 +82,13 @@ export class MemoryManager {
 		const settings = this.options.getSettings();
 		const flag = (on: boolean) => (on ? "on" : "off");
 		const chunks = (["session", "project", "global"] as const).map((layer) => `${layer}=${this.chunkCount(layer)}`).join(" ");
-		return `session=${flag(settings.session)} project=${flag(settings.project)} global=${flag(settings.global)} topK=${settings.topK} ${this.indexing ? "indexing" : "idle"} chunks ${chunks}`;
+		const lists = loadIndexPaths(this.options.cwd);
+		const extra = [
+			lists.include.length > 0 ? `include: ${lists.include.join(", ")}` : "",
+			lists.exclude.length > 0 ? `exclude: ${lists.exclude.join(", ")}` : "",
+		].filter(Boolean);
+		const line = `session=${flag(settings.session)} project=${flag(settings.project)} global=${flag(settings.global)} topK=${settings.topK} ${this.indexing ? "indexing" : "idle"} chunks ${chunks}`;
+		return extra.length > 0 ? `${line}\n${extra.join("\n")}` : line;
 	}
 
 	async start(): Promise<void> {
@@ -200,15 +217,57 @@ export class MemoryManager {
 	async indexProject(): Promise<void> {
 		if (!this.live() || !this.projectEnabled() || !isIndexableProject(this.options.cwd)) return;
 		await this.enqueue(async () => {
+			const lists = loadIndexPaths(this.options.cwd);
 			for (const file of listProjectFiles(this.options.cwd)) {
 				await this.indexOne(file, false);
 			}
+			for (const extra of lists.include) {
+				const resolved = resolveProjectPath(this.options.cwd, extra);
+				if ("error" in resolved) continue;
+				for (const file of filesAt(this.options.cwd, resolved.abs)) {
+					await this.indexOne(file, false);
+				}
+			}
+			await this.deleteCovered(lists);
 		});
 	}
 
 	async indexFile(absPath: string): Promise<void> {
 		if (!this.live() || !this.projectEnabled()) return;
 		await this.enqueue(() => this.indexOne(absPath, true));
+	}
+
+	/** Index a file or folder and keep it across later reindexes. */
+	async addIndexedPath(input: string): Promise<string> {
+		if (!this.live()) return "memory is off";
+		if (!this.projectEnabled()) return "project memory is off";
+		const resolved = resolveProjectPath(this.options.cwd, input);
+		if ("error" in resolved) return resolved.error;
+		if (!existsSync(resolved.abs)) return "no such path";
+		const files = filesAt(this.options.cwd, resolved.abs);
+		if (files.length === 0) return "nothing to index";
+		const lists = loadIndexPaths(this.options.cwd);
+		lists.exclude = lists.exclude.filter((path) => path !== resolved.rel && !coversPath(resolved.rel, path));
+		if (!lists.include.includes(resolved.rel)) lists.include.push(resolved.rel);
+		saveIndexPaths(this.options.cwd, lists);
+		await this.enqueue(async () => {
+			for (const file of files) await this.indexOne(file, true);
+		});
+		return `indexed ${files.length} ${resolved.rel}`;
+	}
+
+	/** Drop a file or folder from the index and keep it out. */
+	async removeIndexedPath(input: string): Promise<string> {
+		if (!this.live()) return "memory is off";
+		if (!this.projectEnabled()) return "project memory is off";
+		const resolved = resolveProjectPath(this.options.cwd, input);
+		if ("error" in resolved) return resolved.error;
+		const lists = loadIndexPaths(this.options.cwd);
+		lists.include = lists.include.filter((path) => path !== resolved.rel && !coversPath(resolved.rel, path));
+		if (!lists.exclude.includes(resolved.rel)) lists.exclude.push(resolved.rel);
+		saveIndexPaths(this.options.cwd, lists);
+		const removed = await this.enqueue(() => this.deleteCovered(loadIndexPaths(this.options.cwd)));
+		return `removed ${resolved.rel} chunks=${removed}`;
 	}
 
 	close(): void {
@@ -267,7 +326,8 @@ export class MemoryManager {
 		if (!db) return;
 		const manifestFile = manifestPath(this.layerRoot("project"), NS);
 		const manifest = loadManifest(manifestFile);
-		const key = relative(this.options.cwd, absPath);
+		const key = relative(this.options.cwd, absPath).split(sep).join("/");
+		if (pathIsExcluded(key, loadIndexPaths(this.options.cwd))) return;
 		const prev = manifest.files[key];
 		let size = 0;
 		let mtimeMs = 0;
@@ -387,11 +447,36 @@ export class MemoryManager {
 		return join(base, "memory", this.options.sessionId);
 	}
 
-	private enqueue(fn: () => Promise<void>): Promise<void> {
+	private async deleteCovered(lists: IndexPathLists): Promise<number> {
+		const db = this.open("project");
+		if (!db) return 0;
+		const manifestFile = manifestPath(this.layerRoot("project"), NS);
+		const manifest = loadManifest(manifestFile);
+		let removed = 0;
+		for (const key of Object.keys(manifest.files)) {
+			const rel = key.split(sep).join("/");
+			if (!pathIsExcluded(rel, lists)) continue;
+			const prev = manifest.files[key];
+			if (!prev) continue;
+			for (const id of prev.ids) {
+				try {
+					db.delete(id);
+				} catch {
+					// row already gone
+				}
+				removed += 1;
+			}
+			delete manifest.files[key];
+		}
+		saveManifest(manifestFile, manifest);
+		return removed;
+	}
+
+	private enqueue<T>(fn: () => Promise<T>): Promise<T> {
 		const run = this.tail.then(async () => {
 			this.indexing = true;
 			try {
-				await fn();
+				return await fn();
 			} finally {
 				this.indexing = false;
 			}
