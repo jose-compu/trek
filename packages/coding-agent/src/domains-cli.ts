@@ -81,7 +81,7 @@ export async function handleWorkflowsCommand(args: string[]): Promise<boolean> {
 			const catalog = loadDomainCatalog(cwd);
 			const selection = overrideSelection(catalog, args[2]);
 			const domain = findDomain(cwd, args[2]);
-			const results = await runArchonWorkflow(domain.workflow, cwd);
+			const results = await runArchonWorkflow(domain.workflow, { cwd });
 			console.log(`selection_reason: ${selection.selectionReason}`);
 			for (const result of results) {
 				console.log(`--- ${result.id} ---`);
@@ -137,5 +137,5 @@ function printWorkflowsHelp(): void {
 	console.log(`${APP_NAME} workflows list`);
 	console.log(`${APP_NAME} workflows show <id>`);
 	console.log(`${APP_NAME} workflows run <id>`);
-	console.log("  run is an operator override. The next turn detects again.");
+	console.log("  run calls bash nodes. A prompt node is an AI step and is called in the session, one step per node.");
 }

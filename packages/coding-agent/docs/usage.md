@@ -212,7 +212,27 @@ See [Memory](memory.md).
 
 `trek workflows show <id>` prints the YAML. `trek workflows run <id>` runs that workflow for this command. The next prompt detects a domain again. A `SKILL.md` file is not a workflow.
 
-When a turn matches a domain, the session draws a green `workflow` call. The domain, the workflow name, and the filled parameters are colored inside that call. The YAML sent to the model stays plain.
+When a turn matches a domain, the session draws a green `workflow` call. The domain, the workflow name, and the filled parameters are colored inside that call. The session then calls the Archon DAG: each prompt node is its own model step, in `depends_on` order. `$USER_MESSAGE` is the user turn. `$id.output` is that node's reply. A fact that is not in the turn or an upstream output is said to be missing. `command`, `script`, and `loop` nodes parse and are not called in this release.
+
+### Operator modes
+
+An operator mode chooses who approves work. It does not change the laws. See [Operator modes](operator-modes.md).
+
+| Mode | Meaning |
+|------|---------|
+| `supervised` | `read` and cheap edits run. A gated tool such as `bash` waits for one confirmation. |
+| `delegated` | A gated tool runs without a fresh confirmation only when `--operator-grant` names it. |
+| `checkpoint` | Same tool rule as supervised, and the act phase stays closed until it is opened. |
+| `diagnostic` | Free tools and the trace only. Mutations are blocked. Same rule as `--diagnostic`. |
+
+```bash
+trek --operator-mode supervised
+trek --operator-mode delegated --operator-grant bash
+trek --operator-mode checkpoint
+trek --operator-mode diagnostic
+```
+
+The mode is for this process. Leaving it unset keeps the previous tool gating.
 
 ### Resource Options
 

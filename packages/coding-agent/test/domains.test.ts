@@ -1,7 +1,8 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, test } from "vitest";
+import { fauxAssistantMessage } from "@trek/ai";
+import { afterEach, describe, expect, test } from "vitest";
 import { loadArchonFile, parseArchonWorkflow } from "../src/core/domains/archon.ts";
 import { addDomain, disableDomain, enableDomain, loadDomainCatalog } from "../src/core/domains/catalog.ts";
 import { runArchonWorkflow } from "../src/core/domains/run.ts";
@@ -11,8 +12,16 @@ import { getReflectiveCycleTraces } from "../src/core/reflective-loop/session-tr
 import { SessionManager } from "../src/core/session-manager.ts";
 import { formatWorkflowCall } from "../src/core/tools/workflow-card.ts";
 import type { Theme, ThemeColor } from "../src/modes/interactive/theme/theme.ts";
+import { createHarness, type Harness } from "./suite/harness.ts";
 
 describe("domains 0.12.0", () => {
+	const harnesses: Harness[] = [];
+	afterEach(() => {
+		while (harnesses.length > 0) {
+			harnesses.pop()?.cleanup();
+		}
+	});
+
 	test("twenty initial domains load and four stay on", () => {
 		const cwd = mkdtempSync(join(tmpdir(), "trek-domains-"));
 		const catalog = loadDomainCatalog(cwd);
@@ -46,6 +55,80 @@ describe("domains 0.12.0", () => {
 		const workflow = loadArchonFile(file);
 		const results = await runArchonWorkflow(workflow, cwd);
 		expect(results).toEqual([{ id: "say", output: "trek-archon-ok" }]);
+	});
+
+	test("a loop is an object, and a prompt node receives the upstream output", async () => {
+		expect(() =>
+			parseArchonWorkflow(
+				[
+					"name: bad-loop",
+					"description: a string is not a loop",
+					"nodes:",
+					"  - id: again",
+					"    loop: keep going",
+					"",
+				].join("\n"),
+			),
+		).toThrow(/loop is an object/);
+		const workflow = parseArchonWorkflow(
+			[
+				"name: chain",
+				"description: two prompt steps",
+				"nodes:",
+				"  - id: one",
+				"    prompt: Name the account in the user turn.",
+				"  - id: two",
+				"    prompt: Read $one.output and do not invent a side.",
+				"    depends_on: [one]",
+				"  - id: again",
+				"    loop:",
+				"      prompt: keep going",
+				"      until: COMPLETE",
+				"      max_iterations: 2",
+				"    depends_on: [two]",
+				"",
+			].join("\n"),
+		);
+		expect(workflow.nodes[2]?.loop).toEqual({ until: "COMPLETE", maxIterations: 2 });
+		const prompts: string[] = [];
+		await expect(
+			runArchonWorkflow(
+				{ ...workflow, nodes: workflow.nodes.filter((node) => node.kind === "prompt") },
+				{
+					cwd: process.cwd(),
+					userMessage: "account 4100",
+					runPrompt: async (prompt) => {
+						prompts.push(prompt);
+						return prompts.length === 1 ? "account 4100" : "the side is not in the turn";
+					},
+				},
+			),
+		).resolves.toEqual([
+			{ id: "one", output: "account 4100" },
+			{ id: "two", output: "the side is not in the turn" },
+		]);
+		expect(prompts[0]).toContain("account 4100");
+		expect(prompts[1]).toContain("account 4100");
+		expect(prompts[1]).toContain("do not invent a side");
+	});
+
+	test("a selected finance workflow calls each prompt node", async () => {
+		const harness = await createHarness({ enableReflectiveLoop: true });
+		harnesses.push(harness);
+		harness.setResponses([
+			fauxAssistantMessage("account 4100, March, 1200"),
+			fauxAssistantMessage("the sides are not in the turn"),
+			fauxAssistantMessage("the SOX control is the bank rec"),
+			fauxAssistantMessage("the correcting entry is not posted"),
+		]);
+		await harness.session.prompt(
+			"The reconciliation break for account 4100 in March is 1200. The SOX control is the bank rec.",
+		);
+		const replies = assistantText(harness);
+		expect(replies).toContain("account 4100, March, 1200");
+		expect(replies).toContain("the sides are not in the turn");
+		expect(replies).toContain("the SOX control is the bank rec");
+		expect(replies).toContain("the correcting entry is not posted");
 	});
 
 	test("untagged prompts select a domain, and a second prompt selects another", () => {
@@ -174,3 +257,14 @@ describe("domains 0.12.0", () => {
 		expect(traces.every((trace) => trace.selectionReason === "match")).toBe(true);
 	});
 });
+
+function assistantText(harness: Harness): string {
+	const lines: string[] = [];
+	for (const message of harness.session.messages) {
+		if (message.role !== "assistant") continue;
+		for (const part of message.content) {
+			if (part.type === "text") lines.push(part.text);
+		}
+	}
+	return lines.join("\n");
+}

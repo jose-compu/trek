@@ -57,6 +57,7 @@ import {
 	shouldCompact,
 } from "./compaction/index.ts";
 import { DEFAULT_THINKING_LEVEL } from "./defaults.ts";
+import { type ArchonWorkflow, parseArchonWorkflow, runArchonWorkflow } from "./domains/index.ts";
 import {
 	type BatchSummary,
 	EditCheckpointManager,
@@ -138,7 +139,11 @@ import {
 	selectSessionRole,
 } from "./runtime/index.ts";
 import {
+	decideTool,
 	formatSchemaMismatchNote,
+	type OperatorMode,
+	operatorBlockReason,
+	phaseIsOpen,
 	SafetyChecker,
 	type SafetyEnv,
 	validateToolResultShape,
@@ -474,6 +479,13 @@ export class AgentSession {
 	private _dryRunEnabled = false;
 	// Diagnostic mode (#49): mutating tools are blocked; reads allowed.
 	private _diagnosticEnabled = false;
+	/** Unset keeps the 0.6.0 diagnostic flag and does not add a new gate. */
+	private _operatorMode: OperatorMode | undefined;
+	private _operatorGrant = new Set<string>();
+	private _confirmOnce = new Set<string>();
+	private _openPhases = new Set<string>();
+	/** Set when this turn selected an Archon workflow. Cleared when the turn calls it. */
+	private _calledWorkflow: ArchonWorkflow | undefined;
 	// Session seed and audit mode (#70). Resolved once at construction.
 	private _reproducibility: ResolvedReproducibility;
 	// Sandbox mode (#10): agent bash commands run inside an OS-level sandbox.
@@ -1281,16 +1293,22 @@ export class AgentSession {
 		toolName: string,
 		args: unknown,
 	): Promise<{ allowed: boolean; law?: number; reason?: string }> {
-		if (this._diagnosticEnabled) {
-			const tier = resolveReversibilityTier(this._baseToolDefinitions.get(toolName)?.reversibilityTier);
-			if (tier !== "free") {
+		const tier = resolveReversibilityTier(this._baseToolDefinitions.get(toolName)?.reversibilityTier);
+		if (this._operatorMode) {
+			const decision = decideTool(this._operatorMode, tier, toolName, this._operatorGrant);
+			const confirmed = decision === "confirm" && this._confirmOnce.delete(toolName);
+			if (!confirmed && decision !== "run") {
 				return {
 					allowed: false,
-					reason: `Diagnostic mode: ${toolName} is blocked (mutating tools are not allowed).`,
+					reason: operatorBlockReason(this._operatorMode, toolName, tier, decision) ?? "blocked",
 				};
 			}
+		} else if (this._diagnosticEnabled && tier !== "free") {
+			return {
+				allowed: false,
+				reason: `Diagnostic mode: ${toolName} is blocked (mutating tools are not allowed).`,
+			};
 		}
-		const tier = resolveReversibilityTier(this._baseToolDefinitions.get(toolName)?.reversibilityTier);
 		const env: SafetyEnv = {
 			halted: this._halted,
 			requireDestructiveConfirm: this._allowDestructiveOps,
@@ -1421,12 +1439,44 @@ export class AgentSession {
 	/** Enable diagnostic operator mode (#49): traces on, mutating tools blocked. */
 	setDiagnostic(enabled: boolean): void {
 		this._diagnosticEnabled = enabled;
+		if (enabled) this._operatorMode = "diagnostic";
+		else if (this._operatorMode === "diagnostic") this._operatorMode = undefined;
 		debugLog("safety", "diagnostic mode", { enabled });
 	}
 
 	/** Whether diagnostic mode is currently enabled. */
 	isDiagnostic(): boolean {
 		return this._diagnosticEnabled;
+	}
+
+	/**
+	 * Select an operator mode for this process. Unset leaves tool gating as it was.
+	 * Diagnostic is the trace-only mode. Supervised and checkpoint wait on gated tools.
+	 * Delegated runs a gated tool only when it is in the grant.
+	 */
+	setOperatorMode(mode: OperatorMode | undefined): void {
+		this._operatorMode = mode;
+		this._diagnosticEnabled = mode === "diagnostic";
+		debugLog("safety", "operator mode", { mode });
+	}
+
+	getOperatorMode(): OperatorMode | undefined {
+		return this._operatorMode;
+	}
+
+	/** Pre-authorize one gated tool. Used by delegated mode. */
+	grantTool(toolName: string): void {
+		this._operatorGrant.add(toolName);
+	}
+
+	/** Allow the next call of one gated tool. Supervised and checkpoint spend this once. */
+	confirmTool(toolName: string): void {
+		this._confirmOnce.add(toolName);
+	}
+
+	/** Open a checkpoint phase. Act stays closed until this is called with "act". */
+	approvePhase(phase: "intend" | "act" | "reflect"): void {
+		this._openPhases.add(phase);
 	}
 
 	/** Set the live effort stop for this process. `off` does not disable safety checks. */
@@ -2377,6 +2427,48 @@ export class AgentSession {
 	// Prompting
 	// =========================================================================
 
+	/**
+	 * A selected workflow is called node by node.
+	 * Prompt and bash nodes run. A command, script, or loop node falls back to one model call.
+	 */
+	private async _actOnTurn(messages: AgentMessage | AgentMessage[]): Promise<void> {
+		const workflow = this._calledWorkflow;
+		this._calledWorkflow = undefined;
+		const callable = workflow?.nodes.every((node) => node.kind === "prompt" || node.kind === "bash") ?? false;
+		if (!workflow || !callable) {
+			await this._runAgentPrompt(messages);
+			return;
+		}
+		const previousTools = this.getActiveToolNames();
+		await runArchonWorkflow(workflow, {
+			cwd: this._cwd,
+			userMessage: this._lastPromptTask,
+			runPrompt: async (prompt, node) => {
+				if (node.allowedTools) {
+					this.setActiveToolsByName(node.allowedTools);
+				}
+				try {
+					await this.agent.prompt(prompt);
+				} finally {
+					if (node.allowedTools) {
+						this.setActiveToolsByName(previousTools);
+					}
+				}
+				return this._lastAssistantText();
+			},
+		});
+	}
+
+	private _lastAssistantText(): string {
+		const message = this._findLastAssistantMessage();
+		if (!message) return "";
+		return message.content
+			.filter((part) => part.type === "text")
+			.map((part) => part.text)
+			.join("\n")
+			.trim();
+	}
+
 	private async _runAgentPrompt(messages: AgentMessage | AgentMessage[]): Promise<void> {
 		try {
 			this._processTree = undefined;
@@ -2677,16 +2769,18 @@ export class AgentSession {
 				cwd: this._cwd,
 				messageCount: this.agent.state.messages.length,
 				getMessageCount: () => this.agent.state.messages.length,
-				act: () => this._runAgentPrompt(messages),
+				act: () => this._actOnTurn(messages),
 				getToolNames: () => this._cycleToolNames.slice(),
 				getPostFlightVerdict: () => this._cyclePostFlight,
 				onDomainSelected: (selection) => {
 					if (selection.yaml.length === 0) {
 						return;
 					}
-					this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n<workflow domain="${selection.domain}" name="${selection.workflow}">\n${selection.yaml}</workflow>`;
+					this._calledWorkflow = parseArchonWorkflow(selection.yaml);
+					this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n<workflow domain="${selection.domain}" name="${selection.workflow}">\nCall each node as its own step, in depends_on order. $USER_MESSAGE is the user turn. $id.output is that node's reply. If a fact is not in the user turn or an upstream output, say it is not in the turn.\n</workflow>`;
 					this._emitWorkflowCard(selection);
 				},
+				phaseAllowed: (phase) => phaseIsOpen(this._operatorMode, phase, this._openPhases),
 			});
 		} else {
 			await this._runAgentPrompt(messages);
