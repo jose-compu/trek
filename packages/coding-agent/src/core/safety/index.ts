@@ -1,3 +1,5 @@
+export { type AntiPattern, type AntiPatternInput, detectAntiPatterns } from "./anti-pattern.ts";
+export { curiosityQuestion } from "./curiosity.ts";
 export {
 	checkLaw0,
 	checkLaw0PostFlight,
@@ -30,6 +32,7 @@ export {
 	type SandboxWrapResult,
 	wrapCommandWithSandbox,
 } from "./sandbox.ts";
+export { applyTone, type ToneProfile } from "./tone.ts";
 export {
 	LAW_TITLES,
 	type LawId,

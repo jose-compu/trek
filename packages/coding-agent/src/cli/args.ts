@@ -55,6 +55,8 @@ export interface Args {
 	operatorMode?: "supervised" | "delegated" | "checkpoint" | "diagnostic";
 	/** Gated tools pre-authorized for delegated mode. */
 	operatorGrant?: string[];
+	/** Wording only. Off leaves every sentence as the model wrote it. */
+	tone?: "off" | "plain";
 	/** Live effort stop for this process. Overrides settings. */
 	effort?: "off" | "normal" | "loose";
 	/** Process-wide memory switch. `off` skips indexing and embeddings. */
@@ -213,6 +215,13 @@ export function parseArgs(args: string[]): Args {
 					type: "error",
 					message: "--operator-mode must be supervised, delegated, checkpoint, or diagnostic",
 				});
+			}
+		} else if (arg === "--tone" && i + 1 < args.length) {
+			const tone = args[++i];
+			if (tone === "off" || tone === "plain") {
+				result.tone = tone;
+			} else {
+				result.diagnostics.push({ type: "error", message: "--tone must be off or plain" });
 			}
 		} else if (arg === "--operator-grant" && i + 1 < args.length) {
 			result.operatorGrant = args[++i]
@@ -378,6 +387,7 @@ ${chalk.bold("Options:")}
   --dry-run                      Preview write/edit/bash without applying changes (#9)
   --diagnostic                   Trace-only: block mutating tools (write/edit/bash) (#49)
   --operator-mode <mode>         supervised, delegated, checkpoint, or diagnostic
+  --tone <off|plain>             Wording only. Off is the default. Law text stays as written.
   --operator-grant <tools>       Comma-separated gated tools for delegated mode
   --effort <off|normal|loose>    Effort stop for this run. loose is 10x normal. off disables it
   --memory <off|on>              Memory for this run. off skips indexing and embeddings

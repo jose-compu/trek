@@ -234,6 +234,8 @@ trek --operator-mode diagnostic
 
 The mode is for this process. Leaving it unset keeps the previous tool gating.
 
+An ambiguous or destructive prompt gets one clarifying question, and the model does not run on that turn. The next prompt is the answer. `--tone plain` shortens wording. A law reason stays as written. `--tone off` is the default. The same tool call three times is flagged as a loop. The flag does not change the law.
+
 ### Resource Options
 
 | Option | Description |

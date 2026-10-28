@@ -139,13 +139,18 @@ import {
 	selectSessionRole,
 } from "./runtime/index.ts";
 import {
+	type AntiPattern,
+	applyTone,
+	curiosityQuestion,
 	decideTool,
+	detectAntiPatterns,
 	formatSchemaMismatchNote,
 	type OperatorMode,
 	operatorBlockReason,
 	phaseIsOpen,
 	SafetyChecker,
 	type SafetyEnv,
+	type ToneProfile,
 	validateToolResultShape,
 	wrapCommandWithSandbox,
 } from "./safety/index.ts";
@@ -360,6 +365,14 @@ function canonicalJson(value: unknown): string {
 // AgentSession Class
 // ============================================================================
 
+function stableArgs(args: unknown): string {
+	try {
+		return JSON.stringify(args ?? {});
+	} catch {
+		return "";
+	}
+}
+
 export class AgentSession {
 	readonly agent: Agent;
 	readonly sessionManager: SessionManager;
@@ -486,6 +499,11 @@ export class AgentSession {
 	private _openPhases = new Set<string>();
 	/** Set when this turn selected an Archon workflow. Cleared when the turn calls it. */
 	private _calledWorkflow: ArchonWorkflow | undefined;
+	/** The next prompt answers the one clarifying question. */
+	private _curiosityOpen = false;
+	private _tone: ToneProfile = "off";
+	private _antiPatterns: AntiPattern[] = [];
+	private _toolSignatures: { name: string; args: string }[] = [];
 	// Session seed and audit mode (#70). Resolved once at construction.
 	private _reproducibility: ResolvedReproducibility;
 	// Sandbox mode (#10): agent bash commands run inside an OS-level sandbox.
@@ -699,6 +717,8 @@ export class AgentSession {
 		this.agent.afterToolCall = async ({ toolCall, args, result, isError }) => {
 			this._releaseFileMutation(toolCall.id);
 			this._cycleToolNames.push(toolCall.name);
+			this._toolSignatures.push({ name: toolCall.name, args: stableArgs(args) });
+			this._antiPatterns = detectAntiPatterns({ toolCalls: this._toolSignatures });
 			this._recordFileAccessForSafety(toolCall.name, args, isError);
 			this._rememberIdempotent(toolCall.name, args, result, isError);
 			if (!isError) {
@@ -1401,6 +1421,21 @@ export class AgentSession {
 	private _resetCycleTraceCollectors(): void {
 		this._cycleToolNames = [];
 		this._cyclePostFlight = undefined;
+		this._toolSignatures = [];
+		this._antiPatterns = [];
+	}
+
+	/** Wording only. `off` is the default and law reasons are left as written. */
+	setTone(profile: ToneProfile): void {
+		this._tone = profile;
+	}
+
+	getTone(): ToneProfile {
+		return this._tone;
+	}
+
+	getAntiPatterns(): readonly AntiPattern[] {
+		return this._antiPatterns;
 	}
 
 	/** Engage the operator HALT/off-switch: blocks tool calls at the next boundary (#7). */
@@ -2459,6 +2494,41 @@ export class AgentSession {
 		});
 	}
 
+	private _recordCuriosity(task: string, question: string): void {
+		const now = Date.now();
+		const model = this.model;
+		const user = { role: "user" as const, content: task, timestamp: now };
+		const assistant = {
+			role: "assistant" as const,
+			content: [{ type: "text" as const, text: question }],
+			api: model?.api ?? "openai-completions",
+			provider: model?.provider ?? "trek",
+			model: model?.id ?? "curiosity",
+			usage: {
+				input: 0,
+				output: 0,
+				cacheRead: 0,
+				cacheWrite: 0,
+				totalTokens: 0,
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+			},
+			stopReason: "stop" as const,
+			timestamp: now + 1,
+		};
+		this.agent.state.messages.push(user, assistant);
+		this.sessionManager.appendMessage(user);
+		this.sessionManager.appendMessage(assistant);
+	}
+
+	private _applyToneToLastAssistant(): void {
+		if (this._tone === "off") return;
+		const message = this._findLastAssistantMessage();
+		if (!message) return;
+		for (const part of message.content) {
+			if (part.type === "text") part.text = applyTone(part.text, this._tone);
+		}
+	}
+
 	private _lastAssistantText(): string {
 		const message = this._findLastAssistantMessage();
 		if (!message) return "";
@@ -2490,6 +2560,7 @@ export class AgentSession {
 				this._effort.beginPrompt();
 			}
 			await this.agent.prompt(messages);
+			this._applyToneToLastAssistant();
 			while (await this._handlePostAgentRun()) {
 				if (!(await this._safeAgentContinue())) {
 					break;
@@ -2637,6 +2708,18 @@ export class AgentSession {
 			if (expandPromptTemplates) {
 				expandedText = this._expandSkillCommand(expandedText);
 				expandedText = expandPromptTemplate(expandedText, [...this.promptTemplates]);
+			}
+
+			if (!this.isStreaming && !this._curiosityOpen) {
+				const question = curiosityQuestion(expandedText);
+				if (question) {
+					this._recordCuriosity(expandedText, question);
+					this._curiosityOpen = true;
+					preflightResult?.(true);
+					return;
+				}
+			} else if (!this.isStreaming) {
+				this._curiosityOpen = false;
 			}
 
 			// If streaming, queue via steer() or followUp() based on option
