@@ -236,6 +236,8 @@ The mode is for this process. Leaving it unset keeps the previous tool gating.
 
 An ambiguous or destructive prompt gets one clarifying question, and the model does not run on that turn. The next prompt is the answer. `--tone plain` shortens wording. A law reason stays as written. `--tone off` is the default. The same tool call three times is flagged as a loop. The flag does not change the law.
 
+On Telegram, `safe_mode` `owner_and_guest` with `owner_user_ids` splits the allowlist. The owner runs tools. A guest may talk. A guest gets no tools, cannot confirm, and a dangerous guest message is refused before the model runs. A stranger is still ignored. With no owner list, safe mode stays off and every allowlisted sender is an owner.
+
 ### Resource Options
 
 | Option | Description |

@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { basename, join } from "node:path";
-import { isAllowedTelegramSender, type TelegramConfig } from "./config.ts";
+import { isAllowedTelegramSender, type TelegramConfig, telegramActor } from "./config.ts";
+import { type DangerClass, screenGuestInput } from "./guest-screen.ts";
 import { planOutboundReply, telegramInboxDir } from "./media.ts";
 import type {
 	TelegramApi,
@@ -12,6 +13,15 @@ import type {
 
 const HELP = ["/start", "/help", "/new", "/status", "/stop", "/confirm"].join("  ");
 const UNSUPPORTED = "Unsupported media (stickers/voice). Send text, a photo, or a document.";
+const GUEST_REFUSAL = "I can't help with that.";
+
+export interface ChannelAudit {
+	actor: "owner" | "guest";
+	safeMode: boolean;
+	guestInput?: "allow" | "refuse";
+	dangerClasses: DangerClass[];
+	excerpt: string;
+}
 
 function isGroupChat(type: string): boolean {
 	return type === "group" || type === "supergroup";
@@ -74,6 +84,9 @@ function largestPhoto(message: TelegramMessage): { file_id: string } | undefined
 export class TelegramRuntime {
 	private offset = 0;
 	private readonly sessions = new Set<string>();
+	private readonly refusals = new Map<string, number>();
+	private readonly repeatedNotice = new Set<string>();
+	private readonly _audits: ChannelAudit[] = [];
 	private readonly config: TelegramConfig;
 	private readonly api: TelegramApi;
 	private readonly host: TelegramSessionHost;
@@ -82,6 +95,10 @@ export class TelegramRuntime {
 		this.config = config;
 		this.api = api;
 		this.host = host;
+	}
+
+	get audits(): readonly ChannelAudit[] {
+		return this._audits;
 	}
 
 	sessionKey(chatId: number, threadId?: number, chatType = "private"): string {
@@ -148,7 +165,8 @@ export class TelegramRuntime {
 			await this.api.sendMessage(chatId, UNSUPPORTED);
 			return;
 		}
-		const key = this.sessionKey(chatId, message.message_thread_id, message.chat.type);
+		const actor = telegramActor(this.config, userId);
+		const key = this.turnKey(chatId, message.message_thread_id, message.chat.type, userId, actor);
 		this.sessions.add(key);
 		const command = commandName(text);
 		if (command === "/start" || command === "/help") {
@@ -170,17 +188,75 @@ export class TelegramRuntime {
 			return;
 		}
 		if (command === "/confirm") {
+			if (actor === "guest") {
+				await this.api.sendMessage(chatId, "Confirmations are for the owner.");
+				return;
+			}
 			this.host.confirm(key);
 			await this.api.sendMessage(chatId, "Destructive ops confirmed for this session.");
 			return;
 		}
-		const attachments = hasMedia ? await this.stageAttachments(message) : [];
 		const prompt = promptText(this.config, text) || (hasMedia ? "See attached media." : "");
+		const names = [message.document?.file_name, message.caption].filter((item): item is string => Boolean(item));
+		if (actor === "guest") {
+			const screen = screenGuestInput([prompt, ...names].join("\n"));
+			this._audits.push({
+				actor,
+				safeMode: true,
+				guestInput: screen.verdict,
+				dangerClasses: screen.classes,
+				excerpt: screen.excerpt,
+			});
+			if (screen.verdict === "refuse") {
+				await this.api.sendMessage(chatId, GUEST_REFUSAL);
+				await this.notifyOwner(chatId, userId, screen.classes, screen.excerpt);
+				return;
+			}
+		} else {
+			this._audits.push({
+				actor,
+				safeMode: this.config.safeMode === "owner_and_guest",
+				guestInput: undefined,
+				dangerClasses: [],
+				excerpt: "",
+			});
+		}
+		const attachments = hasMedia ? await this.stageAttachments(message) : [];
 		if (!prompt && attachments.length === 0) {
 			return;
 		}
-		const reply = await this.host.prompt(key, prompt, attachments);
+		const reply = await this.host.prompt(key, prompt, attachments, { actor });
 		await this.sendReply(chatId, message.chat.type, reply);
+	}
+
+	private turnKey(
+		chatId: number,
+		threadId: number | undefined,
+		chatType: string,
+		userId: number | undefined,
+		actor: "owner" | "guest",
+	): string {
+		const base = this.sessionKey(chatId, threadId, chatType);
+		if (actor === "guest" && userId !== undefined) return `${base}-guest-${userId}`;
+		return base;
+	}
+
+	private async notifyOwner(
+		chatId: number,
+		userId: number | undefined,
+		classes: DangerClass[],
+		excerpt: string,
+	): Promise<void> {
+		if (this.config.guestRefusalNotice === "off") return;
+		const who = `${chatId}:${userId ?? "unknown"}`;
+		const count = (this.refusals.get(who) ?? 0) + 1;
+		this.refusals.set(who, count);
+		const repeated = count >= 3 && !this.repeatedNotice.has(who);
+		if (repeated) this.repeatedNotice.add(who);
+		const text = `Guest ${userId ?? "unknown"} in chat ${chatId}: ${classes.join(", ")}. ${excerpt}${repeated ? " Repeated refusals." : ""}`;
+		for (const ownerId of this.config.ownerUserIds) {
+			await this.api.sendMessage(ownerId, text);
+		}
 	}
 
 	async pollOnce(): Promise<number> {

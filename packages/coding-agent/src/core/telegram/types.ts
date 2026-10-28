@@ -50,8 +50,17 @@ export interface TelegramApi {
 	downloadFile(fileId: string, destPath: string): Promise<void>;
 }
 
+export interface TelegramTurn {
+	actor: "owner" | "guest";
+}
+
 export interface TelegramSessionHost {
-	prompt(sessionKey: string, text: string, attachments?: TelegramPromptAttachment[]): Promise<string>;
+	prompt(
+		sessionKey: string,
+		text: string,
+		attachments?: TelegramPromptAttachment[],
+		turn?: TelegramTurn,
+	): Promise<string>;
 	halt(sessionKey: string): void;
 	reset(sessionKey: string): void;
 	status(sessionKey: string): string;

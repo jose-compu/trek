@@ -11,6 +11,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 - Operator modes for 0.13. `supervised` waits on a gated tool. `delegated` runs a gated tool named in `--operator-grant`. `checkpoint` keeps the act phase closed until it is opened. `diagnostic` remains trace-only. The laws are unchanged.
 - A selected Archon workflow is called node by node. A prompt node is one model step. `$USER_MESSAGE` and `$id.output` are substituted once. A `loop` node is an object with `prompt`, `until`, and `max_iterations`. `command`, `script`, and `loop` still do not run.
 - An ambiguous or destructive prompt asks one question and does not call the model. `--tone plain` changes wording and leaves law text unchanged. Repeating the same tool call three times is flagged as a loop.
+- Telegram safe mode. An owner runs the agent. A guest may talk and gets no tools, no confirmations, and no model call when the text asks for a secret, a tool, or a rule change. A stranger is still ignored.
 
 ## [0.12.0] - 2026-10-28
 

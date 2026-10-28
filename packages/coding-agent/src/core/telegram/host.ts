@@ -6,7 +6,7 @@ import type { AgentSession } from "../agent-session.ts";
 import { formatDeterminismWarning } from "../reproducibility/index.ts";
 import { createAgentSession } from "../sdk.ts";
 import { SessionManager } from "../session-manager.ts";
-import type { TelegramPromptAttachment, TelegramSessionHost } from "./types.ts";
+import type { TelegramPromptAttachment, TelegramSessionHost, TelegramTurn } from "./types.ts";
 
 function lastAssistantText(session: AgentSession): string {
 	for (let i = session.messages.length - 1; i >= 0; i--) {
@@ -66,8 +66,17 @@ export class AgentTelegramHost implements TelegramSessionHost {
 		return session;
 	}
 
-	async prompt(sessionKey: string, text: string, attachments: TelegramPromptAttachment[] = []): Promise<string> {
+	async prompt(
+		sessionKey: string,
+		text: string,
+		attachments: TelegramPromptAttachment[] = [],
+		turn?: TelegramTurn,
+	): Promise<string> {
 		const session = await this.get(sessionKey);
+		if (turn?.actor === "guest") {
+			session.setActiveToolsByName([]);
+			session.setMemoryEnabled(false);
+		}
 		if (session.isHalted()) {
 			return "HALT is engaged. Send /new to resume.";
 		}
