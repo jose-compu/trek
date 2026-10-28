@@ -19,10 +19,14 @@ afterEach(() => {
 });
 
 function toolText(harness: Harness, name: string): string {
-	return harness.session.messages
-		.filter((message) => message.role === "toolResult" && message.toolName === name)
-		.flatMap((message) => message.content.filter((part) => part.type === "text").map((part) => part.text))
-		.join("\n");
+	const lines: string[] = [];
+	for (const message of harness.session.messages) {
+		if (message.role !== "toolResult" || message.toolName !== name) continue;
+		for (const part of message.content) {
+			if (part.type === "text") lines.push(part.text);
+		}
+	}
+	return lines.join("\n");
 }
 
 describe("memory prompts", () => {
