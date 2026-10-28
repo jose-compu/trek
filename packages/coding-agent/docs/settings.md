@@ -68,6 +68,32 @@ Set `PI_SKIP_VERSION_CHECK=1` to disable the Pi version update check. Use `--off
 }
 ```
 
+### Memory
+
+See [Memory](memory.md).
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `memory.enabled` | boolean | `true` | `false` skips indexing, the watcher, embeddings, injection, and the memory tools |
+| `memory.session` | boolean | `true` | Session scratch: turns, thinking, compaction handoff |
+| `memory.project` | boolean | `true` | Project lessons and file chunks in `.trek/memory/` |
+| `memory.global` | boolean | `false` | Global store at `~/.trek/memory/` |
+| `memory.topK` | number | `5` | Hits injected and returned by `recall`. Integer from 1 to 50 |
+
+```json
+{
+  "memory": {
+    "enabled": true,
+    "session": true,
+    "project": true,
+    "global": false,
+    "topK": 5
+  }
+}
+```
+
+`--memory off` overrides this for one process and does not write the file. Paths added or removed with `/memory` are stored in `.trek/memory/paths.json`, not in settings.
+
 ### Compaction
 
 | Setting | Type | Default | Description |

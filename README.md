@@ -26,7 +26,46 @@ Pi compatibility is preserved: community packages from [pi.dev/packages](https:/
 
 ## Status
 
-**0.10.3** is current. `/memory add` indexes a file or folder, and `/memory remove` keeps it out. **0.10.2** colors the layer, kind, tag, and file span on a recall card. **0.10.1** keeps project lessons and indexed file chunks in local memory for a later prompt in that repo. `/memory` shows each store's chunk count. `--memory off` skips indexing and embeddings. **0.10.0** runs independent reads, and edits of different files, together. `trek processes` prints the seeded tree. `--effort loose` multiplies the effort stops by 10, and `--effort off` does not stop the turn for effort. **0.9.1** hides an edit that already matches the file. **0.9.0** routes each component, keeps same-file edits from colliding, and stops a prompt that repeats a failed command or a no-op edit. **0.8.1** updated production dependencies flagged by `npm audit`. **0.8.0** made remote API the default and kept llama.cpp opt-in. **0.7.0 Audit** shipped the session seed (default `42`), `default` / `strict_audit` modes, per-step `trek:audit_step` records, and honest warnings when a provider cannot honor seed. Bit-exact replay is not claimed on closed APIs or on GPU llama.cpp. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
+**0.10.3** is current. Memory is documented in [Memory](#memory). **0.10.0** runs independent reads, and edits of different files, together. `trek processes` prints the seeded tree. `--effort loose` multiplies the effort stops by 10, and `--effort off` does not stop the turn for effort. **0.9.1** hides an edit that already matches the file. **0.9.0** routes each component, keeps same-file edits from colliding, and stops a prompt that repeats a failed command or a no-op edit. **0.8.1** updated production dependencies flagged by `npm audit`. **0.8.0** made remote API the default and kept llama.cpp opt-in. **0.7.0 Audit** shipped the session seed (default `42`), `default` / `strict_audit` modes, per-step `trek:audit_step` records, and honest warnings when a provider cannot honor seed. Bit-exact replay is not claimed on closed APIs or on GPU llama.cpp. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
+
+## Memory
+
+Local semantic memory on LogosDB. A later prompt in the same project can use a stored lesson or an indexed file without calling `recall`. The matching chunks are added to the system prompt. The model text stays plain. Full notes: [packages/coding-agent/docs/memory.md](packages/coding-agent/docs/memory.md).
+
+Three stores. A row cannot cross a boundary.
+
+| Layer | Default | What it holds |
+|---|---|---|
+| Session | on | Question and answer, one thinking excerpt, compaction handoff. Dropped by `/new`. |
+| Project | on | Lessons and file chunks in `.trek/memory/`. Kept for the next session in that directory. |
+| Global | off | `~/.trek/memory/` only when `memory.global` is true. |
+
+```bash
+/memory                         # layers, topK, chunk counts, include and exclude
+/memory index                   # reindex the project
+/memory add docs/catalog        # index a file or folder, even if gitignore skipped it
+/memory remove notes            # delete those chunks and leave the path out
+```
+
+`remember` stores a project lesson. `recall` searches the layers that are on. `forget` deletes the closest row in one layer. A recall card colors the layer, kind, tag, path, and line span.
+
+`--memory off` skips indexing, the watcher, embeddings, injection, and the memory tools for that process. It does not write settings. The same happens when `memory.enabled` is false, or when session, project, and global are all false.
+
+```json
+{
+  "memory": {
+    "enabled": true,
+    "session": true,
+    "project": true,
+    "global": false,
+    "topK": 5
+  }
+}
+```
+
+Project `.trek/settings.json` overrides the global settings file. `topK` is an integer from 1 to 50. Each injected hit is cut at 400 characters. At most one thinking row is injected, and only when its score is at least the weakest file or lesson already chosen.
+
+The indexer walks a project directory (a marker such as `.git` or `package.json`, not your home directory). It skips `.git`, `node_modules`, `dist`, `.trek`, lockfiles, binaries, and files over 200 KB. Gitignore applies unless you `/memory add` the path. Embeddings are MiniLM. A file over 200 KB has to be split. `/memory add` and `/memory remove` are stored in `.trek/memory/paths.json`.
 
 ## Models
 

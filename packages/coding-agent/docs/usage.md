@@ -53,6 +53,10 @@ Type `/` in the editor to open command completion. Extensions can register custo
 | `/reload` | Reload keybindings, extensions, skills, prompts, and context files |
 | `/hotkeys` | Show all keyboard shortcuts |
 | `/changelog` | Display version history |
+| `/memory` | Show memory layers and chunk counts. See [Memory](memory.md) |
+| `/memory index` | Reindex the project |
+| `/memory add <path>` | Index a file or folder and keep it |
+| `/memory remove <path>` | Drop that path from the index |
 | `/quit` | Quit pi |
 
 ## Message Queue
@@ -190,7 +194,17 @@ cat README.md | pi -p "Summarize this text"
 | `--no-builtin-tools`, `-nbt` | Disable built-in tools but keep extension/custom tools enabled |
 | `--no-tools`, `-nt` | Disable all tools |
 
-Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`.
+Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`, `remember`, `recall`, `forget`.
+
+### Memory
+
+| Option | Description |
+|--------|-------------|
+| `--memory off` | Skip indexing, the watcher, embeddings, injection, and the memory tools for this process |
+| `--memory on` | Turn memory on for this process. Does not write settings. Layer flags still apply |
+| `--effort <off\|normal\|loose>` | Effort stop for this run. `loose` is 10× `normal`. `off` does not stop the turn for effort |
+
+See [Memory](memory.md).
 
 ### Resource Options
 
