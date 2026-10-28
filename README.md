@@ -1,4 +1,4 @@
-![Trek Agent 0.8.0 Runtime](./assets/banner-0.8.0.png)
+![Trek Agent 0.10 Memory](./assets/banner-0.10.png)
 
 # Trek Agent v0.10.3
 
