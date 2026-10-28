@@ -8,6 +8,8 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { fakeEmbedder, type Embedder } from "../src/core/memory/embedder.ts";
+import { formatRecallDisplay } from "../src/core/tools/memory.ts";
+import type { Theme, ThemeColor } from "../src/modes/interactive/theme/theme.ts";
 import { isIndexableProject } from "../src/core/memory/index-files.ts";
 import { MemoryManager, selectInjection, type MemoryHit } from "../src/core/memory/manager.ts";
 import { shouldConstructCrossEncoder } from "../src/core/memory/rerank.ts";
@@ -300,6 +302,35 @@ describe("rerank policy", () => {
 		}
 		expect(lfmConstructed).toBe(false);
 		mem.close();
+	});
+});
+
+describe("recall display", () => {
+	it("colors the layer, kind, tag, and file span separately from the passage", () => {
+		const marks: string[] = [];
+		const theme = {
+			fg(color: ThemeColor, text: string) {
+				marks.push(color);
+				return `{${color}}${text}`;
+			},
+		} as Theme;
+		const painted = formatRecallDisplay(
+			[
+				"[project lesson] [kind:lesson][tag:ledger]",
+				"the ledger row keeps debit and credit as separate cent integers.",
+				"[project file] [kind:file][file:src/billing.ts][lines:1-5]",
+				"return Math.round(amount);",
+			].join("\n"),
+			theme,
+		);
+		expect(painted).toContain("{success}project");
+		expect(painted).toContain("{syntaxKeyword}lesson");
+		expect(painted).toContain("{syntaxString}ledger");
+		expect(painted).toContain("{mdLink}src/billing.ts");
+		expect(painted).toContain("{syntaxNumber}1-5");
+		expect(painted).toContain("{toolOutput}the ledger row keeps debit and credit as separate cent integers.");
+		expect(painted).not.toContain("\u001b");
+		expect(marks).toContain("success");
 	});
 });
 

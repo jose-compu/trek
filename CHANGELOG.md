@@ -1,10 +1,14 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.10.1`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.10.2`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
-## [Unreleased]
+## [0.10.2] - 2026-10-28
+
+### Changed
+
+- A recall card colors the layer, kind, tag, and file span. The passage stays in the tool-output color. The text sent to the model stays plain.
 
 ## [0.10.1] - 2026-10-28
 

@@ -1,6 +1,74 @@
+import { Text } from "@trek/tui";
 import { Type } from "typebox";
+import type { Theme, ThemeColor } from "../../modes/interactive/theme/theme.ts";
 import type { ToolDefinition } from "../extensions/types.ts";
 import type { MemoryLayer, MemoryManager } from "../memory/manager.ts";
+import { getTextOutput } from "./render-utils.ts";
+
+const LAYER_COLOR: Record<string, ThemeColor> = {
+	project: "success",
+	session: "accent",
+	global: "warning",
+};
+
+const KIND_COLOR: Record<string, ThemeColor> = {
+	lesson: "syntaxKeyword",
+	file: "mdLink",
+	thinking: "thinkingMedium",
+	turn: "syntaxType",
+	handoff: "syntaxFunction",
+	note: "muted",
+};
+
+const CITATION_COLOR: Record<string, ThemeColor> = {
+	kind: "syntaxKeyword",
+	tag: "syntaxString",
+	file: "mdLink",
+	lines: "syntaxNumber",
+	offset: "syntaxNumber",
+};
+
+const HIT_START = /^\[(session|project|global) (lesson|file|turn|thinking|handoff|note)\]\s*/;
+
+/** Display-only colors. The text stored for the model stays plain. */
+export function formatRecallDisplay(raw: string, theme: Theme): string {
+	if (raw === "no results") return theme.fg("muted", raw);
+	if (raw.startsWith("search failed")) return theme.fg("error", raw);
+	return raw
+		.split("\n")
+		.map((line) => colorRecallLine(line, theme))
+		.join("\n");
+}
+
+function colorRecallLine(line: string, theme: Theme): string {
+	const match = HIT_START.exec(line);
+	if (!match) return theme.fg("toolOutput", line);
+	const layer = match[1] ?? "";
+	const kind = match[2] ?? "";
+	const head =
+		theme.fg("dim", "[") +
+		theme.fg(LAYER_COLOR[layer] ?? "text", layer) +
+		theme.fg("dim", " ") +
+		theme.fg(KIND_COLOR[kind] ?? "text", kind) +
+		theme.fg("dim", "]");
+	const rest = line.slice(match[0].length);
+	return rest ? `${head} ${colorCitation(rest, theme)}` : head;
+}
+
+function colorCitation(text: string, theme: Theme): string {
+	return text.replace(/\[([a-z]+):([^\]]*)\]/g, (token, key: string, value: string) => {
+		const known = CITATION_COLOR[key];
+		if (!known) return theme.fg("toolOutput", token);
+		const valueColor = key === "kind" ? (KIND_COLOR[value] ?? known) : known;
+		return (
+			theme.fg("dim", "[") +
+			theme.fg("muted", key) +
+			theme.fg("dim", ":") +
+			theme.fg(valueColor, value) +
+			theme.fg("dim", "]")
+		);
+	});
+}
 
 const rememberSchema = Type.Object({
 	text: Type.String({ description: "Project lesson to keep for later sessions in this repo" }),
@@ -59,6 +127,11 @@ export function createMemoryToolDefinitions(getMemory: () => MemoryManager): Too
 			} catch (error) {
 				return { content: [{ type: "text", text: `search failed: ${String(error)}` }], details: undefined };
 			}
+		},
+		renderResult(result, _options, theme, context) {
+			const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
+			text.setText(formatRecallDisplay(getTextOutput(result, context.showImages), theme));
+			return text;
 		},
 	};
 	const forget: ToolDefinition = {

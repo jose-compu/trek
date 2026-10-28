@@ -2,7 +2,11 @@
 
 Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent repo `UPSTREAM.md` / Pi monorepo.
 
-## [Unreleased]
+## [0.10.2] - 2026-10-28
+
+### Changed
+
+- A recall card colors the layer, kind, tag, and file span. The passage stays in the tool-output color. The text sent to the model stays plain.
 
 ## [0.10.1] - 2026-10-28
 
