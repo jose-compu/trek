@@ -6,6 +6,10 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Fixed
+
+- An edit that already matches the file is not shown in the terminal.
+
 ## [0.9.0] - 2026-10-28
 
 ### Fixed

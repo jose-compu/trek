@@ -988,6 +988,12 @@ describe("edit tool fuzzy matching", () => {
 		expect(getTextOutput(result)).toMatch(/No change needed/);
 		expect(getTextOutput(result)).not.toMatch(/special characters/);
 		expect(readFileSync(testFile, "utf-8")).toBe("theorem t : True := by\n  rfl\n");
+		const preview = await computeEditsDiff(
+			testFile,
+			[{ oldText: "theorem t : True := by\n  rfl\n", newText: "theorem t : True := by\n  rfl\n" }],
+			process.cwd(),
+		);
+		expect(preview).toEqual({ diff: "", firstChangedLine: undefined, unchanged: true });
 	});
 
 	it("should tell the model to retry edit instead of rewriting the file", async () => {

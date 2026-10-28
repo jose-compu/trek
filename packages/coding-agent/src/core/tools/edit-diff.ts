@@ -691,6 +691,8 @@ export function generateDiffString(
 export interface EditDiffResult {
 	diff: string;
 	firstChangedLine: number | undefined;
+	/** The replacement already matches the file. The TUI does not print a card for this. */
+	unchanged?: boolean;
 }
 
 export interface EditDiffError {
@@ -725,7 +727,7 @@ export async function computeEditsDiff(
 		const normalizedContent = normalizeToLF(content);
 		const { baseContent, newContent, unchanged } = applyEditsToNormalizedContent(normalizedContent, edits, path);
 		if (unchanged) {
-			return { diff: unchangedEditMessage(path), firstChangedLine: undefined };
+			return { diff: "", firstChangedLine: undefined, unchanged: true };
 		}
 
 		// Generate the diff

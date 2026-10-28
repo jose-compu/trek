@@ -313,6 +313,9 @@ function buildEditCallComponent(
 ): EditCallRenderComponent {
 	component.setBgFn(getEditHeaderBg(component.preview, component.settledError, theme));
 	component.clear();
+	if (component.preview && !("error" in component.preview) && component.preview.unchanged) {
+		return component;
+	}
 	component.addChild(new Text(formatEditCall(args, theme, cwd), 0, 0));
 
 	if (!component.preview) {
