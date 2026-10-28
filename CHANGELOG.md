@@ -1,10 +1,14 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.10.0`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.10.1`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
-## [Unreleased]
+## [0.10.1] - 2026-10-28
+
+### Added
+
+- Local memory on LogosDB. `remember`, `recall`, and `forget` use three stores: session, project (`.trek/memory/`), and global (off unless enabled). A project lesson is recalled by a later session in that repo. File chunks and thinking traces are embedded with a situating header. `/memory` shows the layers and the live chunk count in each store. `memory.enabled: false` or `--memory off` skips indexing, the watcher, and embeddings.
 
 ## [0.10.0] - 2026-10-28
 

@@ -13,6 +13,8 @@ const internalPackagePrefix = "@trek/";
 const allowedInstallScriptPackages = new Map([
 	["@google/genai@1.52.0", "preinstall is a no-op in the published package"],
 	["protobufjs@7.6.6", "postinstall only warns about protobufjs version scheme mismatches"],
+	["logosdb@1.1.0", "install fetches the N-API build or compiles the native index"],
+	["sharp@0.32.6", "install fetches the libvips binary pulled in by logosdb-mcp-server"],
 ]);
 
 const args = new Set(process.argv.slice(2));

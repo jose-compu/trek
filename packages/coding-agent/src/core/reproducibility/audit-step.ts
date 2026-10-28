@@ -112,7 +112,7 @@ export interface BuildAuditStepInput {
 	reproducibility: ResolvedReproducibility;
 	toolNames: string[];
 	skillNames: string[];
-	/** Empty until 0.11.0 Memory. */
+	/** Lesson ids injected before this step. */
 	retrievedLessonIds?: string[];
 	clock?: () => Date;
 	/** 0.8.0 coarse role. Omitted when the runtime config cannot be read. */

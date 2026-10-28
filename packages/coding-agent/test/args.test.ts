@@ -328,6 +328,12 @@ describe("parseArgs", () => {
 			expect(parseArgs(["--effort", "max"]).diagnostics.some((item) => item.type === "error")).toBe(true);
 		});
 
+		test("parses --memory", () => {
+			expect(parseArgs(["--memory", "off"]).memory).toBe("off");
+			expect(parseArgs(["--memory", "on"]).memory).toBe("on");
+			expect(parseArgs(["--memory", "maybe"]).diagnostics.some((item) => item.type === "error")).toBe(true);
+		});
+
 		test("parses --diagnostic flag", () => {
 			const result = parseArgs(["--diagnostic", "-p", "hi"]);
 			expect(result.diagnostic).toBe(true);

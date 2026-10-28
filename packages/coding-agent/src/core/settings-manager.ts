@@ -75,6 +75,31 @@ export type PackageSource =
 			themes?: string[];
 	  };
 
+export interface MemorySettings {
+	/** False skips indexing, the file watcher, embeddings, and injection. */
+	enabled?: boolean;
+	session?: boolean;
+	project?: boolean;
+	global?: boolean;
+	/** Injected hits. Clamped to 1–50. Default 5. */
+	topK?: number;
+}
+
+export function clampMemoryTopK(value: unknown): number {
+	const n = typeof value === "number" ? value : Number(value);
+	if (!Number.isInteger(n) || n < 1 || n > 50) return 5;
+	return n;
+}
+
+export function memoryIsActive(settings: {
+	enabled: boolean;
+	session: boolean;
+	project: boolean;
+	global: boolean;
+}): boolean {
+	return settings.enabled && (settings.session || settings.project || settings.global);
+}
+
 export interface Settings {
 	lastChangelogVersion?: string;
 	defaultProvider?: string;
@@ -118,6 +143,8 @@ export interface Settings {
 	diagnostic?: boolean;
 	/** Live effort stop. `loose` is ten times the normal limits. `off` does not stop. */
 	effort?: "off" | "normal" | "loose";
+	/** Local semantic memory. Global is off unless set. */
+	memory?: MemorySettings;
 	/** Audit / reproducibility policy (#70). */
 	reproducibility?: ReproducibilitySettings;
 }
@@ -866,6 +893,17 @@ export class SettingsManager {
 		this.globalSettings.reproducibility = { ...next };
 		this.markModified("reproducibility");
 		this.save();
+	}
+
+	getMemorySettings(): Required<MemorySettings> {
+		const raw = this.settings.memory ?? {};
+		return {
+			enabled: raw.enabled !== false,
+			session: raw.session !== false,
+			project: raw.project !== false,
+			global: raw.global === true,
+			topK: clampMemoryTopK(raw.topK),
+		};
 	}
 
 	setQuietStartup(quiet: boolean): void {

@@ -53,6 +53,8 @@ export interface Args {
 	diagnostic?: boolean;
 	/** Live effort stop for this process. Overrides settings. */
 	effort?: "off" | "normal" | "loose";
+	/** Process-wide memory switch. `off` skips indexing and embeddings. */
+	memory?: "off" | "on";
 	/** Wrap agent bash in OS sandbox when available (#10). */
 	sandbox?: boolean;
 	/** After a mutating prompt, create a small labeled git commit (0.5.0). */
@@ -208,6 +210,16 @@ export function parseArgs(args: string[]): Args {
 					message: "--effort must be off, normal, or loose",
 				});
 			}
+		} else if (arg === "--memory" && i + 1 < args.length) {
+			const memory = args[++i];
+			if (memory === "off" || memory === "on") {
+				result.memory = memory;
+			} else {
+				result.diagnostics.push({
+					type: "error",
+					message: "--memory must be off or on",
+				});
+			}
 		} else if (arg === "--git-commit") {
 			result.gitCommit = true;
 		} else if (arg === "--sandbox") {
@@ -340,6 +352,7 @@ ${chalk.bold("Options:")}
   --dry-run                      Preview write/edit/bash without applying changes (#9)
   --diagnostic                   Trace-only: block mutating tools (write/edit/bash) (#49)
   --effort <off|normal|loose>    Effort stop for this run. loose is 10x normal. off disables it
+  --memory <off|on>              Memory for this run. off skips indexing and embeddings
   --git-commit                   After mutations, create a labeled git commit (0.5.0)
   --sandbox                      Run agent bash inside OS sandbox when available (#10)
   --debug                        Verbose internal logging to ${getDebugLogPath()} (tail -f in another terminal)

@@ -2752,6 +2752,12 @@ export class InteractiveMode {
 				this.showProcesses();
 				return;
 			}
+			if (text === "/memory" || text.startsWith("/memory ")) {
+				const arg = text.slice("/memory".length).trim();
+				this.editor.setText("");
+				await this.showMemory(arg === "index");
+				return;
+			}
 			if (text === "/sandbox") {
 				this.editor.setText("");
 				this.handleToggleSandbox();
@@ -3831,6 +3837,13 @@ export class InteractiveMode {
 		const tree = this.session.formatProcesses();
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new Text(theme.fg("muted", tree), 1, 0));
+		this.ui.requestRender();
+	}
+
+	async showMemory(reindex: boolean): Promise<void> {
+		const text = reindex ? await this.session.reindexMemory() : this.session.formatMemoryStatus();
+		this.chatContainer.addChild(new Spacer(1));
+		this.chatContainer.addChild(new Text(theme.fg("muted", text), 1, 0));
 		this.ui.requestRender();
 	}
 

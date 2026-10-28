@@ -64,7 +64,7 @@ export const AUDIT_STEP_SCHEMA_VERSION = 1;
 
 /**
  * Audit trail per LLM step (REFLECTIVE §12.4).
- * Hashes are 16-char sha256 prefixes. `retrievedLessonIds` stays empty until 0.11.0 Memory.
+ * Hashes are 16-char sha256 prefixes. `retrievedLessonIds` lists lessons injected for this step.
  */
 export interface AuditStepRecord {
 	schemaVersion: typeof AUDIT_STEP_SCHEMA_VERSION;

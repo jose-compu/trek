@@ -151,7 +151,12 @@ import { createSyntheticSourceInfo, type SourceInfo } from "./source-info.ts";
 import { type BuildSystemPromptOptions, buildSystemPrompt } from "./system-prompt.ts";
 import { type BashOperations, createLocalBashOperations } from "./tools/bash.ts";
 import { type Edit, editStillNeeded } from "./tools/edit-diff.ts";
+import { createEmbedder, MemoryManager } from "./memory/index.ts";
+import { memoryIsActive } from "./settings-manager.ts";
 import { createAllToolDefinitions } from "./tools/index.ts";
+import { createMemoryToolDefinitions } from "./tools/memory.ts";
+
+const MEMORY_TOOL_NAMES = new Set(["remember", "recall", "forget"]);
 import { resolveToCwd } from "./tools/path-utils.ts";
 import { createToolDefinitionFromAgentTool } from "./tools/tool-definition-wrapper.ts";
 import {
@@ -471,6 +476,11 @@ export class AgentSession {
 	private _reproducibility: ResolvedReproducibility;
 	// Sandbox mode (#10): agent bash commands run inside an OS-level sandbox.
 	private _sandboxBashEnabled = false;
+	private _memory?: MemoryManager;
+	private _memoryStarted = false;
+	/** Process override from `--memory`. Undefined follows settings. */
+	private _memoryEnabledOverride?: boolean;
+	private _lastRetrievedLessonIds: string[] = [];
 
 	constructor(config: AgentSessionConfig) {
 		this.agent = config.agent;
@@ -1623,6 +1633,7 @@ export class AgentSession {
 			await this._extensionRunner.emit({ type: "agent_start" });
 		} else if (event.type === "agent_end") {
 			await this._extensionRunner.emit({ type: "agent_end", messages: event.messages });
+			await this._captureTurnMemory(event.messages);
 		} else if (event.type === "turn_start") {
 			const extensionEvent: TurnStartEvent = {
 				type: "turn_start",
@@ -1758,6 +1769,11 @@ export class AgentSession {
 	 */
 	dispose(): void {
 		try {
+			this._memory?.close();
+		} catch {
+			// Dispose must succeed even if the memory store is already closed.
+		}
+		try {
 			this._llama?.stop();
 		} catch {
 			// Dispose must succeed even if a local server is already gone.
@@ -1860,6 +1876,105 @@ export class AgentSession {
 		// Rebuild base system prompt with new tool set
 		this._baseSystemPrompt = this._rebuildSystemPrompt(validToolNames);
 		this.agent.state.systemPrompt = this._baseSystemPrompt;
+	}
+
+	formatMemoryStatus(): string {
+		if (!this.memoryActive()) return "memory=off";
+		return this.memory().status();
+	}
+
+	searchMemory(query: string) {
+		if (!this.memoryActive()) return Promise.resolve([]);
+		return this.memory().recall(query);
+	}
+
+	async reindexMemory(): Promise<string> {
+		if (!this.memoryActive()) return "memory=off";
+		await this.memory().indexProject();
+		return this.memory().status();
+	}
+
+	/** Start project indexing when memory is on. Safe to call more than once. */
+	startMemory(): void {
+		if (!this.memoryActive() || this._memoryStarted) return;
+		this._memoryStarted = true;
+		void this.memory().start().catch(() => undefined);
+	}
+
+	/**
+	 * Process-wide switch. `false` closes the store and drops the memory tools.
+	 * Does not write settings.
+	 */
+	setMemoryEnabled(enabled: boolean): void {
+		this._memoryEnabledOverride = enabled;
+		if (!enabled) {
+			this._memoryStarted = false;
+			try {
+				this._memory?.close();
+			} catch {
+				// already closed
+			}
+			this._memory = undefined;
+		}
+		const names = this.getActiveToolNames().filter((name) => !MEMORY_TOOL_NAMES.has(name));
+		if (enabled) names.push(...MEMORY_TOOL_NAMES);
+		this.setActiveToolsByName(names);
+		if (enabled) this.startMemory();
+	}
+
+	private memoryActive(): boolean {
+		if (this._memoryEnabledOverride === false) return false;
+		const settings = this.settingsManager.getMemorySettings();
+		if (this._memoryEnabledOverride === true) {
+			return settings.session || settings.project || settings.global;
+		}
+		return memoryIsActive(settings);
+	}
+
+	private memory(): MemoryManager {
+		if (!this._memory) {
+			this._memory = new MemoryManager({
+				cwd: this._cwd,
+				sessionId: this.sessionManager.getSessionId(),
+				sessionDir: this.sessionManager.getSessionDir() || undefined,
+				getSettings: () => this.settingsManager.getMemorySettings(),
+				embedder: createEmbedder(),
+			});
+		}
+		return this._memory;
+	}
+
+	private async _injectMemory(query: string): Promise<void> {
+		this._lastRetrievedLessonIds = [];
+		if (!this.memoryActive()) return;
+		this.startMemory();
+		try {
+			const block = await this.memory().buildInjection(query);
+			if (!block.text) return;
+			this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n${block.text}`;
+			this._lastRetrievedLessonIds = block.lessonIds;
+		} catch {
+			this._lastRetrievedLessonIds = [];
+		}
+	}
+
+	private async _captureTurnMemory(messages: AgentMessage[]): Promise<void> {
+		if (!this.memoryActive()) return;
+		try {
+			await this.memory().recordTurn(messages, this._cwd);
+			await this.memory().indexProject();
+		} catch {
+			// Memory must not fail the turn.
+		}
+	}
+
+	private async _captureHandoff(): Promise<void> {
+		if (!this.memoryActive()) return;
+		try {
+			await this.memory().recordHandoff(this._cwd);
+		} catch {
+			// Memory must not fail compaction.
+		}
 	}
 
 	/** Whether compaction or branch summarization is currently running */
@@ -2057,6 +2172,7 @@ export class AgentSession {
 			source: runtimeFields.source,
 			routeReason: runtimeFields.routeReason,
 			effort: this._effortMode,
+			retrievedLessonIds: this._lastRetrievedLessonIds,
 		});
 		this.sessionManager.appendAuditStep(record);
 		debugLog("reproducibility", "audit step recorded", record);
@@ -2495,6 +2611,7 @@ export class AgentSession {
 				// Ensure we're using the base prompt (in case previous turn had modifications)
 				this.agent.state.systemPrompt = this._baseSystemPrompt;
 			}
+			await this._injectMemory(expandedText);
 		} catch (error) {
 			preflightResult?.(false);
 			throw error;
@@ -3052,6 +3169,7 @@ export class AgentSession {
 			let extensionCompaction: CompactionResult | undefined;
 			let fromExtension = false;
 
+			await this._captureHandoff();
 			if (this._extensionRunner.hasHandlers("session_before_compact")) {
 				const result = (await this._extensionRunner.emit({
 					type: "session_before_compact",
@@ -3318,6 +3436,7 @@ export class AgentSession {
 			let extensionCompaction: CompactionResult | undefined;
 			let fromExtension = false;
 
+			await this._captureHandoff();
 			if (this._extensionRunner.hasHandlers("session_before_compact")) {
 				const extensionResult = (await this._extensionRunner.emit({
 					type: "session_before_compact",
@@ -3808,6 +3927,12 @@ export class AgentSession {
 			Object.entries(baseToolDefinitions).map(([name, tool]) => [name, tool as ToolDefinition]),
 		);
 
+		if (!this._baseToolsOverride) {
+			for (const definition of createMemoryToolDefinitions(() => this.memory())) {
+				this._baseToolDefinitions.set(definition.name, definition);
+			}
+		}
+
 		if (this._reflectiveLoop) {
 			for (const definition of createReflectiveMetaToolDefinitions(
 				this._reflectiveLoop,
@@ -3842,8 +3967,11 @@ export class AgentSession {
 
 		const defaultActiveToolNames = this._baseToolsOverride
 			? Object.keys(this._baseToolsOverride)
-			: ["read", "bash", "edit", "write"];
-		const baseActiveToolNames = options.activeToolNames ?? defaultActiveToolNames;
+			: ["read", "bash", "edit", "write", ...(this.memoryActive() ? [...MEMORY_TOOL_NAMES] : [])];
+		const requestedActive = options.activeToolNames ?? defaultActiveToolNames;
+		const baseActiveToolNames = this.memoryActive()
+			? requestedActive
+			: requestedActive.filter((name) => !MEMORY_TOOL_NAMES.has(name));
 		this._refreshToolRegistry({
 			activeToolNames: baseActiveToolNames,
 			includeAllExtensionTools: options.includeAllExtensionTools,

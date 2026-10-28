@@ -17,6 +17,7 @@ packages/*/dist-firefox/
 .trek/versions/
 .trek/processes.txt
 .trek/manifest.json
+.trek/memory/
 
 # Editor files
 .vscode/

@@ -887,6 +887,13 @@ export async function main(args: string[], options?: MainOptions) {
 	if (parsed.effort) {
 		session.setEffort(parsed.effort);
 	}
+	if (parsed.memory === "off") {
+		session.setMemoryEnabled(false);
+	} else if (parsed.memory === "on") {
+		session.setMemoryEnabled(true);
+	} else {
+		session.startMemory();
+	}
 	if (parsed.gitCommit) {
 		session.setGitCommit(true);
 	}
