@@ -4,10 +4,18 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Fixed
+
+- A large `edit` call whose `edits` array arrives as a JSON string is parsed, including raw newlines. A cut-off payload keeps the complete replacements. The validation error no longer echoes the whole argument payload.
+- An `edit` whose middle lines drifted still replaces the block when the first and last lines uniquely bound a region of similar size. Copied line-number prefixes are ignored. A miss quotes the current lines.
+- An `edit` whose replacement already matches the file reports that no change is needed. It does not fail, and it does not blame special characters.
+- Different edits of the same file are no longer treated as one edit. A turn may edit different files together. A second edit of the same file in that turn waits.
+- An edit that puts back text already replaced in the same prompt is refused. The latest command errors stay in that result.
+
 ### Added
 
 - `spawn_subtask` hands the child a summary only and aborts past depth 5. IntentionFilter repairs a summary that names no next action, then the turn continues.
-- The live tool loop stops on a repeated action, three steps with no progress, or a spent prompt budget. The result includes the EffortRegulator reason.
+- The live tool loop stops when the same action is used 4 times, the same error repeats 8 times, or the prompt uses its 48 tool calls. A new error, such as a failed build log, is progress. The result includes the EffortRegulator reason.
 - Component routing from `routing.components` or the dynamic policy. Audit steps record the route reason. Workhorse is unchanged. A later Decision model such as Jev can use that slot.
 - Short thinking traces (#108). Tool turns use reasoning effort `minimal` and a 128-token thinking budget. Local GGUFs get the cap in the prompt.
 

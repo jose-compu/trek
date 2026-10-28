@@ -118,4 +118,105 @@ describe("regression #98: edit must not trigger a full rewrite", () => {
 		expect(texts[1]).toMatch(/Successfully replaced/);
 		expect(texts.some((text) => /already applied/i.test(text))).toBe(false);
 	});
+
+	it("refuses an edit that restores text replaced earlier in the prompt", async () => {
+		const harness = await createHarness();
+		harnesses.push(harness);
+		harness.setResponses([
+			fauxAssistantMessage([fauxToolCall("write", { path: "Peano.lean", content: "simp [succ_add, ih]\n" })], {
+				stopReason: "toolUse",
+			}),
+			fauxAssistantMessage(
+				[
+					fauxToolCall("edit", {
+						path: "Peano.lean",
+						edits: [{ oldText: "simp [succ_add, ih]", newText: "simp [succ_add, ih]; rw [ih]" }],
+					}),
+				],
+				{ stopReason: "toolUse" },
+			),
+			fauxAssistantMessage(
+				[fauxToolCall("bash", { command: "echo 'error: Peano.lean:38:14: unsolved goals'; exit 1" })],
+				{ stopReason: "toolUse" },
+			),
+			fauxAssistantMessage(
+				[
+					fauxToolCall("edit", {
+						path: "Peano.lean",
+						edits: [{ oldText: "simp [succ_add, ih]; rw [ih]", newText: "simp [succ_add, ih]" }],
+					}),
+				],
+				{ stopReason: "toolUse" },
+			),
+			fauxAssistantMessage("done"),
+		]);
+
+		await harness.session.prompt("fix the proof");
+
+		expect(readFileSync(join(harness.tempDir, "Peano.lean"), "utf-8")).toBe("simp [succ_add, ih]; rw [ih]\n");
+		const texts = toolTexts(harness, "edit");
+		expect(texts[0]).toMatch(/Successfully replaced/);
+		expect(texts[1]).toMatch(/puts back text already replaced/);
+		expect(texts[1]).toMatch(/Peano.lean:38:14/);
+	});
+
+	it("applies a later different edit of the same file", async () => {
+		const harness = await createHarness();
+		harnesses.push(harness);
+		harness.setResponses([
+			fauxAssistantMessage([fauxToolCall("write", { path: "a.txt", content: "alpha\nbeta\n" })], {
+				stopReason: "toolUse",
+			}),
+			fauxAssistantMessage(
+				[fauxToolCall("edit", { path: "a.txt", edits: [{ oldText: "alpha", newText: "ALPHA" }] })],
+				{ stopReason: "toolUse" },
+			),
+			fauxAssistantMessage(
+				[fauxToolCall("edit", { path: "a.txt", edits: [{ oldText: "beta", newText: "BETA" }] })],
+				{ stopReason: "toolUse" },
+			),
+			fauxAssistantMessage("done"),
+		]);
+
+		await harness.session.prompt("edit twice");
+
+		expect(readFileSync(join(harness.tempDir, "a.txt"), "utf-8")).toBe("ALPHA\nBETA\n");
+		const texts = toolTexts(harness, "edit");
+		expect(texts).toHaveLength(2);
+		expect(texts[0]).toMatch(/Successfully replaced/);
+		expect(texts[1]).toMatch(/Successfully replaced/);
+	});
+
+	it("runs one edit per file when the same turn edits one file twice and another file once", async () => {
+		const harness = await createHarness();
+		harnesses.push(harness);
+		harness.setResponses([
+			fauxAssistantMessage(
+				[
+					fauxToolCall("write", { path: "a.txt", content: "alpha\nbeta\n" }),
+					fauxToolCall("write", { path: "b.txt", content: "one\n" }),
+				],
+				{ stopReason: "toolUse" },
+			),
+			fauxAssistantMessage(
+				[
+					fauxToolCall("edit", { path: "a.txt", edits: [{ oldText: "alpha", newText: "ALPHA" }] }),
+					fauxToolCall("edit", { path: "a.txt", edits: [{ oldText: "beta", newText: "BETA" }] }),
+					fauxToolCall("edit", { path: "b.txt", edits: [{ oldText: "one", newText: "ONE" }] }),
+				],
+				{ stopReason: "toolUse" },
+			),
+			fauxAssistantMessage("done"),
+		]);
+
+		await harness.session.prompt("parallel edits");
+
+		expect(readFileSync(join(harness.tempDir, "a.txt"), "utf-8")).toBe("ALPHA\nbeta\n");
+		expect(readFileSync(join(harness.tempDir, "b.txt"), "utf-8")).toBe("ONE\n");
+		const texts = toolTexts(harness, "edit");
+		expect(texts).toHaveLength(3);
+		expect(texts.filter((text) => /Successfully replaced/.test(text))).toHaveLength(2);
+		expect(texts.some((text) => /Parallel edits apply only to different files/.test(text))).toBe(true);
+		expect(texts.some((text) => /already running in this prompt/.test(text))).toBe(false);
+	});
 });

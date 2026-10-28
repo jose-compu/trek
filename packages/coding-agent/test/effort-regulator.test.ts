@@ -5,7 +5,11 @@
 
 import { fauxAssistantMessage, fauxToolCall } from "@trek/ai";
 import { afterEach, describe, expect, it } from "vitest";
-import { EffortRegulator } from "../src/core/reflective-loop/effort-regulator.ts";
+import {
+	EFFORT_NO_PROGRESS_LIMIT,
+	EFFORT_REPEAT_LIMIT,
+	EffortRegulator,
+} from "../src/core/reflective-loop/effort-regulator.ts";
 import { createHarness, type Harness } from "./suite/harness.ts";
 
 describe("effort regulator", () => {
@@ -16,12 +20,14 @@ describe("effort regulator", () => {
 		}
 	});
 
-	it("stops the turn when the same action runs twice", async () => {
+	it("stops the turn when the same action repeats", async () => {
 		const harness = await createHarness();
 		harnesses.push(harness);
+		const repeat = fauxAssistantMessage([fauxToolCall("bash", { command: "echo effort-repeat" })], {
+			stopReason: "toolUse",
+		});
 		harness.setResponses([
-			fauxAssistantMessage([fauxToolCall("bash", { command: "echo effort-repeat" })], { stopReason: "toolUse" }),
-			fauxAssistantMessage([fauxToolCall("bash", { command: "echo effort-repeat" })], { stopReason: "toolUse" }),
+			...Array.from({ length: EFFORT_REPEAT_LIMIT }, () => repeat),
 			fauxAssistantMessage("should-not-run"),
 		]);
 
@@ -41,12 +47,36 @@ describe("effort regulator", () => {
 		expect(harness.getPendingResponseCount()).toBe(1);
 	});
 
-	it("stops after three steps with no progress", () => {
+	it("keeps going when each error reports something new", async () => {
+		const harness = await createHarness();
+		harnesses.push(harness);
+		const misses = Array.from({ length: EFFORT_NO_PROGRESS_LIMIT }, (_, index) =>
+			fauxAssistantMessage([fauxToolCall("read", { path: `missing-${index}.lean` })], { stopReason: "toolUse" }),
+		);
+		harness.setResponses([
+			...misses,
+			fauxAssistantMessage([fauxToolCall("write", { path: "fixed.lean", content: "ok\n" })], {
+				stopReason: "toolUse",
+			}),
+			fauxAssistantMessage("done"),
+		]);
+
+		await harness.session.prompt("inspect then write");
+
+		const texts = harness.session.messages
+			.filter((message) => message.role === "toolResult")
+			.flatMap((message) => message.content.filter((part) => part.type === "text").map((part) => part.text));
+		expect(texts.some((text) => text.includes("EffortRegulator stopped: no progress."))).toBe(false);
+		expect(texts.some((text) => text.includes("Successfully wrote"))).toBe(true);
+	});
+
+	it("stops after several steps with no progress", () => {
 		const regulator = new EffortRegulator();
-		regulator.updateProgress("read:{}", false);
-		regulator.updateProgress("bash:{}", false);
+		for (let step = 0; step < EFFORT_NO_PROGRESS_LIMIT - 1; step++) {
+			regulator.updateProgress(`step:${step}`, false);
+		}
 		expect(regulator.shouldContinue()).toBe(true);
-		regulator.updateProgress("edit:{}", false);
+		regulator.updateProgress("step:last", false);
 		expect(regulator.stopReason()).toBe("EffortRegulator stopped: no progress.");
 	});
 

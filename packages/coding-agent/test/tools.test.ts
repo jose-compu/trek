@@ -953,6 +953,25 @@ describe("edit tool fuzzy matching", () => {
 		).rejects.toThrow(/Could not find the exact text/);
 	});
 
+	it("reports an already-matching replacement without rewriting the file", async () => {
+		const testFile = join(testDir, "already-matches.lean");
+		writeFileSync(testFile, "theorem t : True := by\n  rfl\n");
+
+		const result = await editTool.execute("test-already-matches", {
+			path: testFile,
+			edits: [
+				{
+					oldText: "theorem t : True := by\n  rfl\n",
+					newText: "theorem t : True := by\n  rfl\n",
+				},
+			],
+		});
+
+		expect(getTextOutput(result)).toMatch(/No change needed/);
+		expect(getTextOutput(result)).not.toMatch(/special characters/);
+		expect(readFileSync(testFile, "utf-8")).toBe("theorem t : True := by\n  rfl\n");
+	});
+
 	it("should tell the model to retry edit instead of rewriting the file", async () => {
 		const testFile = join(testDir, "retry-hint.txt");
 		writeFileSync(testFile, "hello\n");
@@ -1046,6 +1065,104 @@ describe("edit tool fuzzy matching", () => {
 
 		expect(getTextOutput(result)).toContain("Successfully replaced");
 		expect(readFileSync(testFile, "utf-8")).toBe("def run():\nprint('c')\nprint('d')\n");
+	});
+
+	it("replaces a unique block when the middle lines have drifted", async () => {
+		const testFile = join(testDir, "App.jsx");
+		writeFileSync(
+			testFile,
+			[
+				"function Screen() {",
+				"  return null;",
+				"}",
+				"const buttonsConfig = [",
+				"  { label: 'C', pos: [-2.25, 1.4, 0] },",
+				"  { label: '7', pos: [-2.25, 0.45, 0] },",
+				"  { label: '=', pos: [1.05, -2.4, 0] },",
+				"];",
+				"export function App() {",
+				"  return buttonsConfig;",
+				"}",
+				"",
+			].join("\n"),
+		);
+
+		const result = await editTool.execute("test-anchor-buttons", {
+			path: testFile,
+			edits: [
+				{
+					oldText: [
+						"const buttonsConfig = [",
+						"  { label: 'C', pos: [-2.1, 1.35, 0.3] },",
+						"  { label: '7', pos: [-2.1, 0.45, 0.3] },",
+						"  { label: '=', pos: [1.1, -2.25, 0.3] },",
+						"];",
+					].join("\n"),
+					newText: [
+						"const buttonsConfig = [",
+						"  { label: 'C', pos: [-2.1, 1.35, 0.3] },",
+						"  { label: '7', pos: [-2.1, 0.45, 0.3] },",
+						"  { label: '=', pos: [1.1, -2.25, 0.3] },",
+						"];",
+					].join("\n"),
+				},
+			],
+		});
+
+		expect(getTextOutput(result)).toContain("Successfully replaced");
+		const content = readFileSync(testFile, "utf-8");
+		expect(content).toContain("pos: [-2.1, 1.35, 0.3]");
+		expect(content).not.toContain("-2.25, 1.4, 0");
+		expect(content).toContain("function Screen()");
+		expect(content).toContain("export function App()");
+	});
+
+	it("does not replace a long block from a much shorter oldText", async () => {
+		const testFile = join(testDir, "long-buttons.jsx");
+		const lines = ["const buttonsConfig = ["];
+		for (let i = 0; i < 16; i++) {
+			lines.push(`  { label: '${i}', pos: [0, 0, 0] },`);
+		}
+		lines.push("];", "const tail = true;", "");
+		writeFileSync(testFile, lines.join("\n"));
+
+		await expect(
+			editTool.execute("test-anchor-too-short", {
+				path: testFile,
+				edits: [
+					{
+						oldText:
+							"const buttonsConfig = [\n  { label: '0', pos: [1, 1, 1] },\n  { label: '1', pos: [1, 1, 1] },\n];",
+						newText: "const buttonsConfig = [];",
+					},
+				],
+			}),
+		).rejects.toThrow(/Could not find the exact text/);
+
+		const content = readFileSync(testFile, "utf-8");
+		expect(content).toContain("label: '15'");
+		expect(content).toContain("const tail = true;");
+	});
+
+	it("matches oldText that includes copied line numbers", async () => {
+		const testFile = join(testDir, "numbered.jsx");
+		writeFileSync(testFile, "const buttonsConfig = [\n  { label: 'C' },\n];\nconst tail = true;\n");
+
+		const result = await editTool.execute("test-copied-line-numbers", {
+			path: testFile,
+			edits: [
+				{
+					oldText: "156|const buttonsConfig = [\n157|  { label: 'C' },\n158|];",
+					newText: "const buttonsConfig = [\n  { label: 'D' },\n];",
+				},
+			],
+		});
+
+		expect(getTextOutput(result)).toContain("Successfully replaced");
+		const content = readFileSync(testFile, "utf-8");
+		expect(content).toContain("label: 'D'");
+		expect(content).toContain("const tail = true;");
+		expect(content).not.toContain("156|");
 	});
 
 	it("should match tab-indented file against space-indented oldText", async () => {

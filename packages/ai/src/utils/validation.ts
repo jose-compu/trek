@@ -254,6 +254,16 @@ function getValidator(schema: Tool["parameters"]): ReturnType<typeof Compile> {
 	return validator;
 }
 
+const VALIDATION_ARGUMENT_PREVIEW = 2000;
+
+function previewArguments(value: unknown): string {
+	const text = JSON.stringify(value, null, 2);
+	if (text.length <= VALIDATION_ARGUMENT_PREVIEW) {
+		return text;
+	}
+	return `${text.slice(0, VALIDATION_ARGUMENT_PREVIEW)}\n… (truncated, ${text.length} characters)`;
+}
+
 function formatValidationPath(error: TLocalizedValidationError): string {
 	if (error.keyword === "required") {
 		const requiredProperties = (error.params as { requiredProperties?: string[] }).requiredProperties;
@@ -318,7 +328,7 @@ export function validateToolArguments(tool: Tool, toolCall: ToolCall): any {
 			.map((error) => `  - ${formatValidationPath(error)}: ${error.message}`)
 			.join("\n") || "Unknown validation error";
 
-	const errorMessage = `Validation failed for tool "${toolCall.name}":\n${errors}\n\nReceived arguments:\n${JSON.stringify(toolCall.arguments, null, 2)}`;
+	const errorMessage = `Validation failed for tool "${toolCall.name}":\n${errors}\n\nReceived arguments:\n${previewArguments(toolCall.arguments)}`;
 
 	throw new Error(errorMessage);
 }

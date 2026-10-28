@@ -68,8 +68,8 @@ export interface FuzzyMatchResult {
 	 * When exact or line-span match: original content. When fuzzy match: normalized content.
 	 */
 	contentForReplacement: string;
-	/** How the match was found. `lineSpan` stays in original content space. */
-	kind?: "exact" | "fuzzy" | "lineSpan";
+	/** How the match was found. `lineSpan` and `anchor` stay in original content space. */
+	kind?: "exact" | "fuzzy" | "lineSpan" | "anchor";
 }
 
 export interface Edit {
@@ -88,6 +88,12 @@ interface MatchedEdit {
 export interface AppliedEditsResult {
 	baseContent: string;
 	newContent: string;
+	/** True when every replacement already matched the file. */
+	unchanged?: boolean;
+}
+
+export function unchangedEditMessage(path: string): string {
+	return `No change needed in ${path}. The matched text already equals the replacement. Continue with the next step. Do not rewrite the file.`;
 }
 
 /**
@@ -156,6 +162,22 @@ function lineMatchKey(line: string): string {
 		.replace(/[ \t]+/g, " ");
 }
 
+const COPIED_LINE_NUMBER = /^[ \t]*\d{1,6}[ \t]*[|:][ \t]?/;
+
+/** Drop `12|` or `12:` prefixes when the model copied a numbered listing into oldText. */
+export function stripCopiedLineNumbers(oldText: string): string {
+	const lines = oldText.split("\n");
+	const nonempty = lines.filter((line) => line.trim().length > 0);
+	if (nonempty.length === 0) {
+		return oldText;
+	}
+	const prefixed = nonempty.filter((line) => COPIED_LINE_NUMBER.test(line));
+	if (prefixed.length * 2 < nonempty.length) {
+		return oldText;
+	}
+	return lines.map((line) => line.replace(COPIED_LINE_NUMBER, "")).join("\n");
+}
+
 function needleLineKeys(oldText: string): string[] {
 	const lines = oldText.split("\n").map(lineMatchKey);
 	if (lines.length > 1 && lines[lines.length - 1] === "") {
@@ -219,6 +241,96 @@ function findUniqueLineSpan(content: string, oldText: string): { index: number; 
 	return spans[0];
 }
 
+function orderedLineOverlap(needle: string[], keys: string[], start: number, end: number): number {
+	let matched = 2;
+	let cursor = start + 1;
+	for (let index = 1; index < needle.length - 1; index++) {
+		while (cursor < end && keys[cursor] !== needle[index]) {
+			cursor++;
+		}
+		if (cursor >= end) {
+			break;
+		}
+		matched++;
+		cursor++;
+	}
+	return matched;
+}
+
+/**
+ * Locate a block whose first and last lines still bound it after the middle drifted.
+ * The first line must be unique. The closing line must fall in a window near the
+ * size of oldText, so a short stale snippet cannot replace a much larger region.
+ */
+function findAnchoredBlock(content: string, oldText: string): { index: number; matchLength: number } | undefined {
+	const needle = needleLineKeys(oldText).filter((line) => line.length > 0);
+	if (needle.length < 4) {
+		return undefined;
+	}
+	const startKey = needle[0];
+	const endKey = needle[needle.length - 1];
+	if (startKey.length < 12 || endKey.length === 0) {
+		return undefined;
+	}
+
+	const { lines, starts } = lineStartOffsets(content);
+	const keys = lines.map(lineMatchKey);
+	const startHits: number[] = [];
+	for (let i = 0; i < keys.length; i++) {
+		if (keys[i] === startKey) {
+			startHits.push(i);
+		}
+	}
+	if (startHits.length !== 1) {
+		return undefined;
+	}
+
+	const start = startHits[0];
+	const minSpan = Math.max(4, Math.floor(needle.length * 0.5));
+	const maxSpan = Math.ceil(needle.length * 2);
+	const lastAllowed = Math.min(lines.length - 1, start + maxSpan - 1);
+	const candidates: Array<{ end: number; score: number; distance: number }> = [];
+
+	for (let end = start + minSpan - 1; end <= lastAllowed; end++) {
+		if (keys[end] !== endKey) {
+			continue;
+		}
+		candidates.push({
+			end,
+			score: orderedLineOverlap(needle, keys, start, end),
+			distance: Math.abs(end - start + 1 - needle.length),
+		});
+	}
+	if (candidates.length === 0) {
+		return undefined;
+	}
+
+	candidates.sort((left, right) => right.score - left.score || left.distance - right.distance);
+	const best = candidates[0];
+	const rival = candidates[1];
+	if (rival && rival.score === best.score && rival.distance === best.distance) {
+		return undefined;
+	}
+
+	const end = best.end;
+	let endOffset = starts[end] + lines[end].length;
+	if (end < lines.length - 1) {
+		endOffset += 1;
+	}
+	return { index: starts[start], matchLength: endOffset - starts[start] };
+}
+
+function oldTextForMatch(content: string, oldText: string): string {
+	if (fuzzyFindText(content, oldText).found || findAnchoredBlock(content, oldText)) {
+		return oldText;
+	}
+	const stripped = stripCopiedLineNumbers(oldText);
+	if (stripped !== oldText && (fuzzyFindText(content, stripped).found || findAnchoredBlock(content, stripped))) {
+		return stripped;
+	}
+	return oldText;
+}
+
 /** True when at least one oldText is still in the file, so a cached edit must run again. */
 export function editStillNeeded(content: string, edits: Edit[]): boolean {
 	const normalized = normalizeToLF(stripBom(content).text);
@@ -236,10 +348,14 @@ export function editStillNeeded(content: string, edits: Edit[]): boolean {
 function collectAllMatches(
 	content: string,
 	oldText: string,
-	kind: "exact" | "fuzzy" | "lineSpan" | undefined,
+	kind: "exact" | "fuzzy" | "lineSpan" | "anchor" | undefined,
 ): Array<{ index: number; matchLength: number }> {
 	if (kind === "lineSpan") {
 		return collectLineSpans(content, oldText);
+	}
+	if (kind === "anchor") {
+		const span = findAnchoredBlock(content, oldText);
+		return span ? [span] : [];
 	}
 	const haystack = kind === "fuzzy" ? normalizeForFuzzyMatch(content) : content;
 	const needle = kind === "fuzzy" ? normalizeForFuzzyMatch(oldText) : oldText;
@@ -281,7 +397,11 @@ function similarLineHint(content: string, oldText: string): string {
 	if (hits.length === 0) {
 		return "";
 	}
-	return ` Lines still containing ${JSON.stringify(token)}:\n${hits.join("\n")}`;
+	const firstHit = lines.findIndex((line) => line.includes(token));
+	const windowEnd = Math.min(lines.length, firstHit + 12);
+	const window = lines.slice(firstHit, windowEnd).map((line, offset) => `  ${firstHit + offset + 1}: ${line}`);
+	const clipped = window.join("\n").length > 1200 ? `${window.join("\n").slice(0, 1200)}\n  …` : window.join("\n");
+	return ` Lines still containing ${JSON.stringify(token)}:\n${hits.join("\n")}\n Current text from the first hit:\n${clipped}`;
 }
 
 /** Strip UTF-8 BOM if present, return both the BOM (if any) and the text without it */
@@ -327,15 +447,6 @@ function getEmptyOldTextError(path: string, editIndex: number, totalEdits: numbe
 	return new Error(`edits[${editIndex}].oldText must not be empty in ${path}.`);
 }
 
-function getNoChangeError(path: string, totalEdits: number): Error {
-	if (totalEdits === 1) {
-		return new Error(
-			`No changes made to ${path}. The replacement produced identical content. This might indicate an issue with special characters or the text not existing as expected.`,
-		);
-	}
-	return new Error(`No changes made to ${path}. The replacements produced identical content.`);
-}
-
 /**
  * Apply one or more exact-text replacements to LF-normalized content.
  *
@@ -350,7 +461,7 @@ export function applyEditsToNormalizedContent(
 	path: string,
 ): AppliedEditsResult {
 	const normalizedEdits = edits.map((edit) => ({
-		oldText: normalizeToLF(edit.oldText),
+		oldText: oldTextForMatch(normalizedContent, normalizeToLF(edit.oldText)),
 		newText: normalizeToLF(edit.newText),
 		replaceAll: edit.replaceAll === true,
 	}));
@@ -369,10 +480,21 @@ export function applyEditsToNormalizedContent(
 	const matchedEdits: MatchedEdit[] = [];
 	for (let i = 0; i < normalizedEdits.length; i++) {
 		const edit = normalizedEdits[i];
-		const matchResult = fuzzyFindText(baseContent, edit.oldText);
-		if (!matchResult.found) {
+		const direct = fuzzyFindText(baseContent, edit.oldText);
+		const anchored = direct.found ? undefined : findAnchoredBlock(baseContent, edit.oldText);
+		if (!direct.found && !anchored) {
 			throw getNotFoundError(path, i, normalizedEdits.length, baseContent, edit.oldText);
 		}
+		const matchResult: FuzzyMatchResult = anchored
+			? {
+					found: true,
+					index: anchored.index,
+					matchLength: anchored.matchLength,
+					usedFuzzyMatch: false,
+					contentForReplacement: baseContent,
+					kind: "anchor",
+				}
+			: direct;
 
 		const spans = edit.replaceAll
 			? collectAllMatches(baseContent, edit.oldText, matchResult.kind)
@@ -385,7 +507,9 @@ export function applyEditsToNormalizedContent(
 		const occurrences =
 			matchResult.kind === "lineSpan"
 				? collectLineSpans(baseContent, edit.oldText).length
-				: countOccurrences(baseContent, edit.oldText);
+				: matchResult.kind === "anchor"
+					? 1
+					: countOccurrences(baseContent, edit.oldText);
 		if (!edit.replaceAll && occurrences > 1) {
 			throw getDuplicateError(path, i, normalizedEdits.length, occurrences);
 		}
@@ -421,7 +545,7 @@ export function applyEditsToNormalizedContent(
 	}
 
 	if (baseContent === newContent) {
-		throw getNoChangeError(path, normalizedEdits.length);
+		return { baseContent, newContent, unchanged: true };
 	}
 
 	return { baseContent, newContent };
@@ -599,7 +723,10 @@ export async function computeEditsDiff(
 		// Strip BOM before matching (LLM won't include invisible BOM in oldText)
 		const { text: content } = stripBom(rawContent);
 		const normalizedContent = normalizeToLF(content);
-		const { baseContent, newContent } = applyEditsToNormalizedContent(normalizedContent, edits, path);
+		const { baseContent, newContent, unchanged } = applyEditsToNormalizedContent(normalizedContent, edits, path);
+		if (unchanged) {
+			return { diff: unchangedEditMessage(path), firstChangedLine: undefined };
+		}
 
 		// Generate the diff
 		return generateDiffString(baseContent, newContent);

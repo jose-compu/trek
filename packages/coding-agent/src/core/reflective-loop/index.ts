@@ -2,6 +2,8 @@ export {
 	appendEffortReason,
 	EFFORT_BUDGET_RATIO,
 	EFFORT_COST_BUDGET,
+	EFFORT_NO_PROGRESS_LIMIT,
+	EFFORT_REPEAT_LIMIT,
 	EffortRegulator,
 	effortActionKey,
 } from "./effort-regulator.ts";

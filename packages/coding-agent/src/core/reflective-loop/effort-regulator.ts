@@ -4,7 +4,16 @@
 export const EFFORT_BUDGET_RATIO = 0.9;
 
 /** Tool-call budget for one prompt. The live loop spends 1 per tool. */
-export const EFFORT_COST_BUDGET = 24;
+export const EFFORT_COST_BUDGET = 48;
+
+/** Stop after this many tool calls in a row that return an error. */
+export const EFFORT_NO_PROGRESS_LIMIT = 8;
+
+/**
+ * Stop on this many identical tool calls in one prompt.
+ * The first call counts as 1, so 4 allows the same command three more times.
+ */
+export const EFFORT_REPEAT_LIMIT = 4;
 
 export function appendEffortReason<T extends { type: string; text?: string }>(content: T[], reason: string): T[] {
 	const last = content[content.length - 1];
@@ -71,10 +80,10 @@ export class EffortRegulator {
 	}
 
 	stopReason(): string | undefined {
-		if (this.consecutiveNoProgress >= 3) {
+		if (this.consecutiveNoProgress >= EFFORT_NO_PROGRESS_LIMIT) {
 			return "EffortRegulator stopped: no progress.";
 		}
-		if (this.identicalActionCount >= 2) {
+		if (this.identicalActionCount >= EFFORT_REPEAT_LIMIT) {
 			return "EffortRegulator stopped: repeated action.";
 		}
 		if (

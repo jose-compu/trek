@@ -102,15 +102,53 @@ describe("edit tool stringified edits", () => {
 		});
 	});
 
-	it("leaves edits alone when the string is not valid JSON", () => {
+	it("repairs a stringified edits array that contains a raw newline", () => {
 		const definition = createEditToolDefinition(process.cwd());
 		const prepared = definition.prepareArguments!({
 			path: "file.txt",
-			edits: "not json",
+			edits: '[{"oldText":"a\nb","newText":"c"}]',
 		});
 		expect(prepared).toEqual({
 			path: "file.txt",
-			edits: "not json",
+			edits: [{ oldText: "a\nb", newText: "c" }],
 		});
+	});
+
+	it("unwraps an edits array that was stringified twice", () => {
+		const definition = createEditToolDefinition(process.cwd());
+		const prepared = definition.prepareArguments!({
+			path: "file.txt",
+			edits: JSON.stringify(JSON.stringify([{ oldText: "a", newText: "b" }])),
+		});
+		expect(prepared).toEqual({
+			path: "file.txt",
+			edits: [{ oldText: "a", newText: "b" }],
+		});
+	});
+
+	it("keeps complete edits when a large payload is cut off", () => {
+		const definition = createEditToolDefinition(process.cwd());
+		const full = JSON.stringify([
+			{ oldText: "alpha", newText: "beta" },
+			{ oldText: "gamma", newText: "delta" },
+		]);
+		const prepared = definition.prepareArguments!({
+			path: "file.txt",
+			edits: full.slice(0, -12),
+		});
+		expect(prepared).toEqual({
+			path: "file.txt",
+			edits: [{ oldText: "alpha", newText: "beta" }],
+		});
+	});
+
+	it("rejects a string that is not an edits array", () => {
+		const definition = createEditToolDefinition(process.cwd());
+		expect(() =>
+			definition.prepareArguments!({
+				path: "file.txt",
+				edits: "not json",
+			}),
+		).toThrow(/edits arrived as a string/);
 	});
 });

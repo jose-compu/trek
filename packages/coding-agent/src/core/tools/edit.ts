@@ -1,4 +1,5 @@
 import type { AgentTool } from "@trek/agent-core";
+import { parseJsonWithRepair, parseStreamingJson } from "@trek/ai";
 import { Box, Container, Spacer, Text } from "@trek/tui";
 import { constants } from "fs";
 import { access as fsAccess, readFile as fsReadFile, writeFile as fsWriteFile } from "fs/promises";
@@ -18,6 +19,7 @@ import {
 	normalizeToLF,
 	restoreLineEndings,
 	stripBom,
+	unchangedEditMessage,
 } from "./edit-diff.ts";
 import { withFileMutationQueue } from "./file-mutation-queue.ts";
 import { resolveToCwd } from "./path-utils.ts";
@@ -101,6 +103,52 @@ export interface EditToolOptions {
 	dryRun?: () => boolean;
 }
 
+function isEditRecord(value: unknown): value is Edit {
+	if (!value || typeof value !== "object" || Array.isArray(value)) {
+		return false;
+	}
+	const record = value as Record<string, unknown>;
+	return typeof record.oldText === "string" && record.oldText.length > 0 && typeof record.newText === "string";
+}
+
+/** Models sometimes stringify a large edits array, including raw newlines inside the string. */
+function unwrapEdits(value: unknown, depth = 0): unknown {
+	if (depth > 4) {
+		return value;
+	}
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		if (!trimmed.startsWith("[") && !trimmed.startsWith("{") && !trimmed.startsWith('"')) {
+			return value;
+		}
+		try {
+			return unwrapEdits(parseJsonWithRepair(trimmed), depth + 1);
+		} catch {
+			const partial = parseStreamingJson(trimmed);
+			if (!Array.isArray(partial)) {
+				return value;
+			}
+			const closed = trimmed.endsWith("]");
+			const finished = closed ? partial : partial.slice(0, -1);
+			const usable = finished.filter(isEditRecord);
+			return usable.length > 0 ? usable : value;
+		}
+	}
+	if (Array.isArray(value)) {
+		const items: unknown[] = [];
+		for (const item of value) {
+			const unwrapped = unwrapEdits(item, depth + 1);
+			if (Array.isArray(unwrapped)) {
+				items.push(...unwrapped);
+			} else {
+				items.push(unwrapped);
+			}
+		}
+		return items;
+	}
+	return value;
+}
+
 function prepareEditArguments(input: unknown): EditToolInput {
 	if (!input || typeof input !== "object") {
 		return input as EditToolInput;
@@ -108,12 +156,16 @@ function prepareEditArguments(input: unknown): EditToolInput {
 
 	const args = input as Record<string, unknown>;
 
-	// Some models (Opus 4.6, GLM-5.1) send edits as a JSON string instead of an array
 	if (typeof args.edits === "string") {
-		try {
-			const parsed = JSON.parse(args.edits);
-			if (Array.isArray(parsed)) args.edits = parsed;
-		} catch {}
+		const parsed = unwrapEdits(args.edits);
+		if (!Array.isArray(parsed)) {
+			throw new Error(
+				"Edit rejected: edits arrived as a string instead of an array and could not be parsed. Send edits as an array of {oldText, newText}. Keep each oldText short, and split a large change into several edit calls.",
+			);
+		}
+		args.edits = parsed;
+	} else if (Array.isArray(args.edits)) {
+		args.edits = unwrapEdits(args.edits);
 	}
 
 	const legacy = args as LegacyEditToolInput;
@@ -312,8 +364,11 @@ export function createEditToolDefinition(
 			"Use edit for precise changes. Indent and trailing whitespace do not need to match exactly.",
 			"When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls",
 			"Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.",
-			"Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.",
+			"Do not send several edit calls for the same file in one turn. Put them in one edits array. Parallel edit calls are only for different files.",
+			"Do not restore text already replaced in this prompt. If a command still fails, edit the lines named in its error.",
+			"Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions. Do not JSON-stringify the edits array. Split a large change into several edit calls.",
 			"If edit cannot find the text, re-read the file and retry edit with the current text. Do not rewrite the entire file.",
+			"If the result says no change is needed, the file already has the replacement. Continue. Do not rewrite the file.",
 			"If the same token appears more than once, set replaceAll true or add more context. Do not rewrite the file.",
 			"A result that says this edit already applied is only valid if oldText is gone. If the old text is still in the file, retry edit. Do not rewrite the file.",
 		],
@@ -355,8 +410,18 @@ export function createEditToolDefinition(
 				const { bom, text: content } = stripBom(rawContent);
 				const originalEnding = detectLineEnding(content);
 				const normalizedContent = normalizeToLF(content);
-				const { baseContent, newContent } = applyEditsToNormalizedContent(normalizedContent, edits, path);
+				const { baseContent, newContent, unchanged } = applyEditsToNormalizedContent(
+					normalizedContent,
+					edits,
+					path,
+				);
 				throwIfAborted();
+				if (unchanged) {
+					return {
+						content: [{ type: "text", text: unchangedEditMessage(path) }],
+						details: undefined,
+					};
+				}
 
 				const finalContent = bom + restoreLineEndings(newContent, originalEnding);
 				const diffResult = generateDiffString(baseContent, newContent);

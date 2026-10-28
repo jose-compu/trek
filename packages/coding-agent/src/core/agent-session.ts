@@ -307,6 +307,23 @@ interface ToolDefinitionEntry {
 /** Standard thinking levels */
 const THINKING_LEVELS: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high"];
 
+function compactEditText(text: string): string {
+	return text.replace(/\s+/g, " ").trim();
+}
+
+/** Stable JSON that keeps nested edit text. A key-array replacer would drop oldText and newText. */
+function canonicalJson(value: unknown): string {
+	if (Array.isArray(value)) {
+		return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
+	}
+	if (value && typeof value === "object") {
+		const record = value as Record<string, unknown>;
+		const keys = Object.keys(record).sort();
+		return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(",")}}`;
+	}
+	return JSON.stringify(value) ?? "null";
+}
+
 // ============================================================================
 // AgentSession Class
 // ============================================================================
@@ -382,6 +399,12 @@ export class AgentSession {
 	private _loadedPrologue: LoadedPrologue = { content: undefined, sources: [] };
 	private _reflectiveLoop: ReflectiveLoopController | undefined;
 	private _effort = new EffortRegulator();
+	/** Last tool error text. A new message is information, not a stall. */
+	private _lastEffortError: string | undefined;
+	/** Successful replacements in this prompt, so a later edit cannot put that text back. */
+	private _appliedEdits: Array<{ path: string; oldText: string; newText: string }> = [];
+	/** Error lines from the latest failed command, shown when an edit would undo one. */
+	private _lastCommandErrors: string | undefined;
 	private _lastPromptTask = "";
 	/** Tools executed during the current reflective cycle (trace schema v1). */
 	private _cycleToolNames: string[] = [];
@@ -395,6 +418,8 @@ export class AgentSession {
 	private _currentPromptId = "#0";
 	private _idempotency = new Map<string, { text: string; isError: boolean }>();
 	private _idempotencyInFlight = new Set<string>();
+	/** toolCallId of the edit or write currently reserved for a resolved path. */
+	private _fileMutationOwner = new Map<string, string>();
 	private _promptTouchedRelPaths = new Set<string>();
 	private _gitCommitEnabled = process.env.TREK_GIT_COMMIT === "1";
 
@@ -517,8 +542,21 @@ export class AgentSession {
 		this.agent.shouldStopAfterTurn = () => this._effort.stopReason() !== undefined;
 
 		this.agent.beforeToolCall = async ({ toolCall, args }) => {
+			if (this._fileMutationBusy(toolCall.id, toolCall.name, args)) {
+				return {
+					block: true,
+					reason: this._sameFileMutationReason(toolCall.name, args),
+					isError: false,
+				};
+			}
+
+			const releaseIfBlocked = (): void => {
+				this._releaseFileMutation(toolCall.id);
+			};
+
 			const verdict = await this._checkToolSafety(toolCall.name, args);
 			if (!verdict.allowed) {
+				releaseIfBlocked();
 				debugLog("safety", "tool call blocked", { tool: toolCall.name, law: verdict.law, reason: verdict.reason });
 				return { block: true, reason: verdict.reason };
 			}
@@ -526,6 +564,7 @@ export class AgentSession {
 			const idem = this._lookupIdempotent(toolCall.name, args);
 			if (idem) {
 				if (idem.inFlight) {
+					releaseIfBlocked();
 					return {
 						block: true,
 						reason: this._inFlightIdempotentReason(toolCall.name),
@@ -535,8 +574,15 @@ export class AgentSession {
 				if (toolCall.name === "edit" && this._cachedEditStillNeeded(args)) {
 					this._forgetIdempotent(toolCall.name, args);
 				} else {
+					releaseIfBlocked();
 					return this._blockedIdempotentResult(toolCall.name, idem);
 				}
+			}
+
+			const revertReason = this._revertedEditReason(args);
+			if (toolCall.name === "edit" && revertReason) {
+				releaseIfBlocked();
+				return { block: true, reason: revertReason, isError: false };
 			}
 
 			await this._captureEditCheckpoint(toolCall.name, args);
@@ -547,13 +593,18 @@ export class AgentSession {
 			}
 
 			try {
-				return await runner.emitToolCall({
+				const extensionResult = await runner.emitToolCall({
 					type: "tool_call",
 					toolName: toolCall.name,
 					toolCallId: toolCall.id,
 					input: args as Record<string, unknown>,
 				});
+				if (extensionResult?.block) {
+					this._releaseFileMutation(toolCall.id);
+				}
+				return extensionResult;
 			} catch (err) {
+				this._releaseFileMutation(toolCall.id);
 				if (err instanceof Error) {
 					throw err;
 				}
@@ -562,9 +613,15 @@ export class AgentSession {
 		};
 
 		this.agent.afterToolCall = async ({ toolCall, args, result, isError }) => {
+			this._releaseFileMutation(toolCall.id);
 			this._cycleToolNames.push(toolCall.name);
 			this._recordFileAccessForSafety(toolCall.name, args, isError);
 			this._rememberIdempotent(toolCall.name, args, result, isError);
+			if (!isError) {
+				this._recordAppliedEdit(toolCall.name, args);
+			} else {
+				this._rememberCommandErrors(toolCall.name, result);
+			}
 			if (!isError && !this._dryRunEnabled) {
 				await this._recordTrekVersion(toolCall.name, args);
 			}
@@ -575,7 +632,7 @@ export class AgentSession {
 			if (safetyNotes.length > 0) {
 				content = [...content, ...safetyNotes.map((text) => ({ type: "text" as const, text }))];
 			}
-			const effortStop = this._noteLiveEffort(toolCall.name, args, isError);
+			const effortStop = this._noteLiveEffort(toolCall.name, args, result, isError);
 			if (effortStop) {
 				content = appendEffortReason(content, effortStop);
 			}
@@ -617,9 +674,21 @@ export class AgentSession {
 	}
 
 	/** Record the tool on the live loop and return the stop reason when the turn must end. */
-	private _noteLiveEffort(name: string, args: unknown, isError: boolean): string | undefined {
+	private _noteLiveEffort(
+		name: string,
+		args: unknown,
+		result: { content: Array<{ type: string; text?: string }> },
+		isError: boolean,
+	): string | undefined {
 		this._effort.recordCost(1);
-		this._effort.updateProgress(effortActionKey(name, args), !isError);
+		const text = result.content
+			.filter((part) => part.type === "text" && typeof part.text === "string")
+			.map((part) => part.text)
+			.join("\n")
+			.trim();
+		const learned = isError && text.length > 0 && text !== this._lastEffortError;
+		this._lastEffortError = isError ? text : undefined;
+		this._effort.updateProgress(effortActionKey(name, args), !isError || learned);
 		return this._effort.stopReason();
 	}
 
@@ -776,10 +845,124 @@ export class AgentSession {
 	}
 
 	private _idempotencyKey(toolName: string, args: unknown): string {
-		const canonical = JSON.stringify(args ?? {}, Object.keys((args as object) ?? {}).sort());
+		const canonical = canonicalJson(args ?? {});
 		return createHash("sha256")
 			.update(`${this.sessionManager.getSessionId()}:${this._currentPromptNumber}:${toolName}:${canonical}`)
 			.digest("hex");
+	}
+
+	private _mutationPath(toolName: string, args: unknown): string | undefined {
+		if (toolName !== "edit" && toolName !== "write") {
+			return undefined;
+		}
+		if (!args || typeof args !== "object") {
+			return undefined;
+		}
+		const record = args as { path?: unknown; file_path?: unknown };
+		const raw = typeof record.path === "string" ? record.path : record.file_path;
+		if (typeof raw !== "string" || raw.length === 0) {
+			return undefined;
+		}
+		return resolveToCwd(raw, this._cwd);
+	}
+
+	/** Reserve this path for the call. A second edit or write of the same path in the batch is busy. */
+	private _fileMutationBusy(toolCallId: string, toolName: string, args: unknown): boolean {
+		const path = this._mutationPath(toolName, args);
+		if (!path) {
+			return false;
+		}
+		const owner = this._fileMutationOwner.get(path);
+		if (owner !== undefined && owner !== toolCallId) {
+			return true;
+		}
+		this._fileMutationOwner.set(path, toolCallId);
+		return false;
+	}
+
+	private _releaseFileMutation(toolCallId: string): void {
+		for (const [path, owner] of this._fileMutationOwner) {
+			if (owner === toolCallId) {
+				this._fileMutationOwner.delete(path);
+			}
+		}
+	}
+
+	private _recordAppliedEdit(toolName: string, args: unknown): void {
+		if (toolName !== "edit") {
+			return;
+		}
+		const path = this._mutationPath(toolName, args);
+		const edits = (args as { edits?: Array<{ oldText?: unknown; newText?: unknown }> } | undefined)?.edits;
+		if (!path || !Array.isArray(edits)) {
+			return;
+		}
+		for (const edit of edits) {
+			if (typeof edit.oldText !== "string" || typeof edit.newText !== "string") {
+				continue;
+			}
+			this._appliedEdits.push({ path, oldText: edit.oldText, newText: edit.newText });
+		}
+		if (this._appliedEdits.length > 40) {
+			this._appliedEdits.splice(0, this._appliedEdits.length - 40);
+		}
+	}
+
+	private _rememberCommandErrors(toolName: string, result: { content: Array<{ type: string; text?: string }> }): void {
+		if (toolName !== "bash") {
+			return;
+		}
+		const text = result.content
+			.filter((part) => part.type === "text" && typeof part.text === "string")
+			.map((part) => part.text)
+			.join("\n");
+		const errors = text
+			.split("\n")
+			.map((line) => line.trim())
+			.filter((line) => line.startsWith("error:"))
+			.slice(0, 8);
+		if (errors.length > 0) {
+			this._lastCommandErrors = errors.join("\n");
+		}
+	}
+
+	private _revertedEditReason(args: unknown): string | undefined {
+		const path = this._mutationPath("edit", args);
+		const edits = (args as { edits?: Array<{ oldText?: unknown; newText?: unknown }> } | undefined)?.edits;
+		if (!path || !Array.isArray(edits)) {
+			return undefined;
+		}
+		for (const edit of edits) {
+			if (typeof edit.oldText !== "string" || typeof edit.newText !== "string") {
+				continue;
+			}
+			const next = compactEditText(edit.newText);
+			const prev = compactEditText(edit.oldText);
+			const restored = this._appliedEdits.some(
+				(item) =>
+					item.path === path && compactEditText(item.oldText) === next && compactEditText(item.newText) === prev,
+			);
+			if (!restored) {
+				continue;
+			}
+			const listed = this._lastCommandErrors ? `\nLatest errors:\n${this._lastCommandErrors}` : "";
+			return `This edit puts back text already replaced in this prompt. Leave the current text. The failure is on other lines. Edit those. Do not restore the removed text.${listed}`;
+		}
+		return undefined;
+	}
+
+	private _sameFileMutationReason(toolName: string, args: unknown): string {
+		const record = args as { path?: unknown; file_path?: unknown } | undefined;
+		const raw =
+			record && typeof record.path === "string"
+				? record.path
+				: record && typeof record.file_path === "string"
+					? record.file_path
+					: "that file";
+		if (toolName === "edit") {
+			return `Another edit of ${raw} is already running in this turn. Parallel edits apply only to different files. Put every change to this file in one edit call, in edits[]. Re-read the file after that call finishes. Do not rewrite the file.`;
+		}
+		return `Another write of ${raw} is already running in this turn. Parallel writes apply only to different files. Wait for this write to finish. Do not rewrite the file.`;
 	}
 
 	private _mutationNoun(toolName: string): "edit" | "write" {
@@ -1835,6 +2018,9 @@ export class AgentSession {
 
 	private async _runAgentPrompt(messages: AgentMessage | AgentMessage[]): Promise<void> {
 		try {
+			this._lastEffortError = undefined;
+			this._appliedEdits = [];
+			this._lastCommandErrors = undefined;
 			this._effort.beginPrompt(EFFORT_COST_BUDGET);
 			await this.agent.prompt(messages);
 			while (await this._handlePostAgentRun()) {

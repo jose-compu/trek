@@ -6,10 +6,18 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Fixed
+
+- Large `edit` tool calls that arrive with `edits` as one JSON string are recovered. A truncated payload keeps the complete replacements instead of failing as `edits.0: must be object`.
+- An `edit` that misses because the middle of a block drifted still applies when the first and last lines bound that block. A miss includes the current lines instead of only a token.
+- An `edit` that matches text already equal to the replacement reports that no change is needed instead of failing.
+- Parallel edits apply to different files. A second edit of the same file in one turn is not dropped as a duplicate.
+- An edit that restores text already replaced in the same prompt is refused, and the latest command errors are repeated there.
+
 ### Added
 
 - `spawn_subtask` runs a child depth-first with a summary-only handoff. Depth 6 aborts with the depth limit. An intention with no next action is repaired and the turn still makes a tool call.
-- The live tool loop stops when the same action repeats, three steps make no progress, or the prompt budget is spent. The tool result names the EffortRegulator reason.
+- The live tool loop stops when the same action is used 4 times, the same error repeats 8 times, or the prompt uses its 48 tool calls. A new error, such as a failed build log, is progress. The tool result names the EffortRegulator reason.
 - Component routing. A tool step names the Tooling model. Retry 2 uses the next tier. `trek:audit_step` stores `routeReason`. The role stays Workhorse. A later Decision model such as Jev can fill that slot.
 - Short thinking traces (#108). A tool-using turn asks for `reasoning` `minimal` and a 128-token thinking budget. Local models get the same cap in the prompt.
 
