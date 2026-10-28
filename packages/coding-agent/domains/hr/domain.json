@@ -1,0 +1,11 @@
+{
+	"id": "hr",
+	"title": "HR",
+	"alwaysOn": false,
+	"terms": [
+		"candidate drop",
+		"exit interview",
+		"i-9"
+	],
+	"workflow": "people-process.yaml"
+}

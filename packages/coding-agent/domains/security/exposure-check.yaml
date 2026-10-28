@@ -1,0 +1,19 @@
+name: exposure-check
+description: |
+  Check a CVE, a secret exposed in output, or an access control gap. Do not exploit.
+nodes:
+  - id: name-asset
+    prompt: |
+      Name the asset, the CVE, or the path where a secret exposed itself.
+  - id: secrets-and-access
+    prompt: |
+      Say what is exposed and who can reach it. Do not repeat a live secret.
+    depends_on: [name-asset]
+  - id: stop-on-secret
+    prompt: |
+      If the turn contains a live credential, stop and tell the user to rotate it. Do not store it.
+    depends_on: [secrets-and-access]
+  - id: propose-fix
+    prompt: |
+      Propose the fix: rotate, restrict access control, or patch. Do not exploit the bug.
+    depends_on: [stop-on-secret]

@@ -66,6 +66,12 @@ export interface ReflectiveCycleTrace {
 	components: ReflectiveComponentRecord[];
 	toolNames: string[];
 	lawsVerdict: LawsVerdictPair;
+	/** Work domain selected for this turn, or `none`. */
+	domain?: string;
+	/** Archon workflow name selected for this turn, or `none`. */
+	workflow?: string;
+	selectionReason?: "match" | "none" | "operator_override";
+	nodeIds?: string[];
 }
 
 export interface ReflectiveObservation {

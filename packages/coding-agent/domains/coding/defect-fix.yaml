@@ -1,0 +1,19 @@
+name: defect-fix
+description: |
+  Fix a lint error, a type mismatch, or an anti-pattern with the smallest change that the project can verify.
+nodes:
+  - id: reproduce
+    prompt: |
+      Restate the lint error, type mismatch, or anti-pattern and the file it is in.
+  - id: locate
+    prompt: |
+      Name the lines that cause it. Do not rewrite the file before that.
+    depends_on: [reproduce]
+  - id: smallest-change
+    prompt: |
+      Describe the smallest edit. Leave unrelated style alone.
+    depends_on: [locate]
+  - id: verify
+    prompt: |
+      Name the check that proves the fix: the typecheck, the test, or the linter. Do not claim it passed unless it ran.
+    depends_on: [smallest-change]

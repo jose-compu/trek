@@ -1,0 +1,11 @@
+{
+	"id": "conversation",
+	"title": "Conversation",
+	"alwaysOn": false,
+	"terms": [
+		"tone mismatch",
+		"user frustration",
+		"lost context"
+	],
+	"workflow": "repair-dialogue.yaml"
+}

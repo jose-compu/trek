@@ -1,0 +1,11 @@
+{
+	"id": "finance",
+	"title": "Finance",
+	"alwaysOn": false,
+	"terms": [
+		"reconciliation break",
+		"sox control",
+		"journal entry"
+	],
+	"workflow": "control-break.yaml"
+}

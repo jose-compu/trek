@@ -1,0 +1,11 @@
+{
+	"id": "coding",
+	"title": "Coding",
+	"alwaysOn": false,
+	"terms": [
+		"lint error",
+		"type mismatch",
+		"anti-pattern"
+	],
+	"workflow": "defect-fix.yaml"
+}

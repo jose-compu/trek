@@ -3,16 +3,16 @@
  * Home, `/`, and hidden dependency trees are not indexed.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { chunk } from "logosdb-mcp-server/dist/chunker.js";
 import {
 	buildGitignoreContext,
 	findGitRoot,
+	type IgnoreFrame,
 	isIgnoredByStack,
 	maybePushLocalGitignore,
-	type IgnoreFrame,
 } from "logosdb-mcp-server/dist/gitignore-walker.js";
 import { annotateFile } from "./annotate.ts";
 
@@ -204,7 +204,9 @@ function pathList(value: unknown): string[] {
 }
 
 function uniquePaths(paths: string[]): string[] {
-	return [...new Set(paths.map((path) => path.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/$/, "")).filter(Boolean))].sort();
+	return [
+		...new Set(paths.map((path) => path.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/$/, "")).filter(Boolean)),
+	].sort();
 }
 
 function isTextName(name: string): boolean {

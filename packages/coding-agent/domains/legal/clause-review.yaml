@@ -1,0 +1,19 @@
+name: clause-review
+description: |
+  Review an unfavorable clause, a compliance deadline, or a contract unsigned past its date. Do not accept terms.
+nodes:
+  - id: quote-clause
+    prompt: |
+      Quote the clause or the deadline. Do not paraphrase away the obligation.
+  - id: name-risk
+    prompt: |
+      Name the risk in one sentence: liability, term, or a missed date.
+    depends_on: [quote-clause]
+  - id: compare-position
+    prompt: |
+      Compare the clause with the position the user asked to protect.
+    depends_on: [name-risk]
+  - id: questions
+    prompt: |
+      List the questions counsel must answer. Do not accept, sign, or waive.
+    depends_on: [compare-position]

@@ -1,0 +1,11 @@
+{
+	"id": "sales",
+	"title": "Sales",
+	"alwaysOn": false,
+	"terms": [
+		"deal slipped",
+		"pricing mistake",
+		"win loss"
+	],
+	"workflow": "deal-slip.yaml"
+}

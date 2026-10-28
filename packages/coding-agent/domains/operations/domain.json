@@ -1,0 +1,11 @@
+{
+	"id": "operations",
+	"title": "Operations",
+	"alwaysOn": false,
+	"terms": [
+		"mttr",
+		"alert fatigue",
+		"toil"
+	],
+	"workflow": "incident-repeat.yaml"
+}

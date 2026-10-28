@@ -1,0 +1,11 @@
+{
+	"id": "security",
+	"title": "Security",
+	"alwaysOn": true,
+	"terms": [
+		"cve",
+		"secret exposed",
+		"access control"
+	],
+	"workflow": "exposure-check.yaml"
+}

@@ -1,10 +1,15 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.11.0`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.12.0`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
-## [Unreleased]
+## [0.12.0] - 2026-10-28
+
+### Added
+
+- Domain workflows. Twenty Archon workflows ship with the package. Meta, AI, Security, and Engineering stay on. `trek domains` and `trek workflows` list, enable, disable, add, show, and run them.
+- A detected workflow draws a green `workflow` call. Filled parameters are colored inside the call. The YAML sent to the model stays plain.
 
 ## [0.11.0] - 2026-10-28
 

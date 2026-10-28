@@ -100,6 +100,7 @@ import {
 	isHonestyProtocolEnabled,
 	parseHonestyReport,
 } from "./honesty/index.ts";
+import { createEmbedder, MemoryManager } from "./memory/index.ts";
 import { type BashExecutionMessage, type CustomMessage, stripIdempotentPrefix } from "./messages.ts";
 import type { ModelRegistry } from "./model-registry.ts";
 import { hashContent, type LoadedPrologue, loadPrologue } from "./prologue.ts";
@@ -146,17 +147,18 @@ import {
 import type { BranchSummaryEntry, CompactionEntry, SessionManager } from "./session-manager.ts";
 import { CURRENT_SESSION_VERSION, getLatestCompactionEntry, type SessionHeader } from "./session-manager.ts";
 import type { SettingsManager } from "./settings-manager.ts";
+import { memoryIsActive } from "./settings-manager.ts";
 import type { SlashCommandInfo } from "./slash-commands.ts";
 import { createSyntheticSourceInfo, type SourceInfo } from "./source-info.ts";
 import { type BuildSystemPromptOptions, buildSystemPrompt } from "./system-prompt.ts";
 import { type BashOperations, createLocalBashOperations } from "./tools/bash.ts";
 import { type Edit, editStillNeeded } from "./tools/edit-diff.ts";
-import { createEmbedder, MemoryManager } from "./memory/index.ts";
-import { memoryIsActive } from "./settings-manager.ts";
 import { createAllToolDefinitions } from "./tools/index.ts";
 import { createMemoryToolDefinitions } from "./tools/memory.ts";
+import { workflowToolDefinition } from "./tools/workflow-card.ts";
 
 const MEMORY_TOOL_NAMES = new Set(["remember", "recall", "forget"]);
+
 import { resolveToCwd } from "./tools/path-utils.ts";
 import { createToolDefinitionFromAgentTool } from "./tools/tool-definition-wrapper.ts";
 import {
@@ -1852,7 +1854,34 @@ export class AgentSession {
 	}
 
 	getToolDefinition(name: string): ToolDefinition | undefined {
+		if (name === "workflow") return workflowToolDefinition;
 		return this._toolDefinitions.get(name)?.definition;
+	}
+
+	/** Green call card for a detected domain workflow. Display only. */
+	private _emitWorkflowCard(selection: {
+		domain: string;
+		workflow: string;
+		selectionReason: string;
+		nodeIds: string[];
+		parameters: { name: string; kind: "text" | "number"; value: string }[];
+	}): void {
+		const toolCallId = `workflow-${Date.now().toString(36)}-${selection.domain}`;
+		const args = {
+			domain: selection.domain,
+			workflow: selection.workflow,
+			reason: selection.selectionReason,
+			parameters: selection.parameters,
+			nodes: selection.nodeIds,
+		};
+		this._emit({ type: "tool_execution_start", toolCallId, toolName: "workflow", args });
+		this._emit({
+			type: "tool_execution_end",
+			toolCallId,
+			toolName: "workflow",
+			result: { content: [{ type: "text", text: "" }], details: undefined },
+			isError: false,
+		});
 	}
 
 	/**
@@ -1910,7 +1939,9 @@ export class AgentSession {
 	startMemory(): void {
 		if (!this.memoryActive() || this._memoryStarted) return;
 		this._memoryStarted = true;
-		void this.memory().start().catch(() => undefined);
+		void this.memory()
+			.start()
+			.catch(() => undefined);
 	}
 
 	/**
@@ -2649,6 +2680,13 @@ export class AgentSession {
 				act: () => this._runAgentPrompt(messages),
 				getToolNames: () => this._cycleToolNames.slice(),
 				getPostFlightVerdict: () => this._cyclePostFlight,
+				onDomainSelected: (selection) => {
+					if (selection.yaml.length === 0) {
+						return;
+					}
+					this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n<workflow domain="${selection.domain}" name="${selection.workflow}">\n${selection.yaml}</workflow>`;
+					this._emitWorkflowCard(selection);
+				},
 			});
 		} else {
 			await this._runAgentPrompt(messages);

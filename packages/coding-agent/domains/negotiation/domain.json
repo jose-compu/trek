@@ -1,0 +1,10 @@
+{
+	"id": "negotiation",
+	"title": "Negotiation",
+	"alwaysOn": false,
+	"terms": [
+		"batna",
+		"concession leak"
+	],
+	"workflow": "term-review.yaml"
+}

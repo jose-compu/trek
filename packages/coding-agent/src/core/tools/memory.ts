@@ -144,7 +144,10 @@ export function createMemoryToolDefinitions(getMemory: () => MemoryManager): Too
 			const query = String((params as { query?: string }).query ?? "");
 			const layer = asLayer((params as { layer?: string }).layer);
 			if (!layer) {
-				return { content: [{ type: "text", text: "layer must be session, project, or global" }], details: undefined };
+				return {
+					content: [{ type: "text", text: "layer must be session, project, or global" }],
+					details: undefined,
+				};
 			}
 			try {
 				const result = await getMemory().forget(query, layer);

@@ -1,0 +1,11 @@
+{
+	"id": "marketing",
+	"title": "Marketing",
+	"alwaysOn": false,
+	"terms": [
+		"ctr drop",
+		"brand sentiment",
+		"utm attribution"
+	],
+	"workflow": "campaign-check.yaml"
+}

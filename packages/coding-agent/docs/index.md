@@ -39,7 +39,7 @@ For the full first-run flow, see [Quickstart](quickstart.md).
 ## Start here
 
 - [Quickstart](quickstart.md) - install, authenticate, and run a first session.
-- [Using Pi](usage.md) - interactive mode, slash commands, context files, and CLI reference.
+- [Using Pi](usage.md) - interactive mode, slash commands, context files, domains, and the CLI reference.
 - [Providers](providers.md) - subscription and API-key setup for built-in providers.
 - [Containerization](containerization.md) - sandbox pi with OpenShell, Gondolin, or Docker.
 - [Settings](settings.md) - global and project settings.

@@ -1,0 +1,11 @@
+{
+	"id": "legal",
+	"title": "Legal",
+	"alwaysOn": false,
+	"terms": [
+		"unfavorable clause",
+		"compliance deadline",
+		"contract unsigned"
+	],
+	"workflow": "clause-review.yaml"
+}

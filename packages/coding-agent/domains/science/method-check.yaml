@@ -1,0 +1,19 @@
+name: method-check
+description: |
+  Check a method: data leakage, a misused p-value, or a broken train test split. Do not claim a result.
+nodes:
+  - id: hypothesis
+    prompt: |
+      State the hypothesis the user is testing.
+  - id: leakage
+    prompt: |
+      Say whether the train test split can see the outcome, or that leakage was not described.
+    depends_on: [hypothesis]
+  - id: test-choice
+    prompt: |
+      Name the test and whether the p-value is being used as the user said. Do not compute a new one from missing data.
+    depends_on: [leakage]
+  - id: correction
+    prompt: |
+      State the correction to the method. Do not claim the hypothesis is confirmed.
+    depends_on: [test-choice]

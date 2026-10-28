@@ -1,0 +1,23 @@
+name: model-quality
+description: |
+  Check a model-quality drop: RAG retrieval, hallucination rate, token cost, or a context window overflow. Do not call a provider from this workflow.
+nodes:
+  - id: observe
+    prompt: |
+      Name the failure: quality, latency, cost, retrieval, or a guardrail miss. Quote the symptom, not a guess.
+  - id: compare-config
+    prompt: |
+      Compare the model, prompt, and settings in use with the last known good configuration. One difference is enough.
+    depends_on: [observe]
+  - id: check-retrieval
+    prompt: |
+      If the answer depends on retrieved text, say whether the chunks are relevant or stale. If retrieval is not involved, say so.
+    depends_on: [compare-config]
+  - id: check-cost
+    prompt: |
+      State whether token cost or the context window is the limit. Do not invent a price.
+    depends_on: [check-retrieval]
+  - id: recommend
+    prompt: |
+      Recommend one change. Do not switch providers or rewrite the system prompt unless this turn asked for that.
+    depends_on: [check-cost]

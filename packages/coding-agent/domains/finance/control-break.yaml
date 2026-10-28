@@ -1,0 +1,19 @@
+name: control-break
+description: |
+  Examine a reconciliation break, a SOX control failure, or a flagged journal entry. Do not post a journal.
+nodes:
+  - id: name-account
+    prompt: |
+      Name the account, the period, and the amount of the break.
+  - id: quantify-break
+    prompt: |
+      Separate what is known from what is estimated. Do not invent a balance.
+    depends_on: [name-account]
+  - id: cite-control
+    prompt: |
+      Name the SOX control or the close task that failed, if one is in the request.
+    depends_on: [quantify-break]
+  - id: propose-entry
+    prompt: |
+      Propose the correcting entry in words. Do not post it.
+    depends_on: [cite-control]

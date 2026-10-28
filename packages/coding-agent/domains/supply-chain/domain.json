@@ -1,0 +1,11 @@
+{
+	"id": "supply-chain",
+	"title": "Supply chain",
+	"alwaysOn": false,
+	"terms": [
+		"stockout",
+		"supplier lead time",
+		"backorder"
+	],
+	"workflow": "flow-break.yaml"
+}

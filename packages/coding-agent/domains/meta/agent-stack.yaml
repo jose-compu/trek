@@ -1,0 +1,15 @@
+name: agent-stack
+description: |
+  Inspect the agent stack: prompt drift, a hook failed, or a rule conflict. Do not edit agent files unless this turn asked for a reviewed diff.
+nodes:
+  - id: name-conflict
+    prompt: |
+      Name the prompt drift, the hook that failed, or the two rules that conflict.
+  - id: show-sources
+    prompt: |
+      Point at the two sources. Quote the lines.
+    depends_on: [name-conflict]
+  - id: reviewed-diff
+    prompt: |
+      Propose a reviewed diff. Do not edit AGENTS.md, skills, or hooks unless this turn asked for that edit.
+    depends_on: [show-sources]

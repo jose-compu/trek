@@ -4,27 +4,34 @@
  * Annotations are the 1.3.0 situating header on the embedded string.
  */
 
-import { existsSync, mkdirSync, statSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, type FSWatcher, mkdirSync, statSync, watch } from "node:fs";
 import { homedir } from "node:os";
 import { join, relative, sep } from "node:path";
 import type { AgentMessage } from "@trek/agent-core";
 import { loadManifest, manifestPath, saveManifest } from "logosdb-mcp-server/dist/file-index-manifest.js";
 import { hybridRerank } from "logosdb-mcp-server/dist/hybrid.js";
 import { NamespaceStore } from "logosdb-mcp-server/dist/store.js";
-import { memoryIsActive, type MemorySettings } from "../settings-manager.ts";
-import { annotateHandoff, annotateLesson, annotateThinking, annotateTurn, kindOf, type MemoryKind } from "./annotate.ts";
+import { type MemorySettings, memoryIsActive } from "../settings-manager.ts";
+import {
+	annotateHandoff,
+	annotateLesson,
+	annotateThinking,
+	annotateTurn,
+	kindOf,
+	type MemoryKind,
+} from "./annotate.ts";
 import type { Embedder } from "./embedder.ts";
 import {
 	chunksForFile,
 	coversPath,
 	filesAt,
+	type IndexPathLists,
 	isIndexableProject,
 	listProjectFiles,
 	loadIndexPaths,
 	pathIsExcluded,
 	resolveProjectPath,
 	saveIndexPaths,
-	type IndexPathLists,
 } from "./index-files.ts";
 import type { Reranker } from "./rerank.ts";
 import { captureTurn, handoffNote } from "./turns.ts";
@@ -81,7 +88,9 @@ export class MemoryManager {
 		if (!this.live()) return "memory=off";
 		const settings = this.options.getSettings();
 		const flag = (on: boolean) => (on ? "on" : "off");
-		const chunks = (["session", "project", "global"] as const).map((layer) => `${layer}=${this.chunkCount(layer)}`).join(" ");
+		const chunks = (["session", "project", "global"] as const)
+			.map((layer) => `${layer}=${this.chunkCount(layer)}`)
+			.join(" ");
 		const lists = loadIndexPaths(this.options.cwd);
 		const extra = [
 			lists.include.length > 0 ? `include: ${lists.include.join(", ")}` : "",
@@ -301,7 +310,9 @@ export class MemoryManager {
 				if (!name || this.closed) return;
 				const rel = String(name);
 				const parts = rel.split(/[/\\]/);
-				if (parts.some((part) => part === ".trek" || part === "node_modules" || part === ".git" || part === "dist")) {
+				if (
+					parts.some((part) => part === ".trek" || part === "node_modules" || part === ".git" || part === "dist")
+				) {
 					return;
 				}
 				const abs = join(this.options.cwd, rel);

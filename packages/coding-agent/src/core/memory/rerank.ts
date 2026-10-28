@@ -3,8 +3,8 @@
  * API mode and the LFM suite must not construct a reranker.
  */
 
-import type { HierarchyMode, SuiteId } from "../runtime/types.ts";
 import { suitePreset } from "../runtime/suites.ts";
+import type { HierarchyMode, SuiteId } from "../runtime/types.ts";
 
 export interface Reranker {
 	/** Return a permutation of document indexes, best first. */

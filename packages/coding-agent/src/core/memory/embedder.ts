@@ -55,7 +55,9 @@ export function createEmbedder(env: NodeJS.ProcessEnv = process.env): Embedder {
 
 function lazyMiniLm(): Embedder {
 	let failed = false;
-	let extractor: ((text: string, opts: { pooling: string; normalize: boolean }) => Promise<{ data: ArrayLike<number> }>) | undefined;
+	let extractor:
+		| ((text: string, opts: { pooling: string; normalize: boolean }) => Promise<{ data: ArrayLike<number> }>)
+		| undefined;
 	return {
 		dim: MINILM_DIM,
 		async embed(text: string) {
@@ -67,7 +69,10 @@ function lazyMiniLm(): Embedder {
 							task: string,
 							model: string,
 						) => Promise<
-							(text: string, opts: { pooling: string; normalize: boolean }) => Promise<{ data: ArrayLike<number> }>
+							(
+								text: string,
+								opts: { pooling: string; normalize: boolean },
+							) => Promise<{ data: ArrayLike<number> }>
 						>;
 					};
 					extractor = await transformers.pipeline("feature-extraction", MINILM);

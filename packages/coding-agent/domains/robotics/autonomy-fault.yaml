@@ -1,0 +1,19 @@
+name: autonomy-fault
+description: |
+  Diagnose an autonomy fault: failed to localize, a safety stop, or a sim to real gap. Do not command the robot.
+nodes:
+  - id: name-subsystem
+    prompt: |
+      Name the subsystem: perception, localization, planning, control, or hardware.
+  - id: sim-vs-hardware
+    prompt: |
+      Say whether the failure is sim to real, a sensor timestamp, or a control oscillation.
+    depends_on: [name-subsystem]
+  - id: safety-stop
+    prompt: |
+      State whether a safety stop fired and whether it should have.
+    depends_on: [sim-vs-hardware]
+  - id: next-check
+    prompt: |
+      Name the next check. Do not command the robot or clear the stop.
+    depends_on: [safety-stop]

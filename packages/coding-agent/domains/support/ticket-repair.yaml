@@ -1,0 +1,19 @@
+name: ticket-repair
+description: |
+  Repair a support miss: an SLA breach, a ticket reopened, or a CSAT drop. Do not invent a customer commitment.
+nodes:
+  - id: restate-ticket
+    prompt: |
+      Restate the ticket in one sentence. Leave out account numbers.
+  - id: missed-sla
+    prompt: |
+      Say whether this is an SLA breach, a wrong diagnosis, or a ticket reopened.
+    depends_on: [restate-ticket]
+  - id: next-reply
+    prompt: |
+      Draft the next reply. Do not promise a date the user did not authorize.
+    depends_on: [missed-sla]
+  - id: knowledge-gap
+    prompt: |
+      Name the knowledge-base gap, or say the article exists and was not used.
+    depends_on: [next-reply]
