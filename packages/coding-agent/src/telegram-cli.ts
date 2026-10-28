@@ -14,6 +14,9 @@ function printTelegramHelp(): void {
 	console.log("  Long-poll Telegram Bot API and drive AgentSession (DMs and groups).");
 	console.log("  Token: TREK_TELEGRAM_BOT_TOKEN or ~/.trek/telegram.json");
 	console.log("  Allowlists: allowed_user_ids / allowed_chat_ids (required, non-empty).");
+	console.log(
+		"  Safe mode: owner_user_ids plus safe_mode owner_and_guest. Guests talk. They do not run tools or confirm.",
+	);
 	console.log("  Groups: reply only on /command or @bot mention; sessions isolated per chat/topic.");
 	console.log("  Safety: /stop HALTs; gated tools need /confirm; traces are omitted in groups.");
 	console.log("  Photos/documents stage to cwd/.trek/telegram/inbox/. Stickers/voice are unsupported.");
