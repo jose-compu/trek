@@ -262,6 +262,19 @@ export interface AgentLoopConfig extends SimpleStreamOptions {
 	toolExecution?: ToolExecutionMode;
 
 	/**
+	 * Split a parallel tool batch into ordered groups.
+	 * Groups run one after another. Tools inside a group still run together.
+	 * A batch of one tool does not call this.
+	 */
+	partitionToolCalls?: (toolCalls: AgentToolCall[]) => AgentToolCall[][];
+
+	/**
+	 * Record a tool batch before it runs, including a batch of one.
+	 * A batch of one still skips `partitionToolCalls`.
+	 */
+	recordToolCalls?: (toolCalls: AgentToolCall[]) => void;
+
+	/**
 	 * Called before a tool is executed, after arguments have been validated.
 	 *
 	 * Return `{ block: true }` to prevent execution. The loop emits a tool result instead.

@@ -116,6 +116,8 @@ export interface Settings {
 	websocketConnectTimeoutMs?: number; // WebSocket connect/open handshake timeout in milliseconds; 0 disables it
 	/** Diagnostic operator mode (#49): traces on, mutating tools blocked. */
 	diagnostic?: boolean;
+	/** Live effort stop. `loose` is ten times the normal limits. `off` does not stop. */
+	effort?: "off" | "normal" | "loose";
 	/** Audit / reproducibility policy (#70). */
 	reproducibility?: ReproducibilitySettings;
 }
@@ -846,6 +848,14 @@ export class SettingsManager {
 
 	getDiagnostic(): boolean {
 		return this.settings.diagnostic === true;
+	}
+
+	getEffort(): "off" | "normal" | "loose" {
+		const value = this.settings.effort;
+		if (value === "off" || value === "normal" || value === "loose") {
+			return value;
+		}
+		return "normal";
 	}
 
 	getReproducibilitySettings(): ReproducibilitySettings {

@@ -15,6 +15,7 @@ packages/*/dist-firefox/
 
 # Trek 0.5 local file history (labeled git commits are the git undo layer)
 .trek/versions/
+.trek/processes.txt
 .trek/manifest.json
 
 # Editor files

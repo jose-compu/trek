@@ -13,9 +13,10 @@
  * Modes use this class and add their own I/O layer on top.
  */
 
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname } from "node:path";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import type { Agent, AgentEvent, AgentMessage, AgentState, AgentTool, ThinkingLevel } from "@trek/agent-core";
 import type { AssistantMessage, ImageContent, Message, Model, TextContent } from "@trek/ai";
 import {
@@ -34,6 +35,15 @@ import { stripFrontmatter } from "../utils/frontmatter.ts";
 import { resolvePath } from "../utils/paths.ts";
 import { sleep } from "../utils/sleep.ts";
 import { isTrekEnvTruthy } from "../utils/trek-env.ts";
+import {
+	composePromptTree,
+	formatProcessTree,
+	noteToolDuration,
+	type ProcessNode,
+	planToolGroups,
+	revertInOrder,
+	type ScheduledCall,
+} from "./algebra/process-schedule.ts";
 import { formatNoApiKeyFoundMessage, formatNoModelSelectedMessage } from "./auth-guidance.ts";
 import { type BashResult, executeBashWithOperations } from "./bash-executor.ts";
 import {
@@ -97,10 +107,11 @@ import { expandPromptTemplate, type PromptTemplate } from "./prompt-templates.ts
 import {
 	appendEffortReason,
 	createReflectiveMetaToolDefinitions,
-	EFFORT_COST_BUDGET,
-	EFFORT_REPEAT_LIMIT,
+	type EffortLimits,
+	type EffortMode,
 	EffortRegulator,
 	effortActionKey,
+	effortLimitsFor,
 	isReflectiveLoopEnabled,
 	ReflectiveLoopController,
 } from "./reflective-loop/index.ts";
@@ -408,6 +419,8 @@ export class AgentSession {
 	private _loadedPrologue: LoadedPrologue = { content: undefined, sources: [] };
 	private _reflectiveLoop: ReflectiveLoopController | undefined;
 	private _effort = new EffortRegulator();
+	private _effortMode: EffortMode = "normal";
+	private _effortLimits: EffortLimits | undefined = effortLimitsFor("normal");
 	/** Last tool error text. A new message is information, not a stall. */
 	private _lastEffortError: string | undefined;
 	/** Successful replacements in this prompt, so a later edit cannot put that text back. */
@@ -418,8 +431,15 @@ export class AgentSession {
 	private _lastBashFailure: { key: string; errors: string } | undefined;
 	/** Failed runs of one command in this prompt. Other tools do not reset it. */
 	private _bashFailCounts = new Map<string, number>();
-	/** Edits that already matched the file. The second one ends the turn. */
+	/** Edits that already matched the file. The second one ends the turn under normal. */
 	private _noChangeCount = 0;
+	/** Consecutive identical located errors for the last failed command. */
+	private _sameErrorStreak = 0;
+	private _processTree: ProcessNode | undefined;
+	private _processBatches: ScheduledCall[][] = [];
+	private _processDurations = new Map<string, number>();
+	private _toolStartedAt = new Map<string, number>();
+	private _pendingInverses: Array<() => Promise<void>> = [];
 	private _lastPromptTask = "";
 	/** Tools executed during the current reflective cycle (trace schema v1). */
 	private _cycleToolNames: string[] = [];
@@ -490,6 +510,7 @@ export class AgentSession {
 			this._reflectiveLoop = new ReflectiveLoopController(this.sessionManager);
 			this._effort = this._reflectiveLoop.effort;
 		}
+		this.setEffort(this.settingsManager.getEffort());
 
 		// Always subscribe to agent events for internal handling
 		// (session persistence, extensions, auto-compaction, retry logic)
@@ -554,7 +575,31 @@ export class AgentSession {
 	 * happens here instead of in wrappers.
 	 */
 	private _installAgentToolHooks(): void {
-		this.agent.shouldStopAfterTurn = () => this._effort.stopReason() !== undefined;
+		this.agent.shouldStopAfterTurn = () =>
+			this._effortLimits !== undefined && this._effort.stopReason() !== undefined;
+		this.agent.recordToolCalls = (toolCalls) => {
+			const calls = toolCalls.map((toolCall) => ({
+				id: toolCall.id,
+				name: toolCall.name,
+				args: toolCall.arguments,
+			}));
+			this._processBatches.push(calls);
+			this._rebuildProcessTree();
+		};
+		this.agent.partitionToolCalls = (toolCalls) => {
+			const calls = toolCalls.map((toolCall) => ({
+				id: toolCall.id,
+				name: toolCall.name,
+				args: toolCall.arguments,
+			}));
+			const byId = new Map(toolCalls.map((toolCall) => [toolCall.id, toolCall]));
+			return planToolGroups(calls).map((group) =>
+				group.flatMap((call) => {
+					const toolCall = byId.get(call.id);
+					return toolCall ? [toolCall] : [];
+				}),
+			);
+		};
 
 		this.agent.beforeToolCall = async ({ toolCall, args }) => {
 			if (this._fileMutationBusy(toolCall.id, toolCall.name, args)) {
@@ -695,6 +740,9 @@ export class AgentSession {
 		result: { content: Array<{ type: string; text?: string }> },
 		isError: boolean,
 	): string | undefined {
+		if (!this._effortLimits) {
+			return undefined;
+		}
 		this._effort.recordCost(1);
 		const text = result.content
 			.filter((part) => part.type === "text" && typeof part.text === "string")
@@ -706,7 +754,6 @@ export class AgentSession {
 			this._noChangeCount += 1;
 		}
 		let learned = isError && text.length > 0 && text !== this._lastEffortError;
-		let sameErrors = false;
 		let repeatedCommand = false;
 		if (name === "bash" && isError) {
 			const errors = bashErrorSignature(text);
@@ -715,18 +762,19 @@ export class AgentSession {
 			this._bashFailCounts.set(key, count);
 			if (errors.length > 0 && this._lastBashFailure?.key === key && this._lastBashFailure.errors === errors) {
 				learned = false;
-				sameErrors = true;
+				this._sameErrorStreak += 1;
 			} else if (errors.length > 0) {
 				this._lastBashFailure = { key, errors };
+				this._sameErrorStreak = 1;
 			}
-			repeatedCommand = count >= EFFORT_REPEAT_LIMIT;
+			repeatedCommand = count >= this._effortLimits.repeatLimit;
 		}
 		this._lastEffortError = isError ? text : undefined;
 		this._effort.updateProgress(effortActionKey(name, args), (!isError || learned) && !noChange);
-		if (noChange && this._noChangeCount >= 2) {
+		if (noChange && this._noChangeCount >= this._effortLimits.noChangeLimit) {
 			return "EffortRegulator stopped: no change.";
 		}
-		if (sameErrors) {
+		if (this._sameErrorStreak >= this._effortLimits.sameErrorLimit) {
 			return "EffortRegulator stopped: same errors.";
 		}
 		if (repeatedCommand) {
@@ -780,6 +828,7 @@ export class AgentSession {
 		for (const filePath of paths) {
 			try {
 				const absolutePath = resolveToCwd(filePath, this._cwd);
+				this._registerInverse(absolutePath);
 				const rel = this._trekStore.toRelPath(absolutePath);
 				if (!rel) {
 					continue;
@@ -796,6 +845,60 @@ export class AgentSession {
 		}
 		if (changed) {
 			this._persistCheckpoints();
+		}
+	}
+
+	/** Snapshot the bytes that an inverse restores. Taken before the write. */
+	private _registerInverse(absolutePath: string): void {
+		const prior = existsSync(absolutePath) ? readFileSync(absolutePath) : undefined;
+		this._pendingInverses.push(async () => {
+			if (prior === undefined) {
+				if (existsSync(absolutePath)) {
+					unlinkSync(absolutePath);
+				}
+				return;
+			}
+			mkdirSync(dirname(absolutePath), { recursive: true });
+			writeFileSync(absolutePath, prior);
+		});
+	}
+
+	/** Inverse, then .trek history, then git. */
+	async revertLastMutation(): Promise<void> {
+		const inverse = this._pendingInverses.pop();
+		await revertInOrder({
+			inverse,
+			trek: async () => {
+				await this.undoLastEditBatches(1);
+			},
+			git: async () => {
+				this._gitRestoreTouched();
+			},
+		});
+	}
+
+	private _gitRestoreTouched(): void {
+		if (!existsSync(join(this._cwd, ".git"))) {
+			return;
+		}
+		const paths = [...this._promptTouchedRelPaths];
+		if (paths.length === 0) {
+			return;
+		}
+		try {
+			execFileSync("git", ["checkout", "--", ...paths], { cwd: this._cwd, stdio: "ignore" });
+		} catch (error) {
+			debugLog("undo", "git restore skipped", { error: String(error) });
+		}
+	}
+
+	private _writeProcessTree(): void {
+		try {
+			const dir = join(this._cwd, ".trek");
+			mkdirSync(dir, { recursive: true });
+			writeFileSync(join(dir, "processes.txt"), `${this.formatProcesses()}\n`);
+		} catch (error) {
+			debugLog("algebra", "process tree write failed", { error: String(error) });
 		}
 	}
 
@@ -1314,6 +1417,22 @@ export class AgentSession {
 		return this._diagnosticEnabled;
 	}
 
+	/** Set the live effort stop for this process. `off` does not disable safety checks. */
+	setEffort(mode: EffortMode): void {
+		this._effortMode = mode;
+		this._effortLimits = effortLimitsFor(mode);
+		if (this._effortLimits) {
+			this._effort.applyLimits(this._effortLimits);
+		} else {
+			this._effort.setEnabled(false);
+		}
+		debugLog("effort", "mode", { mode });
+	}
+
+	getEffort(): EffortMode {
+		return this._effortMode;
+	}
+
 	/**
 	 * Honesty protocol (#4/#6): parse the `<honesty>` footer from the most recent
 	 * assistant message into a structured report (confidence, assumption ledger,
@@ -1550,6 +1669,7 @@ export class AgentSession {
 				args: event.args,
 			};
 			await this._extensionRunner.emit(extensionEvent);
+			this._toolStartedAt.set(event.toolCallId, performance.now());
 			debugLog("tool", "execution start", { toolName: event.toolName, toolCallId: event.toolCallId });
 		} else if (event.type === "tool_execution_update") {
 			const extensionEvent: ToolExecutionUpdateEvent = {
@@ -1569,6 +1689,28 @@ export class AgentSession {
 				isError: event.isError,
 			};
 			await this._extensionRunner.emit(extensionEvent);
+			const started = this._toolStartedAt.get(event.toolCallId);
+			if (started !== undefined && this._processTree) {
+				const durationMs = Math.max(0, Math.round(performance.now() - started));
+				this._processDurations.set(event.toolCallId, durationMs);
+				noteToolDuration(this._processTree, event.toolCallId, durationMs);
+			}
+		}
+	}
+
+	/** Current prompt schedule in the four algebra names. */
+	formatProcesses(): string {
+		return formatProcessTree(this._processTree);
+	}
+
+	private _rebuildProcessTree(): void {
+		const tree = composePromptTree(this._processBatches, this._reproducibility.cpaSeed);
+		this._processTree = tree;
+		if (!tree) {
+			return;
+		}
+		for (const [toolCallId, durationMs] of this._processDurations) {
+			noteToolDuration(tree, toolCallId, durationMs);
 		}
 	}
 
@@ -1914,6 +2056,7 @@ export class AgentSession {
 			role: runtimeFields.role,
 			source: runtimeFields.source,
 			routeReason: runtimeFields.routeReason,
+			effort: this._effortMode,
 		});
 		this.sessionManager.appendAuditStep(record);
 		debugLog("reproducibility", "audit step recorded", record);
@@ -2077,13 +2220,24 @@ export class AgentSession {
 
 	private async _runAgentPrompt(messages: AgentMessage | AgentMessage[]): Promise<void> {
 		try {
+			this._processTree = undefined;
+			this._processBatches = [];
+			this._processDurations.clear();
+			this._toolStartedAt.clear();
 			this._lastEffortError = undefined;
 			this._appliedEdits = [];
 			this._lastCommandErrors = undefined;
 			this._lastBashFailure = undefined;
 			this._bashFailCounts = new Map();
 			this._noChangeCount = 0;
-			this._effort.beginPrompt(EFFORT_COST_BUDGET);
+			this._sameErrorStreak = 0;
+			if (this._effortLimits) {
+				this._effort.applyLimits(this._effortLimits);
+				this._effort.beginPrompt(this._effortLimits.costBudget);
+			} else {
+				this._effort.setEnabled(false);
+				this._effort.beginPrompt();
+			}
 			await this.agent.prompt(messages);
 			while (await this._handlePostAgentRun()) {
 				if (!(await this._safeAgentContinue())) {
@@ -2091,6 +2245,7 @@ export class AgentSession {
 				}
 			}
 		} finally {
+			this._writeProcessTree();
 			this._flushPendingBashMessages();
 			await this._maybeGitCommitPrompt();
 		}

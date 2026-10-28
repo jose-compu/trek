@@ -15,6 +15,46 @@ export const EFFORT_NO_PROGRESS_LIMIT = 8;
  */
 export const EFFORT_REPEAT_LIMIT = 4;
 
+/** Identical located errors before the turn stops. */
+export const EFFORT_SAME_ERROR_LIMIT = 2;
+
+/** No-op edits before the turn stops. */
+export const EFFORT_NO_CHANGE_LIMIT = 2;
+
+export const EFFORT_LOOSE_FACTOR = 10;
+
+export type EffortMode = "off" | "normal" | "loose";
+
+export interface EffortLimits {
+	costBudget: number;
+	noProgressLimit: number;
+	repeatLimit: number;
+	sameErrorLimit: number;
+	noChangeLimit: number;
+}
+
+export function parseEffortMode(value: unknown): EffortMode | undefined {
+	if (value === "off" || value === "normal" || value === "loose") {
+		return value;
+	}
+	return undefined;
+}
+
+/** `undefined` means the regulator is off and must not stop the turn. */
+export function effortLimitsFor(mode: EffortMode): EffortLimits | undefined {
+	if (mode === "off") {
+		return undefined;
+	}
+	const factor = mode === "loose" ? EFFORT_LOOSE_FACTOR : 1;
+	return {
+		costBudget: EFFORT_COST_BUDGET * factor,
+		noProgressLimit: EFFORT_NO_PROGRESS_LIMIT * factor,
+		repeatLimit: EFFORT_REPEAT_LIMIT * factor,
+		sameErrorLimit: EFFORT_SAME_ERROR_LIMIT * factor,
+		noChangeLimit: EFFORT_NO_CHANGE_LIMIT * factor,
+	};
+}
+
 export function appendEffortReason<T extends { type: string; text?: string }>(content: T[], reason: string): T[] {
 	const last = content[content.length - 1];
 	if (last?.type === "text" && typeof last.text === "string") {
@@ -49,6 +89,19 @@ export class EffortRegulator {
 	private observationSkipped = false;
 	private costUsed = 0;
 	private costBudget: number | undefined;
+	private noProgressLimit = EFFORT_NO_PROGRESS_LIMIT;
+	private repeatLimit = EFFORT_REPEAT_LIMIT;
+	private enabled = true;
+
+	setEnabled(enabled: boolean): void {
+		this.enabled = enabled;
+	}
+
+	applyLimits(limits: Pick<EffortLimits, "noProgressLimit" | "repeatLimit">): void {
+		this.noProgressLimit = limits.noProgressLimit;
+		this.repeatLimit = limits.repeatLimit;
+		this.enabled = true;
+	}
 
 	markObservationSkipped(): void {
 		this.observationSkipped = true;
@@ -80,10 +133,13 @@ export class EffortRegulator {
 	}
 
 	stopReason(): string | undefined {
-		if (this.consecutiveNoProgress >= EFFORT_NO_PROGRESS_LIMIT) {
+		if (!this.enabled) {
+			return undefined;
+		}
+		if (this.consecutiveNoProgress >= this.noProgressLimit) {
 			return "EffortRegulator stopped: no progress.";
 		}
-		if (this.identicalActionCount >= EFFORT_REPEAT_LIMIT) {
+		if (this.identicalActionCount >= this.repeatLimit) {
 			return "EffortRegulator stopped: repeated action.";
 		}
 		if (

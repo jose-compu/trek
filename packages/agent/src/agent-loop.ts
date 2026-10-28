@@ -382,13 +382,34 @@ async function executeToolCalls(
 	emit: AgentEventSink,
 ): Promise<ExecutedToolCallBatch> {
 	const toolCalls = assistantMessage.content.filter((c) => c.type === "toolCall");
+	if (toolCalls.length > 0) {
+		config.recordToolCalls?.(toolCalls);
+	}
 	const hasSequentialToolCall = toolCalls.some(
 		(tc) => currentContext.tools?.find((t) => t.name === tc.name)?.executionMode === "sequential",
 	);
 	if (config.toolExecution === "sequential" || hasSequentialToolCall) {
 		return executeToolCallsSequential(currentContext, assistantMessage, toolCalls, config, signal, emit);
 	}
-	return executeToolCallsParallel(currentContext, assistantMessage, toolCalls, config, signal, emit);
+	const groups =
+		toolCalls.length > 1 && config.partitionToolCalls ? config.partitionToolCalls(toolCalls) : [toolCalls];
+	if (groups.length <= 1) {
+		return executeToolCallsParallel(currentContext, assistantMessage, groups[0] ?? toolCalls, config, signal, emit);
+	}
+	const messages: ToolResultMessage[] = [];
+	let terminate = false;
+	for (const group of groups) {
+		if (group.length === 0) {
+			continue;
+		}
+		const batch = await executeToolCallsParallel(currentContext, assistantMessage, group, config, signal, emit);
+		messages.push(...batch.messages);
+		if (batch.terminate || signal?.aborted) {
+			terminate = true;
+			break;
+		}
+	}
+	return { messages, terminate };
 }
 
 type ExecutedToolCallBatch = {

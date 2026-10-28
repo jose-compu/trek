@@ -1,6 +1,6 @@
 ![Trek Agent 0.8.0 Runtime](./assets/banner-0.8.0.png)
 
-# Trek Agent v0.9.1
+# Trek Agent v0.10.0
 
 Trek is a **hard fork of the [Pi Coding Agent](https://pi.dev/)** — the minimal terminal coding agent with read, bash, edit, write tools, sessions, and a TypeScript extension ecosystem.
 
@@ -15,17 +15,18 @@ Pi optimizes for simplicity and adaptability: you extend it with plugins rather 
 | **Determinism** | Full O→I→A→R traces, replay, seed logging, honest reproducibility limits | 0.6.0 Trace → 0.7.5 Audit |
 | **Memory** | Session / project / global layers with incremental indexing | 0.11.0 Memory |
 | **Domain workflows** | Predefined per-domain workflows in [Archon](https://github.com/coleam00/archon) YAML (`name`, `description`, `nodes`). [ClawHub skills](https://clawhub.ai/dashboard) inspire the domain and workflow list only. Each task context detects the work domain and the Archon workflow it needs (Meta, AI, Security always candidates). `trek workflows run` is an override | 0.12.0 Domains |
-| **Local model hierarchy** | API-first by default. Opt-in `local` / `hybrid` llama.cpp roles (Mistral suite). Frontier is the fourth layer. Per-component routing is later | **0.8.0 Runtime** → **0.9.0 Routing** (current) |
+| **Local model hierarchy** | API-first by default. Opt-in `local` / `hybrid` llama.cpp roles (Mistral suite). Frontier is the fourth layer. Per-component routing is later | **0.8.0 Runtime** → **0.9.0 Routing** |
+| **Algebra** | Safe tools run together. Same-file writes stay ordered. The process tree is seeded and reversible | **0.10.0 Algebra** (current) |
 
 Every user turn follows **Observe → Intend → Act → Reflect** (O→I→A→R). Safety checks wrap **Act**. During **Intend**, Trek detects the work domain from that task context and selects the workflow the context needs. The next turn detects again. Traces and audit metadata accumulate over time so behavior is inspectable, not opaque.
 
 Pi compatibility is preserved: community packages from [pi.dev/packages](https://pi.dev/packages) install with `trek install npm:<package>`. See [Pi Coding Agent plugins](#pi-coding-agent-plugins) below.
 
-**Version:** 0.9.1 — see [CHANGELOG.md](./CHANGELOG.md). Full plan: [ROADMAP.md](../ROADMAP.md).
+**Version:** 0.10.0 — see [CHANGELOG.md](./CHANGELOG.md). Full plan: [ROADMAP.md](../ROADMAP.md).
 
 ## Status
 
-**0.9.1** is current. An edit that already matches the file is not shown. **0.9.0** routes each component, keeps same-file edits from colliding, and stops a prompt that repeats a failed command or a no-op edit. **0.8.1** updated production dependencies flagged by `npm audit`. **0.8.0** made remote API the default and kept llama.cpp opt-in. **0.7.0 Audit** shipped the session seed (default `42`), `default` / `strict_audit` modes, per-step `trek:audit_step` records, and honest warnings when a provider cannot honor seed. Bit-exact replay is not claimed on closed APIs or on GPU llama.cpp. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
+**0.10.0** is current. Independent reads and edits of different files run together. `trek processes` prints the seeded tree. `--effort loose` multiplies the effort stops by 10, and `--effort off` does not stop the turn for effort. **0.9.1** hides an edit that already matches the file. **0.9.0** routes each component, keeps same-file edits from colliding, and stops a prompt that repeats a failed command or a no-op edit. **0.8.1** updated production dependencies flagged by `npm audit`. **0.8.0** made remote API the default and kept llama.cpp opt-in. **0.7.0 Audit** shipped the session seed (default `42`), `default` / `strict_audit` modes, per-step `trek:audit_step` records, and honest warnings when a provider cannot honor seed. Bit-exact replay is not claimed on closed APIs or on GPU llama.cpp. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
 
 ## Models
 

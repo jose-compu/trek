@@ -250,7 +250,7 @@ describe("regression #98: edit must not trigger a full rewrite", () => {
 		expect(texts[1]).toMatch(/Successfully replaced/);
 	});
 
-	it("runs one edit per file when the same turn edits one file twice and another file once", async () => {
+	it("orders two edits of one file and still edits a different file in that turn", async () => {
 		const harness = await createHarness();
 		harnesses.push(harness);
 		harness.setResponses([
@@ -274,12 +274,13 @@ describe("regression #98: edit must not trigger a full rewrite", () => {
 
 		await harness.session.prompt("parallel edits");
 
-		expect(readFileSync(join(harness.tempDir, "a.txt"), "utf-8")).toBe("ALPHA\nbeta\n");
+		expect(readFileSync(join(harness.tempDir, "a.txt"), "utf-8")).toBe("ALPHA\nBETA\n");
 		expect(readFileSync(join(harness.tempDir, "b.txt"), "utf-8")).toBe("ONE\n");
 		const texts = toolTexts(harness, "edit");
 		expect(texts).toHaveLength(3);
-		expect(texts.filter((text) => /Successfully replaced/.test(text))).toHaveLength(2);
-		expect(texts.some((text) => /Parallel edits apply only to different files/.test(text))).toBe(true);
-		expect(texts.some((text) => /already running in this prompt/.test(text))).toBe(false);
+		expect(texts.filter((text) => /Successfully replaced/.test(text))).toHaveLength(3);
+		expect(texts.some((text) => /Parallel edits apply only to different files/.test(text))).toBe(false);
+		expect(harness.session.formatProcesses()).toMatch(/sequence/);
+		expect(harness.session.formatProcesses()).toMatch(/seed /);
 	});
 });

@@ -50,6 +50,7 @@ import { InteractiveMode, runBatchMode, runPrintMode, runRpcMode } from "./modes
 import { ExtensionSelectorComponent } from "./modes/interactive/components/extension-selector.ts";
 import { initTheme, stopThemeWatcher } from "./modes/interactive/theme/theme.ts";
 import { handleConfigCommand, handlePackageCommand } from "./package-manager-cli.ts";
+import { handleProcessesCommand } from "./processes-cli.ts";
 import { handleTelegramCommand } from "./telegram-cli.ts";
 import { handleTraceCommand } from "./trace-cli.ts";
 import { debugLog, getActiveDebugLogPath, setDebugEnabled } from "./utils/debug-log.ts";
@@ -577,6 +578,10 @@ export async function main(args: string[], options?: MainOptions) {
 		return;
 	}
 
+	if (await handleProcessesCommand(args)) {
+		return;
+	}
+
 	if (await handleRevertCommand(args)) {
 		return;
 	}
@@ -878,6 +883,9 @@ export async function main(args: string[], options?: MainOptions) {
 	}
 	if (parsed.diagnostic || isTrekEnvTruthy("DIAGNOSTIC") || session.settingsManager.getDiagnostic()) {
 		session.setDiagnostic(true);
+	}
+	if (parsed.effort) {
+		session.setEffort(parsed.effort);
 	}
 	if (parsed.gitCommit) {
 		session.setGitCommit(true);

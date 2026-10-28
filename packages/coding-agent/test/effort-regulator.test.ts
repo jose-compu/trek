@@ -137,4 +137,55 @@ describe("effort regulator", () => {
 		regulator.recordCost(1);
 		expect(regulator.stopReason()).toBe("EffortRegulator stopped: spent budget.");
 	});
+
+	it("continues the same repeats when effort is loose", async () => {
+		const harness = await createHarness({ settings: { effort: "loose" } });
+		harnesses.push(harness);
+		const repeat = fauxAssistantMessage([fauxToolCall("bash", { command: "echo effort-loose" })], {
+			stopReason: "toolUse",
+		});
+		harness.setResponses([
+			...Array.from({ length: EFFORT_REPEAT_LIMIT }, () => repeat),
+			fauxAssistantMessage("continued"),
+		]);
+
+		await harness.session.prompt("repeat under loose effort");
+
+		const texts = harness.session.messages
+			.filter((message) => message.role === "toolResult")
+			.flatMap((message) => message.content.filter((part) => part.type === "text").map((part) => part.text));
+		expect(texts.some((text) => text.includes("EffortRegulator stopped"))).toBe(false);
+		expect(harness.session.getEffort()).toBe("loose");
+		expect(
+			harness.session.messages.some(
+				(message) =>
+					message.role === "assistant" &&
+					message.content.some((part) => part.type === "text" && part.text === "continued"),
+			),
+		).toBe(true);
+		expect(harness.getPendingResponseCount()).toBe(0);
+	});
+
+	it("does not stop for effort when the setting is off", async () => {
+		const harness = await createHarness({ settings: { effort: "off" } });
+		harnesses.push(harness);
+		const repeat = fauxAssistantMessage([fauxToolCall("bash", { command: "echo effort-off" })], {
+			stopReason: "toolUse",
+		});
+		harness.setResponses([
+			...Array.from({ length: EFFORT_REPEAT_LIMIT }, () => repeat),
+			fauxAssistantMessage("continued"),
+		]);
+
+		await harness.session.prompt("repeat with effort off");
+
+		const texts = harness.session.messages
+			.filter((message) => message.role === "toolResult")
+			.flatMap((message) => message.content.filter((part) => part.type === "text").map((part) => part.text));
+		expect(texts.some((text) => text.includes("EffortRegulator stopped"))).toBe(false);
+		expect(harness.session.getEffort()).toBe("off");
+		const steps = harness.sessionManager.getAuditSteps<{ effort?: string }>();
+		expect(steps.at(-1)?.effort).toBe("off");
+		expect(harness.getPendingResponseCount()).toBe(0);
+	});
 });

@@ -2,10 +2,17 @@ export {
 	appendEffortReason,
 	EFFORT_BUDGET_RATIO,
 	EFFORT_COST_BUDGET,
+	EFFORT_LOOSE_FACTOR,
+	EFFORT_NO_CHANGE_LIMIT,
 	EFFORT_NO_PROGRESS_LIMIT,
 	EFFORT_REPEAT_LIMIT,
+	EFFORT_SAME_ERROR_LIMIT,
+	type EffortLimits,
+	type EffortMode,
 	EffortRegulator,
 	effortActionKey,
+	effortLimitsFor,
+	parseEffortMode,
 } from "./effort-regulator.ts";
 export { isReflectiveLoopEnabled } from "./enabled.ts";
 export { ReflectiveLoopController, type RunPromptCycleOptions } from "./loop-controller.ts";

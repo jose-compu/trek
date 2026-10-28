@@ -2747,6 +2747,11 @@ export class InteractiveMode {
 				this.showUndoSelector();
 				return;
 			}
+			if (text === "/processes") {
+				this.editor.setText("");
+				this.showProcesses();
+				return;
+			}
 			if (text === "/sandbox") {
 				this.editor.setText("");
 				this.handleToggleSandbox();
@@ -3819,6 +3824,13 @@ export class InteractiveMode {
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new Text(theme.fg("error", `Error: ${errorMessage}`), 1, 0));
 		this.chatContainer.addChild(new Spacer(1));
+		this.ui.requestRender();
+	}
+
+	showProcesses(): void {
+		const tree = this.session.formatProcesses();
+		this.chatContainer.addChild(new Spacer(1));
+		this.chatContainer.addChild(new Text(theme.fg("muted", tree), 1, 0));
 		this.ui.requestRender();
 	}
 

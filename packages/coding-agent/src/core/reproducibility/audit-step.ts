@@ -41,6 +41,7 @@ export const AuditStepSchema = Type.Object({
 	),
 	source: Type.Optional(Type.Union([Type.Literal("local"), Type.Literal("api")])),
 	routeReason: Type.Optional(Type.String({ minLength: 1 })),
+	effort: Type.Optional(Type.Union([Type.Literal("off"), Type.Literal("normal"), Type.Literal("loose")])),
 });
 
 export type AuditStepSchemaType = Static<typeof AuditStepSchema>;
@@ -118,6 +119,7 @@ export interface BuildAuditStepInput {
 	role?: AuditStepRecord["role"];
 	source?: AuditStepRecord["source"];
 	routeReason?: string;
+	effort?: AuditStepRecord["effort"];
 }
 
 export function buildAuditStep(input: BuildAuditStepInput): AuditStepRecord {
@@ -154,6 +156,9 @@ export function buildAuditStep(input: BuildAuditStepInput): AuditStepRecord {
 	}
 	if (input.routeReason) {
 		record.routeReason = input.routeReason;
+	}
+	if (input.effort) {
+		record.effort = input.effort;
 	}
 	return record;
 }

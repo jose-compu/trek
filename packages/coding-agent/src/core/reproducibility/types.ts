@@ -87,4 +87,6 @@ export interface AuditStepRecord {
 	source?: "local" | "api";
 	/** Why this model was chosen. Absent on records written before 0.9.0 routing. */
 	routeReason?: string;
+	/** Live effort stop for this step. Absent on records written before 0.10.0. */
+	effort?: "off" | "normal" | "loose";
 }

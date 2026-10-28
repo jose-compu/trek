@@ -2,7 +2,12 @@
 
 Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent repo `UPSTREAM.md` / Pi monorepo.
 
-## [Unreleased]
+## [0.10.0] - 2026-10-28
+
+### Added
+
+- `--effort off|normal|loose` and the `effort` setting. `loose` multiplies every effort stop by 10. `off` does not stop the turn for effort. Safety checks stay on.
+- Independent reads, and edits of different files, run together. Edits of the same file stay in order. `trek processes` and `/processes` print parallel, sequence, guarded choice, and inversion, with the session seed, including a prompt that uses one tool at a time. A revert applies the inverse, then `.trek` history, then git.
 
 ## [0.9.1] - 2026-10-28
 

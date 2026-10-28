@@ -203,6 +203,10 @@ export class Agent {
 	public maxRetryDelayMs?: number;
 	/** Tool execution strategy for assistant messages that contain multiple tool calls. */
 	public toolExecution: ToolExecutionMode;
+	/** Optional split of a parallel tool batch into ordered groups. */
+	public partitionToolCalls?: AgentLoopConfig["partitionToolCalls"];
+	/** Records every tool batch, including a batch of one. */
+	public recordToolCalls?: AgentLoopConfig["recordToolCalls"];
 	/** Sampling temperature forwarded to providers (#71). */
 	public temperature?: number;
 	/** Nucleus sampling forwarded to providers (#71). */
@@ -451,6 +455,8 @@ export class Agent {
 			topP: this.topP,
 			seed: this.seed,
 			toolExecution: this.toolExecution,
+			partitionToolCalls: this.partitionToolCalls,
+			recordToolCalls: this.recordToolCalls,
 			beforeToolCall: this.beforeToolCall,
 			afterToolCall: this.afterToolCall,
 			prepareNextTurn: this.prepareNextTurn ? async () => await this.prepareNextTurn?.(this.signal) : undefined,

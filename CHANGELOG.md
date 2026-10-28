@@ -1,10 +1,15 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.9.1`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.10.0`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
-## [Unreleased]
+## [0.10.0] - 2026-10-28
+
+### Added
+
+- `--effort off|normal|loose` and the `effort` setting. `loose` multiplies every effort stop by 10. `off` does not stop the turn for effort. Safety checks stay on.
+- Independent reads, and edits of different files, run together. Edits of the same file stay in order. `trek processes` and `/processes` print parallel, sequence, guarded choice, and inversion, with the session seed, including a prompt that uses one tool at a time. A revert applies the inverse, then `.trek` history, then git.
 
 ## [0.9.1] - 2026-10-28
 

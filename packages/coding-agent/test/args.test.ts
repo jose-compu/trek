@@ -321,6 +321,13 @@ describe("parseArgs", () => {
 			expect(result.sandbox).toBe(true);
 		});
 
+		test("parses --effort", () => {
+			expect(parseArgs(["--effort", "loose"]).effort).toBe("loose");
+			expect(parseArgs(["--effort", "off"]).effort).toBe("off");
+			expect(parseArgs(["--effort", "normal"]).effort).toBe("normal");
+			expect(parseArgs(["--effort", "max"]).diagnostics.some((item) => item.type === "error")).toBe(true);
+		});
+
 		test("parses --diagnostic flag", () => {
 			const result = parseArgs(["--diagnostic", "-p", "hi"]);
 			expect(result.diagnostic).toBe(true);

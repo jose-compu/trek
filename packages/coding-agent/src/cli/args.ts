@@ -51,6 +51,8 @@ export interface Args {
 	dryRun?: boolean;
 	/** Diagnostic operator mode: traces on, mutating tools blocked (#49). */
 	diagnostic?: boolean;
+	/** Live effort stop for this process. Overrides settings. */
+	effort?: "off" | "normal" | "loose";
 	/** Wrap agent bash in OS sandbox when available (#10). */
 	sandbox?: boolean;
 	/** After a mutating prompt, create a small labeled git commit (0.5.0). */
@@ -196,6 +198,16 @@ export function parseArgs(args: string[]): Args {
 			result.dryRun = true;
 		} else if (arg === "--diagnostic") {
 			result.diagnostic = true;
+		} else if (arg === "--effort" && i + 1 < args.length) {
+			const effort = args[++i];
+			if (effort === "off" || effort === "normal" || effort === "loose") {
+				result.effort = effort;
+			} else {
+				result.diagnostics.push({
+					type: "error",
+					message: "--effort must be off, normal, or loose",
+				});
+			}
 		} else if (arg === "--git-commit") {
 			result.gitCommit = true;
 		} else if (arg === "--sandbox") {
@@ -327,6 +339,7 @@ ${chalk.bold("Options:")}
   --verbose                      Stream tool calls/results to stderr in print mode; verbose startup in TUI
   --dry-run                      Preview write/edit/bash without applying changes (#9)
   --diagnostic                   Trace-only: block mutating tools (write/edit/bash) (#49)
+  --effort <off|normal|loose>    Effort stop for this run. loose is 10x normal. off disables it
   --git-commit                   After mutations, create a labeled git commit (0.5.0)
   --sandbox                      Run agent bash inside OS sandbox when available (#10)
   --debug                        Verbose internal logging to ${getDebugLogPath()} (tail -f in another terminal)
