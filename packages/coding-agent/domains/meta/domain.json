@@ -1,0 +1,11 @@
+{
+	"id": "meta",
+	"title": "Meta",
+	"alwaysOn": true,
+	"terms": [
+		"prompt drift",
+		"hook failed",
+		"rule conflict"
+	],
+	"workflow": "agent-stack.yaml"
+}

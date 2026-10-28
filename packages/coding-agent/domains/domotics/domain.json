@@ -1,0 +1,11 @@
+{
+	"id": "domotics",
+	"title": "Domotics",
+	"alwaysOn": false,
+	"terms": [
+		"automation conflict",
+		"sensor drift",
+		"device unreachable"
+	],
+	"workflow": "automation-fault.yaml"
+}

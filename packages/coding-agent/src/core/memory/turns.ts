@@ -22,9 +22,11 @@ export function captureTurn(messages: readonly AgentMessage[], cwd: string): Tur
 	if (answer) {
 		const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
 		const dir = cwd.split(/[/\\]/).filter(Boolean).slice(-2).join("/");
-		result.turn = [`[${stamp}] ${dir}`, `Q: ${question.slice(0, QUESTION_CAP)}`, `A: ${answer.slice(0, ANSWER_CAP)}`].join(
-			"\n",
-		);
+		result.turn = [
+			`[${stamp}] ${dir}`,
+			`Q: ${question.slice(0, QUESTION_CAP)}`,
+			`A: ${answer.slice(0, ANSWER_CAP)}`,
+		].join("\n");
 	}
 	if (thinking && question) {
 		const excerpt = thinking.slice(0, THINKING_CAP);

@@ -1,0 +1,15 @@
+name: flow-break
+description: |
+  Examine a stockout, a longer supplier lead time, or a backorder. Do not place an order.
+nodes:
+  - id: name-sku
+    prompt: |
+      Name the SKU, the site, and whether this is a stockout or a backorder.
+  - id: forecast-vs-stock
+    prompt: |
+      Separate the demand figure the user gave from the stock figure. Do not invent either.
+    depends_on: [name-sku]
+  - id: next-check
+    prompt: |
+      Name the next check on supplier lead time or the warehouse. Do not place an order.
+    depends_on: [forecast-vs-stock]

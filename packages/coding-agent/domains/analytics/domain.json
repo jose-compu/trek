@@ -1,0 +1,12 @@
+{
+	"id": "analytics",
+	"title": "Analytics",
+	"alwaysOn": false,
+	"terms": [
+		"metric definition",
+		"data freshness",
+		"etl pipeline",
+		"dashboard"
+	],
+	"workflow": "metric-trust.yaml"
+}

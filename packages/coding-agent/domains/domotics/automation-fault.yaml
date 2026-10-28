@@ -1,0 +1,19 @@
+name: automation-fault
+description: |
+  Diagnose an automation conflict, sensor drift, or a device unreachable. Do not actuate hardware.
+nodes:
+  - id: name-device
+    prompt: |
+      Name the device, the automation, and the last time it behaved.
+  - id: check-conflict
+    prompt: |
+      Say whether two automations fight, a sensor is stale, or the device is unreachable.
+    depends_on: [name-device]
+  - id: check-safety
+    prompt: |
+      Say whether a safety rule is missing or too weak. Do not disable a safety rule.
+    depends_on: [check-conflict]
+  - id: propose-fix
+    prompt: |
+      Propose one local fix. Do not send a command to the device.
+    depends_on: [check-safety]

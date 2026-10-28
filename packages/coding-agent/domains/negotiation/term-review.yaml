@@ -1,0 +1,15 @@
+name: term-review
+description: |
+  Review a negotiation stall: a BATNA gap or a concession leak. Do not accept terms or set a price.
+nodes:
+  - id: restate-positions
+    prompt: |
+      Restate each side's position in one line. Leave names of private limits out of the reply.
+  - id: batna-gap
+    prompt: |
+      Name the BATNA gap: what is unknown, not a number you invent.
+    depends_on: [restate-positions]
+  - id: concession-guardrail
+    prompt: |
+      List any concession that is past the user's stated guardrail. Do not accept terms or set a price.
+    depends_on: [batna-gap]

@@ -1,6 +1,6 @@
-![Trek Agent 0.11 Memory](./assets/banner-0.11.png)
+![Trek Agent 0.12 Domains](./assets/banner-0.12.png)
 
-# Trek Agent v0.11.0
+# Trek Agent v0.12.0
 
 Trek is a **hard fork of the [Pi Coding Agent](https://pi.dev/)** — the minimal terminal coding agent with read, bash, edit, write tools, sessions, and a TypeScript extension ecosystem.
 
@@ -13,8 +13,8 @@ Pi optimizes for simplicity and adaptability: you extend it with plugins rather 
 | **Safety** | Laws hierarchy, HALT, read-before-write, honesty protocol, dry-run, sandbox, undo | **0.4.0 Guardrails** → 0.13.0 Guardrails+ |
 | **Undo** | `.trek` file versions, `trek history` / `trek revert`, labeled git commits | **0.5.0 Undo** |
 | **Determinism** | Full O→I→A→R traces, replay, seed logging, honest reproducibility limits | 0.6.0 Trace → 0.7.5 Audit |
-| **Memory** | Session / project / global layers with incremental indexing | **0.11.0 Memory** (current) |
-| **Domain workflows** | Predefined per-domain workflows in [Archon](https://github.com/coleam00/archon) YAML (`name`, `description`, `nodes`). [ClawHub skills](https://clawhub.ai/dashboard) inspire the domain and workflow list only. Each task context detects the work domain and the Archon workflow it needs (Meta, AI, Security always candidates). `trek workflows run` is an override | 0.12.0 Domains |
+| **Memory** | Session / project / global layers with incremental indexing | **0.11.0 Memory** |
+| **Domain workflows** | Predefined per-domain workflows in [Archon](https://github.com/coleam00/archon) YAML (`name`, `description`, `nodes`). The initial domains come from [self-improving-skills](https://github.com/jose-compu/self-improving-skills). A new domain can be added with its own workflow. Each task context detects the work domain and the Archon workflow it needs (Meta, AI, Security, and Engineering always candidates). A green `workflow` call shows the filled parameters. `trek workflows run` is an override | **0.12.0 Domains** (current) |
 | **Local model hierarchy** | API-first by default. Opt-in `local` / `hybrid` llama.cpp roles (Mistral suite). Frontier is the fourth layer. Per-component routing is later | **0.8.0 Runtime** → **0.9.0 Routing** |
 | **Algebra** | Safe tools run together. Same-file writes stay ordered. The process tree is seeded and reversible | **0.10.0 Algebra** |
 
@@ -22,11 +22,11 @@ Every user turn follows **Observe → Intend → Act → Reflect** (O→I→A→
 
 Pi compatibility is preserved: community packages from [pi.dev/packages](https://pi.dev/packages) install with `trek install npm:<package>`. See [Pi Coding Agent plugins](#pi-coding-agent-plugins) below.
 
-**Version:** 0.11.0 — see [CHANGELOG.md](./CHANGELOG.md). Full plan: [ROADMAP.md](../ROADMAP.md).
+**Version:** 0.12.0 — see [CHANGELOG.md](./CHANGELOG.md). Full plan: [ROADMAP.md](../ROADMAP.md).
 
 ## Status
 
-**0.11.0** is current. Memory is documented in [Memory](#memory). **0.10.0** runs independent reads, and edits of different files, together. `trek processes` prints the seeded tree. `--effort loose` multiplies the effort stops by 10, and `--effort off` does not stop the turn for effort. **0.9.1** hides an edit that already matches the file. **0.9.0** routes each component, keeps same-file edits from colliding, and stops a prompt that repeats a failed command or a no-op edit. **0.8.1** updated production dependencies flagged by `npm audit`. **0.8.0** made remote API the default and kept llama.cpp opt-in. **0.7.0 Audit** shipped the session seed (default `42`), `default` / `strict_audit` modes, per-step `trek:audit_step` records, and honest warnings when a provider cannot honor seed. Bit-exact replay is not claimed on closed APIs or on GPU llama.cpp. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
+**0.12.0** is current. A matching turn draws a green workflow call. Domain commands are in [Domains](#domains). **0.11.0** memory is documented in [Memory](#memory). **0.10.0** runs independent reads, and edits of different files, together. `trek processes` prints the seeded tree. `--effort loose` multiplies the effort stops by 10, and `--effort off` does not stop the turn for effort. **0.9.1** hides an edit that already matches the file. **0.9.0** routes each component, keeps same-file edits from colliding, and stops a prompt that repeats a failed command or a no-op edit. **0.8.1** updated production dependencies flagged by `npm audit`. **0.8.0** made remote API the default and kept llama.cpp opt-in. **0.7.0 Audit** shipped the session seed (default `42`), `default` / `strict_audit` modes, per-step `trek:audit_step` records, and honest warnings when a provider cannot honor seed. Bit-exact replay is not claimed on closed APIs or on GPU llama.cpp. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
 
 ## Memory
 
@@ -66,6 +66,23 @@ Three stores. A row cannot cross a boundary.
 Project `.trek/settings.json` overrides the global settings file. `topK` is an integer from 1 to 50. Each injected hit is cut at 400 characters. At most one thinking row is injected, and only when its score is at least the weakest file or lesson already chosen.
 
 The indexer walks a project directory (a marker such as `.git` or `package.json`, not your home directory). It skips `.git`, `node_modules`, `dist`, `.trek`, lockfiles, binaries, and files over 200 KB. Gitignore applies unless you `/memory add` the path. Embeddings are MiniLM. A file over 200 KB has to be split. `/memory add` and `/memory remove` are stored in `.trek/memory/paths.json`.
+
+## Domains
+
+Twenty Archon workflows ship with the package. Meta, AI, Security, and Engineering stay on and cannot be disabled. The other sixteen start on and can be turned off. A domain added with `trek domains add` starts off.
+
+Each turn scores the task against the enabled terms and injects one workflow. The session draws a green `workflow` call. The domain, the workflow name, and the filled parameters are colored inside that call. The YAML sent to the model stays plain. The next turn selects again.
+
+```bash
+trek domains list
+trek domains disable finance
+trek domains enable finance
+trek domains add warehouse oxblood.yaml
+trek workflows show finance
+trek workflows run finance
+```
+
+`trek workflows run` is an override for that command. A `SKILL.md` file is not a workflow. Added workflows live in `.trek/domains/`.
 
 ## Models
 

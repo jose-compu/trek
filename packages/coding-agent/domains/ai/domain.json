@@ -1,0 +1,12 @@
+{
+	"id": "ai",
+	"title": "AI",
+	"alwaysOn": true,
+	"terms": [
+		"rag retrieval",
+		"hallucination rate",
+		"token cost",
+		"context window"
+	],
+	"workflow": "model-quality.yaml"
+}

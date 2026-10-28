@@ -1,0 +1,11 @@
+{
+	"id": "science",
+	"title": "Science",
+	"alwaysOn": false,
+	"terms": [
+		"data leakage",
+		"p-value",
+		"train test split"
+	],
+	"workflow": "method-check.yaml"
+}

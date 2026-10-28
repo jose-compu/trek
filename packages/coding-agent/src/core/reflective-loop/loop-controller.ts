@@ -1,4 +1,6 @@
 import { debugLog } from "../../utils/debug-log.ts";
+import { loadDomainCatalog } from "../domains/catalog.ts";
+import { type DomainSelection, formatSelection, selectDomain } from "../domains/select.ts";
 import type { SessionManager } from "../session-manager.ts";
 import {
 	buildTraceCycleV1,
@@ -47,12 +49,15 @@ export interface RunPromptCycleOptions {
 	getToolNames?: () => string[];
 	/** Aggregated post-flight laws verdict after Act tools. */
 	getPostFlightVerdict?: () => LawsVerdictRecord | undefined;
+	/** Called after domain selection and before Act, so the tooling prompt can see one workflow. */
+	onDomainSelected?: (selection: DomainSelection) => void;
 }
 
 export class ReflectiveLoopController {
 	private effortRegulator = new EffortRegulator();
 	private subtaskStack = new SubtaskStack();
 	private sessionManager: SessionManager;
+	private previousTask = "";
 
 	constructor(sessionManager: SessionManager) {
 		this.sessionManager = sessionManager;
@@ -141,9 +146,10 @@ export class ReflectiveLoopController {
 		const guarded = runOutputGuard(intention);
 		intention = guarded.intention;
 		components.push(...guarded.components);
+		const selection = this.selectForTurn(options.task, options.cwd);
 		phases.intend = {
 			phase: "intend",
-			summary: `${modelSummary}; ${focusSummary}; ${intention.summary}`,
+			summary: `${modelSummary}; ${focusSummary}; ${intention.summary}; ${formatSelection(selection)}`,
 		};
 
 		// Laws / policy gate (issue #3: PolicyConstraints and Laws are one implementation)
@@ -166,6 +172,7 @@ export class ReflectiveLoopController {
 				phaseTimestamps,
 				startedAt,
 				lawsPre,
+				selection,
 			});
 			persistCycleBoundary(this.sessionManager, trace);
 			throw new Error(policy.reason ?? "Blocked by policy constraints.");
@@ -190,6 +197,7 @@ export class ReflectiveLoopController {
 				phaseTimestamps,
 				startedAt,
 				lawsPre,
+				selection,
 			});
 			persistCycleBoundary(this.sessionManager, trace);
 			throw new Error(phases.act.blockReason);
@@ -197,6 +205,7 @@ export class ReflectiveLoopController {
 
 		// A — Act (delegate to existing agent loop)
 		const actMark = markPhase("act");
+		options.onDomainSelected?.(selection);
 		await options.act();
 		const actResult = summarizeAct(ctx, options.getMessageCount());
 		this.effortRegulator.updateProgress(intention.summary, actResult.messageCountAfter > ctx.messageCount);
@@ -221,6 +230,7 @@ export class ReflectiveLoopController {
 			lawsPre,
 			lawsPost: options.getPostFlightVerdict?.(),
 			toolNames: options.getToolNames?.() ?? [],
+			selection,
 		});
 		persistCycleBoundary(this.sessionManager, trace);
 		debugLog("reflective-loop", "cycle complete", { cycleNumber, cycleId, promptId: ctx.promptId });
@@ -238,6 +248,7 @@ export class ReflectiveLoopController {
 		lawsPre?: LawsVerdictRecord;
 		lawsPost?: LawsVerdictRecord;
 		toolNames?: string[];
+		selection?: DomainSelection;
 	}): ReflectiveCycleTrace {
 		return buildTraceCycleV1({
 			cycleNumber: args.cycleNumber,
@@ -253,6 +264,17 @@ export class ReflectiveLoopController {
 			toolNames: args.toolNames ?? [],
 			lawsPre: args.lawsPre,
 			lawsPost: args.lawsPost,
+			domain: args.selection?.domain,
+			workflow: args.selection?.workflow,
+			selectionReason: args.selection?.selectionReason,
+			nodeIds: args.selection?.nodeIds,
 		});
+	}
+
+	private selectForTurn(task: string, cwd: string): DomainSelection {
+		const catalog = loadDomainCatalog(cwd);
+		const selection = selectDomain(catalog, { task, previous: this.previousTask });
+		this.previousTask = task;
+		return selection;
 	}
 }

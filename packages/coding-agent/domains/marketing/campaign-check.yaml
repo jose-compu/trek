@@ -1,0 +1,15 @@
+name: campaign-check
+description: |
+  Check a campaign miss: a CTR drop, a brand sentiment shift, or broken UTM attribution. Do not publish.
+nodes:
+  - id: name-metric
+    prompt: |
+      Name the metric, the channel, and the comparison window.
+  - id: separate-signal
+    prompt: |
+      Separate a real CTR drop or sentiment shift from a broken UTM attribution or a definition change.
+    depends_on: [name-metric]
+  - id: one-change
+    prompt: |
+      Propose one message or measurement change. Do not publish it.
+    depends_on: [separate-signal]

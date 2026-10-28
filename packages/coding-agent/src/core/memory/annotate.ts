@@ -3,7 +3,7 @@
  * The embedder sees the header. The stored row keeps the raw body.
  */
 
-import { embedTextForChunk, buildSituatingHeader } from "logosdb-mcp-server/dist/chunk-context.js";
+import { buildSituatingHeader, embedTextForChunk } from "logosdb-mcp-server/dist/chunk-context.js";
 import { type Chunk, resolveChunkMode } from "logosdb-mcp-server/dist/chunker.js";
 
 export type MemoryKind = "lesson" | "file" | "turn" | "thinking" | "handoff";

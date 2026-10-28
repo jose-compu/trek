@@ -1,0 +1,19 @@
+name: repair-dialogue
+description: |
+  Repair a conversation after a tone mismatch, user frustration, or lost context. Do not edit prompt files.
+nodes:
+  - id: name-break
+    prompt: |
+      Name the break: tone mismatch, user frustration, lost context, or a repeated rephrase.
+  - id: restate-ask
+    prompt: |
+      Restate the user's ask in one sentence.
+    depends_on: [name-break]
+  - id: drop-tone
+    prompt: |
+      Drop the phrasing that caused the mismatch. Do not apologize at length.
+    depends_on: [restate-ask]
+  - id: answer-once
+    prompt: |
+      Answer the restated ask once. Do not edit prompt files or skills.
+    depends_on: [drop-tone]

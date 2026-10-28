@@ -1,0 +1,11 @@
+{
+	"id": "business",
+	"title": "Business",
+	"alwaysOn": false,
+	"terms": [
+		"kpi definition",
+		"approval bottleneck",
+		"stakeholder handoff"
+	],
+	"workflow": "decision-path.yaml"
+}

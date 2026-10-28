@@ -1,0 +1,23 @@
+name: metric-trust
+description: |
+  Decide whether a metric can be trusted. Check the metric definition, data freshness, the ETL pipeline, and the dashboard.
+nodes:
+  - id: name-metric
+    prompt: |
+      Name the metric, the grain, and the time window. If two teams use the same name, say both definitions.
+  - id: check-freshness
+    prompt: |
+      State the latest timestamp and whether the data freshness SLA is missed.
+    depends_on: [name-metric]
+  - id: compare-definitions
+    prompt: |
+      If definitions disagree, quote both. Do not average them.
+    depends_on: [check-freshness]
+  - id: locate-break
+    prompt: |
+      Point at the ETL pipeline step, schema change, or dashboard filter that explains the number.
+    depends_on: [compare-definitions]
+  - id: correct
+    prompt: |
+      State the correction or the next query. Do not publish a replacement number you have not calculated.
+    depends_on: [locate-break]

@@ -1,0 +1,12 @@
+{
+	"id": "engineering",
+	"title": "Engineering",
+	"alwaysOn": true,
+	"terms": [
+		"build failed",
+		"architecture violation",
+		"flaky test",
+		"tech debt"
+	],
+	"workflow": "change-review.yaml"
+}

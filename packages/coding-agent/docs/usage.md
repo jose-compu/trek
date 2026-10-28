@@ -206,6 +206,14 @@ Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`, `remember
 
 See [Memory](memory.md).
 
+### Domains
+
+`trek domains` lists the twenty initial domains. Meta, AI, Security, and Engineering stay on. `trek domains disable <id>` removes another domain from the next turn. `trek domains add <id> <file.yaml>` copies an Archon workflow into `.trek/domains/` and leaves it disabled until `trek domains enable`.
+
+`trek workflows show <id>` prints the YAML. `trek workflows run <id>` runs that workflow for this command. The next prompt detects a domain again. A `SKILL.md` file is not a workflow.
+
+When a turn matches a domain, the session draws a green `workflow` call. The domain, the workflow name, and the filled parameters are colored inside that call. The YAML sent to the model stays plain.
+
 ### Resource Options
 
 | Option | Description |

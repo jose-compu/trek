@@ -1,0 +1,19 @@
+name: people-process
+description: |
+  Review a people-process gap: a candidate drop, an exit interview theme, or an I-9 issue. Do not decide employment.
+nodes:
+  - id: name-stage
+    prompt: |
+      Name the process stage and the date. Redact the person's name unless the user already used it for this task.
+  - id: check-policy
+    prompt: |
+      Name the policy the step is supposed to follow.
+    depends_on: [name-stage]
+  - id: redact
+    prompt: |
+      Remove health, identity-document, and compensation details from the reply.
+    depends_on: [check-policy]
+  - id: propose-fix
+    prompt: |
+      Propose a process fix. Do not hire, fire, or score a person.
+    depends_on: [redact]

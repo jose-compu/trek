@@ -1,0 +1,19 @@
+name: change-review
+description: |
+  Review an engineering change: a build failed, an architecture violation, a flaky test, or tech debt. Trek is a coding agent, so this domain stays on.
+nodes:
+  - id: state-constraint
+    prompt: |
+      State the design constraint the change must keep.
+  - id: check-build
+    prompt: |
+      Name the build, test, or dependency failure. If none has been run, say so.
+    depends_on: [state-constraint]
+  - id: name-debt
+    prompt: |
+      Name the tech debt or the architecture violation, or say there is none in this turn.
+    depends_on: [check-build]
+  - id: apply-or-refuse
+    prompt: |
+      Apply the smallest change that meets the constraint, or refuse it and say why.
+    depends_on: [name-debt]

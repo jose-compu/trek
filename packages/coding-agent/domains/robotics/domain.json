@@ -1,0 +1,11 @@
+{
+	"id": "robotics",
+	"title": "Robotics",
+	"alwaysOn": false,
+	"terms": [
+		"failed to localize",
+		"safety stop",
+		"sim to real"
+	],
+	"workflow": "autonomy-fault.yaml"
+}

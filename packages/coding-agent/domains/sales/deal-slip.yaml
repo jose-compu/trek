@@ -1,0 +1,19 @@
+name: deal-slip
+description: |
+  Review a deal that slipped, a pricing mistake, or a win loss pattern. Do not discount.
+nodes:
+  - id: name-stage
+    prompt: |
+      Name the stage, the slip, and the date. Do not invent a forecast.
+  - id: objection
+    prompt: |
+      Name the objection that has shown up more than once, or say none was given.
+    depends_on: [name-stage]
+  - id: pricing-error
+    prompt: |
+      If there is a pricing mistake, state the figure the user supplied. Do not offer a discount.
+    depends_on: [objection]
+  - id: next-question
+    prompt: |
+      Give the next question to ask. Do not commit a price.
+    depends_on: [pricing-error]

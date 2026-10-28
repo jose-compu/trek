@@ -146,7 +146,18 @@ export function parseCycleTrace(data: unknown, options: ParseCycleTraceOptions =
 		components,
 		toolNames: parseToolNames(raw.toolNames),
 		lawsVerdict: normalizeLawsVerdict(raw.lawsVerdict),
+		domain: typeof raw.domain === "string" ? raw.domain : undefined,
+		workflow: typeof raw.workflow === "string" ? raw.workflow : undefined,
+		selectionReason: parseSelectionReason(raw.selectionReason),
+		nodeIds: parseToolNames(raw.nodeIds),
 	};
+}
+
+function parseSelectionReason(value: unknown): ReflectiveCycleTrace["selectionReason"] {
+	if (value === "match" || value === "none" || value === "operator_override") {
+		return value;
+	}
+	return undefined;
 }
 
 export function parseCycleTraceFromEntry(entry: SessionEntry): ReflectiveCycleTrace | undefined {
@@ -170,6 +181,10 @@ export interface BuildTraceCycleInput {
 	toolNames?: string[];
 	lawsPre?: LawsVerdictRecord;
 	lawsPost?: LawsVerdictRecord;
+	domain?: string;
+	workflow?: string;
+	selectionReason?: ReflectiveCycleTrace["selectionReason"];
+	nodeIds?: string[];
 }
 
 export function buildTraceCycleV1(input: BuildTraceCycleInput): ReflectiveCycleTrace {
@@ -187,5 +202,9 @@ export function buildTraceCycleV1(input: BuildTraceCycleInput): ReflectiveCycleT
 		components: input.components,
 		toolNames: input.toolNames ?? [],
 		lawsVerdict: { pre: input.lawsPre, post: input.lawsPost },
+		domain: input.domain,
+		workflow: input.workflow,
+		selectionReason: input.selectionReason,
+		nodeIds: input.nodeIds,
 	};
 }

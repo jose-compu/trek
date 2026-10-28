@@ -7,14 +7,14 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { fakeEmbedder, type Embedder } from "../src/core/memory/embedder.ts";
-import { formatRecallDisplay } from "../src/core/tools/memory.ts";
-import type { Theme, ThemeColor } from "../src/modes/interactive/theme/theme.ts";
+import { type Embedder, fakeEmbedder } from "../src/core/memory/embedder.ts";
 import { isIndexableProject } from "../src/core/memory/index-files.ts";
-import { MemoryManager, selectInjection, type MemoryHit } from "../src/core/memory/manager.ts";
+import { type MemoryHit, MemoryManager, selectInjection } from "../src/core/memory/manager.ts";
 import { shouldConstructCrossEncoder } from "../src/core/memory/rerank.ts";
 import { captureTurn } from "../src/core/memory/turns.ts";
 import type { MemorySettings } from "../src/core/settings-manager.ts";
+import { formatRecallDisplay } from "../src/core/tools/memory.ts";
+import type { Theme, ThemeColor } from "../src/modes/interactive/theme/theme.ts";
 
 const dirs: string[] = [];
 
@@ -31,7 +31,12 @@ function settings(extra: Partial<MemorySettings> = {}): Required<MemorySettings>
 	return { enabled: true, session: true, project: true, global: false, topK: 5, ...extra };
 }
 
-function manager(cwd: string, sessionId: string, embedder: Embedder = fakeEmbedder(), extra: Partial<MemorySettings> = {}) {
+function manager(
+	cwd: string,
+	sessionId: string,
+	embedder: Embedder = fakeEmbedder(),
+	extra: Partial<MemorySettings> = {},
+) {
 	return new MemoryManager({
 		cwd,
 		sessionId,
@@ -109,7 +114,10 @@ describe("memory layers", () => {
 		writeFileSync(file, "beta token billing-new\n");
 		await waitFor(async () => {
 			hits = await mem.recall("billing-new");
-			return hits.some((hit) => hit.text.includes("billing-new")) && !hits.some((hit) => hit.text.includes("billing-old"));
+			return (
+				hits.some((hit) => hit.text.includes("billing-new")) &&
+				!hits.some((hit) => hit.text.includes("billing-old"))
+			);
 		});
 		mem.close();
 	});
@@ -157,7 +165,7 @@ describe("memory layers", () => {
 		const row = hits.find((hit) => hit.kind === "thinking");
 		expect(row?.text).toContain(thinking);
 		expect(row?.text).not.toContain("opaque-signature");
-		expect(row && row.text.length).toBeLessThanOrEqual(thinking.length + 20);
+		expect(row?.text.length).toBeLessThanOrEqual(thinking.length + 20);
 		const turn = hits.find((hit) => hit.kind === "turn");
 		expect(turn?.text).not.toContain(thinking);
 
@@ -306,14 +314,14 @@ describe("rerank policy", () => {
 		const use = shouldConstructCrossEncoder({ effectiveMode: "local", suite: "mistral" });
 		const calls: string[][] = [];
 		const reranker = use
-			? ((constructed = true),
-				{
+			? {
 					async rerank(_query: string, documents: string[]) {
 						calls.push(documents);
 						return documents.map((_, index) => documents.length - 1 - index);
 					},
-				})
+				}
 			: undefined;
+		if (reranker) constructed = true;
 		expect(constructed).toBe(true);
 		const mem = new MemoryManager({
 			cwd,
