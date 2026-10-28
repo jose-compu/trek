@@ -87,7 +87,9 @@ jobs:
             trek-windows-arm64.zip \
             --clobber
 
+  # GitHub release only. npm publish stays off.
   publish-npm:
+    if: false
     runs-on: ubuntu-latest
     needs: build
     environment: npm-publish

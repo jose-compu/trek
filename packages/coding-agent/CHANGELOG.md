@@ -4,6 +4,8 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-28
+
 ### Added
 
 - Operator modes for 0.13. `supervised` waits on a gated tool. `delegated` runs a gated tool named in `--operator-grant`. `checkpoint` keeps the act phase closed until it is opened. `diagnostic` remains trace-only. The laws are unchanged.
