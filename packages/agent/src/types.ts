@@ -58,6 +58,11 @@ export interface BeforeToolCallResult {
 	block?: boolean;
 	reason?: string;
 	isError?: boolean;
+	/**
+	 * Stop the turn after this blocked result. Used when the same no-op edit is reported again.
+	 * Early termination only happens when every finalized tool result in the batch sets this to true.
+	 */
+	terminate?: boolean;
 }
 
 /**

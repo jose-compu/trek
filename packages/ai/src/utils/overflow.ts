@@ -87,7 +87,8 @@ const NON_OVERFLOW_PATTERNS = [
  * - Anthropic: "prompt is too long: X tokens > Y maximum" or "request_too_large"
  * - OpenAI (Completions & Responses): "exceeds the context window" or "exceeds the model's maximum context length of X tokens"
  * - Google Gemini: "input token count exceeds the maximum"
- * - xAI (Grok): "maximum prompt length is X but request contains Y"
+ * - xAI (Grok): "maximum prompt length is X but request contains Y", or a silent
+ *   `stop` whose reported input exceeds the window
  * - Groq: "reduce the length of the messages"
  * - Cerebras: 400/413 status code (no body)
  * - Mistral: "Prompt contains X tokens ... too large for model with Y maximum context length"

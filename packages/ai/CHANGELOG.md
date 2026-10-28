@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- xAI may accept an over-window prompt. Overflow is still detected when the reported input exceeds the window.
+
 ## [0.8.1] - 2026-10-01
 
 ## [0.8.0] - 2026-09-30

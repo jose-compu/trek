@@ -4,7 +4,12 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { executeBashWithOperations } from "../src/core/bash-executor.ts";
-import { type BashOperations, createBashTool, createLocalBashOperations } from "../src/core/tools/bash.ts";
+import {
+	type BashOperations,
+	bashCollapsedText,
+	createBashTool,
+	createLocalBashOperations,
+} from "../src/core/tools/bash.ts";
 import { computeEditsDiff } from "../src/core/tools/edit-diff.ts";
 import {
 	createEditTool,
@@ -448,6 +453,19 @@ describe("Coding Agent Tools", () => {
 			await expect(bashTool.execute("test-call-9", { command: "exit 1" })).rejects.toThrow(
 				/(Command failed|code 1)/,
 			);
+		});
+
+		it("puts located compiler errors ahead of the exit code", async () => {
+			const command = "printf '%s\\n' 'error: Peano/Basic.lean:19:0: invalid export' 'error: build failed'; exit 1";
+			await expect(bashTool.execute("test-call-9b", { command })).rejects.toThrow(
+				/^error: Peano\/Basic\.lean:19:0: invalid export/,
+			);
+			const collapsed = bashCollapsedText(
+				"trace: lake\nerror: Peano/Basic.lean:19:0: invalid export\nerror: build failed\n\nCommand exited with code 1",
+			);
+			expect(collapsed).toContain("error: Peano/Basic.lean:19:0: invalid export");
+			expect(collapsed).toContain("Command exited with code 1");
+			expect(collapsed?.startsWith("error: Peano/Basic.lean:19:0:")).toBe(true);
 		});
 
 		it("should respect timeout", async () => {

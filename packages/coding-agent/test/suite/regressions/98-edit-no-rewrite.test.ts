@@ -119,6 +119,33 @@ describe("regression #98: edit must not trigger a full rewrite", () => {
 		expect(texts.some((text) => /already applied/i.test(text))).toBe(false);
 	});
 
+	it("reports an already-matching edit once, then stops", async () => {
+		const harness = await createHarness();
+		harnesses.push(harness);
+		const editArgs = {
+			path: "Peano.lean",
+			edits: [{ oldText: "theorem t : True := by\n  rfl\n", newText: "theorem t : True := by\n  rfl\n" }],
+		};
+		harness.setResponses([
+			fauxAssistantMessage(
+				[fauxToolCall("write", { path: "Peano.lean", content: "theorem t : True := by\n  rfl\n" })],
+				{ stopReason: "toolUse" },
+			),
+			fauxAssistantMessage([fauxToolCall("edit", editArgs)], { stopReason: "toolUse" }),
+			fauxAssistantMessage([fauxToolCall("edit", editArgs)], { stopReason: "toolUse" }),
+			fauxAssistantMessage([fauxToolCall("edit", editArgs)], { stopReason: "toolUse" }),
+			fauxAssistantMessage("should-not-run"),
+		]);
+
+		await harness.session.prompt("edit the proof");
+
+		const texts = toolTexts(harness, "edit");
+		expect(texts[0]).toMatch(/No change needed in Peano.lean/);
+		expect(texts.filter((text) => text.includes("The matched text already equals the replacement.")).length).toBe(1);
+		expect(texts[1]).toMatch(/already reported/);
+		expect(harness.getPendingResponseCount()).toBe(2);
+	});
+
 	it("refuses an edit that restores text replaced earlier in the prompt", async () => {
 		const harness = await createHarness();
 		harnesses.push(harness);
@@ -158,6 +185,42 @@ describe("regression #98: edit must not trigger a full rewrite", () => {
 		expect(texts[0]).toMatch(/Successfully replaced/);
 		expect(texts[1]).toMatch(/puts back text already replaced/);
 		expect(texts[1]).toMatch(/Peano.lean:38:14/);
+	});
+
+	it("refuses a larger edit that puts a replaced line back", async () => {
+		const harness = await createHarness();
+		harnesses.push(harness);
+		const removed = "  | succ m ih => rw [mul_succ, ih, mul_succ, add_comm]; rw [add_comm]";
+		const written = "  | succ m ih => rw [mul, ih, mul_succ n m]; rfl";
+		harness.setResponses([
+			fauxAssistantMessage([fauxToolCall("write", { path: "Peano.lean", content: `${removed}\n` })], {
+				stopReason: "toolUse",
+			}),
+			fauxAssistantMessage(
+				[fauxToolCall("edit", { path: "Peano.lean", edits: [{ oldText: removed, newText: written }] })],
+				{ stopReason: "toolUse" },
+			),
+			fauxAssistantMessage(
+				[
+					fauxToolCall("edit", {
+						path: "Peano.lean",
+						edits: [
+							{
+								oldText: `theorem mul_comm (m n : MyNat) : mul m n = mul n m := by\n${written}`,
+								newText: `theorem mul_comm (m n : MyNat) : mul m n = mul n m := by\n${removed}`,
+							},
+						],
+					}),
+				],
+				{ stopReason: "toolUse" },
+			),
+			fauxAssistantMessage("done"),
+		]);
+
+		await harness.session.prompt("fix the proof");
+
+		expect(readFileSync(join(harness.tempDir, "Peano.lean"), "utf-8")).toBe(`${written}\n`);
+		expect(toolTexts(harness, "edit")[1]).toMatch(/puts back text already replaced/);
 	});
 
 	it("applies a later different edit of the same file", async () => {

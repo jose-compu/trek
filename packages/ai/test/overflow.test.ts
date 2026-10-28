@@ -103,6 +103,12 @@ describe("isContextOverflow", () => {
 		};
 	}
 
+	it("detects a silent stop whose input exceeds the context window", () => {
+		const message = createLengthStopMessage(161404, 128, 55);
+		message.stopReason = "stop";
+		expect(isContextOverflow(message, 131072)).toBe(true);
+	});
+
 	it("detects Xiaomi-style overflow (length stop with zero output and filled context)", () => {
 		const message = createLengthStopMessage(58, 1048512, 0);
 		expect(isContextOverflow(message, 1048576)).toBe(true);

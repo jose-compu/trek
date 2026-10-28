@@ -152,6 +152,35 @@ export interface BashToolOptions {
 }
 
 const BASH_PREVIEW_LINES = 5;
+const DIAGNOSTIC_LINE = /^\s*error:\s+\S+:\d+:\d+:/;
+
+/** Located compiler errors, such as `error: File.lean:19:0: ...`. Generic build lines are omitted. */
+export function compilerDiagnosticLines(output: string): string[] {
+	const found = output
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => DIAGNOSTIC_LINE.test(line));
+	return [...new Set(found)].slice(0, 12);
+}
+
+/** Collapsed bash view for a failed build: the diagnostics, not the trailing exit line. */
+export function bashCollapsedText(output: string): string | undefined {
+	const found = compilerDiagnosticLines(output);
+	if (found.length === 0) {
+		return undefined;
+	}
+	const shown = found.slice(0, 8);
+	const extra = found.length - shown.length;
+	const status = [...output.split("\n")].reverse().find((line) => /^Command exited with code \d+/.test(line.trim()));
+	const parts = [...shown];
+	if (extra > 0) {
+		parts.push(`... ${extra} more error lines`);
+	}
+	if (status) {
+		parts.push(status.trim());
+	}
+	return parts.join("\n");
+}
 const BASH_UPDATE_THROTTLE_MS = 100;
 
 type BashRenderState = {
@@ -222,9 +251,22 @@ function rebuildBashResultRenderComponent(
 			component.addChild({
 				render: (width: number) => {
 					if (state.cachedLines === undefined || state.cachedWidth !== width) {
-						const preview = truncateToVisualLines(styledOutput, BASH_PREVIEW_LINES, width);
+						const collapsed = bashCollapsedText(output);
+						const previewSource = collapsed
+							? collapsed
+									.split("\n")
+									.map((line) => theme.fg("toolOutput", line))
+									.join("\n")
+							: styledOutput;
+						const preview = truncateToVisualLines(
+							previewSource,
+							collapsed ? Math.max(BASH_PREVIEW_LINES, collapsed.split("\n").length) : BASH_PREVIEW_LINES,
+							width,
+						);
 						state.cachedLines = preview.visualLines;
-						state.cachedSkipped = preview.skippedCount;
+						state.cachedSkipped = collapsed
+							? Math.max(output.split("\n").length - collapsed.split("\n").length, 0)
+							: preview.skippedCount;
 						state.cachedWidth = width;
 					}
 					if (state.cachedSkipped && state.cachedSkipped > 0) {
@@ -408,7 +450,9 @@ export function createBashToolDefinition(
 				const snapshot = await finishOutput();
 				const { text: outputText, details } = formatOutput(snapshot);
 				if (exitCode !== 0 && exitCode !== null) {
-					throw new Error(appendStatus(outputText, `Command exited with code ${exitCode}`));
+					const diagnostics = compilerDiagnosticLines(outputText);
+					const lead = diagnostics.length > 0 ? `${diagnostics.join("\n")}\n\n` : "";
+					throw new Error(lead + appendStatus(outputText, `Command exited with code ${exitCode}`));
 				}
 				return { content: [{ type: "text", text: outputText }], details };
 			} finally {

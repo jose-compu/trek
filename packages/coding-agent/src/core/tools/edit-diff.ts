@@ -331,18 +331,18 @@ function oldTextForMatch(content: string, oldText: string): string {
 	return oldText;
 }
 
-/** True when at least one oldText is still in the file, so a cached edit must run again. */
+/** True when a cached edit would still change the file. An already-matching replacement does not. */
 export function editStillNeeded(content: string, edits: Edit[]): boolean {
-	const normalized = normalizeToLF(stripBom(content).text);
-	for (const edit of edits) {
-		if (typeof edit.oldText !== "string" || edit.oldText.length === 0) {
-			return true;
-		}
-		if (fuzzyFindText(normalized, normalizeToLF(edit.oldText)).found) {
-			return true;
-		}
+	if (!Array.isArray(edits) || edits.length === 0) {
+		return true;
 	}
-	return false;
+	const normalized = normalizeToLF(stripBom(content).text);
+	try {
+		return applyEditsToNormalizedContent(normalized, edits, "").unchanged !== true;
+	} catch (error) {
+		const message = error instanceof Error ? error.message : "";
+		return !message.includes("Could not find");
+	}
 }
 
 function collectAllMatches(

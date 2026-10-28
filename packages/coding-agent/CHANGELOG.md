@@ -10,7 +10,9 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 - An `edit` whose middle lines drifted still replaces the block when the first and last lines uniquely bound a region of similar size. Copied line-number prefixes are ignored. A miss quotes the current lines.
 - An `edit` whose replacement already matches the file reports that no change is needed. It does not fail, and it does not blame special characters.
 - Different edits of the same file are no longer treated as one edit. A turn may edit different files together. A second edit of the same file in that turn waits.
-- An edit that puts back text already replaced in the same prompt is refused. The latest command errors stay in that result.
+- An edit that puts back text already replaced in the same prompt is refused, including when that text sits inside a larger block. The latest command errors stay in that result.
+- An edit that already matches the file is reported once. The same notice does not repeat.
+- A failed command shows the located `error:` lines before the exit code. The same errors stop the turn, and so does the fourth failure of that command.
 
 ### Added
 

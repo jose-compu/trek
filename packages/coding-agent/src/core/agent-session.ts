@@ -98,6 +98,7 @@ import {
 	appendEffortReason,
 	createReflectiveMetaToolDefinitions,
 	EFFORT_COST_BUDGET,
+	EFFORT_REPEAT_LIMIT,
 	EffortRegulator,
 	effortActionKey,
 	isReflectiveLoopEnabled,
@@ -311,6 +312,14 @@ function compactEditText(text: string): string {
 	return text.replace(/\s+/g, " ").trim();
 }
 
+function bashErrorSignature(text: string): string {
+	const lines = text
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => /^\s*error:\s+\S+:\d+:\d+:/.test(line));
+	return [...new Set(lines)].join("\n");
+}
+
 /** Stable JSON that keeps nested edit text. A key-array replacer would drop oldText and newText. */
 function canonicalJson(value: unknown): string {
 	if (Array.isArray(value)) {
@@ -405,6 +414,12 @@ export class AgentSession {
 	private _appliedEdits: Array<{ path: string; oldText: string; newText: string }> = [];
 	/** Error lines from the latest failed command, shown when an edit would undo one. */
 	private _lastCommandErrors: string | undefined;
+	/** Last failed command and its located errors. The same pair again ends the turn. */
+	private _lastBashFailure: { key: string; errors: string } | undefined;
+	/** Failed runs of one command in this prompt. Other tools do not reset it. */
+	private _bashFailCounts = new Map<string, number>();
+	/** Edits that already matched the file. The second one ends the turn. */
+	private _noChangeCount = 0;
 	private _lastPromptTask = "";
 	/** Tools executed during the current reflective cycle (trace schema v1). */
 	private _cycleToolNames: string[] = [];
@@ -686,9 +701,37 @@ export class AgentSession {
 			.map((part) => part.text)
 			.join("\n")
 			.trim();
-		const learned = isError && text.length > 0 && text !== this._lastEffortError;
+		const noChange = name === "edit" && text.includes("No change needed");
+		if (noChange) {
+			this._noChangeCount += 1;
+		}
+		let learned = isError && text.length > 0 && text !== this._lastEffortError;
+		let sameErrors = false;
+		let repeatedCommand = false;
+		if (name === "bash" && isError) {
+			const errors = bashErrorSignature(text);
+			const key = effortActionKey(name, args);
+			const count = (this._bashFailCounts.get(key) ?? 0) + 1;
+			this._bashFailCounts.set(key, count);
+			if (errors.length > 0 && this._lastBashFailure?.key === key && this._lastBashFailure.errors === errors) {
+				learned = false;
+				sameErrors = true;
+			} else if (errors.length > 0) {
+				this._lastBashFailure = { key, errors };
+			}
+			repeatedCommand = count >= EFFORT_REPEAT_LIMIT;
+		}
 		this._lastEffortError = isError ? text : undefined;
-		this._effort.updateProgress(effortActionKey(name, args), !isError || learned);
+		this._effort.updateProgress(effortActionKey(name, args), (!isError || learned) && !noChange);
+		if (noChange && this._noChangeCount >= 2) {
+			return "EffortRegulator stopped: no change.";
+		}
+		if (sameErrors) {
+			return "EffortRegulator stopped: same errors.";
+		}
+		if (repeatedCommand) {
+			return "EffortRegulator stopped: same command failed.";
+		}
 		return this._effort.stopReason();
 	}
 
@@ -938,10 +981,17 @@ export class AgentSession {
 			}
 			const next = compactEditText(edit.newText);
 			const prev = compactEditText(edit.oldText);
-			const restored = this._appliedEdits.some(
-				(item) =>
-					item.path === path && compactEditText(item.oldText) === next && compactEditText(item.newText) === prev,
-			);
+			const restored = this._appliedEdits.some((item) => {
+				if (item.path !== path) {
+					return false;
+				}
+				const removed = compactEditText(item.oldText);
+				const written = compactEditText(item.newText);
+				if (removed === next && written === prev) {
+					return true;
+				}
+				return removed.length >= 24 && written.length >= 24 && prev.includes(written) && next.includes(removed);
+			});
 			if (!restored) {
 				continue;
 			}
@@ -981,9 +1031,18 @@ export class AgentSession {
 		block: true;
 		reason: string;
 		isError: boolean;
+		terminate?: boolean;
 	} {
 		const text = stripIdempotentPrefix(cached.text).trim();
 		const noun = this._mutationNoun(toolName);
+		if (noun === "edit" && text.includes("No change needed")) {
+			return {
+				block: true,
+				reason: "No change needed. That edit was already reported. Continue with a different change.",
+				isError: false,
+				terminate: true,
+			};
+		}
 		const head =
 			noun === "edit"
 				? "This exact edit already applied in this prompt. The file already has this change. Continue with the next step. Do not rewrite the file."
@@ -2021,6 +2080,9 @@ export class AgentSession {
 			this._lastEffortError = undefined;
 			this._appliedEdits = [];
 			this._lastCommandErrors = undefined;
+			this._lastBashFailure = undefined;
+			this._bashFailCounts = new Map();
+			this._noChangeCount = 0;
 			this._effort.beginPrompt(EFFORT_COST_BUDGET);
 			await this.agent.prompt(messages);
 			while (await this._handlePostAgentRun()) {

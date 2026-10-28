@@ -47,6 +47,57 @@ describe("effort regulator", () => {
 		expect(harness.getPendingResponseCount()).toBe(1);
 	});
 
+	it("stops when the same command fails with the same errors", async () => {
+		const harness = await createHarness();
+		harnesses.push(harness);
+		const fail = fauxAssistantMessage(
+			[
+				fauxToolCall("bash", {
+					command: "printf '%s\\n' 'error: Peano/Basic.lean:38:14: unsolved goals'; exit 1",
+				}),
+			],
+			{ stopReason: "toolUse" },
+		);
+		harness.setResponses([fail, fail, fauxAssistantMessage("should-not-run")]);
+
+		await harness.session.prompt("build twice");
+
+		const texts = harness.session.messages
+			.filter((message) => message.role === "toolResult")
+			.flatMap((message) => message.content.filter((part) => part.type === "text").map((part) => part.text));
+		expect(texts.some((text) => text.includes("EffortRegulator stopped: same errors."))).toBe(true);
+		expect(texts.filter((text) => text.includes("error: Peano/Basic.lean:38:14: unsolved goals")).length).toBe(2);
+		expect(harness.getPendingResponseCount()).toBe(1);
+	});
+
+	it("stops the fourth failure of one command even when the errors change", async () => {
+		const harness = await createHarness();
+		harnesses.push(harness);
+		const command =
+			'n=$(cat .n 2>/dev/null || echo 0); n=$((n+1)); echo "$n" > .n; printf "error: Peano.lean:%s:1: unsolved goals\\n" "$n"; exit 1';
+		const steps = Array.from({ length: EFFORT_REPEAT_LIMIT }, () => [
+			fauxAssistantMessage([fauxToolCall("read", { path: "Peano.lean" })], { stopReason: "toolUse" as const }),
+			fauxAssistantMessage([fauxToolCall("bash", { command })], { stopReason: "toolUse" as const }),
+		]).flat();
+		harness.setResponses([
+			fauxAssistantMessage([fauxToolCall("write", { path: "Peano.lean", content: "x\n" })], {
+				stopReason: "toolUse",
+			}),
+			...steps,
+			fauxAssistantMessage("should-not-run"),
+		]);
+
+		await harness.session.prompt("rebuild");
+
+		const texts = harness.session.messages
+			.filter((message) => message.role === "toolResult")
+			.flatMap((message) => message.content.filter((part) => part.type === "text").map((part) => part.text));
+		expect(texts.some((text) => text.includes("EffortRegulator stopped: same command failed."))).toBe(true);
+		expect(texts.some((text) => text.includes("error: Peano.lean:1:1: unsolved goals"))).toBe(true);
+		expect(texts.some((text) => text.includes("error: Peano.lean:4:1: unsolved goals"))).toBe(true);
+		expect(harness.getPendingResponseCount()).toBe(1);
+	});
+
 	it("keeps going when each error reports something new", async () => {
 		const harness = await createHarness();
 		harnesses.push(harness);

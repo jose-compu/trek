@@ -310,7 +310,8 @@ describe("Context overflow error handling", () => {
 
 	// =============================================================================
 	// xAI
-	// Expected pattern: "maximum prompt length is X but the request contains Y"
+	// May return "maximum prompt length is X but the request contains Y",
+	// or accept the prompt and stop with usage.input above the window.
 	// =============================================================================
 
 	describe.skipIf(!process.env.XAI_API_KEY)("xAI", () => {
@@ -319,8 +320,12 @@ describe("Context overflow error handling", () => {
 			const result = await testContextOverflow(model, process.env.XAI_API_KEY!);
 			logResult(result);
 
-			expect(result.stopReason).toBe("error");
-			expect(result.errorMessage).toMatch(/maximum prompt length is \d+/i);
+			if (result.stopReason === "error") {
+				expect(result.errorMessage).toMatch(/maximum prompt length is \d+/i);
+			} else {
+				expect(result.stopReason).toBe("stop");
+				expect(result.usage.input + result.usage.cacheRead).toBeGreaterThan(model.contextWindow);
+			}
 			expect(isContextOverflow(result.response, model.contextWindow)).toBe(true);
 		}, 120000);
 	});

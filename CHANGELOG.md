@@ -12,7 +12,10 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 - An `edit` that misses because the middle of a block drifted still applies when the first and last lines bound that block. A miss includes the current lines instead of only a token.
 - An `edit` that matches text already equal to the replacement reports that no change is needed instead of failing.
 - Parallel edits apply to different files. A second edit of the same file in one turn is not dropped as a duplicate.
-- An edit that restores text already replaced in the same prompt is refused, and the latest command errors are repeated there.
+- An edit that restores text already replaced in the same prompt is refused, including inside a larger block, and the latest command errors are repeated there.
+- An edit that already matches the file is reported once. The same notice does not repeat.
+- A failed command leads with the located compiler errors. The same errors stop the turn, and so does the fourth failure of that command.
+- xAI may accept an over-window prompt and return stop. Overflow is still detected when the reported input exceeds the window.
 
 ### Added
 
