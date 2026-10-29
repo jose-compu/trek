@@ -4,6 +4,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Added
+
+- `spawn_branches` runs up to four independent subtasks in parallel. Each branch gets its summary only and the same tools, laws, and operator mode. A file written by one branch is claimed for that spawn. Bash calls and confirm dialogs run one at a time. HALT stops every branch. `gather` merges branch summaries in the order given.
+
 ## [0.13.1] - 2026-10-29
 
 ### Added
