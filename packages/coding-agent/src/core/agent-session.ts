@@ -17,7 +17,14 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import type { Agent, AgentEvent, AgentMessage, AgentState, AgentTool, ThinkingLevel } from "@trek/agent-core";
+import {
+	Agent,
+	type AgentEvent,
+	type AgentMessage,
+	type AgentState,
+	type AgentTool,
+	type ThinkingLevel,
+} from "@trek/agent-core";
 import type { AssistantMessage, ImageContent, Message, Model, TextContent } from "@trek/ai";
 import {
 	clampThinkingLevel,
@@ -130,14 +137,24 @@ import { hashContent, type LoadedPrologue, loadPrologue } from "./prologue.ts";
 import { expandPromptTemplate, type PromptTemplate } from "./prompt-templates.ts";
 import {
 	appendEffortReason,
+	BRANCH_EXCLUDED_TOOL_NAMES,
+	type BranchInput,
+	type BranchResult,
+	type BranchTask,
+	branchPrompt,
 	createReflectiveMetaToolDefinitions,
 	type EffortLimits,
 	type EffortMode,
 	EffortRegulator,
 	effortActionKey,
 	effortLimitsFor,
+	FileClaims,
+	gatherBranches,
 	isReflectiveLoopEnabled,
+	mutatedPath,
+	planBranches,
 	ReflectiveLoopController,
+	SerialQueue,
 } from "./reflective-loop/index.ts";
 import {
 	assertStrictAuditTarget,
@@ -521,6 +538,12 @@ export class AgentSession {
 	private _operatorGrant = new Set<string>();
 	private _confirmOnce = new Set<string>();
 	private _toolConfirm: ((toolName: string, detail: string) => Promise<boolean> | boolean) | undefined;
+	/** One confirm dialog at a time, so parallel branches do not stack prompts. */
+	private _confirmQueue = new SerialQueue();
+	private _branchBash = new SerialQueue();
+	private _branchAgents = new Set<Agent>();
+	private _branchResults = new Map<string, BranchResult>();
+	private _branchCount = 0;
 	private _openPhases = new Set<string>();
 	/** Set when this turn selected an Archon workflow. Cleared when the turn calls it. */
 	private _calledWorkflow: ArchonWorkflow | undefined;
@@ -1507,6 +1530,7 @@ export class AgentSession {
 	/** Engage the operator HALT/off-switch: blocks tool calls at the next boundary (#7). */
 	requestHalt(): void {
 		this._halted = true;
+		for (const child of this._branchAgents) child.abort();
 		debugLog("safety", "HALT engaged", {});
 	}
 
@@ -1592,10 +1616,97 @@ export class AgentSession {
 			detail = JSON.stringify(args ?? {});
 		}
 		if (detail.length > 180) detail = `${detail.slice(0, 180)}…`;
+		const confirm = this._toolConfirm;
+		return this._confirmQueue.run(async () => {
+			if (this._halted) return false;
+			try {
+				return (await confirm(toolName, detail)) === true;
+			} catch {
+				return false;
+			}
+		});
+	}
+
+	/** Parallel child agents. Each passes the parent tool gate and the spawn's file claims. */
+	private async _spawnBranches(subtasks: BranchInput[], signal?: AbortSignal): Promise<BranchResult[]> {
+		const tasks = planBranches(subtasks, () => `b${++this._branchCount}`);
+		const claims = new FileClaims();
+		const results = await Promise.all(tasks.map((task) => this._runBranch(task, tasks.length, claims, signal)));
+		for (const result of results) {
+			this._branchResults.set(result.id, result);
+			this.sessionManager.appendCustomEntry("trek:branch", result);
+		}
+		return results;
+	}
+
+	private async _runBranch(
+		task: BranchTask,
+		count: number,
+		claims: FileClaims,
+		signal?: AbortSignal,
+	): Promise<BranchResult> {
+		if (this._halted) {
+			return { id: task.id, description: task.description, summary: "HALT is engaged.", isError: true };
+		}
+		const tools = this.agent.state.tools
+			.filter((tool) => !BRANCH_EXCLUDED_TOOL_NAMES.has(tool.name))
+			.map((tool) =>
+				tool.name === "bash"
+					? {
+							...tool,
+							execute: (...args: Parameters<AgentTool["execute"]>) =>
+								this._branchBash.run(() => tool.execute(...args)),
+						}
+					: tool,
+			);
+		const child = new Agent({
+			initialState: {
+				model: this.agent.state.model,
+				systemPrompt: this.agent.state.systemPrompt,
+				thinkingLevel: this.agent.state.thinkingLevel,
+				tools,
+			},
+			convertToLlm: this.agent.convertToLlm,
+			streamFn: this.agent.streamFn,
+			getApiKey: this.agent.getApiKey,
+			sessionId: this.agent.sessionId,
+		});
+		const parentBefore = this.agent.beforeToolCall;
+		child.beforeToolCall = async (context, toolSignal) => {
+			const path = mutatedPath(context.toolCall.name, context.args, this._cwd);
+			const claim = path ? claims.claim(path, task.id) : undefined;
+			if (path && claim?.owner) {
+				const shown = path.startsWith(`${this._cwd}/`) ? path.slice(this._cwd.length + 1) : path;
+				return { block: true, reason: `branch ${task.id}: ${shown} is claimed by branch ${claim.owner}` };
+			}
+			const verdict = await parentBefore?.(context, toolSignal);
+			if (verdict?.block && path && claim?.created) claims.release(path, task.id);
+			return verdict;
+		};
+		child.afterToolCall = this.agent.afterToolCall;
+		const onAbort = () => child.abort();
+		signal?.addEventListener("abort", onAbort);
+		this._branchAgents.add(child);
 		try {
-			return (await this._toolConfirm(toolName, detail)) === true;
-		} catch {
-			return false;
+			await child.prompt(branchPrompt(task, count));
+			const last = [...child.state.messages].reverse().find((message) => message.role === "assistant") as
+				| AssistantMessage
+				| undefined;
+			const text = last
+				? last.content
+						.filter((part): part is TextContent => part.type === "text")
+						.map((part) => part.text)
+						.join("\n")
+				: "";
+			const failed = !last || last.stopReason === "error" || last.stopReason === "aborted";
+			const summary = stripHonestyFooter(text).trim() || last?.errorMessage || "no summary";
+			return { id: task.id, description: task.description, summary, isError: failed };
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			return { id: task.id, description: task.description, summary: message, isError: true };
+		} finally {
+			this._branchAgents.delete(child);
+			signal?.removeEventListener("abort", onAbort);
 		}
 	}
 
@@ -4417,6 +4528,10 @@ export class AgentSession {
 				() => this.agent.state.messages.length,
 				() => this._lastPromptTask,
 				() => resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd })),
+				{
+					spawn: (subtasks, signal) => this._spawnBranches(subtasks, signal),
+					gather: (ids) => gatherBranches(this._branchResults, ids),
+				},
 			)) {
 				this._baseToolDefinitions.set(definition.name, definition);
 			}

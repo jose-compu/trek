@@ -3,10 +3,33 @@ import { Type } from "typebox";
 import type { ToolDefinition } from "../extensions/types.ts";
 import type { ResolvedRuntime } from "../runtime/resolve.ts";
 import { wrapToolDefinition } from "../tools/tool-definition-wrapper.ts";
+import { type BranchInput, type BranchResult, formatBranchResults, MAX_BREADTH } from "./branches.ts";
 import type { ReflectiveLoopController } from "./loop-controller.ts";
 import { runDepthFirstSubtask } from "./spawn-subtask.ts";
 
-export const REFLECTIVE_META_TOOL_NAMES = ["observe", "reflect", "spawn_subtask"] as const;
+export const REFLECTIVE_META_TOOL_NAMES = ["observe", "reflect", "spawn_subtask", "spawn_branches", "gather"] as const;
+
+/** A branch does not spawn again. */
+export const BRANCH_EXCLUDED_TOOL_NAMES: ReadonlySet<string> = new Set(["spawn_subtask", "spawn_branches", "gather"]);
+
+export interface BranchRunner {
+	spawn(subtasks: BranchInput[], signal?: AbortSignal): Promise<BranchResult[]>;
+	gather(ids: string[]): string;
+}
+
+const branchesSchema = Type.Object({
+	subtasks: Type.Array(
+		Type.Object({
+			description: Type.String({ description: "What this branch must do" }),
+			summary: Type.Optional(Type.String({ description: "Parent summary handed to this branch" })),
+		}),
+		{ description: `Independent subtasks, at most ${MAX_BREADTH}. They run in parallel.` },
+	),
+});
+
+const gatherSchema = Type.Object({
+	subtask_ids: Type.Array(Type.String(), { description: "Branch ids returned by spawn_branches" }),
+});
 
 const observeSchema = Type.Object({});
 
@@ -27,6 +50,7 @@ export function createReflectiveMetaToolDefinitions(
 	getMessageCount: () => number,
 	getLastTask: () => string,
 	getResolved: () => ResolvedRuntime,
+	branches?: BranchRunner,
 ): ToolDefinition[] {
 	const observeDefinition: ToolDefinition = {
 		name: "observe",
@@ -97,7 +121,37 @@ export function createReflectiveMetaToolDefinitions(
 		},
 	};
 
-	return [observeDefinition, reflectDefinition, spawnDefinition];
+	if (!branches) return [observeDefinition, reflectDefinition, spawnDefinition];
+
+	const branchesDefinition: ToolDefinition = {
+		name: "spawn_branches",
+		label: "spawn_branches",
+		description: `Run up to ${MAX_BREADTH} independent subtasks in parallel. Each branch gets its summary only and the same tools and laws. Returns each branch summary.`,
+		parameters: branchesSchema,
+		// Each call inside a branch passes the parent gate.
+		reversibilityTier: "free",
+		execute: async (_toolCallId, input: { subtasks: BranchInput[] }, signal) => {
+			const results = await branches.spawn(input.subtasks ?? [], signal);
+			return {
+				content: [{ type: "text", text: formatBranchResults(results) }],
+				details: { branches: results },
+			};
+		},
+	};
+
+	const gatherDefinition: ToolDefinition = {
+		name: "gather",
+		label: "gather",
+		description: "Merge the summaries of earlier branches, in the order given.",
+		parameters: gatherSchema,
+		reversibilityTier: "free",
+		execute: async (_toolCallId, input: { subtask_ids: string[] }) => {
+			const text = branches.gather(input.subtask_ids ?? []);
+			return { content: [{ type: "text", text }], details: { ids: input.subtask_ids } };
+		},
+	};
+
+	return [observeDefinition, reflectDefinition, spawnDefinition, branchesDefinition, gatherDefinition];
 }
 
 export function createReflectiveMetaTools(

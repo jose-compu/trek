@@ -1,4 +1,17 @@
 export {
+	type BranchInput,
+	type BranchResult,
+	type BranchTask,
+	branchPrompt,
+	FileClaims,
+	formatBranchResults,
+	gatherBranches,
+	MAX_BREADTH,
+	mutatedPath,
+	planBranches,
+	SerialQueue,
+} from "./branches.ts";
+export {
 	appendEffortReason,
 	EFFORT_BUDGET_RATIO,
 	EFFORT_COST_BUDGET,
@@ -16,7 +29,13 @@ export {
 } from "./effort-regulator.ts";
 export { isReflectiveLoopEnabled } from "./enabled.ts";
 export { ReflectiveLoopController, type RunPromptCycleOptions } from "./loop-controller.ts";
-export { createReflectiveMetaToolDefinitions, createReflectiveMetaTools } from "./meta-tools.ts";
+export {
+	BRANCH_EXCLUDED_TOOL_NAMES,
+	type BranchRunner,
+	createReflectiveMetaToolDefinitions,
+	createReflectiveMetaTools,
+	REFLECTIVE_META_TOOL_NAMES,
+} from "./meta-tools.ts";
 export { checkPolicyConstraints } from "./policy-constraints.ts";
 export {
 	appendReflectiveCycleTrace,
