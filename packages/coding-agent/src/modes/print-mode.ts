@@ -41,6 +41,10 @@ function logVerboseEvent(event: AgentSessionEvent): void {
 		case "prompt_meta":
 			console.error(`[trek] prompt ${event.promptId}`);
 			break;
+		case "workflow_check":
+		case "anti_pattern":
+			console.error(event.text);
+			break;
 		case "tool_execution_start":
 			console.error(`[trek] tool → ${event.toolName} ${JSON.stringify(event.args)}`);
 			break;

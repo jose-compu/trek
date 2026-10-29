@@ -57,7 +57,28 @@ import {
 	shouldCompact,
 } from "./compaction/index.ts";
 import { DEFAULT_THINKING_LEVEL } from "./defaults.ts";
-import { type ArchonWorkflow, parseArchonWorkflow, runArchonWorkflow } from "./domains/index.ts";
+import {
+	type ArchonWorkflow,
+	checkWorkflowNodes,
+	completeDomainCommand,
+	formatWorkflowCheck,
+	isSpecificFact,
+	loadDomainCatalog,
+	missingWorkflowFacts,
+	parseArchonWorkflow,
+	parseWorkflowEdit,
+	restoreDomainWorkflow,
+	runArchonWorkflow,
+	runDomainSessionCommand,
+	saveDomainWorkflow,
+	tryWorkflowYaml,
+	unwrapWorkflowYaml,
+	workflowDraftPrompt,
+	workflowEditIsThin,
+	workflowEditQuestion,
+	workflowFactQuestion,
+	workflowFactRefusal,
+} from "./domains/index.ts";
 import {
 	type BatchSummary,
 	EditCheckpointManager,
@@ -100,6 +121,7 @@ import {
 	type HonestyReport,
 	isHonestyProtocolEnabled,
 	parseHonestyReport,
+	stripHonestyFooter,
 } from "./honesty/index.ts";
 import { createEmbedder, MemoryManager } from "./memory/index.ts";
 import { type BashExecutionMessage, type CustomMessage, stripIdempotentPrefix } from "./messages.ts";
@@ -232,7 +254,9 @@ export type AgentSessionEvent =
 	  }
 	| { type: "auto_retry_start"; attempt: number; maxAttempts: number; delayMs: number; errorMessage: string }
 	| { type: "auto_retry_end"; success: boolean; attempt: number; finalError?: string }
-	| { type: "prompt_meta"; promptNumber: number; promptId: string; preview?: string };
+	| { type: "prompt_meta"; promptNumber: number; promptId: string; preview?: string }
+	| { type: "workflow_check"; text: string }
+	| { type: "anti_pattern"; text: string };
 
 /** Listener function for agent session events */
 export type AgentSessionEventListener = (event: AgentSessionEvent) => void;
@@ -496,9 +520,19 @@ export class AgentSession {
 	private _operatorMode: OperatorMode | undefined;
 	private _operatorGrant = new Set<string>();
 	private _confirmOnce = new Set<string>();
+	private _toolConfirm: ((toolName: string, detail: string) => Promise<boolean> | boolean) | undefined;
 	private _openPhases = new Set<string>();
 	/** Set when this turn selected an Archon workflow. Cleared when the turn calls it. */
 	private _calledWorkflow: ArchonWorkflow | undefined;
+	private _calledFacts: Array<{ name: string; value: string }> = [];
+	private _workflowCheck: string | undefined;
+	/** The previous turn, kept while Trek waits for workflow facts. */
+	private _workflowFactPrefix: string | undefined;
+	private _workflowFactAsk: { task: string; domain: string; missing: string[] } | undefined;
+	private _workflowEditAsk: { kind: "create" | "edit"; id: string } | undefined;
+	/** The user named at least one missing fact. Do not ask again on this turn. */
+	private _workflowFactsAccepted = false;
+	private _workflowHold: { task: string; domain: string; missing: string[] } | undefined;
 	/** The next prompt answers the one clarifying question. */
 	private _curiosityOpen = false;
 	private _tone: ToneProfile = "off";
@@ -1316,8 +1350,13 @@ export class AgentSession {
 		const tier = resolveReversibilityTier(this._baseToolDefinitions.get(toolName)?.reversibilityTier);
 		if (this._operatorMode) {
 			const decision = decideTool(this._operatorMode, tier, toolName, this._operatorGrant);
-			const confirmed = decision === "confirm" && this._confirmOnce.delete(toolName);
-			if (!confirmed && decision !== "run") {
+			const preconfirmed = decision === "confirm" && this._confirmOnce.delete(toolName);
+			const asked =
+				decision === "confirm" &&
+				!preconfirmed &&
+				(this._operatorMode === "supervised" || this._operatorMode === "checkpoint") &&
+				(await this._askToolConfirm(toolName, args));
+			if (decision !== "run" && !preconfirmed && !asked) {
 				return {
 					allowed: false,
 					reason: operatorBlockReason(this._operatorMode, toolName, tier, decision) ?? "blocked",
@@ -1438,6 +1477,33 @@ export class AgentSession {
 		return this._antiPatterns;
 	}
 
+	/** Flags this turn. The flag does not change a law. */
+	private _noteAntiPatterns(turnStart: number): void {
+		const assistantTexts: string[] = [];
+		const toolOutputs: string[] = [];
+		for (const message of this.agent.state.messages.slice(turnStart)) {
+			if (message.role === "assistant") {
+				for (const part of message.content) {
+					if (part.type === "text") assistantTexts.push(part.text);
+				}
+			} else if (message.role === "toolResult") {
+				for (const part of message.content) {
+					if (part.type === "text" && part.text) toolOutputs.push(part.text);
+				}
+			}
+		}
+		const found = detectAntiPatterns({ toolCalls: this._toolSignatures, assistantTexts, toolOutputs });
+		this._antiPatterns = found;
+		if (found.length === 0) return;
+		const text = `anti-pattern: ${found.join(", ")}`;
+		const message = this._findLastAssistantMessage();
+		const part = message ? [...message.content].reverse().find((item) => item.type === "text") : undefined;
+		if (part && part.type === "text" && !part.text.includes("anti-pattern:")) {
+			part.text = `${part.text}\n\n${text}`;
+		}
+		this._emit({ type: "anti_pattern", text });
+	}
+
 	/** Engage the operator HALT/off-switch: blocks tool calls at the next boundary (#7). */
 	requestHalt(): void {
 		this._halted = true;
@@ -1486,7 +1552,8 @@ export class AgentSession {
 
 	/**
 	 * Select an operator mode for this process. Unset leaves tool gating as it was.
-	 * Diagnostic is the trace-only mode. Supervised and checkpoint wait on gated tools.
+	 * Diagnostic is the trace-only mode. Ask answers and may read, and does not write.
+	 * Supervised and checkpoint wait on gated tools.
 	 * Delegated runs a gated tool only when it is in the grant.
 	 */
 	setOperatorMode(mode: OperatorMode | undefined): void {
@@ -1507,6 +1574,29 @@ export class AgentSession {
 	/** Allow the next call of one gated tool. Supervised and checkpoint spend this once. */
 	confirmTool(toolName: string): void {
 		this._confirmOnce.add(toolName);
+	}
+
+	/** The TUI asks before a supervised gated tool. No handler means the call stays blocked. */
+	setToolConfirmHandler(
+		handler: ((toolName: string, detail: string) => Promise<boolean> | boolean) | undefined,
+	): void {
+		this._toolConfirm = handler;
+	}
+
+	private async _askToolConfirm(toolName: string, args: unknown): Promise<boolean> {
+		if (!this._toolConfirm) return false;
+		let detail = "";
+		if (args && typeof args === "object" && "command" in args && typeof args.command === "string") {
+			detail = args.command;
+		} else {
+			detail = JSON.stringify(args ?? {});
+		}
+		if (detail.length > 180) detail = `${detail.slice(0, 180)}…`;
+		try {
+			return (await this._toolConfirm(toolName, detail)) === true;
+		} catch {
+			return false;
+		}
 	}
 
 	/** Open a checkpoint phase. Act stays closed until this is called with "act". */
@@ -1992,6 +2082,21 @@ export class AgentSession {
 		this.agent.state.systemPrompt = this._baseSystemPrompt;
 	}
 
+	runDomainCommand(name: "domains" | "workflows", arg: string): string {
+		return runDomainSessionCommand(this._cwd, name, arg);
+	}
+
+	completeDomainCommand(
+		name: "domains" | "workflows",
+		argumentPrefix: string,
+	): Array<{ value: string; label: string; description?: string }> {
+		return completeDomainCommand(this._cwd, name, argumentPrefix);
+	}
+
+	getWorkflowCheck(): string | undefined {
+		return this._workflowCheck;
+	}
+
 	formatMemoryStatus(): string {
 		if (!this.memoryActive()) return "memory=off";
 		return this.memory().status();
@@ -2467,17 +2572,28 @@ export class AgentSession {
 	 * Prompt and bash nodes run. A command, script, or loop node falls back to one model call.
 	 */
 	private async _actOnTurn(messages: AgentMessage | AgentMessage[]): Promise<void> {
+		const hold = this._workflowHold;
+		this._workflowHold = undefined;
+		if (hold) {
+			this._workflowFactAsk = hold;
+			this._recordLocalTurn(this._lastPromptTask, workflowFactQuestion(hold.domain, hold.missing), "workflow");
+			return;
+		}
 		const workflow = this._calledWorkflow;
+		const facts = this._calledFacts;
 		this._calledWorkflow = undefined;
+		this._calledFacts = [];
 		const callable = workflow?.nodes.every((node) => node.kind === "prompt" || node.kind === "bash") ?? false;
 		if (!workflow || !callable) {
 			await this._runAgentPrompt(messages);
 			return;
 		}
 		const previousTools = this.getActiveToolNames();
-		await runArchonWorkflow(workflow, {
+		const turnStart = this.agent.state.messages.length;
+		const results = await runArchonWorkflow(workflow, {
 			cwd: this._cwd,
 			userMessage: this._lastPromptTask,
+			facts,
 			runPrompt: async (prompt, node) => {
 				if (node.allowedTools) {
 					this.setActiveToolsByName(node.allowedTools);
@@ -2489,21 +2605,113 @@ export class AgentSession {
 						this.setActiveToolsByName(previousTools);
 					}
 				}
-				return this._lastAssistantText();
+				return stripHonestyFooter(this._lastAssistantText()).trim();
 			},
 		});
+		const findings = checkWorkflowNodes(
+			this._lastPromptTask,
+			workflow.nodes.map((node) => ({
+				id: node.id,
+				prompt: node.body,
+				output: results.find((result) => result.id === node.id)?.output ?? "",
+			})),
+		);
+		this._noteAntiPatterns(turnStart);
+		this._workflowCheck = findings.length > 0 ? formatWorkflowCheck(findings) : undefined;
+		if (!this._workflowCheck) return;
+		const message = this._findLastAssistantMessage();
+		const part = message ? [...message.content].reverse().find((item) => item.type === "text") : undefined;
+		if (part && part.type === "text") part.text = `${part.text}\n\n${this._workflowCheck}`;
+		this._emit({ type: "workflow_check", text: this._workflowCheck });
+	}
+
+	private async _takeWorkflowEdit(text: string): Promise<boolean> {
+		if (this._workflowEditAsk) {
+			const ask = this._workflowEditAsk;
+			this._workflowEditAsk = undefined;
+			const request = { kind: ask.kind, id: ask.id, instruction: text.trim() };
+			if (workflowFactRefusal(text) || workflowEditIsThin(request)) {
+				this._recordLocalTurn(text, `Workflow stopped. ${ask.id} was not written.`, "workflow");
+				return true;
+			}
+			await this._commitWorkflowEdit(text, request);
+			return true;
+		}
+		const request = parseWorkflowEdit(text);
+		if (!request) return false;
+		if (request.kind !== "restore" && workflowEditIsThin(request)) {
+			this._workflowEditAsk = { kind: request.kind, id: request.id };
+			this._recordLocalTurn(text, workflowEditQuestion(request), "workflow");
+			return true;
+		}
+		await this._commitWorkflowEdit(text, request);
+		return true;
+	}
+
+	private async _commitWorkflowEdit(
+		userText: string,
+		request: { kind: "create" | "edit" | "restore"; id: string; instruction: string },
+	): Promise<void> {
+		try {
+			if (request.kind === "restore") {
+				const restored = restoreDomainWorkflow(this._cwd, request.id);
+				this._recordLocalTurn(userText, `Restored ${request.id} workflow ${restored.name}.`, "workflow");
+				return;
+			}
+			const existing = loadDomainCatalog(this._cwd).domains.find((domain) => domain.id === request.id);
+			if (request.kind === "create" && existing) {
+				this._recordLocalTurn(
+					userText,
+					`${request.id} already has a workflow. Edit it to change the steps.`,
+					"workflow",
+				);
+				return;
+			}
+			if (request.kind === "edit" && !existing) {
+				this._recordLocalTurn(userText, `unknown domain ${request.id}`, "workflow");
+				return;
+			}
+			let yaml = tryWorkflowYaml(request.instruction);
+			if (!yaml) {
+				if (!this.model) {
+					throw new Error(formatNoModelSelectedMessage());
+				}
+				const previous = this.getActiveToolNames();
+				this.setActiveToolsByName([]);
+				try {
+					await this.agent.prompt(workflowDraftPrompt(request, existing?.yaml));
+				} finally {
+					this.setActiveToolsByName(previous);
+				}
+				yaml = unwrapWorkflowYaml(stripHonestyFooter(this._lastAssistantText()));
+			}
+			const saved = saveDomainWorkflow(this._cwd, request.id, yaml);
+			const line = saved.created
+				? `Saved ${request.id} workflow ${saved.name}. It starts off. Enable it with /domains enable ${request.id}.`
+				: saved.backedUp
+					? `Saved ${request.id} workflow ${saved.name}. The previous version is kept. Say restore the ${request.id} workflow to go back.`
+					: `${request.id} workflow ${saved.name} is unchanged.`;
+			this._recordLocalTurn(userText, line, "workflow");
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this._recordLocalTurn(userText, `Workflow not saved. ${message}`, "workflow");
+		}
 	}
 
 	private _recordCuriosity(task: string, question: string): void {
+		this._recordLocalTurn(task, question, "curiosity");
+	}
+
+	private _recordLocalTurn(task: string, reply: string, modelId: string): void {
 		const now = Date.now();
 		const model = this.model;
 		const user = { role: "user" as const, content: task, timestamp: now };
 		const assistant = {
 			role: "assistant" as const,
-			content: [{ type: "text" as const, text: question }],
+			content: [{ type: "text" as const, text: reply }],
 			api: model?.api ?? "openai-completions",
 			provider: model?.provider ?? "trek",
-			model: model?.id ?? "curiosity",
+			model: model?.id ?? modelId,
 			usage: {
 				input: 0,
 				output: 0,
@@ -2559,8 +2767,10 @@ export class AgentSession {
 				this._effort.setEnabled(false);
 				this._effort.beginPrompt();
 			}
+			const turnStart = this.agent.state.messages.length;
 			await this.agent.prompt(messages);
 			this._applyToneToLastAssistant();
+			this._noteAntiPatterns(turnStart);
 			while (await this._handlePostAgentRun()) {
 				if (!(await this._safeAgentContinue())) {
 					break;
@@ -2710,6 +2920,31 @@ export class AgentSession {
 				expandedText = expandPromptTemplate(expandedText, [...this.promptTemplates]);
 			}
 
+			if (!this.isStreaming && (await this._takeWorkflowEdit(expandedText))) {
+				preflightResult?.(true);
+				return;
+			}
+
+			if (!this.isStreaming && this._workflowFactAsk) {
+				const ask = this._workflowFactAsk;
+				this._workflowFactAsk = undefined;
+				const combined = `${ask.task}\n${expandedText}`;
+				const still = missingWorkflowFacts(ask.domain, combined);
+				const named = ask.missing.some((name) => !still.includes(name));
+				const added = /[a-z]{4,}/i.test(expandedText);
+				if (workflowFactRefusal(expandedText) || (!named && !added)) {
+					this._recordLocalTurn(
+						expandedText,
+						`Workflow stopped. ${ask.domain} did not receive ${ask.missing.join(", ")}.`,
+						"workflow",
+					);
+					preflightResult?.(true);
+					return;
+				}
+				this._workflowFactsAccepted = true;
+				this._workflowFactPrefix = ask.task;
+			}
+
 			if (!this.isStreaming && !this._curiosityOpen) {
 				const question = curiosityQuestion(expandedText);
 				if (question) {
@@ -2846,6 +3081,10 @@ export class AgentSession {
 		});
 		if (this._reflectiveLoop) {
 			this._resetCycleTraceCollectors();
+			if (this._workflowFactPrefix) {
+				this._lastPromptTask = `${this._workflowFactPrefix}\n${this._lastPromptTask}`;
+				this._workflowFactPrefix = undefined;
+			}
 			await this._reflectiveLoop.runPromptCycle({
 				task: this._lastPromptTask,
 				promptId,
@@ -2859,7 +3098,18 @@ export class AgentSession {
 					if (selection.yaml.length === 0) {
 						return;
 					}
+					if (!this._workflowFactsAccepted) {
+						const missing = missingWorkflowFacts(selection.domain, this._lastPromptTask);
+						if (missing.length > 0) {
+							this._workflowHold = { task: this._lastPromptTask, domain: selection.domain, missing };
+							return;
+						}
+					}
+					this._workflowFactsAccepted = false;
 					this._calledWorkflow = parseArchonWorkflow(selection.yaml);
+					this._calledFacts = selection.parameters
+						.filter((fact) => isSpecificFact(fact.name, fact.value))
+						.map((fact) => ({ name: fact.name, value: fact.value }));
 					this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n<workflow domain="${selection.domain}" name="${selection.workflow}">\nCall each node as its own step, in depends_on order. $USER_MESSAGE is the user turn. $id.output is that node's reply. If a fact is not in the user turn or an upstream output, say it is not in the turn.\n</workflow>`;
 					this._emitWorkflowCard(selection);
 				},

@@ -64,6 +64,23 @@ describe("tone", () => {
 });
 
 describe("anti-pattern", () => {
+	const harnesses: Harness[] = [];
+	afterEach(() => {
+		while (harnesses.length > 0) {
+			harnesses.pop()?.cleanup();
+		}
+	});
+
+	it("prints the flag on the turn and does not change the reply", async () => {
+		const harness = await createHarness();
+		harnesses.push(harness);
+		harness.setResponses([fauxAssistantMessage("You're absolutely right. The file stays.")]);
+		await harness.session.prompt("Leave the readme as it is.");
+		expect(harness.session.getAntiPatterns()).toContain("sycophancy");
+		expect(assistantText(harness)).toContain("anti-pattern: sycophancy");
+		expect(assistantText(harness)).toContain("The file stays.");
+	});
+
 	it("flags a synthetic loop and ignores two identical calls", () => {
 		const call = { name: "bash", args: '{"command":"echo trek"}' };
 		expect(detectAntiPatterns({ toolCalls: [call, call] })).not.toContain("loop");

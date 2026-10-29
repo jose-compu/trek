@@ -23,6 +23,8 @@ export interface RunArchonOptions {
 	cwd: string;
 	/** The user turn. Prompt nodes see it as `$USER_MESSAGE`. */
 	userMessage?: string;
+	/** Facts already taken from the turn. A node must not invent past these. */
+	facts?: ReadonlyArray<{ name: string; value: string }>;
 	/** Required for a prompt node. Archon calls the model once per node. */
 	runPrompt?: (prompt: string, node: ArchonNode) => Promise<string>;
 }
@@ -52,7 +54,7 @@ async function callNode(
 		if (!options.runPrompt) {
 			throw new Error(`prompt node ${node.id} is an AI step and needs a model call`);
 		}
-		const prompt = renderPrompt(workflow, node, options.userMessage ?? "", outputs);
+		const prompt = renderPrompt(workflow, node, options.userMessage ?? "", outputs, options.facts ?? []);
 		return (await options.runPrompt(prompt, node)).trim();
 	}
 	if (node.kind === "bash") {
@@ -85,18 +87,24 @@ function renderPrompt(
 	node: ArchonNode,
 	userMessage: string,
 	outputs: Map<string, string>,
+	facts: ReadonlyArray<{ name: string; value: string }>,
 ): string {
 	const body = substitute(node.body, workflow, node.id, userMessage, outputs);
 	const lines = [
 		"Answer only this Archon node.",
-		"If a fact is not in the user turn or an upstream output, say it is not in the turn.",
+		"One line. No preamble.",
+		"If a fact is not in the user turn, the known facts, or an upstream output, say it is not in the turn.",
 		"",
 		"User turn:",
 		userMessage,
-		"",
-		`Node ${node.id}:`,
-		body,
 	];
+	if (facts.length > 0) {
+		lines.push("", "Known facts:");
+		for (const fact of facts) {
+			lines.push(`${fact.name}: ${fact.value}`);
+		}
+	}
+	lines.push("", `Node ${node.id}:`, body);
 	for (const dep of node.dependsOn) {
 		if (!node.body.includes(`$${dep}.output`)) {
 			lines.push("", `$${dep}.output:`, outputs.get(dep) ?? "");

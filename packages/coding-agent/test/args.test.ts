@@ -338,6 +338,17 @@ describe("parseArgs", () => {
 			const result = parseArgs(["--diagnostic", "-p", "hi"]);
 			expect(result.diagnostic).toBe(true);
 		});
+
+		test("parses --operator-mode diagnostic and rejects an unknown mode", () => {
+			expect(parseArgs(["--operator-mode", "diagnostic"]).operatorMode).toBe("diagnostic");
+			expect(parseArgs(["--operator-mode", "ask"]).operatorMode).toBe("ask");
+			expect(parseArgs(["--operator-mode", "trace"]).diagnostics).toEqual([
+				{
+					type: "error",
+					message: "--operator-mode must be supervised, delegated, checkpoint, diagnostic, or ask",
+				},
+			]);
+		});
 	});
 
 	describe("--offline flag", () => {

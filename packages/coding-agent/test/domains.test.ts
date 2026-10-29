@@ -5,8 +5,10 @@ import { fauxAssistantMessage } from "@trek/ai";
 import { afterEach, describe, expect, test } from "vitest";
 import { loadArchonFile, parseArchonWorkflow } from "../src/core/domains/archon.ts";
 import { addDomain, disableDomain, enableDomain, loadDomainCatalog } from "../src/core/domains/catalog.ts";
+import { checkWorkflowNodes } from "../src/core/domains/node-check.ts";
 import { runArchonWorkflow } from "../src/core/domains/run.ts";
 import { selectDomain } from "../src/core/domains/select.ts";
+import { runDomainSessionCommand } from "../src/core/domains/session-command.ts";
 import { ReflectiveLoopController } from "../src/core/reflective-loop/loop-controller.ts";
 import { getReflectiveCycleTraces } from "../src/core/reflective-loop/session-trace.ts";
 import { SessionManager } from "../src/core/session-manager.ts";
@@ -129,6 +131,79 @@ describe("domains 0.12.0", () => {
 		expect(replies).toContain("the sides are not in the turn");
 		expect(replies).toContain("the SOX control is the bank rec");
 		expect(replies).toContain("the correcting entry is not posted");
+		expect(replies).not.toContain("workflow check");
+	});
+
+	test("a session command uses the same store and does not run a workflow", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-slash-domains-"));
+		const listed = runDomainSessionCommand(cwd, "domains", "");
+		expect(listed).toMatch(/│ finance\s+│ on\s+│ control-break\s+│/);
+		expect(listed).toMatch(/│ engineering\s+│ always\s+│ change-review\s+│/);
+		expect(listed).toContain("Detection still chooses the workflow");
+		expect(runDomainSessionCommand(cwd, "domains", "disable finance")).toMatch(
+			/│ finance\s+│ off\s+│ control-break\s+│/,
+		);
+		const skipped = selectDomain(loadDomainCatalog(cwd), {
+			task: "The reconciliation break for account 4100 in March is 1200. The SOX control is the bank rec.",
+		});
+		expect(skipped.domain).not.toBe("finance");
+		runDomainSessionCommand(cwd, "domains", "enable finance");
+		expect(loadDomainCatalog(cwd).disabled.has("finance")).toBe(false);
+		expect(runDomainSessionCommand(cwd, "domains", "disable engineering")).toMatch(/cannot be disabled/);
+		const shown = runDomainSessionCommand(cwd, "workflows", "show finance");
+		expect(shown).toContain("finance  control-break");
+		expect(shown).toMatch(/│ name-account\s+│/);
+		expect(shown).toMatch(/│ propose-entry\s+│/);
+		expect(shown).toContain("Do not post it.");
+		expect(shown).not.toContain("name: control-break");
+		expect(runDomainSessionCommand(cwd, "workflows", "run finance")).toMatch(/does not run a workflow/);
+	});
+
+	test("a node reply that invents a fact is visible, and a missing fact said to be absent is not", () => {
+		const user =
+			"The build failed on the adapter. The architecture violation is the layer rule. The tech debt is the empty adapter.";
+		const invented = checkWorkflowNodes(user, [
+			{
+				id: "state-constraint",
+				prompt: "State the design constraint the change must keep.",
+				output: "adapters depend only on the domain layer without bypassing it",
+			},
+		]);
+		expect(invented.map((finding) => finding.kind)).toEqual(["not-in-turn"]);
+		expect(invented[0]?.detail).toContain("domain");
+		const absent = checkWorkflowNodes(
+			"The reconciliation break for account 4100 in March is 1200. The SOX control is the bank rec.",
+			[
+				{
+					id: "propose-entry",
+					prompt: "Propose the correcting entry in words. Do not post it.",
+					output: "the sides are not in the turn",
+				},
+			],
+		);
+		expect(absent).toEqual([]);
+		const skipped = checkWorkflowNodes("account 4100", [
+			{ id: "name-account", prompt: "Name the account, the period, and the amount of the break.", output: "" },
+		]);
+		expect(skipped[0]?.kind).toBe("skipped");
+	});
+
+	test("a selected workflow shows the check on the turn and does not call a tool", async () => {
+		const harness = await createHarness({ enableReflectiveLoop: true });
+		harnesses.push(harness);
+		harness.setResponses([
+			fauxAssistantMessage("adapters depend only on the domain layer without bypassing it"),
+			fauxAssistantMessage("no build was run"),
+			fauxAssistantMessage("the tech debt is the empty adapter"),
+			fauxAssistantMessage("refuse to edit"),
+		]);
+		await harness.session.prompt(
+			"The build failed on the adapter. The architecture violation is the layer rule. The tech debt is the empty adapter. Do not use tools. Do not read files.",
+		);
+		const replies = assistantText(harness);
+		expect(replies).toContain("workflow check");
+		expect(replies).toContain("state-constraint: fact not in the turn");
+		expect(harness.session.getWorkflowCheck()).toContain("domain");
 	});
 
 	test("untagged prompts select a domain, and a second prompt selects another", () => {

@@ -4,16 +4,16 @@ description: |
 nodes:
   - id: state-constraint
     prompt: |
-      State the design constraint the change must keep.
+      Quote the architecture violation in the words the user turn already uses. One line. If it is not named, say it is not in the turn.
   - id: check-build
     prompt: |
-      Name the build, test, or dependency failure. If none has been run, say so.
+      Quote the build, test, or dependency failure from the user turn. One line. If none is named, say none has been run.
     depends_on: [state-constraint]
   - id: name-debt
     prompt: |
-      Name the tech debt or the architecture violation, or say there is none in this turn.
+      Quote the tech debt from the user turn. One line. If it is not named, say it is not in the turn.
     depends_on: [check-build]
   - id: apply-or-refuse
     prompt: |
-      Apply the smallest change that meets the constraint, or refuse it and say why.
+      Do not edit and do not run a tool. One line: refuse the change, or say the facts are not in the turn.
     depends_on: [name-debt]

@@ -1,10 +1,20 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.13.0`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.13.1`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.13.1] - 2026-10-29
+
+### Added
+
+- `/domains` and `/workflows` in a session. The list shows each domain, whether it is on, and the workflow name. Enable and disable use the same store as the CLI. Meta, AI, Security, and Engineering stay on. The command does not run a workflow.
+- A workflow reply is checked against its nodes. A skipped node, or a fact that is not in the turn, is marked on that turn. The check does not post, edit, or run a tool.
+- A prompt can create a domain workflow, edit one, or restore the previous version. The previous YAML is kept under `.trek/domains/<id>/history/`.
+- Supervised mode asks before a gated tool. Yes runs that call. `/confirm bash` allows the next call.
+- `--operator-mode ask` answers and may read files or the web. It does not write, edit, or run bash. Act stays open.
 
 ## [0.13.0] - 2026-10-28
 

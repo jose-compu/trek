@@ -160,7 +160,7 @@ describe("effort regulator", () => {
 			harness.session.messages.some(
 				(message) =>
 					message.role === "assistant" &&
-					message.content.some((part) => part.type === "text" && part.text === "continued"),
+					message.content.some((part) => part.type === "text" && part.text.includes("continued")),
 			),
 		).toBe(true);
 		expect(harness.getPendingResponseCount()).toBe(0);

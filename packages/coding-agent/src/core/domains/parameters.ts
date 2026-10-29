@@ -28,8 +28,8 @@ const SPECS: Record<string, ParameterSpec[]> = {
 	],
 	engineering: [
 		{ name: "build", kind: "text", pattern: "(build failed(?: on [^,\\n.]+)?)" },
-		{ name: "violation", kind: "text", pattern: "(architecture violation)" },
-		{ name: "debt", kind: "text", pattern: "(tech debt(?: is (?:the )?)?[^\\n.]*)" },
+		{ name: "violation", kind: "text", pattern: "(architecture violation(?: is (?:the )?[^\\n.]+)?)" },
+		{ name: "debt", kind: "text", pattern: "(tech debt(?: is (?:the )?[^\\n.]+)?)" },
 	],
 	security: [
 		{ name: "secret", kind: "text", pattern: "(secret exposed(?: in [^,\\n.]+)?)" },
@@ -56,6 +56,47 @@ export function fillWorkflowParameters(domainId: string, text: string, matchedTe
 	return matchedTerms
 		.map((term) => ({ name: term, kind: "text" as const, value: sentenceAround(text, term) }))
 		.filter((row) => row.value.length > 0);
+}
+
+const BARE_FACT: Record<string, RegExp> = {
+	build: /^build failed$/i,
+	violation: /^architecture violation$/i,
+	debt: /^tech debt$/i,
+	secret: /^secret exposed$/i,
+	cve: /^cve$/i,
+	lint: /^lint error$/i,
+	type: /^type mismatch$/i,
+	clause: /^unfavorable clause$/i,
+	leakage: /^data leakage$/i,
+	split: /^(?:train test split|train\/test split)$/i,
+};
+
+/** Specs that are absent, or present only as the bare term. A bare term is not enough to start. */
+export function missingWorkflowFacts(domainId: string, text: string): string[] {
+	const specs = SPECS[domainId];
+	if (!specs) return [];
+	return specs.flatMap((spec) => {
+		const value = capture(spec.pattern, text);
+		return value && isSpecificFact(spec.name, value) ? [] : [spec.name];
+	});
+}
+
+export function isSpecificFact(name: string, value: string): boolean {
+	const bare = BARE_FACT[name];
+	if (!bare) return value.trim().length > 0;
+	return !bare.test(value.trim());
+}
+
+export function workflowFactQuestion(domainId: string, missing: readonly string[]): string {
+	const list =
+		missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(", ")} and ${missing[missing.length - 1]}`;
+	return `Which ${list} are in scope for the ${domainId} workflow? Say stop to leave it unstarted.`;
+}
+
+export function workflowFactRefusal(text: string): boolean {
+	return /^(?:no|nope|stop|skip|none|nothing|cancel|won'?t|will not|i (?:do not|don'?t) know|not now)\b/i.test(
+		text.trim(),
+	);
 }
 
 function capture(pattern: string, text: string): string {

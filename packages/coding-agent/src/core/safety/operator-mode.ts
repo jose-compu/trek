@@ -6,16 +6,32 @@
  * Delegated: a gated tool in the grant runs. Any other gated tool waits.
  * Checkpoint: the same tool rule as supervised, and the act phase stays closed until opened.
  * Diagnostic: only free tools run. The trace is still written.
+ * Ask: the model answers. File reads and web reads run. Writes do not.
  */
 
 import type { ReversibilityTier } from "../extensions/types.ts";
 import type { ReflectivePhase } from "../reflective-loop/types.ts";
 
-export type OperatorMode = "supervised" | "delegated" | "checkpoint" | "diagnostic";
+export type OperatorMode = "supervised" | "delegated" | "checkpoint" | "diagnostic" | "ask";
 
 export type OperatorDecision = "run" | "confirm" | "block";
 
-export const OPERATOR_MODES: readonly OperatorMode[] = ["supervised", "delegated", "checkpoint", "diagnostic"];
+export const OPERATOR_MODES: readonly OperatorMode[] = ["supervised", "delegated", "checkpoint", "diagnostic", "ask"];
+
+/** Tools an ask session may call. Writes, bash, and memory changes are not in this set. */
+export const ASK_READ_TOOLS: ReadonlySet<string> = new Set([
+	"read",
+	"grep",
+	"find",
+	"ls",
+	"recall",
+	"webfetch",
+	"web_fetch",
+	"web-fetch",
+	"websearch",
+	"web_search",
+	"web-search",
+]);
 
 export const CHECKPOINT_ACT_REASON = "Checkpoint: the act phase is closed. Open it before the agent runs.";
 
@@ -31,6 +47,7 @@ export function decideTool(
 ): OperatorDecision {
 	if (tier === "forbidden") return "block";
 	if (mode === "diagnostic") return tier === "free" ? "run" : "block";
+	if (mode === "ask") return tier === "free" || ASK_READ_TOOLS.has(toolName) ? "run" : "block";
 	if (tier === "free" || tier === "cheap") return "run";
 	if (mode === "delegated" && grant.has(toolName)) return "run";
 	return "confirm";
@@ -43,6 +60,9 @@ export function operatorBlockReason(
 	decision: OperatorDecision,
 ): string | undefined {
 	if (decision === "run") return undefined;
+	if (mode === "ask") {
+		return `Ask mode: ${toolName} is blocked. This mode reads files and the web, and does not write.`;
+	}
 	if (mode === "diagnostic") {
 		return `Diagnostic mode: ${toolName} is blocked (mutating tools are not allowed).`;
 	}

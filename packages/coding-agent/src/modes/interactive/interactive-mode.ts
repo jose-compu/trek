@@ -490,6 +490,15 @@ export class InteractiveMode {
 			description: command.description,
 		}));
 
+		for (const name of ["domains", "workflows"] as const) {
+			const command = slashCommands.find((item) => item.name === name);
+			if (!command) continue;
+			command.getArgumentCompletions = (prefix: string) => {
+				const items = this.session.completeDomainCommand(name, prefix);
+				return items.length > 0 ? items : null;
+			};
+		}
+
 		const modelCommand = slashCommands.find((command) => command.name === "model");
 		if (modelCommand) {
 			modelCommand.getArgumentCompletions = (prefix: string): AutocompleteItem[] | null => {
@@ -1659,6 +1668,9 @@ export class InteractiveMode {
 	private async rebindCurrentSession(): Promise<void> {
 		this.unsubscribe?.();
 		this.unsubscribe = undefined;
+		this.session.setToolConfirmHandler((toolName, detail) =>
+			this.showExtensionConfirm("Supervised", `Run ${toolName}?\n${detail}`),
+		);
 		this.applyRuntimeSettings();
 		await this.bindCurrentSessionExtensions();
 		this.subscribeToAgent();
@@ -2758,6 +2770,31 @@ export class InteractiveMode {
 				await this.showMemory(arg);
 				return;
 			}
+			if (text === "/confirm" || text.startsWith("/confirm ")) {
+				const tool = text.slice("/confirm".length).trim();
+				this.editor.setText("");
+				if (!/^[a-z][a-z0-9_-]{0,40}$/i.test(tool)) {
+					this.showError("usage: /confirm <tool>");
+					return;
+				}
+				this.session.confirmTool(tool);
+				this.chatContainer.addChild(new Spacer(1));
+				this.chatContainer.addChild(new Text(theme.fg("muted", `Next ${tool} call is confirmed.`), 1, 0));
+				this.ui.requestRender();
+				return;
+			}
+			if (
+				text === "/domains" ||
+				text.startsWith("/domains ") ||
+				text === "/workflows" ||
+				text.startsWith("/workflows ")
+			) {
+				const name = text.startsWith("/workflows") ? "workflows" : "domains";
+				const arg = text.slice(name === "workflows" ? "/workflows".length : "/domains".length).trim();
+				this.editor.setText("");
+				this.showDomainCommand(name, arg);
+				return;
+			}
 			if (text === "/sandbox") {
 				this.editor.setText("");
 				this.handleToggleSandbox();
@@ -2907,6 +2944,13 @@ export class InteractiveMode {
 
 			case "prompt_meta":
 				this.updateEditorPromptLabel();
+				break;
+
+			case "workflow_check":
+			case "anti_pattern":
+				this.chatContainer.addChild(new Spacer(1));
+				this.chatContainer.addChild(new Text(theme.fg("warning", event.text), 1, 0));
+				this.ui.requestRender();
 				break;
 
 			case "message_start":
@@ -3837,6 +3881,13 @@ export class InteractiveMode {
 		const tree = this.session.formatProcesses();
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new Text(theme.fg("muted", tree), 1, 0));
+		this.ui.requestRender();
+	}
+
+	showDomainCommand(name: "domains" | "workflows", arg: string): void {
+		const text = this.session.runDomainCommand(name, arg);
+		this.chatContainer.addChild(new Spacer(1));
+		this.chatContainer.addChild(new Text(theme.fg("muted", text), 1, 0));
 		this.ui.requestRender();
 	}
 

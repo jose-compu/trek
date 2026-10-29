@@ -52,7 +52,7 @@ export interface Args {
 	/** Diagnostic operator mode: traces on, mutating tools blocked (#49). */
 	diagnostic?: boolean;
 	/** 0.13 operator mode. Diagnostic matches --diagnostic. */
-	operatorMode?: "supervised" | "delegated" | "checkpoint" | "diagnostic";
+	operatorMode?: "supervised" | "delegated" | "checkpoint" | "diagnostic" | "ask";
 	/** Gated tools pre-authorized for delegated mode. */
 	operatorGrant?: string[];
 	/** Wording only. Off leaves every sentence as the model wrote it. */
@@ -208,12 +208,18 @@ export function parseArgs(args: string[]): Args {
 			result.diagnostic = true;
 		} else if (arg === "--operator-mode" && i + 1 < args.length) {
 			const mode = args[++i];
-			if (mode === "supervised" || mode === "delegated" || mode === "checkpoint" || mode === "diagnostic") {
+			if (
+				mode === "supervised" ||
+				mode === "delegated" ||
+				mode === "checkpoint" ||
+				mode === "diagnostic" ||
+				mode === "ask"
+			) {
 				result.operatorMode = mode;
 			} else {
 				result.diagnostics.push({
 					type: "error",
-					message: "--operator-mode must be supervised, delegated, checkpoint, or diagnostic",
+					message: "--operator-mode must be supervised, delegated, checkpoint, diagnostic, or ask",
 				});
 			}
 		} else if (arg === "--tone" && i + 1 < args.length) {
@@ -386,7 +392,7 @@ ${chalk.bold("Options:")}
   --verbose                      Stream tool calls/results to stderr in print mode; verbose startup in TUI
   --dry-run                      Preview write/edit/bash without applying changes (#9)
   --diagnostic                   Trace-only: block mutating tools (write/edit/bash) (#49)
-  --operator-mode <mode>         supervised, delegated, checkpoint, or diagnostic
+  --operator-mode <mode>         supervised, delegated, checkpoint, diagnostic, or ask
   --tone <off|plain>             Wording only. Off is the default. Law text stays as written.
   --operator-grant <tools>       Comma-separated gated tools for delegated mode
   --effort <off|normal|loose>    Effort stop for this run. loose is 10x normal. off disables it

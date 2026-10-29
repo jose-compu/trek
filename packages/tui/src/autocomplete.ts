@@ -238,6 +238,15 @@ export interface AutocompleteSuggestions {
 	prefix: string; // What we're matching against (e.g., "/" or "src/")
 }
 
+/** True when a slash command's argument is a filesystem path, such as `/command /tmp`. */
+export function slashArgumentIsPath(text: string): boolean {
+	const trimmed = text.trimStart();
+	const space = trimmed.indexOf(" ");
+	if (!trimmed.startsWith("/") || space === -1) return false;
+	const arg = trimmed.slice(space + 1).trimStart();
+	return arg.startsWith("/") || arg.startsWith("./") || arg.startsWith("../") || arg.startsWith("~/");
+}
+
 export interface AutocompleteProvider {
 	// Get autocomplete suggestions for current text/cursor position
 	// Returns null if no suggestions available
@@ -773,8 +782,8 @@ export class CombinedAutocompleteProvider implements AutocompleteProvider {
 		const currentLine = lines[cursorLine] || "";
 		const textBeforeCursor = currentLine.slice(0, cursorCol);
 
-		// Don't trigger if we're typing a slash command at the start of the line
-		if (textBeforeCursor.trim().startsWith("/") && !textBeforeCursor.trim().includes(" ")) {
+		// A slash command completes its own arguments. A path argument still completes files.
+		if (textBeforeCursor.trimStart().startsWith("/") && !slashArgumentIsPath(textBeforeCursor)) {
 			return false;
 		}
 

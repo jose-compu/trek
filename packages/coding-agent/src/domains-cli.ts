@@ -8,6 +8,7 @@ import { APP_NAME } from "./config.ts";
 import { addDomain, disableDomain, enableDomain, loadDomainCatalog } from "./core/domains/catalog.ts";
 import { runArchonWorkflow } from "./core/domains/run.ts";
 import { overrideSelection } from "./core/domains/select.ts";
+import { formatDomainList, runDomainSessionCommand } from "./core/domains/session-command.ts";
 
 export async function handleDomainsCommand(args: string[]): Promise<boolean> {
 	if (args[0] !== "domains") {
@@ -72,8 +73,8 @@ export async function handleWorkflowsCommand(args: string[]): Promise<boolean> {
 		}
 		if (sub === "show") {
 			requireId(args[2], "workflows show <id>");
-			const domain = findDomain(cwd, args[2]);
-			process.stdout.write(domain.yaml.endsWith("\n") ? domain.yaml : `${domain.yaml}\n`);
+			const shown = runDomainSessionCommand(cwd, "workflows", `show ${args[2]}`);
+			process.stdout.write(shown.endsWith("\n") ? shown : `${shown}\n`);
 			return true;
 		}
 		if (sub === "run") {
@@ -101,12 +102,7 @@ export async function handleWorkflowsCommand(args: string[]): Promise<boolean> {
 }
 
 function printDomains(cwd: string): void {
-	const catalog = loadDomainCatalog(cwd);
-	for (const domain of catalog.domains) {
-		const on = domain.alwaysOn || !catalog.disabled.has(domain.id);
-		const flag = domain.alwaysOn ? "always" : on ? "on" : "off";
-		console.log(`${domain.id}\t${flag}\t${domain.workflowName}`);
-	}
+	console.log(formatDomainList(cwd));
 }
 
 function findDomain(cwd: string, id: string) {

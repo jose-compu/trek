@@ -37,6 +37,13 @@ export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
 	{ name: "undo", description: "Undo agent edits back to a specific prompt (opens selector)" },
 	{ name: "processes", description: "Show this prompt's parallel, sequence, guarded choice, and inversion tree" },
 	{ name: "memory", description: "Show memory, /memory index, /memory add <path>, or /memory remove <path>" },
+	{
+		name: "domains",
+		description:
+			"List domains, /domains enable <id>, or /domains disable <id>. Detection still chooses the workflow.",
+	},
+	{ name: "workflows", description: "List workflows, or /workflows show <id>. Does not run a workflow." },
+	{ name: "confirm", description: "Allow the next call of one gated tool: /confirm bash" },
 	{ name: "sandbox", description: "Toggle OS-level sandbox for agent bash commands" },
 	{ name: "resume", description: "Resume a different session" },
 	{ name: "reload", description: "Reload keybindings, extensions, skills, prompts, and themes" },

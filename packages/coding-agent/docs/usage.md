@@ -212,7 +212,13 @@ See [Memory](memory.md).
 
 `trek workflows show <id>` prints the YAML. `trek workflows run <id>` runs that workflow for this command. The next prompt detects a domain again. A `SKILL.md` file is not a workflow.
 
-When a turn matches a domain, the session draws a green `workflow` call. The domain, the workflow name, and the filled parameters are colored inside that call. The session then calls the Archon DAG: each prompt node is its own model step, in `depends_on` order. `$USER_MESSAGE` is the user turn. `$id.output` is that node's reply. A fact that is not in the turn or an upstream output is said to be missing. `command`, `script`, and `loop` nodes parse and are not called in this release.
+When a turn matches a domain but a required fact is only the bare term, or is absent, Trek asks once for the missing facts and does not call the model. A reply of stop, or a reply that names none of them, ends the workflow. A reply that names a fact starts the nodes on the original turn plus that reply.
+
+When a turn matches a domain, the session draws a green `workflow` call. The domain, the workflow name, and the filled parameters are colored inside that call. The session then calls the Archon DAG: each prompt node is its own model step, in `depends_on` order. `$USER_MESSAGE` is the user turn. `$id.output` is that node's reply. A fact that is not in the turn or an upstream output is said to be missing. After the nodes, a reply that skips a node or adds a fact that is not in the turn is marked `workflow check`. That mark does not post a journal, edit a file, or run a tool. `command`, `script`, and `loop` nodes parse and are not called in this release.
+
+In a session, `/domains` lists each domain, whether it is on, and its workflow. `/domains disable finance` uses the same store as `trek domains disable`. Meta, AI, Security, and Engineering stay on. `/workflows show finance` prints the nodes. The session command does not run a workflow. Detection still chooses the workflow on the next prompt.
+
+A prompt can create a domain workflow, edit one, or restore the previous version. `create a domain workflow for warehouse: ...` writes `.trek/domains/warehouse/` and leaves it off until `/domains enable warehouse`. `edit the finance workflow: ...` keeps the previous YAML under `.trek/domains/finance/history/` and replaces the live file. `restore the finance workflow` goes back one version. A bundled workflow is copied into that history first, so the package file stays as it shipped. If the prompt does not say what to write, Trek asks once. Stop leaves the file unwritten.
 
 ### Operator modes
 
@@ -220,16 +226,18 @@ An operator mode chooses who approves work. It does not change the laws. See [Op
 
 | Mode | Meaning |
 |------|---------|
-| `supervised` | `read` and cheap edits run. A gated tool such as `bash` waits for one confirmation. |
+| `supervised` | `read` and cheap edits run. A gated tool such as `bash` asks `Run bash?` in the terminal. Yes runs that call. `/confirm bash` allows the next call without asking. |
 | `delegated` | A gated tool runs without a fresh confirmation only when `--operator-grant` names it. |
-| `checkpoint` | Same tool rule as supervised, and the act phase stays closed until it is opened. |
+| `checkpoint` | Act stays closed. Every prompt stops with `Checkpoint: the act phase is closed` before the model runs. Quit and start without this flag. There is no `/` command that opens the phase. |
 | `diagnostic` | Free tools and the trace only. Mutations are blocked. Same rule as `--diagnostic`. |
+| `ask` | The model answers. File reads and web reads run. `write`, `edit`, and `bash` do not. Act stays open, unlike checkpoint. |
 
 ```bash
 trek --operator-mode supervised
 trek --operator-mode delegated --operator-grant bash
 trek --operator-mode checkpoint
 trek --operator-mode diagnostic
+trek --operator-mode ask
 ```
 
 The mode is for this process. Leaving it unset keeps the previous tool gating.
