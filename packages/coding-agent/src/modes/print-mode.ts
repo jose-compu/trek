@@ -45,6 +45,9 @@ function logVerboseEvent(event: AgentSessionEvent): void {
 		case "anti_pattern":
 			console.error(event.text);
 			break;
+		case "lesson_stored":
+			console.error(event.text);
+			break;
 		case "tool_execution_start":
 			console.error(`[trek] tool → ${event.toolName} ${JSON.stringify(event.args)}`);
 			break;

@@ -1,7 +1,7 @@
 import { type Component, truncateToWidth } from "@trek/tui";
 import type { AppKeybinding } from "../../../core/keybindings.ts";
 import { theme } from "../theme/theme.ts";
-import { keyHint, rawKeyHint } from "./keybinding-hints.ts";
+import { keyText } from "./keybinding-hints.ts";
 
 /** Visibility of the shortcut bar below the editor input. */
 export type ShortcutBarVisibility = "hidden" | "compact" | "expanded";
@@ -64,6 +64,10 @@ const EXPANDED_SECTIONS: { title: string; entries: ShortcutEntry[] }[] = [
 	},
 ];
 
+function hint(key: string, description: string): string {
+	return theme.fg("accent", key) + theme.fg("dim", ` ${description}`);
+}
+
 function formatEntry(entry: ShortcutEntry): string {
 	if (typeof entry === "string") {
 		const descriptions: Partial<Record<AppKeybinding, string>> = {
@@ -88,9 +92,9 @@ function formatEntry(entry: ShortcutEntry): string {
 			"app.editor.external": "ext. editor",
 			"app.clipboard.pasteImage": "paste image",
 		};
-		return keyHint(entry, descriptions[entry] ?? entry);
+		return hint(keyText(entry), descriptions[entry] ?? entry);
 	}
-	return rawKeyHint(entry.raw, entry.description);
+	return hint(entry.raw, entry.description);
 }
 
 function joinCompact(entries: ShortcutEntry[], separator: string): string {
@@ -114,22 +118,22 @@ export class ShortcutBarComponent implements Component {
 
 	render(width: number): string[] {
 		const visibility = this.getVisibility();
-		const separator = theme.fg("muted", " · ");
+		const separator = theme.fg("dim", " · ");
 
 		if (visibility === "hidden") {
-			const line = keyHint("app.shortcuts.toggle", "show shortcuts");
-			return [truncateToWidth(theme.fg("dim", line), width, theme.fg("dim", "..."))];
+			const line = hint(keyText("app.shortcuts.toggle"), "show shortcuts");
+			return [truncateToWidth(line, width, theme.fg("dim", "..."))];
 		}
 
 		if (visibility === "compact") {
 			const line = joinCompact(COMPACT_SHORTCUTS, separator);
-			return [truncateToWidth(theme.fg("dim", line), width, theme.fg("dim", "..."))];
+			return [truncateToWidth(line, width, theme.fg("dim", "..."))];
 		}
 
 		const lines: string[] = [];
 		lines.push(
 			truncateToWidth(
-				theme.fg("dim", `Shortcuts`) + separator + keyHint("app.shortcuts.toggle", "hide"),
+				theme.fg("dim", "Shortcuts") + separator + hint(keyText("app.shortcuts.toggle"), "hide"),
 				width,
 				theme.fg("dim", "..."),
 			),
@@ -137,7 +141,7 @@ export class ShortcutBarComponent implements Component {
 		for (const section of EXPANDED_SECTIONS) {
 			lines.push(truncateToWidth(theme.fg("muted", section.title), width));
 			const sectionLine = joinCompact(section.entries, separator);
-			lines.push(truncateToWidth(theme.fg("dim", sectionLine), width, theme.fg("dim", "...")));
+			lines.push(truncateToWidth(sectionLine, width, theme.fg("dim", "...")));
 		}
 		return lines;
 	}

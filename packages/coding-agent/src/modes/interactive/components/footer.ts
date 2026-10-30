@@ -107,47 +107,50 @@ export class FooterComponent implements Component {
 		const contextPercent = contextUsage?.percent !== null ? contextPercentValue.toFixed(1) : "?";
 
 		// Replace home directory with ~
-		let pwd = formatCwdForFooter(this.session.sessionManager.getCwd(), process.env.HOME || process.env.USERPROFILE);
+		const dim = (text: string) => theme.fg("dim", text);
+		const quiet = (text: string) => theme.fg("muted", text);
+		const mark = (text: string) => theme.fg("accent", text);
+
+		const cwd = formatCwdForFooter(this.session.sessionManager.getCwd(), process.env.HOME || process.env.USERPROFILE);
+		let pwd = dim(cwd);
 
 		// Add git branch if available
 		const branch = this.footerData.getGitBranch();
 		if (branch) {
-			pwd = `${pwd} (${branch})`;
+			pwd = `${pwd} ${quiet("(")}${mark(branch)}${quiet(")")}`;
 		}
 
 		// Add session name if set
 		const sessionName = this.session.sessionManager.getSessionName();
 		if (sessionName) {
-			pwd = `${pwd} • ${sessionName}`;
+			pwd = `${pwd}${dim(" • ")}${quiet(sessionName)}`;
 		}
 
 		// Build stats line
 		const statsParts = [];
-		if (totalInput) statsParts.push(`↑${formatTokens(totalInput)}`);
-		if (totalOutput) statsParts.push(`↓${formatTokens(totalOutput)}`);
-		if (totalCacheRead) statsParts.push(`R${formatTokens(totalCacheRead)}`);
-		if (totalCacheWrite) statsParts.push(`W${formatTokens(totalCacheWrite)}`);
+		if (totalInput) statsParts.push(`${dim("↑")}${quiet(formatTokens(totalInput))}`);
+		if (totalOutput) statsParts.push(`${dim("↓")}${quiet(formatTokens(totalOutput))}`);
+		if (totalCacheRead) statsParts.push(`${dim("R")}${quiet(formatTokens(totalCacheRead))}`);
+		if (totalCacheWrite) statsParts.push(`${dim("W")}${quiet(formatTokens(totalCacheWrite))}`);
 
 		// Show cost with "(sub)" indicator if using OAuth subscription
 		const usingSubscription = state.model ? this.session.modelRegistry.isUsingOAuth(state.model) : false;
 		if (totalCost || usingSubscription) {
-			const costStr = `$${totalCost.toFixed(3)}${usingSubscription ? " (sub)" : ""}`;
+			const costStr = quiet(`$${totalCost.toFixed(3)}`) + (usingSubscription ? dim(" (sub)") : "");
 			statsParts.push(costStr);
 		}
 
 		// Colorize context percentage based on usage
 		let contextPercentStr: string;
 		const autoIndicator = this.autoCompactEnabled ? " (auto)" : "";
-		const contextPercentDisplay =
-			contextPercent === "?"
-				? `?/${formatTokens(contextWindow)}${autoIndicator}`
-				: `${contextPercent}%/${formatTokens(contextWindow)}${autoIndicator}`;
+		const percentLabel = contextPercent === "?" ? "?" : `${contextPercent}%`;
+		const windowLabel = `/${formatTokens(contextWindow)}`;
 		if (contextPercentValue > 90) {
-			contextPercentStr = theme.fg("error", contextPercentDisplay);
+			contextPercentStr = theme.fg("error", `${percentLabel}${windowLabel}`) + dim(autoIndicator);
 		} else if (contextPercentValue > 70) {
-			contextPercentStr = theme.fg("warning", contextPercentDisplay);
+			contextPercentStr = theme.fg("warning", `${percentLabel}${windowLabel}`) + dim(autoIndicator);
 		} else {
-			contextPercentStr = contextPercentDisplay;
+			contextPercentStr = quiet(percentLabel) + dim(windowLabel + autoIndicator);
 		}
 		statsParts.push(contextPercentStr);
 
@@ -168,20 +171,19 @@ export class FooterComponent implements Component {
 		const minPadding = 2;
 
 		// Add thinking level indicator if model supports reasoning
-		let rightSideWithoutProvider = modelName;
+		let rightSideWithoutProvider = mark(modelName);
 		if (state.model?.reasoning) {
 			const thinkingLevel = state.thinkingLevel || "off";
-			rightSideWithoutProvider =
-				thinkingLevel === "off" ? `${modelName} • thinking off` : `${modelName} • ${thinkingLevel}`;
+			const level = thinkingLevel === "off" ? "thinking off" : thinkingLevel;
+			rightSideWithoutProvider = `${mark(modelName)}${dim(" • ")}${dim(level)}`;
 		}
 
 		// Prepend the provider in parentheses if there are multiple providers and there's enough room
 		let rightSide = rightSideWithoutProvider;
 		if (this.footerData.getAvailableProviderCount() > 1 && state.model) {
-			rightSide = `(${state.model!.provider}) ${rightSideWithoutProvider}`;
-			if (statsLeftWidth + minPadding + visibleWidth(rightSide) > width) {
-				// Too wide, fall back
-				rightSide = rightSideWithoutProvider;
+			const withProvider = `${dim(`(${state.model.provider})`)} ${rightSideWithoutProvider}`;
+			if (statsLeftWidth + minPadding + visibleWidth(withProvider) <= width) {
+				rightSide = withProvider;
 			}
 		}
 
@@ -207,15 +209,8 @@ export class FooterComponent implements Component {
 			}
 		}
 
-		// Apply dim to each part separately. statsLeft may contain color codes (for context %)
-		// that end with a reset, which would clear an outer dim wrapper. So we dim the parts
-		// before and after the colored section independently.
-		const dimStatsLeft = theme.fg("dim", statsLeft);
-		const remainder = statsLine.slice(statsLeft.length); // padding + rightSide
-		const dimRemainder = theme.fg("dim", remainder);
-
-		const pwdLine = truncateToWidth(theme.fg("dim", pwd), width, theme.fg("dim", "..."));
-		const lines = [pwdLine, dimStatsLeft + dimRemainder];
+		const pwdLine = truncateToWidth(pwd, width, dim("..."));
+		const lines = [pwdLine, statsLine];
 
 		// Add extension statuses on a single line, sorted by key alphabetically
 		const extensionStatuses = this.footerData.getExtensionStatuses();

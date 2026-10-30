@@ -120,9 +120,15 @@ export function stripHonestyFooter(text: string): string {
 }
 
 /** Fixed status line. The raw tag stays off screen. */
-export function honestyDisplay(
-	text: string,
-): { confidence: ConfidenceLevel; headline: string; details: string[] } | undefined {
+export function honestyDisplay(text: string):
+	| {
+			confidence: ConfidenceLevel;
+			assumptions: number;
+			unverified: number;
+			headline: string;
+			details: string[];
+	  }
+	| undefined {
 	const report = parseHonestyReport(text);
 	if (!report.confidence) {
 		return undefined;
@@ -132,7 +138,13 @@ export function honestyDisplay(
 		...report.assumptions.map((item) => `assumption: ${item}`),
 		...report.unverified.map((item) => `unverified: ${item}`),
 	];
-	return { confidence: report.confidence, headline, details };
+	return {
+		confidence: report.confidence,
+		assumptions: report.assumptions.length,
+		unverified: report.unverified.length,
+		headline,
+		details,
+	};
 }
 
 /** One display line when the footer has a real confidence. The raw tag stays off screen. */
