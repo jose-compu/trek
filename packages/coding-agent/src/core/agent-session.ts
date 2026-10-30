@@ -298,7 +298,8 @@ export type AgentSessionEvent =
 	| { type: "auto_retry_end"; success: boolean; attempt: number; finalError?: string }
 	| { type: "prompt_meta"; promptNumber: number; promptId: string; preview?: string }
 	| { type: "workflow_check"; text: string }
-	| { type: "anti_pattern"; text: string };
+	| { type: "anti_pattern"; text: string }
+	| { type: "lesson_stored"; text: string };
 
 /** Listener function for agent session events */
 export type AgentSessionEventListener = (event: AgentSessionEvent) => void;
@@ -456,6 +457,8 @@ export class AgentSession {
 	private _followUpMessages: string[] = [];
 	/** Messages queued to be included with the next user prompt as context ("asides"). */
 	private _pendingNextTurnMessages: CustomMessage[] = [];
+	/** Lesson ids stored during this prompt, shown once the turn finishes. */
+	private _lessonNotices: string[] = [];
 
 	// Compaction state
 	private _compactionAbortController: AbortController | undefined = undefined;
@@ -2680,6 +2683,7 @@ export class AgentSession {
 			const id = /^stored (project:\d+)$/.exec(stored)?.[1];
 			if (!id) return;
 			saveLessonRecord(this._cwd, id, lesson);
+			this._lessonNotices.push(id);
 			this.sessionManager.appendCustomEntry("trek:lesson", {
 				id,
 				kind: evidence.kind,
@@ -3115,10 +3119,18 @@ export class AgentSession {
 				}
 			}
 		} finally {
+			this._emitLessonNotice();
 			this._writeProcessTree();
 			this._flushPendingBashMessages();
 			await this._maybeGitCommitPrompt();
 		}
+	}
+
+	private _emitLessonNotice(): void {
+		if (this._lessonNotices.length === 0) return;
+		const ids = this._lessonNotices.splice(0);
+		const label = ids.length === 1 ? "lesson" : "lessons";
+		this._emit({ type: "lesson_stored", text: `${label} ${ids.join(", ")}` });
 	}
 
 	private async _maybeGitCommitPrompt(): Promise<void> {
@@ -3457,6 +3469,7 @@ export class AgentSession {
 		} else {
 			await this._runAgentPrompt(messages);
 		}
+		this._emitLessonNotice();
 	}
 
 	/**

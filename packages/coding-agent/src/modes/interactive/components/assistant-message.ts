@@ -16,6 +16,33 @@ export function shouldRenderAssistantTextBlock(text: string, allTextBlocks: read
 	);
 }
 
+function honestyCardLines(status: {
+	confidence: "high" | "medium" | "low";
+	assumptions: number;
+	unverified: number;
+	details: string[];
+}): string[] {
+	const tone = status.confidence === "high" ? "success" : status.confidence === "low" ? "error" : "warning";
+	const mark = status.confidence === "high" ? "✔" : status.confidence === "low" ? "✖" : "⚠";
+	const gap = theme.fg("dim", "   ");
+	const count = (n: number, hot: "warning" | "error") => theme.fg(n > 0 ? hot : "muted", String(n));
+	const head = [
+		theme.bold(theme.fg(tone, `${mark} honesty`)),
+		`${theme.fg("muted", "confidence")} ${theme.fg(tone, status.confidence)}`,
+		`${theme.fg("muted", "assumptions")} ${count(status.assumptions, "warning")}`,
+		`${theme.fg("muted", "unverified")} ${count(status.unverified, "error")}`,
+	].join(gap);
+	const lines = [head];
+	for (const detail of status.details) {
+		const split = detail.indexOf(": ");
+		const key = split === -1 ? detail : detail.slice(0, split);
+		const value = split === -1 ? "" : detail.slice(split + 2);
+		const keyTone = key === "unverified" ? "error" : "warning";
+		lines.push(`${theme.fg("dim", "            ")}${theme.fg(keyTone, key.padEnd(12))}${theme.fg("text", value)}`);
+	}
+	return lines;
+}
+
 function collectTrimmedTextBlocks(content: AssistantMessage["content"]): string[] {
 	return content
 		.filter((block) => block.type === "text" && block.text.trim())
@@ -113,10 +140,9 @@ export class AssistantMessageComponent extends Container {
 				this.contentContainer.addChild(new Markdown(visible, 1, 0, this.markdownTheme));
 				const status = honestyDisplay(content.text);
 				if (status) {
-					const color =
-						status.confidence === "high" ? "success" : status.confidence === "low" ? "error" : "warning";
-					const details = status.details.length > 0 ? `   ${theme.fg("dim", status.details.join("   "))}` : "";
-					this.contentContainer.addChild(new Text(theme.fg(color, status.headline) + details, 1, 0));
+					for (const line of honestyCardLines(status)) {
+						this.contentContainer.addChild(new Text(line, 1, 0));
+					}
 				}
 			} else if (content.type === "thinking" && content.thinking.trim()) {
 				// Add spacing only when another visible assistant content block follows.

@@ -858,11 +858,14 @@ export class InteractiveMode {
 		// Main interactive loop
 		while (true) {
 			const userInput = await this.getUserInput();
+			this.showWorkingNow();
 			try {
 				await this.session.prompt(userInput);
 			} catch (error: unknown) {
 				const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 				this.showError(errorMessage);
+			} finally {
+				if (!this.session.isStreaming) this.stopWorkingLoader();
 			}
 		}
 	}
@@ -1873,6 +1876,15 @@ export class InteractiveMode {
 
 	private getWorkingLoaderMessage(): string {
 		return this.workingMessage ?? this.defaultWorkingMessage;
+	}
+
+	/** Show the spinner before the model call. Lesson writes and promotion run first. */
+	private showWorkingNow(): void {
+		if (!this.workingVisible || this.loadingAnimation) return;
+		this.statusContainer.clear();
+		this.loadingAnimation = this.createWorkingLoader();
+		this.statusContainer.addChild(this.loadingAnimation);
+		this.ui.requestRender();
 	}
 
 	private createWorkingLoader(): Loader {
@@ -2887,6 +2899,7 @@ export class InteractiveMode {
 			// Normal message submission
 			// First, move any pending bash components to chat
 			this.flushPendingBashComponents();
+			this.showWorkingNow();
 
 			if (this.onInputCallback) {
 				this.onInputCallback(text);
@@ -2930,8 +2943,9 @@ export class InteractiveMode {
 					this.retryLoader.stop();
 					this.retryLoader = undefined;
 				}
-				this.stopWorkingLoader();
-				if (this.workingVisible) {
+				if (!this.workingVisible) {
+					this.stopWorkingLoader();
+				} else if (!this.loadingAnimation) {
 					this.loadingAnimation = this.createWorkingLoader();
 					this.statusContainer.addChild(this.loadingAnimation);
 				}
@@ -2962,6 +2976,11 @@ export class InteractiveMode {
 			case "anti_pattern":
 				this.chatContainer.addChild(new Spacer(1));
 				this.chatContainer.addChild(new Text(theme.fg("warning", event.text), 1, 0));
+				this.ui.requestRender();
+				break;
+
+			case "lesson_stored":
+				this.chatContainer.addChild(new Text(`${theme.fg("success", "✔")} ${theme.fg("dim", event.text)}`, 1, 0));
 				this.ui.requestRender();
 				break;
 

@@ -1,10 +1,19 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.14.0`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.14.1`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.14.1] - 2026-10-30
+
+### Changed
+
+- The honesty line is a short status row. High is a green check, medium a yellow mark, low a red mark. A zero count stays dim. An assumption or an unverified claim is on its own line.
+- A stored lesson prints one dim line under the answer.
+- Working... appears when the prompt is accepted, before the lesson write and the promotion call.
+- Shortcut keys, the git branch, and the model name use the theme accent. The rest of the footer stays gray. Context still turns yellow above 70% and red above 90%.
 
 ## [0.14.0] - 2026-10-29
 
