@@ -97,3 +97,15 @@ Lesson ids from that block are written on the audit step as `retrievedLessonIds`
 Embeddings are MiniLM (`Xenova/all-MiniLM-L6-v2`, 384 dimensions), loaded on first use. If the model cannot load, recall returns no hits and the turn continues. Tests use a fake embedder and do not download it.
 
 A cross-encoder is allowed only for a local or hybrid Mistral, Mistral Pro, or Qwen suite. API mode and the LFM suite do not construct one. The session does not start a reranker process.
+
+## Lessons
+
+A stored lesson is L3. A lesson placed in the prompt is L2.
+
+**Writing (L3).** After a turn with a tool error, a law block, or an EffortRegulator stop, the session model writes one lesson: when it applies, the mistake, and a rule for next time. A prompt that starts with a correction (`no`, `that is wrong`, `not what I asked`, `/undo`) writes a lesson about the previous turn before the answer. The lesson is stored in project memory, tagged with its domain, and recorded as a `trek:lesson` session entry. The call is outside the transcript and has no tools. A clean turn writes nothing.
+
+**Promotion (L3 to L2).** Each prompt looks up the 20 nearest lessons in project and global memory, reranked where the suite allows it. The Frontier model, or Planning when Frontier is not assigned, picks up to five that apply. Only those lessons enter the prompt. An id it invents is dropped. The choice, the model, and the reason are recorded as a `trek:lesson_promotion` entry. When no lesson is found, no call is made. When the reply is not usable or no Planning or Frontier model is assigned, the lessons keep score order.
+
+`TREK_LESSONS=0` stops writing lessons. `TREK_LESSON_PROMOTION=0` uses score order and makes no promotion call. `TREK_PROMOTION_MODEL=0` leaves L2 on score order and refuses L1. Memory that is off writes and promotes nothing.
+
+**Crystallize (L2 to L1).** `/crystallize <id>` asks the Frontier model, or Planning when Frontier is not assigned, for a yes or a no. A no stops and names the reason. A yes shows the draft and waits. Yes writes `.trek/skills/lessons/<id>/SKILL.md`, which the next session loads. No handler, including print mode, writes nothing. A grant does not skip the Yes. `/crystallize remove <id>` moves that file into `history/`. `/lessons` lists the id, the domain, whether a skill is live, and the rule. Compaction keeps the user intent, the lesson ids, and the errors, and drops verbose tool output. The lesson ids are appended to the compaction summary and to a `trek:compaction` entry.

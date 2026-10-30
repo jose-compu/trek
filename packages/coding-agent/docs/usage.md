@@ -204,7 +204,13 @@ Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`, `remember
 | `--memory on` | Turn memory on for this process. Does not write settings. Layer flags still apply |
 | `--effort <off\|normal\|loose>` | Effort stop for this run. `loose` is 10× `normal`. `off` does not stop the turn for effort |
 
-See [Memory](memory.md).
+See [Memory](memory.md). Lessons and skills are in [Learning](learning.md).
+
+### Learning
+
+`spawn_branches` runs up to four independent subtasks at once. Each branch has the same tools, laws, and operator mode. The first branch to write a path owns it for that spawn. `gather` returns the summaries in the order given.
+
+A failed turn, or a correction, stores one lesson in project memory. The Frontier model, or Planning when Frontier is not assigned, picks up to five lessons for the next prompt. `/crystallize <id>` turns one lesson into a skill only after you confirm. `/lessons` lists them. `/crystallize remove <id>` takes the skill back and keeps the file under `history/`.
 
 ### Domains
 

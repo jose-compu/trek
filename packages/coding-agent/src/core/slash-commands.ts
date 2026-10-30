@@ -43,6 +43,12 @@ export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
 			"List domains, /domains enable <id>, or /domains disable <id>. Detection still chooses the workflow.",
 	},
 	{ name: "workflows", description: "List workflows, or /workflows show <id>. Does not run a workflow." },
+	{ name: "lessons", description: "List stored lessons. A skill column shows which ones were confirmed." },
+	{
+		name: "crystallize",
+		description:
+			"Turn a lesson into a skill after you confirm: /crystallize <id>. /crystallize remove <id> takes it back.",
+	},
 	{ name: "confirm", description: "Allow the next call of one gated tool: /confirm bash" },
 	{ name: "sandbox", description: "Toggle OS-level sandbox for agent bash commands" },
 	{ name: "resume", description: "Resume a different session" },

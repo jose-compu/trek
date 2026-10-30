@@ -2,192 +2,151 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Trek Agent 0.13</title>
+<title>Trek Agent 0.14</title>
+<!-- Logos are clipped from brand/trek-identity.jpg by scripts/clip-brand-logos.sh. Do not redraw them here. -->
 <style>
+  :root {
+    --void: #07070c;
+    --night: #12121c;
+    --card: #1a1a28;
+    --border: #2a2a3d;
+    --text: #f5f5f8;
+    --violet: #7c5cff;
+    --glow: #a78bfa;
+    --magenta: #8b5cf6;
+    --muted: #a3a3b8;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 1983px; height: 793px; overflow: hidden; background: #070b16; }
+  html, body { width: 1983px; height: 793px; overflow: hidden; background: var(--void); }
   .banner {
     width: 1983px;
     height: 793px;
     position: relative;
     overflow: hidden;
-    color: #e8edf7;
-    font-family: "SF Pro Display", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+    color: var(--text);
+    font-family: "Inter", "SF Pro Display", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
     background:
-      radial-gradient(900px 700px at 92% 42%, rgba(124, 58, 237, 0.55), transparent 62%),
-      radial-gradient(700px 500px at 78% 80%, rgba(88, 28, 180, 0.28), transparent 70%),
-      linear-gradient(180deg, #0c1020 0%, #070b16 55%, #060914 100%);
+      radial-gradient(900px 700px at 90% 45%, rgba(124, 92, 255, 0.42), transparent 62%),
+      radial-gradient(700px 500px at 76% 85%, rgba(139, 92, 246, 0.22), transparent 70%),
+      linear-gradient(180deg, #0b0b14 0%, var(--void) 60%, var(--void) 100%);
   }
   .watermark {
     position: absolute;
-    right: -70px;
-    top: 110px;
-    width: 560px;
-    height: 560px;
-    opacity: 0.55;
+    right: 40px;
+    top: 150px;
+    width: 500px;
+    height: 500px;
+    opacity: 0.5;
     pointer-events: none;
   }
-  .inner { position: relative; z-index: 1; height: 100%; padding: 52px 64px 44px; display: flex; flex-direction: column; }
-  .head { display: flex; align-items: center; gap: 18px; }
-  .logo { width: 92px; height: 92px; flex: none; filter: drop-shadow(0 8px 16px rgba(76, 29, 149, 0.45)); }
+  .inner { position: relative; z-index: 1; height: 100%; padding: 46px 64px 44px; display: flex; flex-direction: column; }
+  .head { display: flex; align-items: center; gap: 20px; }
+  .lockup { height: 84px; width: auto; }
   .brand { display: flex; flex-direction: column; gap: 6px; }
-  .brand-row { display: flex; align-items: center; gap: 14px; }
-  .name { font-size: 40px; font-weight: 700; letter-spacing: -0.03em; }
   .badge {
-    border: 1.5px solid rgba(167, 139, 250, 0.85);
+    align-self: flex-start;
+    border: 1.5px solid var(--glow);
     color: #ddd6fe;
     border-radius: 999px;
     padding: 4px 14px 5px;
     font-size: 20px;
     font-weight: 600;
-    letter-spacing: 0.01em;
   }
-  .tagline { color: #9aa3b8; font-size: 20px; font-weight: 500; }
-  .main { margin-top: 42px; display: grid; grid-template-columns: 640px 1fr; gap: 20px; align-items: start; flex: 1; padding-right: 40px; }
+  .tagline { color: var(--muted); font-size: 20px; font-weight: 500; }
+  .main { margin-top: 40px; display: grid; grid-template-columns: 640px 1fr; gap: 20px; align-items: start; flex: 1; padding-right: 420px; }
   h1 { font-size: 84px; line-height: 0.95; font-weight: 800; letter-spacing: -0.045em; }
   h1 span {
     display: block;
     margin-top: 8px;
-    background: linear-gradient(90deg, #c4b5fd 0%, #8b5cf6 45%, #7c3aed 100%);
+    background: linear-gradient(90deg, #ddd6fe 0%, var(--glow) 40%, var(--violet) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
-  .sub { margin-top: 28px; max-width: 560px; color: #b7c0d4; font-size: 26px; line-height: 1.35; font-weight: 500; }
-  .cols { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding-top: 18px; }
+  .sub { margin-top: 28px; max-width: 580px; color: #c4c4d4; font-size: 26px; line-height: 1.35; font-weight: 500; }
+  .cols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding-top: 18px; }
   .col { padding: 0 16px; }
-  .col + .col { border-left: 1px solid rgba(148, 163, 184, 0.18); }
+  .col + .col { border-left: 1px solid var(--border); }
   .icon { height: 78px; display: flex; align-items: center; }
   .col h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 10px; }
-  .col p { color: #b4bdd0; font-size: 17px; line-height: 1.35; font-weight: 500; }
+  .col p { color: #b8b8c8; font-size: 17px; line-height: 1.35; font-weight: 500; }
   .upgrade { margin-top: auto; display: flex; align-items: center; gap: 16px; }
   .prompt {
     width: 54px; height: 40px; border-radius: 10px;
-    border: 1.5px solid rgba(167, 139, 250, 0.7);
+    border: 1.5px solid var(--glow);
+    background: var(--night);
     display: grid; place-items: center;
-    color: #c4b5fd; font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 18px;
+    color: #ddd6fe; font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 18px;
   }
-  .up-label { color: #a78bfa; font-weight: 700; font-size: 22px; margin-right: 8px; }
-  .cmd {
-    font-family: "SF Mono", ui-monospace, Menlo, monospace;
-    font-size: 22px; color: #e5e7eb; font-weight: 500;
-  }
+  .up-label { color: var(--glow); font-weight: 700; font-size: 22px; margin-right: 8px; }
+  .cmd { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 22px; color: #e5e5ee; font-weight: 500; }
 </style>
 </head>
 <body>
   <div class="banner" id="banner">
-    <svg class="watermark" viewBox="0 0 100 100" aria-hidden="true">
-      <defs>
-        <linearGradient id="wg" x1="30" y1="92" x2="70" y2="8" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stop-color="#5b21b6" stop-opacity="0.45"/>
-          <stop offset="1" stop-color="#ddd6fe" stop-opacity="0.85"/>
-        </linearGradient>
-        <clipPath id="wfront">
-          <path d="M30 92 L58 14 Q62 8 66 14 L96 92 Z"/>
-        </clipPath>
-      </defs>
-      <path d="M6 92 L30 40 L52 92 Z" fill="#7c3aed" opacity="0.35"/>
-      <path d="M30 92 L58 14 Q62 8 66 14 L96 92 Z" fill="url(#wg)"/>
-      <path d="M62 12 L96 92 H62 Z" fill="#2e1065" opacity="0.28"/>
-      <g clip-path="url(#wfront)">
-        <path d="M64 80 L50 68 L70 58 L52 46 L68 34 L58 22" fill="none" stroke="#ffffff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
-      </g>
-      <circle cx="62" cy="14" r="2.6" fill="#ffffff"/>
-    </svg>
+    <img class="watermark" src="brand/logos/mark-hero.png" alt="" />
     <div class="inner">
       <header class="head">
-        <svg class="logo" viewBox="0 0 100 100" aria-hidden="true">
-          <defs>
-            <linearGradient id="lg" x1="28" y1="94" x2="70" y2="6" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stop-color="#4c1d95"/>
-              <stop offset="0.5" stop-color="#7c3aed"/>
-              <stop offset="1" stop-color="#e9d5ff"/>
-            </linearGradient>
-            <clipPath id="front">
-              <path d="M30 92 L58 14 Q62 8 66 14 L96 92 Z"/>
-            </clipPath>
-          </defs>
-          <path d="M6 92 L30 40 L52 92 Z" fill="#6d28d9"/>
-          <path d="M30 92 L58 14 Q62 8 66 14 L96 92 Z" fill="url(#lg)"/>
-          <path d="M62 12 L96 92 H62 Z" fill="#1e1b4b" opacity="0.22"/>
-          <g clip-path="url(#front)">
-            <path d="M64 80 L50 68 L70 58 L52 46 L68 34 L58 22" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-          </g>
-          <circle cx="62" cy="14" r="3.2" fill="#ffffff"/>
-        </svg>
+        <img class="lockup" src="brand/logos/lockup-dark-full.png" alt="Trek Agent" />
         <div class="brand">
-          <div class="brand-row">
-            <div class="name">Trek Agent</div>
-            <div class="badge">v0.13.0</div>
-          </div>
+          <div class="badge">v0.14.0</div>
           <div class="tagline">Powerful. Precise. Honest.</div>
         </div>
       </header>
       <div class="main">
         <div>
-          <h1>Trek 0.13<span>Guardrails</span></h1>
-          <p class="sub">The owner sets the mode. A guest may talk and cannot run tools.</p>
+          <h1>Trek 0.14<span>Learning</span></h1>
+          <p class="sub">Branches run in parallel. A failed turn leaves a lesson. You confirm what becomes a skill.</p>
         </div>
         <div class="cols">
           <div class="col">
             <div class="icon">
               <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <rect x="16" y="14" width="32" height="10" rx="2" stroke="#c4b5fd" stroke-width="2.2"/>
-                <rect x="16" y="28" width="32" height="10" rx="2" stroke="#e9d5ff" stroke-width="2.2"/>
-                <rect x="16" y="42" width="32" height="10" rx="2" stroke="#a78bfa" stroke-width="2.2"/>
+                <circle cx="32" cy="14" r="5" stroke="#ddd6fe" stroke-width="2.2"/>
+                <path d="M32 19 V30 M32 30 L14 46 M32 30 L32 46 M32 30 L50 46" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round"/>
+                <circle cx="14" cy="50" r="4" stroke="#7c5cff" stroke-width="2.2"/>
+                <circle cx="32" cy="50" r="4" stroke="#7c5cff" stroke-width="2.2"/>
+                <circle cx="50" cy="50" r="4" stroke="#7c5cff" stroke-width="2.2"/>
               </svg>
             </div>
-            <h2>Modes</h2>
-            <p>Supervised, delegated, checkpoint, or diagnostic. Laws still apply.</p>
+            <h2>Branches</h2>
+            <p>Up to four subtasks run at once. Each keeps the laws.</p>
           </div>
           <div class="col">
             <div class="icon">
               <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <circle cx="28" cy="28" r="12" stroke="#c4b5fd" stroke-width="2.4"/>
-                <path d="M37 37 L50 50" stroke="#e9d5ff" stroke-width="2.6" stroke-linecap="round"/>
+                <rect x="14" y="12" width="36" height="42" rx="4" stroke="#a78bfa" stroke-width="2.2"/>
+                <path d="M22 24 h20 M22 32 h20 M22 40 h12" stroke="#ddd6fe" stroke-width="2.2" stroke-linecap="round"/>
               </svg>
             </div>
-            <h2>Nodes</h2>
-            <p>Each Archon prompt node is one model step.</p>
+            <h2>Lessons</h2>
+            <p>A tool error or a correction is stored as one rule.</p>
           </div>
           <div class="col">
             <div class="icon">
               <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <path d="M14 22 h12 l4 4 h20 v24 H14 Z" stroke="#c4b5fd" stroke-width="2.2" stroke-linejoin="round"/>
-                <path d="M22 38 h20" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round"/>
+                <path d="M32 50 V16 M20 28 L32 16 L44 28" stroke="#a78bfa" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M16 54 h32" stroke="#7c5cff" stroke-width="2.4" stroke-linecap="round"/>
               </svg>
             </div>
-            <h2>Ask</h2>
-            <p>An ambiguous prompt gets one question. The model waits.</p>
+            <h2>Promotion</h2>
+            <p>Frontier or Planning picks the lessons for this prompt.</p>
           </div>
           <div class="col">
             <div class="icon">
               <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <path d="M12 22 h28" stroke="#c4b5fd" stroke-width="2.4" stroke-linecap="round"/>
-                <path d="M12 32 h40" stroke="#e9d5ff" stroke-width="2.4" stroke-linecap="round"/>
-                <path d="M12 42 h22" stroke="#a78bfa" stroke-width="2.4" stroke-linecap="round"/>
+                <path d="M32 12 L50 22 V42 L32 52 L14 42 V22 Z" stroke="#a78bfa" stroke-width="2.2" stroke-linejoin="round"/>
+                <path d="M24 32 L30 38 L41 26" stroke="#ddd6fe" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </div>
-            <h2>Guest</h2>
-            <p>A group guest cannot run tools, read secrets, or confirm.</p>
-          </div>
-          <div class="col">
-            <div class="icon">
-              <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <circle cx="32" cy="16" r="5" stroke="#c4b5fd" stroke-width="2.2"/>
-                <circle cx="18" cy="46" r="5" stroke="#a78bfa" stroke-width="2.2"/>
-                <circle cx="46" cy="46" r="5" stroke="#e9d5ff" stroke-width="2.2"/>
-                <path d="M32 21 L18 41 M32 21 L46 41" stroke="#c4b5fd" stroke-width="2.2"/>
-              </svg>
-            </div>
-            <h2>Tone</h2>
-            <p>Plain wording leaves a law reason unchanged.</p>
+            <h2>Skills</h2>
+            <p>A lesson becomes a skill only when you confirm it.</p>
           </div>
         </div>
       </div>
       <div class="upgrade">
         <div class="prompt">&gt;_</div>
-        <div><span class="up-label">Release</span> <span class="cmd">github.com/jose-compu/trek/releases/tag/v0.13.0</span></div>
+        <div><span class="up-label">Release</span> <span class="cmd">github.com/jose-compu/trek/releases/tag/v0.14.0</span></div>
       </div>
     </div>
   </div>

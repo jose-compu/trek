@@ -28,6 +28,7 @@ export {
 	type SpawnRequest,
 	weightFileExists,
 } from "./process-manager.ts";
+export { NO_PROMOTION_MODEL, type PromotionRole, promotionRole } from "./promotion-model.ts";
 export {
 	globalModelsYamlPath,
 	loadRuntimeConfig,

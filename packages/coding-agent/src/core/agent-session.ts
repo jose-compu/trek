@@ -130,7 +130,7 @@ import {
 	parseHonestyReport,
 	stripHonestyFooter,
 } from "./honesty/index.ts";
-import { createEmbedder, MemoryManager } from "./memory/index.ts";
+import { createEmbedder, type MemoryHit, MemoryManager } from "./memory/index.ts";
 import { type BashExecutionMessage, type CustomMessage, stripIdempotentPrefix } from "./messages.ts";
 import type { ModelRegistry } from "./model-registry.ts";
 import { hashContent, type LoadedPrologue, loadPrologue } from "./prologue.ts";
@@ -142,19 +142,41 @@ import {
 	type BranchResult,
 	type BranchTask,
 	branchPrompt,
+	CRYSTALLIZE_NEEDS_YES,
+	CRYSTALLIZE_TOOL_NAME,
+	createCrystallizeTool,
 	createReflectiveMetaToolDefinitions,
+	crystallizePrompt,
 	type EffortLimits,
 	type EffortMode,
 	EffortRegulator,
 	effortActionKey,
 	effortLimitsFor,
 	FileClaims,
+	formatLesson,
+	formatLessonsTable,
 	gatherBranches,
+	isCorrection,
 	isReflectiveLoopEnabled,
+	type LessonEvidence,
+	lessonIdsFromEntries,
+	lessonPromotionEnabled,
+	lessonPrompt,
+	lessonsEnabled,
+	loadLessonRecord,
 	mutatedPath,
+	parseCrystallize,
+	parseLesson,
+	parsePromotion,
 	planBranches,
+	promotionPrompt,
 	ReflectiveLoopController,
+	removeCrystallizedSkill,
 	SerialQueue,
+	saveLessonRecord,
+	turnFailures,
+	withLessonIds,
+	writeCrystallizedSkill,
 } from "./reflective-loop/index.ts";
 import {
 	assertStrictAuditTarget,
@@ -174,6 +196,9 @@ import {
 	latestUserPrompt,
 	loadRuntimeConfig,
 	localLlamaChatModel,
+	NO_PROMOTION_MODEL,
+	promotionRole,
+	type ResolvedRuntime,
 	resolveRuntime,
 	selectSessionRole,
 } from "./runtime/index.ts";
@@ -1371,7 +1396,8 @@ export class AgentSession {
 		args: unknown,
 	): Promise<{ allowed: boolean; law?: number; reason?: string }> {
 		const tier = resolveReversibilityTier(this._baseToolDefinitions.get(toolName)?.reversibilityTier);
-		if (this._operatorMode) {
+		// Crystallize confirms after the draft, inside the tool. A grant does not skip that Yes.
+		if (toolName !== CRYSTALLIZE_TOOL_NAME && this._operatorMode) {
 			const decision = decideTool(this._operatorMode, tier, toolName, this._operatorGrant);
 			const preconfirmed = decision === "confirm" && this._confirmOnce.delete(toolName);
 			const asked =
@@ -2293,7 +2319,9 @@ export class AgentSession {
 		if (!this.memoryActive()) return;
 		this.startMemory();
 		try {
-			const block = await this.memory().buildInjection(query);
+			const block = await this.memory().buildInjection(query, (q, candidates) =>
+				this._promoteLessons(q, candidates),
+			);
 			if (!block.text) return;
 			this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n${block.text}`;
 			this._lastRetrievedLessonIds = block.lessonIds;
@@ -2557,14 +2585,31 @@ export class AgentSession {
 			return;
 		}
 		this._rememberApiSessionModel();
+		const registered = this._localRoleModel(selection.role, selection.modelId, resolved);
+		const previous = this.model;
+		this.agent.state.model = registered;
+		if (!selection.thinking) {
+			this.agent.state.thinkingLevel = "off";
+		}
+		if (!modelsAreEqual(previous, registered)) {
+			this.sessionManager.appendModelChange(registered.provider, registered.id);
+			await this._emitModelSelect(registered, previous, "set");
+		}
+	}
+
+	private _localRoleModel(
+		role: Parameters<LlamaProcessManager["ensure"]>[0],
+		modelId: string,
+		resolved: ResolvedRuntime,
+	): Model<any> {
 		let handle: ReturnType<LlamaProcessManager["ensure"]>;
 		try {
-			handle = this._llamaManager().ensure(selection.role, resolved);
+			handle = this._llamaManager().ensure(role, resolved);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			throw new Error(`Local mode did not call the API model. ${message}`);
 		}
-		const draft = localLlamaChatModel({ modelId: selection.modelId, endpoint: handle.endpoint });
+		const draft = localLlamaChatModel({ modelId, endpoint: handle.endpoint });
 		this._modelRegistry.registerProvider(LOCAL_LLAMA_PROVIDER, {
 			baseUrl: draft.baseUrl,
 			apiKey: "local",
@@ -2588,14 +2633,195 @@ export class AgentSession {
 		if (!registered) {
 			throw new Error(`Local model ${draft.name} was not registered.`);
 		}
-		const previous = this.model;
-		this.agent.state.model = registered;
-		if (!selection.thinking) {
-			this.agent.state.thinkingLevel = "off";
+		return registered;
+	}
+
+	/** Frontier when assigned, else Planning. CI and faux runs use the session model. */
+	private _promotionModel(): { model: Model<any>; role: string; reason: string } | undefined {
+		if (process.env.TREK_PROMOTION_MODEL === "0") return undefined;
+		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const pick = promotionRole(resolved);
+		if (!pick) return undefined;
+		const api = this.model?.provider === LOCAL_LLAMA_PROVIDER ? this._apiSessionModel : this.model;
+		if (pick.assignment.source === "api" || process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			return api ? { model: api, role: pick.role, reason: pick.reason } : undefined;
 		}
-		if (!modelsAreEqual(previous, registered)) {
-			this.sessionManager.appendModelChange(registered.provider, registered.id);
-			await this._emitModelSelect(registered, previous, "set");
+		const role = pick.role === "frontier" ? "planning" : pick.role;
+		return { model: this._localRoleModel(role, pick.assignment.id, resolved), role: pick.role, reason: pick.reason };
+	}
+
+	/** One model call outside the transcript, with no tools. */
+	private async _sideCall(model: Model<any>, prompt: string): Promise<string> {
+		const auth = await this._getCompactionRequestAuth(model);
+		const stream = await this.agent.streamFn(
+			model,
+			{
+				systemPrompt: "You are a Trek learning step. Reply with JSON only.",
+				messages: [{ role: "user", content: [{ type: "text", text: prompt }], timestamp: Date.now() }],
+			},
+			{ apiKey: auth.apiKey, headers: auth.headers },
+		);
+		const reply = await stream.result();
+		const text = reply.content
+			.filter((part): part is TextContent => part.type === "text")
+			.map((part) => part.text)
+			.join("\n");
+		return stripHonestyFooter(text).trim();
+	}
+
+	/** The work-horse writes one lesson into project memory (L3). */
+	private async _writeLesson(evidence: LessonEvidence): Promise<void> {
+		if (!lessonsEnabled() || !this.memoryActive() || !this.model) return;
+		try {
+			const lesson = parseLesson(await this._sideCall(this.model, lessonPrompt(evidence)));
+			if (!lesson) return;
+			this.startMemory();
+			const stored = await this.memory().remember(formatLesson(lesson), lesson.domain);
+			const id = /^stored (project:\d+)$/.exec(stored)?.[1];
+			if (!id) return;
+			saveLessonRecord(this._cwd, id, lesson);
+			this.sessionManager.appendCustomEntry("trek:lesson", {
+				id,
+				kind: evidence.kind,
+				modelId: this.model.id,
+				lesson,
+			});
+		} catch (error) {
+			debugLog("memory", "lesson not written", { error: error instanceof Error ? error.message : String(error) });
+		}
+	}
+
+	/**
+	 * L2 to L1. The promotion model drafts the skill. A no stops.
+	 * A yes writes only when the user confirms. No handler means nothing is written.
+	 */
+	async crystallizeLesson(id: string): Promise<string> {
+		const lesson = loadLessonRecord(this._cwd, id);
+		if (!lesson) return `unknown lesson ${id}`;
+		const pick = this._promotionModel();
+		if (!pick) return NO_PROMOTION_MODEL;
+		try {
+			const verdict = parseCrystallize(await this._sideCall(pick.model, crystallizePrompt(lesson)));
+			if (!verdict) return "The promotion model did not return a usable verdict. Nothing was written.";
+			const yes =
+				verdict.promote === "yes" &&
+				(await this._askToolConfirm(CRYSTALLIZE_TOOL_NAME, { lesson_id: id, skill: verdict.skill }));
+			const written = verdict.promote === "yes" && yes;
+			this.sessionManager.appendCustomEntry("trek:crystallize", {
+				id,
+				promote: verdict.promote,
+				reason: verdict.reason,
+				role: pick.role,
+				modelId: pick.model.id,
+				written,
+			});
+			if (verdict.promote === "no") return verdict.reason;
+			if (!yes) return CRYSTALLIZE_NEEDS_YES;
+			const path = writeCrystallizedSkill(this._cwd, id, lesson, verdict.skill ?? lesson.rule);
+			return `Wrote ${path}. It loads on the next session.`;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			return `Crystallize failed: ${message}`;
+		}
+	}
+
+	async runLessonCommand(name: "lessons" | "crystallize", arg: string): Promise<string> {
+		const parts = arg
+			.trim()
+			.split(/\s+/)
+			.filter((part) => part.length > 0);
+		try {
+			if (name === "lessons") return formatLessonsTable(this._cwd);
+			if (parts[0] === "remove") {
+				if (!parts[1]) return "usage: /crystallize remove <id>";
+				return removeCrystallizedSkill(this._cwd, parts[1]);
+			}
+			if (!parts[0]) return "usage: /crystallize <id> | /crystallize remove <id>";
+			return await this.crystallizeLesson(parts[0]);
+		} catch (error) {
+			return error instanceof Error ? error.message : String(error);
+		}
+	}
+
+	private _annotateCompaction(summary: string): string {
+		const ids = lessonIdsFromEntries(this.sessionManager.getEntries());
+		if (ids.length > 0) {
+			this.sessionManager.appendCustomEntry("trek:compaction", { lessonIds: ids });
+		}
+		return withLessonIds(summary, ids);
+	}
+
+	private async _learnFromTurn(turnStart: number): Promise<void> {
+		if (!lessonsEnabled() || !this.memoryActive()) return;
+		const failures = turnFailures(this.agent.state.messages.slice(turnStart));
+		if (failures.length === 0) return;
+		await this._writeLesson({
+			kind: "error",
+			task: this._lastPromptTask,
+			failures,
+			reply: stripHonestyFooter(this._lastAssistantText()),
+		});
+	}
+
+	private async _learnFromCorrection(text: string): Promise<void> {
+		if (!lessonsEnabled() || !this.memoryActive() || !isCorrection(text)) return;
+		const messages = this.agent.state.messages;
+		let lastUser = -1;
+		for (let i = messages.length - 1; i >= 0; i--) {
+			if (messages[i]?.role === "user") {
+				lastUser = i;
+				break;
+			}
+		}
+		if (lastUser < 0) return;
+		const previous = messages[lastUser];
+		const task =
+			previous && "content" in previous && Array.isArray(previous.content)
+				? previous.content
+						.filter((part): part is TextContent => part.type === "text")
+						.map((part) => part.text)
+						.join("\n")
+				: "";
+		await this._writeLesson({
+			kind: "correction",
+			task,
+			failures: turnFailures(messages.slice(lastUser)),
+			reply: stripHonestyFooter(this._lastAssistantText()),
+			correction: text,
+		});
+	}
+
+	/** L3 to L2: the Planning/Frontier model picks which lessons enter the prompt. */
+	private async _promoteLessons(query: string, candidates: MemoryHit[]): Promise<string[] | undefined> {
+		if (!lessonPromotionEnabled()) return undefined;
+		try {
+			const pick = this._promotionModel();
+			if (!pick) return undefined;
+			const ids = candidates.map((hit) => hit.id);
+			const chosen = parsePromotion(
+				await this._sideCall(
+					pick.model,
+					promotionPrompt(
+						query,
+						candidates.map((hit) => ({ id: hit.id, text: hit.text })),
+					),
+				),
+				ids,
+			);
+			this.sessionManager.appendCustomEntry("trek:lesson_promotion", {
+				layer: "L2",
+				candidates: ids,
+				picked: chosen ?? null,
+				role: pick.role,
+				modelId: pick.model.id,
+				reason: pick.reason,
+			});
+			return chosen;
+		} catch (error) {
+			debugLog("memory", "lesson promotion skipped", {
+				error: error instanceof Error ? error.message : String(error),
+			});
+			return undefined;
 		}
 	}
 
@@ -2882,6 +3108,7 @@ export class AgentSession {
 			await this.agent.prompt(messages);
 			this._applyToneToLastAssistant();
 			this._noteAntiPatterns(turnStart);
+			await this._learnFromTurn(turnStart);
 			while (await this._handlePostAgentRun()) {
 				if (!(await this._safeAgentContinue())) {
 					break;
@@ -3175,6 +3402,7 @@ export class AgentSession {
 				// Ensure we're using the base prompt (in case previous turn had modifications)
 				this.agent.state.systemPrompt = this._baseSystemPrompt;
 			}
+			await this._learnFromCorrection(expandedText);
 			await this._injectMemory(expandedText);
 		} catch (error) {
 			preflightResult?.(false);
@@ -3810,6 +4038,7 @@ export class AgentSession {
 				throw new Error("Compaction cancelled");
 			}
 
+			summary = this._annotateCompaction(summary);
 			this.sessionManager.appendCompaction(summary, firstKeptEntryId, tokensBefore, details, fromExtension);
 			const newEntries = this.sessionManager.getEntries();
 			const sessionContext = this.sessionManager.buildSessionContext();
@@ -4091,6 +4320,7 @@ export class AgentSession {
 				return false;
 			}
 
+			summary = this._annotateCompaction(summary);
 			this.sessionManager.appendCompaction(summary, firstKeptEntryId, tokensBefore, details, fromExtension);
 			const newEntries = this.sessionManager.getEntries();
 			const sessionContext = this.sessionManager.buildSessionContext();
@@ -4519,6 +4749,12 @@ export class AgentSession {
 			for (const definition of createMemoryToolDefinitions(() => this.memory())) {
 				this._baseToolDefinitions.set(definition.name, definition);
 			}
+			if (lessonsEnabled()) {
+				this._baseToolDefinitions.set(
+					CRYSTALLIZE_TOOL_NAME,
+					createCrystallizeTool((id) => this.crystallizeLesson(id)),
+				);
+			}
 		}
 
 		if (this._reflectiveLoop) {
@@ -4559,7 +4795,14 @@ export class AgentSession {
 
 		const defaultActiveToolNames = this._baseToolsOverride
 			? Object.keys(this._baseToolsOverride)
-			: ["read", "bash", "edit", "write", ...(this.memoryActive() ? [...MEMORY_TOOL_NAMES] : [])];
+			: [
+					"read",
+					"bash",
+					"edit",
+					"write",
+					...(this.memoryActive() ? [...MEMORY_TOOL_NAMES] : []),
+					...(lessonsEnabled() ? [CRYSTALLIZE_TOOL_NAME] : []),
+				];
 		const requestedActive = options.activeToolNames ?? defaultActiveToolNames;
 		const baseActiveToolNames = this.memoryActive()
 			? requestedActive

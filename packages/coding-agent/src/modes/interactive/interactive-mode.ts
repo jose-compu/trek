@@ -2784,6 +2784,18 @@ export class InteractiveMode {
 				return;
 			}
 			if (
+				text === "/lessons" ||
+				text.startsWith("/lessons ") ||
+				text === "/crystallize" ||
+				text.startsWith("/crystallize ")
+			) {
+				const name = text.startsWith("/crystallize") ? "crystallize" : "lessons";
+				const arg = text.slice(name === "crystallize" ? "/crystallize".length : "/lessons".length).trim();
+				this.editor.setText("");
+				await this.showLessonCommand(name, arg);
+				return;
+			}
+			if (
 				text === "/domains" ||
 				text.startsWith("/domains ") ||
 				text === "/workflows" ||
@@ -3881,6 +3893,13 @@ export class InteractiveMode {
 		const tree = this.session.formatProcesses();
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new Text(theme.fg("muted", tree), 1, 0));
+		this.ui.requestRender();
+	}
+
+	async showLessonCommand(name: "lessons" | "crystallize", arg: string): Promise<void> {
+		const text = await this.session.runLessonCommand(name, arg);
+		this.chatContainer.addChild(new Spacer(1));
+		this.chatContainer.addChild(new Text(theme.fg("muted", text), 1, 0));
 		this.ui.requestRender();
 	}
 

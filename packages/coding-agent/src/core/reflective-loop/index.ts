@@ -12,6 +12,26 @@ export {
 	SerialQueue,
 } from "./branches.ts";
 export {
+	COMPACTION_LESSON_RULE,
+	CRYSTALLIZE_NEEDS_YES,
+	CRYSTALLIZE_TOOL_NAME,
+	type CrystallizeVerdict,
+	createCrystallizeTool,
+	crystallizePrompt,
+	formatLessonsTable,
+	lessonIdsFromEntries,
+	listLessonRecords,
+	loadLessonRecord,
+	parseCrystallize,
+	removeCrystallizedSkill,
+	type StoredLesson,
+	saveLessonRecord,
+	skillIsLive,
+	skillNameForLesson,
+	withLessonIds,
+	writeCrystallizedSkill,
+} from "./crystallize.ts";
+export {
 	appendEffortReason,
 	EFFORT_BUDGET_RATIO,
 	EFFORT_COST_BUDGET,
@@ -28,6 +48,23 @@ export {
 	parseEffortMode,
 } from "./effort-regulator.ts";
 export { isReflectiveLoopEnabled } from "./enabled.ts";
+export {
+	formatLesson,
+	isCorrection,
+	type Lesson,
+	type LessonCandidate,
+	type LessonEvidence,
+	lessonBody,
+	lessonPromotionEnabled,
+	lessonPrompt,
+	lessonsEnabled,
+	MAX_LESSON_CANDIDATES,
+	MAX_PROMOTED_LESSONS,
+	parseLesson,
+	parsePromotion,
+	promotionPrompt,
+	turnFailures,
+} from "./lesson.ts";
 export { ReflectiveLoopController, type RunPromptCycleOptions } from "./loop-controller.ts";
 export {
 	BRANCH_EXCLUDED_TOOL_NAMES,

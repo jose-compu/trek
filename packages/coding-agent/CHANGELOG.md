@@ -4,9 +4,13 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-29
+
 ### Added
 
 - `spawn_branches` runs up to four independent subtasks in parallel. Each branch gets its summary only and the same tools, laws, and operator mode. A file written by one branch is claimed for that spawn. Bash calls and confirm dialogs run one at a time. HALT stops every branch. `gather` merges branch summaries in the order given.
+- Lessons. After a turn with a tool error, a law block, or an effort stop, or after a correction, the session model writes one lesson into project memory. Each prompt, the Frontier model (Planning when Frontier is not assigned) picks up to five of the 20 nearest lessons for the prompt. An invented id is dropped. `TREK_LESSONS=0` and `TREK_LESSON_PROMOTION=0` turn the two steps off.
+- `/crystallize <id>` asks that same model whether the lesson should become a skill. A no stops. A yes waits for you. Yes writes `.trek/skills/lessons/<id>/SKILL.md`, loaded on the next session. Print mode cannot approve, and a grant does not skip the Yes. `/lessons` lists them. `/crystallize remove <id>` keeps the file under `history/`. Compaction keeps the intent, the lesson ids, and the errors.
 
 ## [0.13.1] - 2026-10-29
 
