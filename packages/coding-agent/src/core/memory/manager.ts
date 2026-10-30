@@ -117,7 +117,7 @@ export class MemoryManager {
 		return `stored project:${id}`;
 	}
 
-	async recall(query: string, layer?: MemoryLayer, hybrid = true): Promise<MemoryHit[]> {
+	async recall(query: string, layer?: MemoryLayer, hybrid = true, limit?: number): Promise<MemoryHit[]> {
 		if (!this.live()) return [];
 		const q = query.trim();
 		if (!q) return [];
@@ -125,7 +125,7 @@ export class MemoryManager {
 		if (vector.length === 0) return [];
 		const settings = this.options.getSettings();
 		const layers = (layer ? [layer] : (["session", "project", "global"] as const)).filter((name) => settings[name]);
-		const topK = settings.topK;
+		const topK = limit ?? settings.topK;
 		const hits: MemoryHit[] = [];
 		for (const name of layers) {
 			const db = this.open(name);
@@ -185,7 +185,25 @@ export class MemoryManager {
 		return `deleted ${hit.id}`;
 	}
 
-	async buildInjection(query: string): Promise<MemoryInjection> {
+	/** Stored lessons nearest the query, reranked where the suite allows it. */
+	async lessonCandidates(query: string, limit = 20): Promise<MemoryHit[]> {
+		const settings = this.options.getSettings();
+		const found: MemoryHit[] = [];
+		for (const layer of ["project", "global"] as const) {
+			if (!settings[layer]) continue;
+			found.push(...(await this.recall(query, layer, true, limit * 2)).filter((hit) => hit.kind === "lesson"));
+		}
+		return found.sort((a, b) => b.score - a.score).slice(0, limit);
+	}
+
+	/**
+	 * `promote` picks lesson ids for L2. Undefined from it keeps score order.
+	 * Lessons it does not pick stay out of the prompt.
+	 */
+	async buildInjection(
+		query: string,
+		promote?: (query: string, candidates: MemoryHit[]) => Promise<string[] | undefined>,
+	): Promise<MemoryInjection> {
 		if (!this.live()) return { text: "", lessonIds: [] };
 		const q = query.trim().slice(0, 512);
 		if (!q) return { text: "", lessonIds: [] };
@@ -195,7 +213,25 @@ export class MemoryManager {
 		} catch {
 			return { text: "", lessonIds: [] };
 		}
-		const picked = selectInjection(hits, this.options.getSettings().topK);
+		let picked = selectInjection(hits, this.options.getSettings().topK);
+		if (promote) {
+			let candidates: MemoryHit[] = [];
+			try {
+				candidates = await this.lessonCandidates(q);
+			} catch {
+				candidates = [];
+			}
+			const chosen = candidates.length > 0 ? await promote(q, candidates) : undefined;
+			if (chosen) {
+				const byId = new Map(candidates.map((hit) => [hit.id, hit]));
+				const lessons = chosen.flatMap((id) => byId.get(id) ?? []);
+				const rest = selectInjection(
+					hits.filter((hit) => hit.kind !== "lesson"),
+					this.options.getSettings().topK,
+				);
+				picked = [...lessons, ...rest];
+			}
+		}
 		if (picked.length === 0) return { text: "", lessonIds: [] };
 		const lines = picked.map((hit) => `[${hit.layer} ${hit.kind}] ${hit.text.slice(0, 400)}`);
 		return {

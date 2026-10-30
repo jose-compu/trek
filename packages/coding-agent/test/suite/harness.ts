@@ -71,6 +71,8 @@ export interface HarnessOptions {
 	cwd?: string;
 	/** Leave the O→I→A→R loop on (default harness sets TREK_REFLECTIVE_LOOP=0). */
 	enableReflectiveLoop?: boolean;
+	/** Write lessons and promote them. The default harness sets TREK_LESSONS=0 and TREK_LESSON_PROMOTION=0. */
+	enableLessons?: boolean;
 }
 
 export interface Harness {
@@ -91,6 +93,11 @@ export interface Harness {
 	cleanup: () => void;
 }
 
+function restoreEnv(name: string, value: string | undefined): void {
+	if (value === undefined) delete process.env[name];
+	else process.env[name] = value;
+}
+
 function createTempDir(): string {
 	const tempDir = join(tmpdir(), `pi-suite-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 	mkdirSync(tempDir, { recursive: true });
@@ -104,6 +111,12 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
 	} else {
 		process.env.TREK_REFLECTIVE_LOOP = "0";
 	}
+
+	const previousLessonsEnv = process.env.TREK_LESSONS;
+	const previousPromotionEnv = process.env.TREK_LESSON_PROMOTION;
+	const lessonsFlag = options.enableLessons ? "1" : "0";
+	process.env.TREK_LESSONS = lessonsFlag;
+	process.env.TREK_LESSON_PROMOTION = lessonsFlag;
 
 	const tempDir = options.cwd ?? createTempDir();
 	const ownsTempDir = options.cwd === undefined;
@@ -224,6 +237,8 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
 			} else {
 				process.env.TREK_REFLECTIVE_LOOP = previousReflectiveLoopEnv;
 			}
+			restoreEnv("TREK_LESSONS", previousLessonsEnv);
+			restoreEnv("TREK_LESSON_PROMOTION", previousPromotionEnv);
 			if (ownsTempDir && existsSync(tempDir)) {
 				rmSync(tempDir, { recursive: true });
 			}

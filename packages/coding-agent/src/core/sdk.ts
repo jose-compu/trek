@@ -254,6 +254,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		"forget",
 		"spawn_branches",
 		"gather",
+		"crystallize",
 	];
 	const allowedToolNames = options.tools ?? (options.noTools === "all" ? [] : undefined);
 	const excludedToolNames = [

@@ -14,6 +14,7 @@ import {
 	createCompactionSummaryMessage,
 	createCustomMessage,
 } from "../messages.ts";
+import { COMPACTION_LESSON_RULE } from "../reflective-loop/crystallize.ts";
 import { buildSessionContext, type CompactionEntry, type SessionEntry } from "../session-manager.ts";
 import {
 	computeFileLists,
@@ -482,7 +483,8 @@ Use this EXACT format:
 - [Any data, examples, or references needed to continue]
 - [Or "(none)" if not applicable]
 
-Keep each section concise. Preserve exact file paths, function names, and error messages.`;
+Keep each section concise. Preserve exact file paths, function names, and error messages.
+${COMPACTION_LESSON_RULE}`;
 
 const UPDATE_SUMMARIZATION_PROMPT = `The messages above are NEW conversation messages to incorporate into the existing summary provided in <previous-summary> tags.
 
@@ -521,7 +523,8 @@ Use this EXACT format:
 ## Critical Context
 - [Preserve important context, add new if needed]
 
-Keep each section concise. Preserve exact file paths, function names, and error messages.`;
+Keep each section concise. Preserve exact file paths, function names, and error messages.
+${COMPACTION_LESSON_RULE}`;
 
 function createSummarizationOptions(
 	model: Model<any>,
@@ -735,7 +738,8 @@ Summarize the prefix to provide context for the retained suffix:
 ## Context for Suffix
 - [Information needed to understand the retained recent work]
 
-Be concise. Focus on what's needed to understand the kept suffix.`;
+Be concise. Focus on what's needed to understand the kept suffix.
+${COMPACTION_LESSON_RULE}`;
 
 /**
  * Generate summaries for compaction using prepared data.
