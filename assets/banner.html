@@ -17,137 +17,119 @@
     --muted: #a3a3b8;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 1983px; height: 793px; overflow: hidden; background: var(--void); }
+  html, body { width: 1400px; height: 520px; overflow: hidden; background: var(--void); }
   .banner {
-    width: 1983px;
-    height: 793px;
+    width: 1400px;
+    height: 520px;
     position: relative;
     overflow: hidden;
     color: var(--text);
     font-family: "Inter", "SF Pro Display", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
     background:
-      radial-gradient(900px 700px at 90% 45%, rgba(124, 92, 255, 0.42), transparent 62%),
-      radial-gradient(700px 500px at 76% 85%, rgba(139, 92, 246, 0.22), transparent 70%),
-      linear-gradient(180deg, #0b0b14 0%, var(--void) 60%, var(--void) 100%);
+      radial-gradient(720px 520px at 88% 42%, rgba(124, 92, 255, 0.38), transparent 64%),
+      radial-gradient(480px 360px at 70% 100%, rgba(139, 92, 246, 0.16), transparent 70%),
+      linear-gradient(180deg, #0b0b14 0%, var(--void) 70%);
   }
-  .watermark {
+  .mark {
     position: absolute;
-    right: 40px;
-    top: 150px;
-    width: 500px;
-    height: 500px;
-    opacity: 0.5;
+    right: 28px;
+    top: 70px;
+    width: 360px;
+    height: 360px;
+    object-fit: contain;
     pointer-events: none;
   }
-  .inner { position: relative; z-index: 1; height: 100%; padding: 46px 64px 44px; display: flex; flex-direction: column; }
-  .head { display: flex; align-items: center; gap: 20px; }
-  .lockup { height: 84px; width: auto; }
-  .brand { display: flex; flex-direction: column; gap: 6px; }
+  .inner {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    padding: 36px 48px 28px;
+    display: flex;
+    flex-direction: column;
+  }
+  .copy { max-width: 920px; }
+  .head { display: flex; align-items: center; gap: 18px; }
+  .lockup { height: 52px; width: auto; }
   .badge {
-    align-self: flex-start;
     border: 1.5px solid var(--glow);
     color: #ddd6fe;
     border-radius: 999px;
-    padding: 4px 14px 5px;
-    font-size: 20px;
-    font-weight: 600;
+    padding: 5px 14px 6px;
+    font-size: 18px;
+    font-weight: 650;
+    letter-spacing: 0.01em;
   }
-  .tagline { color: var(--muted); font-size: 20px; font-weight: 500; }
-  .main { margin-top: 40px; display: grid; grid-template-columns: 640px 1fr; gap: 20px; align-items: start; flex: 1; padding-right: 420px; }
-  h1 { font-size: 84px; line-height: 0.95; font-weight: 800; letter-spacing: -0.045em; }
+  .tagline { color: var(--muted); font-size: 18px; font-weight: 550; }
+  h1 {
+    margin-top: 28px;
+    font-size: 76px;
+    line-height: 0.92;
+    font-weight: 800;
+    letter-spacing: -0.045em;
+  }
   h1 span {
     display: block;
-    margin-top: 8px;
-    background: linear-gradient(90deg, #ddd6fe 0%, var(--glow) 40%, var(--violet) 100%);
+    margin-top: 6px;
+    background: linear-gradient(90deg, #ddd6fe 0%, var(--glow) 45%, var(--violet) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
-  .sub { margin-top: 28px; max-width: 580px; color: #c4c4d4; font-size: 26px; line-height: 1.35; font-weight: 500; }
-  .cols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding-top: 18px; }
-  .col { padding: 0 16px; }
-  .col + .col { border-left: 1px solid var(--border); }
-  .icon { height: 78px; display: flex; align-items: center; }
-  .col h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 10px; }
-  .col p { color: #b8b8c8; font-size: 17px; line-height: 1.35; font-weight: 500; }
-  .upgrade { margin-top: auto; display: flex; align-items: center; gap: 16px; }
-  .prompt {
-    width: 54px; height: 40px; border-radius: 10px;
-    border: 1.5px solid var(--glow);
-    background: var(--night);
-    display: grid; place-items: center;
-    color: #ddd6fe; font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 18px;
+  .sub {
+    margin-top: 22px;
+    max-width: 760px;
+    color: #d4d4e0;
+    font-size: 26px;
+    line-height: 1.3;
+    font-weight: 550;
   }
-  .up-label { color: var(--glow); font-weight: 700; font-size: 22px; margin-right: 8px; }
-  .cmd { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 22px; color: #e5e5ee; font-weight: 500; }
+  .rail {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    max-width: 980px;
+  }
+  .item { padding: 0 22px 0 0; margin-right: 22px; border-right: 1px solid var(--border); }
+  .item:last-child { border-right: 0; margin-right: 0; }
+  .item strong {
+    display: block;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .item span { display: block; margin-top: 4px; color: var(--muted); font-size: 16px; font-weight: 500; }
+  .foot {
+    margin-top: 18px;
+    color: var(--glow);
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    font-size: 16px;
+    font-weight: 550;
+  }
+  .foot b { color: #e5e5ee; font-weight: 500; }
 </style>
 </head>
 <body>
-  <div class="banner" id="banner">
-    <img class="watermark" src="brand/logos/mark-hero.png" alt="" />
+  <div class="banner">
+    <img class="mark" src="brand/logos/mark-hero.png" alt="" />
     <div class="inner">
-      <header class="head">
-        <img class="lockup" src="brand/logos/lockup-dark-full.png" alt="Trek Agent" />
-        <div class="brand">
+      <div class="copy">
+        <header class="head">
+          <img class="lockup" src="brand/logos/lockup-dark-full.png" alt="Trek Agent" />
           <div class="badge">v0.14.0</div>
           <div class="tagline">Powerful. Precise. Honest.</div>
-        </div>
-      </header>
-      <div class="main">
-        <div>
-          <h1>Trek 0.14<span>Learning</span></h1>
-          <p class="sub">Branches run in parallel. A failed turn leaves a lesson. You confirm what becomes a skill.</p>
-        </div>
-        <div class="cols">
-          <div class="col">
-            <div class="icon">
-              <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <circle cx="32" cy="14" r="5" stroke="#ddd6fe" stroke-width="2.2"/>
-                <path d="M32 19 V30 M32 30 L14 46 M32 30 L32 46 M32 30 L50 46" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round"/>
-                <circle cx="14" cy="50" r="4" stroke="#7c5cff" stroke-width="2.2"/>
-                <circle cx="32" cy="50" r="4" stroke="#7c5cff" stroke-width="2.2"/>
-                <circle cx="50" cy="50" r="4" stroke="#7c5cff" stroke-width="2.2"/>
-              </svg>
-            </div>
-            <h2>Branches</h2>
-            <p>Up to four subtasks run at once. Each keeps the laws.</p>
-          </div>
-          <div class="col">
-            <div class="icon">
-              <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <rect x="14" y="12" width="36" height="42" rx="4" stroke="#a78bfa" stroke-width="2.2"/>
-                <path d="M22 24 h20 M22 32 h20 M22 40 h12" stroke="#ddd6fe" stroke-width="2.2" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <h2>Lessons</h2>
-            <p>A tool error or a correction is stored as one rule.</p>
-          </div>
-          <div class="col">
-            <div class="icon">
-              <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <path d="M32 50 V16 M20 28 L32 16 L44 28" stroke="#a78bfa" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M16 54 h32" stroke="#7c5cff" stroke-width="2.4" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <h2>Promotion</h2>
-            <p>Frontier or Planning picks the lessons for this prompt.</p>
-          </div>
-          <div class="col">
-            <div class="icon">
-              <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <path d="M32 12 L50 22 V42 L32 52 L14 42 V22 Z" stroke="#a78bfa" stroke-width="2.2" stroke-linejoin="round"/>
-                <path d="M24 32 L30 38 L41 26" stroke="#ddd6fe" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </div>
-            <h2>Skills</h2>
-            <p>A lesson becomes a skill only when you confirm it.</p>
-          </div>
-        </div>
+        </header>
+        <h1>Trek 0.14<span>Learning</span></h1>
+        <p class="sub">Branches run in parallel. A failed turn leaves a lesson. You confirm what becomes a skill.</p>
       </div>
-      <div class="upgrade">
-        <div class="prompt">&gt;_</div>
-        <div><span class="up-label">Release</span> <span class="cmd">github.com/jose-compu/trek/releases/tag/v0.14.0</span></div>
+      <div class="rail">
+        <div class="item"><strong>Branches</strong><span>Up to four, laws on each</span></div>
+        <div class="item"><strong>Lessons</strong><span>One rule from the miss</span></div>
+        <div class="item"><strong>Promotion</strong><span>Frontier or Planning</span></div>
+        <div class="item"><strong>Skills</strong><span>Only after your Yes</span></div>
       </div>
+      <div class="foot">Release <b>github.com/jose-compu/trek/releases/tag/v0.14.0</b></div>
     </div>
   </div>
 </body>
