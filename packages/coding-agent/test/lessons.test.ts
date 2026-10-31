@@ -94,7 +94,7 @@ function resolved(roles: ResolvedRuntime["roles"]): ResolvedRuntime {
 		effectiveMode: "api",
 		suite: "mistral",
 		quant: "Q4_K_M",
-		rerank: false,
+		rerank: true,
 		presetRoles: roles,
 		roles,
 		requiresHuggingFaceToken: false,

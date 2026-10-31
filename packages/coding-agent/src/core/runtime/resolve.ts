@@ -78,6 +78,9 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 	const roles: Partial<Record<RuntimeRole, RoleAssignment>> = {};
 	if (effectiveMode === "api") {
 		roles.frontier = frontierRole(frontier);
+		// Memory embed + rerank stay local even when chat is API-only.
+		roles.embedding = overlay(preset.roles.embedding, config.roles.embedding);
+		roles.reranker = overlay(preset.roles.reranker, config.roles.reranker);
 	} else {
 		for (const [name, assignment] of Object.entries(preset.roles) as [RuntimeRole, RoleAssignment][]) {
 			roles[name] = overlay(assignment, config.roles[name]);
@@ -97,7 +100,7 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 		effectiveMode,
 		suite: config.hierarchy.suite,
 		quant: config.hierarchy.quant,
-		rerank: preset.rerank,
+		rerank: true,
 		presetRoles,
 		roles,
 		requiresHuggingFaceToken: sessionNeedsLocalWeights(effectiveMode, roles),
@@ -148,7 +151,7 @@ export function formatRuntimeStatus(resolved: ResolvedRuntime): string {
 		`huggingFaceToken: ${resolved.requiresHuggingFaceToken ? "required for local weights" : "not required"}`,
 		`rerank: ${resolved.rerank ? "on" : "off"}`,
 	];
-	const order: RuntimeRole[] = ["workhorse", "planning", "embedding", "reranker", "frontier"];
+	const order: RuntimeRole[] = ["tooling", "workhorse", "planning", "embedding", "reranker", "frontier"];
 	for (const name of order) {
 		const active = resolved.roles[name];
 		const preset = resolved.presetRoles[name];

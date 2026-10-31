@@ -40,7 +40,7 @@ import {
 import type { SessionLocalRole, SuiteId } from "../src/core/runtime/types.ts";
 
 const SUITES: SuiteId[] = ["mistral", "mistral-pro", "qwen", "lfm"];
-const LOCAL_ROLES: SessionLocalRole[] = ["workhorse", "planning"];
+const LOCAL_ROLES: SessionLocalRole[] = ["tooling", "workhorse", "planning"];
 let nextLlamaPort = Number(process.env.TREK_LLAMA_PORT_START ?? 18180);
 
 const grokLive = Boolean(process.env.XAI_API_KEY?.trim());

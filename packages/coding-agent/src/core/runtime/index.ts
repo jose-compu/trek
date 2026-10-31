@@ -17,6 +17,25 @@ export {
 	smallContextPrompt,
 } from "./context-budget.ts";
 export {
+	ESCALATION_LADDER,
+	type EscalateAsk,
+	type EscalateSignal,
+	type EscalateTier,
+	escalateComplexity,
+	formatEscalateCard,
+	isHigherLadderRole,
+	isLadderRole,
+	type LadderRole,
+	ladderIndex,
+	nextLadderRole,
+	parseEscalateAsk,
+	parseEscalateSignal,
+	resolveEscalateTarget,
+	roleAvailable,
+	startLadderRole,
+	stripEscalateSignal,
+} from "./escalate.ts";
+export {
 	LMSTUDIO_PROVIDER,
 	LOCAL_LLAMA_PROVIDER,
 	LOCAL_LLAMA_TIMEOUT_MS,
@@ -52,6 +71,16 @@ export {
 	summarizePerformance,
 	tokensPerSecond,
 } from "./performance.ts";
+export {
+	applyPlanBlock,
+	extractPlanBody,
+	PLANNING_REPLAN_EVERY,
+	planningBriefPrompt,
+	planningReplanEnabled,
+	planningReplanPrompt,
+	shouldReplanAfterTool,
+	toolResultSnippet,
+} from "./planning-brief.ts";
 export {
 	createDefaultLlamaProcessManager,
 	createPortAllocator,
@@ -90,6 +119,7 @@ export {
 	classifyTask,
 	FRONTIER_COMPLEXITY_THRESHOLD,
 	latestUserPrompt,
+	promptNeedsPlanning,
 	type RoleSelection,
 	selectSessionRole,
 	selectThinkRole,

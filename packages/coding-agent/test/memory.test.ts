@@ -303,26 +303,21 @@ describe("memory disabled", () => {
 });
 
 describe("rerank policy", () => {
-	it("calls a reranker for Mistral and does not construct one for LFM or API mode", async () => {
+	it("constructs a reranker for every mode and suite, and calls it on recall", async () => {
 		expect(shouldConstructCrossEncoder({ effectiveMode: "local", suite: "mistral" })).toBe(true);
 		expect(shouldConstructCrossEncoder({ effectiveMode: "local", suite: "qwen" })).toBe(true);
-		expect(shouldConstructCrossEncoder({ effectiveMode: "local", suite: "lfm" })).toBe(false);
-		expect(shouldConstructCrossEncoder({ effectiveMode: "api", suite: "mistral" })).toBe(false);
+		expect(shouldConstructCrossEncoder({ effectiveMode: "local", suite: "lfm" })).toBe(true);
+		expect(shouldConstructCrossEncoder({ effectiveMode: "api", suite: "mistral" })).toBe(true);
+		expect(shouldConstructCrossEncoder({ effectiveMode: "hybrid", suite: "lfm" })).toBe(true);
 
 		const cwd = project("rerank");
-		let constructed = false;
-		const use = shouldConstructCrossEncoder({ effectiveMode: "local", suite: "mistral" });
 		const calls: string[][] = [];
-		const reranker = use
-			? {
-					async rerank(_query: string, documents: string[]) {
-						calls.push(documents);
-						return documents.map((_, index) => documents.length - 1 - index);
-					},
-				}
-			: undefined;
-		if (reranker) constructed = true;
-		expect(constructed).toBe(true);
+		const reranker = {
+			async rerank(_query: string, documents: string[]) {
+				calls.push(documents);
+				return documents.map((_, index) => documents.length - 1 - index);
+			},
+		};
 		const mem = new MemoryManager({
 			cwd,
 			sessionId: "s",
@@ -335,12 +330,6 @@ describe("rerank policy", () => {
 		await mem.remember("beta lesson about barley");
 		await mem.recall("oats and barley");
 		expect(calls.length).toBe(1);
-
-		let lfmConstructed = false;
-		if (shouldConstructCrossEncoder({ effectiveMode: "local", suite: "lfm" })) {
-			lfmConstructed = true;
-		}
-		expect(lfmConstructed).toBe(false);
 		mem.close();
 	});
 });

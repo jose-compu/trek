@@ -32,7 +32,7 @@ function printHelp(): void {
 	console.log(`${APP_NAME} models set-mode api|local|hybrid`);
 	console.log(`${APP_NAME} models set-suite mistral|mistral-pro|qwen|lfm`);
 	console.log(`${APP_NAME} models set-role <role> --id <id> [--source local|api|lmstudio] [--thinking on|off]`);
-	console.log(`${APP_NAME} models set-lmstudio --id <id> | --workhorse <id> --planning <id>`);
+	console.log(`${APP_NAME} models set-lmstudio --id <id> | --tooling <id> --workhorse <id> --planning <id>`);
 	console.log(`${APP_NAME} models benchmark`);
 	console.log("  Role registry in ~/.trek/models.yaml. Project .trek/models.yaml overrides it.");
 	console.log("  Default mode is api: one session model. Local and hybrid are opt-in.");
@@ -140,7 +140,7 @@ function setRole(rest: string[]): boolean {
 	const roleName = rest[0];
 	if (!roleName || !isRuntimeRole(roleName)) {
 		console.error(
-			chalk.red("Usage: trek models set-role <workhorse|planning|frontier|embedding|reranker> --id <id>"),
+			chalk.red("Usage: trek models set-role <tooling|workhorse|planning|frontier|embedding|reranker> --id <id>"),
 		);
 		process.exitCode = 1;
 		return true;
@@ -188,13 +188,12 @@ function setRole(rest: string[]): boolean {
 	} else if (source === "lmstudio") {
 		assignment.baseUrl = DEFAULT_LMSTUDIO_BASE_URL;
 	}
-	const role = roleName === "tooling" ? "workhorse" : roleName;
 	try {
 		const current = loadGlobal();
 		if (process.exitCode) {
 			return true;
 		}
-		writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), withRoleOverride(current, role, assignment));
+		writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), withRoleOverride(current, roleName, assignment));
 	} catch (error) {
 		console.error(chalk.red(error instanceof Error ? error.message : String(error)));
 		process.exitCode = 1;
@@ -208,8 +207,11 @@ function setLmStudio(rest: string[]): boolean {
 	const single = flagValue(rest, "--id");
 	const workhorseId = flagValue(rest, "--workhorse") ?? single;
 	const planningId = flagValue(rest, "--planning") ?? single;
-	if (!workhorseId || !planningId) {
-		console.error(chalk.red("Usage: trek models set-lmstudio --id <id> | --workhorse <id> --planning <id>"));
+	const toolingId = flagValue(rest, "--tooling") ?? workhorseId ?? single;
+	if (!toolingId || !workhorseId || !planningId) {
+		console.error(
+			chalk.red("Usage: trek models set-lmstudio --id <id> | --tooling <id> --workhorse <id> --planning <id>"),
+		);
 		process.exitCode = 1;
 		return true;
 	}
@@ -219,6 +221,12 @@ function setLmStudio(rest: string[]): boolean {
 		return true;
 	}
 	let next = withHierarchy(current, { mode: current.hierarchy.mode === "api" ? "local" : current.hierarchy.mode });
+	next = withRoleOverride(next, "tooling", {
+		source: "lmstudio",
+		id: toolingId,
+		thinking: false,
+		baseUrl,
+	});
 	next = withRoleOverride(next, "workhorse", {
 		source: "lmstudio",
 		id: workhorseId,

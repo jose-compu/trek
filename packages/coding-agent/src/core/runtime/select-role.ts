@@ -1,10 +1,11 @@
 /**
- * Session routing uses routeComponent. Workhorse acts. Planning thinks.
- * Frontier (API) takes deep thinking, planning, and hard debugging when present.
- * api mode keeps a single session model.
+ * Session routing. Ladder: Tooling → Workhorse → Planning → Frontier.
+ * Act starts on Tooling. Elevate / fail climbs. api mode is a single session model.
  */
 
 import { routeComponent } from "./component-router.ts";
+import type { LadderRole } from "./escalate.ts";
+import { escalateComplexity, startLadderRole } from "./escalate.ts";
 import type { ResolvedRuntime } from "./resolve.ts";
 import type { RoleSource, RouteComponent } from "./types.ts";
 
@@ -18,11 +19,14 @@ const HARD_TASK =
 const MAKE_ARTIFACT =
 	/\b(make|write|code|develop)\b[\s\S]{0,80}\b(app|game|site|website|page|server|api|program|project|chess|html|javascript|script|tool)\b/i;
 
-/** A one-line correction stays on the workhorse, including after a Planning turn. */
+/** A one-line correction stays low on the ladder. */
 const SMALL_EDIT = /\b(typo|format|lint|rename|spell(?:ing)?)\b/i;
 
 const DEEP_WORK =
 	/\b(debug|diagnos|root[- ]cause|hard bug|investigate|architect(?:ure)?|deep (?:think|plan|dive)|research)\b/i;
+
+const PLAN_CUES =
+	/\b(then|after that|and then|steps?|how (?:do|should|can)|why|explain|compare|review|improve|migrate|architect|design|refactor|implement)\b/i;
 
 export type TaskKind = "mechanical" | "act" | "plan" | "deep";
 
@@ -48,7 +52,13 @@ export function promptNeedsPlanning(text: string): boolean {
 	if (HARD_TASK.test(trimmed) || MAKE_ARTIFACT.test(trimmed)) {
 		return true;
 	}
-	return trimmed.length >= 400 && /\b(file|files|html|javascript|css|function|component|page)\b/i.test(trimmed);
+	if (trimmed.length >= 400 && /\b(file|files|html|javascript|css|function|component|page)\b/i.test(trimmed)) {
+		return true;
+	}
+	if (PLAN_CUES.test(trimmed) && trimmed.length >= 40) {
+		return true;
+	}
+	return false;
 }
 
 export function classifyTask(text: string): TaskClass {
@@ -66,7 +76,7 @@ export function classifyTask(text: string): TaskClass {
 }
 
 export interface RoleSelection {
-	role: "workhorse" | "planning" | "frontier";
+	role: LadderRole;
 	source: RoleSource;
 	modelId: string;
 	provider?: string;
@@ -80,10 +90,23 @@ export function selectThinkRole(input: {
 	complexity?: number;
 	retries?: number;
 	previousRole?: RoleSelection["role"];
+	/** Floor from elevation / ladder climb. */
+	elevateTo?: LadderRole;
 	overrides?: Parameters<typeof routeComponent>[0]["overrides"];
 }): RoleSelection | undefined {
 	if (input.resolved.effectiveMode === "api") {
 		return undefined;
+	}
+	if (input.elevateTo === "planning" || input.elevateTo === "frontier") {
+		return routeComponent({
+			component: "intend",
+			resolved: input.resolved,
+			complexity: input.complexity ?? escalateComplexity(input.elevateTo),
+			retries: input.retries ?? 0,
+			depth: 0,
+			minRole: input.elevateTo,
+			overrides: input.overrides,
+		});
 	}
 	const classified = classifyTask(input.text ?? "");
 	let kind = classified.kind;
@@ -92,6 +115,7 @@ export function selectThinkRole(input: {
 	} else if (input.previousRole === "planning" && (input.text ?? "").trim().length > 0 && kind !== "mechanical") {
 		kind = kind === "deep" ? "deep" : "plan";
 	}
+	// Brief only for plan/deep (or elevated planning/frontier). Act stays on Tooling until escalate.
 	if (kind === "mechanical" || kind === "act") {
 		return undefined;
 	}
@@ -102,6 +126,7 @@ export function selectThinkRole(input: {
 		complexity,
 		retries: input.retries ?? 0,
 		depth: 0,
+		minRole: input.elevateTo,
 		overrides: input.overrides,
 	});
 }
@@ -111,8 +136,10 @@ export function selectSessionRole(input: {
 	resolved: ResolvedRuntime;
 	complexity?: number;
 	retries?: number;
-	/** The role already bound for this session. A follow-up stays on a Planning task. */
 	previousRole?: RoleSelection["role"];
+	/** Current ladder floor (starts tooling; climbs on elevate/fail). */
+	elevateTo?: LadderRole;
+	ladderRole?: LadderRole;
 	overrides?: Parameters<typeof routeComponent>[0]["overrides"];
 }): RoleSelection {
 	const { resolved } = input;
@@ -123,6 +150,7 @@ export function selectSessionRole(input: {
 		});
 	}
 
+	const floor = input.elevateTo ?? input.ladderRole ?? startLadderRole(resolved);
 	const text = input.text ?? "";
 	const classified = classifyTask(text);
 	let kind = classified.kind;
@@ -136,32 +164,38 @@ export function selectSessionRole(input: {
 		input.complexity ??
 		(kind === "deep" ? 0.85 : kind === "plan" ? Math.max(classified.complexity, 0.4) : classified.complexity);
 
-	if (kind === "deep") {
+	if (kind === "deep" || floor === "frontier") {
 		return routeComponent({
 			component: "intend",
 			resolved,
-			complexity,
+			complexity: Math.max(complexity, escalateComplexity(floor)),
 			retries: input.retries ?? 0,
 			depth: 0,
+			minRole: floor,
 			overrides: input.overrides,
 		});
 	}
-	if (kind === "plan") {
+
+	if (kind === "plan" || floor === "planning") {
+		// Planning may act after elevation; otherwise Tooling/Workhorse still executes.
 		return routeComponent({
-			component: "toolIntent",
+			component: floor === "planning" ? "intend" : "toolIntent",
 			resolved,
 			complexity,
 			retries: input.retries ?? 0,
-			depth: 1,
+			depth: floor === "planning" ? 0 : 1,
+			minRole: floor,
 			overrides: input.overrides,
 		});
 	}
+
 	return routeComponent({
 		component: classified.component,
 		resolved,
 		complexity,
 		retries: input.retries ?? 0,
 		depth: 1,
+		minRole: floor,
 		overrides: input.overrides,
 	});
 }
@@ -177,7 +211,7 @@ export function sessionRoleForModel(
 		}
 		return undefined;
 	}
-	for (const role of ["planning", "workhorse"] as const) {
+	for (const role of ["planning", "workhorse", "tooling"] as const) {
 		const id = resolved.roles[role]?.id;
 		if (!id) {
 			continue;

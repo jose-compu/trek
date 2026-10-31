@@ -3048,6 +3048,12 @@ export class InteractiveMode {
 				this.ui.requestRender();
 				break;
 
+			case "hierarchy_escalate":
+				// Discreet one-line card — no spacer, dim only.
+				this.chatContainer.addChild(new Text(theme.fg("dim", event.text), 0, 0));
+				this.ui.requestRender();
+				break;
+
 			case "message_start":
 				if (event.message.role === "custom") {
 					this.addMessageToChat(event.message);

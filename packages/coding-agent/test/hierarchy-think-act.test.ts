@@ -13,11 +13,14 @@ import {
 	DEFAULT_LMSTUDIO_BASE_URL,
 	defaultRuntimeConfig,
 	lmStudioChatModel,
+	parseEscalateSignal,
 	readRuntimeConfigFile,
 	resolveRuntime,
 	routeComponent,
 	selectSessionRole,
 	selectThinkRole,
+	shouldReplanAfterTool,
+	stripEscalateSignal,
 	withHierarchy,
 	withRoleOverride,
 	writeRuntimeConfigFile,
@@ -38,12 +41,12 @@ describe("think versus act", () => {
 		expect(classifyTask("list the files").kind).toBe("act");
 	});
 
-	it("uses routeComponent so Act is workhorse and Intend is planning", () => {
+	it("uses routeComponent so Act starts on tooling and Intend is planning", () => {
 		const resolved = localResolved();
 		const act = routeComponent({ component: "toolIntent", resolved, complexity: 0.4, depth: 1 });
 		const think = routeComponent({ component: "intend", resolved, complexity: 0.4, depth: 0 });
-		expect(act.role).toBe("workhorse");
-		expect(act.reason).toMatch(/toolIntent uses workhorse/);
+		expect(act.role).toBe("tooling");
+		expect(act.reason).toMatch(/toolIntent uses tooling/);
 		expect(think.role).toBe("planning");
 		expect(think.reason).toMatch(/intend uses planning/);
 		expect(selectSessionRole({ text: "build a web chess", resolved }).reason).toBe(act.reason);
@@ -73,6 +76,49 @@ describe("think versus act", () => {
 		});
 		expect(selectThinkRole({ text: "build a web chess", resolved: api })).toBeUndefined();
 	});
+
+	it("does not think on act turns unless the ladder elevates to Planning/Frontier", () => {
+		const resolved = localResolved();
+		expect(selectThinkRole({ text: "list the files", resolved })).toBeUndefined();
+		expect(selectThinkRole({ text: "list the files", resolved, elevateTo: "planning" })?.role).toBe("planning");
+		const hybrid = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", suite: "mistral" }), {
+			frontier: { provider: "xai", modelId: "grok-4" },
+		});
+		expect(selectThinkRole({ text: "list the files", resolved: hybrid, elevateTo: "frontier" })?.role).toBe(
+			"frontier",
+		);
+		expect(selectSessionRole({ text: "list the files", resolved: hybrid, elevateTo: "frontier" }).role).toBe(
+			"frontier",
+		);
+		expect(selectSessionRole({ text: "list the files", resolved, elevateTo: "workhorse" }).role).toBe("workhorse");
+		expect(selectSessionRole({ text: "list the files", resolved, elevateTo: "planning" }).role).toBe("planning");
+	});
+
+	it("parses ladder escalate JSON and soft stuck phrases", () => {
+		const local = localResolved();
+		const hybrid = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", suite: "mistral" }), {
+			frontier: { provider: "xai", modelId: "grok-4" },
+		});
+		expect(parseEscalateSignal('{"escalate":"next","why":"need tools"}', "tooling", local)).toEqual({
+			tier: "workhorse",
+			why: "need tools",
+			explicit: true,
+		});
+		expect(parseEscalateSignal('{"escalate":"planning","why":"ambiguous design"}', "tooling", local)).toEqual({
+			tier: "planning",
+			why: "ambiguous design",
+			explicit: true,
+		});
+		expect(parseEscalateSignal('{"escalate":"frontier","why":"hard bug"}', "planning", hybrid)?.tier).toBe(
+			"frontier",
+		);
+		expect(parseEscalateSignal("I am stuck on the architecture", "tooling", local)?.tier).toBe("workhorse");
+		expect(parseEscalateSignal("I am stuck on the architecture", "tooling", local)?.explicit).toBe(false);
+		expect(stripEscalateSignal('ok\n{"escalate":"planning","why":"x"}\n')).toBe("ok");
+		expect(shouldReplanAfterTool({ toolsSincePlan: 1, isError: false, planActive: true })).toBe(false);
+		expect(shouldReplanAfterTool({ toolsSincePlan: 1, isError: false, elevated: true })).toBe(true);
+		expect(shouldReplanAfterTool({ toolsSincePlan: 1, isError: true, planActive: true })).toBe(true);
+	});
 });
 
 describe("LM Studio roles", () => {
@@ -98,19 +144,20 @@ describe("LM Studio roles", () => {
 		expect(single.id).toBe("bonsai-27b");
 
 		const config = withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "mistral" });
-		const one = withRoleOverride(config, "workhorse", {
-			source: "lmstudio",
-			id: "bonsai-27b",
+		const lm = {
+			source: "lmstudio" as const,
 			thinking: false,
 			baseUrl: DEFAULT_LMSTUDIO_BASE_URL,
-		});
-		const two = withRoleOverride(one, "planning", {
-			source: "lmstudio",
+		};
+		const one = withRoleOverride(config, "tooling", { ...lm, id: "tool-0.8b" });
+		const two = withRoleOverride(one, "workhorse", { ...lm, id: "bonsai-27b" });
+		const three = withRoleOverride(two, "planning", {
+			...lm,
 			id: "lfm2.5-1.2b-thinking-mlx",
 			thinking: true,
-			baseUrl: DEFAULT_LMSTUDIO_BASE_URL,
 		});
-		const resolved = resolveRuntime(two, { frontier: null });
+		const resolved = resolveRuntime(three, { frontier: null });
+		expect(resolved.roles.tooling?.source).toBe("lmstudio");
 		expect(resolved.roles.workhorse?.source).toBe("lmstudio");
 		expect(resolved.roles.planning?.id).toBe("lfm2.5-1.2b-thinking-mlx");
 		expect(resolved.requiresHuggingFaceToken).toBe(false);
@@ -129,6 +176,7 @@ describe("LM Studio roles", () => {
 		console.log = log;
 		const saved = readRuntimeConfigFile(join(root, "models.yaml"));
 		expect(saved.hierarchy.mode).toBe("local");
+		expect(saved.roles.tooling).toMatchObject({ source: "lmstudio", id: "act-model" });
 		expect(saved.roles.workhorse).toMatchObject({ source: "lmstudio", id: "act-model" });
 		expect(saved.roles.planning).toMatchObject({ source: "lmstudio", id: "think-model" });
 		writeRuntimeConfigFile(join(root, "models.yaml"), saved);

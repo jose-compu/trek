@@ -9,5 +9,12 @@ export {
 	type MemoryManagerOptions,
 	selectInjection,
 } from "./manager.ts";
-export { type Reranker, shouldConstructCrossEncoder } from "./rerank.ts";
+export {
+	createReranker,
+	fakeReranker,
+	type Reranker,
+	shouldConstructCrossEncoder,
+	suiteRerankerId,
+	useFakeReranker,
+} from "./rerank.ts";
 export { captureTurn, handoffNote, THINKING_MIN } from "./turns.ts";

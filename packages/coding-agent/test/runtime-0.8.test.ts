@@ -190,10 +190,10 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(manager.list()).toEqual([]);
 	});
 
-	it("set-mode local with mocked ports starts workhorse and planning once each", () => {
+	it("set-mode local with mocked ports starts tooling, workhorse, and planning once each", () => {
 		const resolved = resolveRuntime(localConfig(), { frontier: null });
 		expect(resolved.effectiveMode).toBe("local");
-		expect(sessionLocalRoles(resolved)).toEqual(["workhorse", "planning"]);
+		expect(sessionLocalRoles(resolved)).toEqual(["tooling", "workhorse", "planning"]);
 		const calls: string[] = [];
 		let pid = 100;
 		const manager = new LlamaProcessManager({
@@ -210,8 +210,8 @@ describe("0.8.0 runtime gate (#92)", () => {
 			manager.ensure(role, resolved);
 			manager.ensure(role, resolved);
 		}
-		expect(calls).toEqual(["workhorse:18080", "planning:18081"]);
-		expect(manager.list()).toHaveLength(2);
+		expect(calls).toEqual(["tooling:18080", "workhorse:18081", "planning:18082"]);
+		expect(manager.list()).toHaveLength(3);
 		const stopped: number[] = [];
 		const stopping = new LlamaProcessManager({
 			spawn: () => ({ pid: 4242 }),
@@ -269,7 +269,7 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(resolved.roles.frontier?.source).toBe("api");
 		expect(resolved.roles.frontier?.provider).toBe("openai");
 		expect(resolved.roles.workhorse?.source).toBe("local");
-		expect(sessionLocalRoles(resolved)).toEqual(["workhorse", "planning"]);
+		expect(sessionLocalRoles(resolved)).toEqual(["tooling", "workhorse", "planning"]);
 		expect(detectFrontier({ XAI_API_KEY: "x", OPENAI_API_KEY: "o" })?.provider).toBe("xai");
 	});
 
@@ -278,7 +278,7 @@ describe("0.8.0 runtime gate (#92)", () => {
 		const qwen = resolveRuntime(localConfig("qwen"), { frontier: null });
 		const lfm = resolveRuntime(localConfig("lfm"), { frontier: null });
 		const pro = resolveRuntime(localConfig("mistral-pro"), { frontier: null });
-		expect(mistral.roles.tooling).toBeUndefined();
+		expect(mistral.roles.tooling?.id).toBe("Qwen3.5-0.8B");
 		expect(mistral.roles.workhorse?.id).toBe("Ministral-3-3B-Instruct-2512");
 		expect(mistral.roles.planning?.id).toBe("Ministral-3-8B-Reasoning-2512");
 		expect(mistral.rerank).toBe(true);
@@ -286,8 +286,8 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(qwen.roles.workhorse?.thinking).toBe(false);
 		expect(qwen.roles.planning?.thinking).toBe(true);
 		expect(lfm.roles.embedding?.id).toBe("LFM2-ColBERT-350M");
-		expect(lfm.roles.reranker).toBeUndefined();
-		expect(lfm.rerank).toBe(false);
+		expect(lfm.roles.reranker?.id).toBe("cross-encoder/ms-marco-MiniLM-L-6-v2");
+		expect(lfm.rerank).toBe(true);
 		expect(lfm.roles.planning?.thinking).toBe(true);
 		expect(pro.roles.workhorse?.id).toBe("Devstral-Small-2507");
 		expect(pro.roles.workhorse?.thinking).toBe(false);
@@ -318,17 +318,17 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(model.compat?.supportsReasoningEffort).toBe(false);
 	});
 
-	it("routes Act to Workhorse and deep work to Frontier through routeComponent", () => {
+	it("routes Act from Tooling upward and deep work to Frontier through routeComponent", () => {
 		const local = resolveRuntime(localConfig(), { frontier: null });
 		const hybrid = resolveRuntime(localConfig(), { frontier: { provider: "anthropic", modelId: "frontier" } });
-		expect(selectSessionRole({ text: "fix the typo", resolved: local }).role).toBe("workhorse");
+		expect(selectSessionRole({ text: "fix the typo", resolved: local }).role).toBe("tooling");
 		expect(selectSessionRole({ text: "fix the typo", resolved: local }).thinking).toBe(false);
 		expect(selectSessionRole({ text: "build a web chess in /tmp/blah", resolved: local })).toMatchObject({
-			role: "workhorse",
-			reason: /toolIntent uses workhorse/,
+			role: "tooling",
+			reason: /toolIntent uses tooling/,
 		});
 		expect(selectSessionRole({ text: "plan the login page", resolved: local })).toMatchObject({
-			role: "workhorse",
+			role: "tooling",
 			source: "local",
 		});
 		expect(selectSessionRole({ text: "debug the hard bug", resolved: local }).role).toBe("planning");
@@ -347,7 +347,7 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(formatBenchmark(benchmarkRuntime(api, { weightsAvailable: () => true }))).toMatch(/api mode/);
 		const local = resolveRuntime(localConfig(), { frontier: null });
 		const rows = benchmarkRuntime(local, { weightsAvailable: () => false });
-		expect(rows).toHaveLength(2);
+		expect(rows).toHaveLength(3);
 		expect(rows.every((row) => row.status === "skipped")).toBe(true);
 	});
 

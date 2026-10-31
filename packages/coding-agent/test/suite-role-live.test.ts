@@ -33,8 +33,8 @@ const live =
 const SUITES: SuiteId[] = ["mistral", "mistral-pro", "qwen", "lfm"];
 
 const TASKS = [
-	{ label: "build", text: "build a web chess in javascript in /tmp/chess", role: "workhorse" as const },
-	{ label: "typo", text: "fix the typo in the title", role: "workhorse" as const },
+	{ label: "build", text: "build a web chess in javascript in /tmp/chess", role: "tooling" as const },
+	{ label: "typo", text: "fix the typo in the title", role: "tooling" as const },
 ];
 
 const TOOLS = [
@@ -91,7 +91,7 @@ describe.skipIf(!live)("suite roles on real weights", () => {
 				const resolved = runtime(suite);
 				const selected = selectSessionRole({ text: task.text, resolved });
 				expect(selected.role).toBe(task.role);
-				expect(selected.modelId).toBe(resolved.roles.workhorse?.id);
+				expect(selected.modelId).toBe(resolved.roles.tooling?.id);
 				if (!onDisk(selected.modelId)) {
 					console.log(`skip ${suite} ${selected.role} ${selected.modelId}: weight not on disk`);
 					return;

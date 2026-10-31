@@ -14,7 +14,15 @@ When the user asks you to build, run, install, or open something, call a tool fi
 - Run the commands with the bash tool.
 - Start a local server and open the browser yourself when they ask to see it.
 - The files on disk are the result. Do not answer with a tutorial, pasted code, or steps for the user to run.
-- Do not say you cannot run a program or open a browser. Use the tools.`;
+- Do not say you cannot run a program or open a browser. Use the tools.
+
+## Escalate when stuck
+
+The chat ladder is Tooling → Workhorse → Planning → Frontier. Prefer tools at your tier.
+When the task is beyond you, keep failing, or needs a stronger model, emit one JSON line and stop tool calls for that step:
+{"escalate":"next","why":"short reason"}
+Or name a higher tier: "workhorse", "planning", or "frontier".
+Do not escalate for typos, renames, or a single clear tool call. Never ask to go down the ladder.`;
 
 const WORK_REQUEST =
 	/\b(build|create|make|implement|write|add|fix|run|start|install|open|launch|scaffold|deploy|code|edit)\b/i;

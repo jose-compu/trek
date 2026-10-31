@@ -12,12 +12,12 @@ export type SuiteId = (typeof SUITE_IDS)[number];
 export const RUNTIME_ROLES = ["tooling", "workhorse", "planning", "frontier", "embedding", "reranker"] as const;
 export type RuntimeRole = (typeof RUNTIME_ROLES)[number];
 
-/** Roles that may own a llama-server process. Frontier never does. Tooling is a yaml alias of workhorse. */
-export const LOCAL_SERVER_ROLES = ["workhorse", "planning", "embedding", "reranker"] as const;
+/** Roles that may own a llama-server process. Frontier never does. */
+export const LOCAL_SERVER_ROLES = ["tooling", "workhorse", "planning", "embedding", "reranker"] as const;
 export type LocalServerRole = (typeof LOCAL_SERVER_ROLES)[number];
 
-/** Chat processes a local session starts. Tooling is not loaded. */
-export const SESSION_LOCAL_ROLES = ["workhorse", "planning"] as const;
+/** Chat processes a local session may start. Ladder: tooling → workhorse → planning. */
+export const SESSION_LOCAL_ROLES = ["tooling", "workhorse", "planning"] as const;
 export type SessionLocalRole = (typeof SESSION_LOCAL_ROLES)[number];
 
 export type RoleSource = "local" | "api" | "lmstudio";
@@ -44,7 +44,7 @@ export const ROUTE_COMPONENTS = ["worldModel", "toolIntent", "mechanical", "inte
 export type RouteComponent = (typeof ROUTE_COMPONENTS)[number];
 
 /** Session roles a component may be pinned to. Embedding and reranker are not chat routes. */
-export type RouteRole = "workhorse" | "planning" | "frontier";
+export type RouteRole = "tooling" | "workhorse" | "planning" | "frontier";
 
 export interface RoutingPolicy {
 	/** Static role per component. Absent components use the dynamic policy. */
@@ -64,7 +64,7 @@ export function isRouteComponent(value: string): value is RouteComponent {
 }
 
 export function isRouteRole(value: string): value is RouteRole {
-	return value === "workhorse" || value === "planning" || value === "frontier";
+	return value === "tooling" || value === "workhorse" || value === "planning" || value === "frontier";
 }
 
 export function isRoleSource(value: string): value is RoleSource {
