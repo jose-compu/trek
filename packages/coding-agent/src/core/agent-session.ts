@@ -29,6 +29,7 @@ import type { AssistantMessage, ImageContent, Message, Model, TextContent } from
 import {
 	clampThinkingLevel,
 	cleanupSessionResources,
+	completeSimple,
 	getSupportedThinkingLevels,
 	isContextOverflow,
 	modelsAreEqual,
@@ -203,7 +204,9 @@ import {
 } from "./reproducibility/index.ts";
 import type { ResourceExtensionPaths, ResourceLoader } from "./resource-loader.ts";
 import {
+	contextBudget,
 	createDefaultLlamaProcessManager,
+	fitCompactionSettings,
 	type LlamaProcessManager,
 	LOCAL_LLAMA_PROVIDER,
 	LOCAL_SUITE_WORK_SECTION,
@@ -214,7 +217,10 @@ import {
 	promotionRole,
 	type ResolvedRuntime,
 	resolveRuntime,
+	SMALL_CONTEXT_TOOLS,
 	selectSessionRole,
+	sessionRoleForModel,
+	smallContextPrompt,
 } from "./runtime/index.ts";
 import {
 	type AntiPattern,
@@ -2232,9 +2238,13 @@ export class AgentSession {
 	 * Changes take effect on the next agent turn.
 	 */
 	setActiveToolsByName(toolNames: string[]): void {
+		const allowed = this._usesSmallContext()
+			? toolNames.filter((name) => (SMALL_CONTEXT_TOOLS as readonly string[]).includes(name))
+			: toolNames;
+		const names = this._usesSmallContext() && allowed.length === 0 ? [...SMALL_CONTEXT_TOOLS] : allowed;
 		const tools: AgentTool[] = [];
 		const validToolNames: string[] = [];
-		for (const name of toolNames) {
+		for (const name of names) {
 			const tool = this._toolRegistry.get(name);
 			if (tool) {
 				tools.push(tool);
@@ -2505,7 +2515,20 @@ export class AgentSession {
 		return Array.from(unique);
 	}
 
+	private _usesSmallContext(): boolean {
+		const window = this.model?.contextWindow ?? 0;
+		return this.model?.provider === LOCAL_LLAMA_PROVIDER && contextBudget(window).small;
+	}
+
+	private _fittedCompactionSettings() {
+		const settings = this.settingsManager.getCompactionSettings();
+		return fitCompactionSettings(settings, this.model?.contextWindow ?? 0);
+	}
+
 	private _rebuildSystemPrompt(toolNames: string[]): string {
+		if (this._usesSmallContext()) {
+			return smallContextPrompt(this._cwd);
+		}
 		const validToolNames = toolNames.filter((name) => this._toolRegistry.has(name));
 		const toolSnippets: Record<string, string> = {};
 		const promptGuidelines: string[] = [];
@@ -2657,7 +2680,11 @@ export class AgentSession {
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
-		const selection = selectSessionRole({ text, resolved });
+		const selection = selectSessionRole({
+			text,
+			resolved,
+			previousRole: sessionRoleForModel(resolved, this.model),
+		});
 		if (selection.source !== "local") {
 			this._restoreApiSessionModel();
 			return;
@@ -2728,18 +2755,31 @@ export class AgentSession {
 		return { model: this._localRoleModel(role, pick.assignment.id, resolved), role: pick.role, reason: pick.reason };
 	}
 
+	/** Side calls must not block the TUI on a slow local server. */
+	private static readonly SIDE_CALL_TIMEOUT_MS = 45_000;
+
+	private _localOpenAiServer(model: Model<any>): boolean {
+		const url = model.baseUrl ?? "";
+		return model.api === "openai-completions" && /127\.0\.0\.1|localhost/.test(url);
+	}
+
 	/** One model call outside the transcript, with no tools. */
 	private async _sideCall(model: Model<any>, prompt: string): Promise<string> {
 		const auth = await this._getCompactionRequestAuth(model);
-		const stream = await this.agent.streamFn(
+		const reply = await completeSimple(
 			model,
 			{
 				systemPrompt: "You are a Trek learning step. Reply with JSON only.",
 				messages: [{ role: "user", content: [{ type: "text", text: prompt }], timestamp: Date.now() }],
 			},
-			{ apiKey: auth.apiKey, headers: auth.headers },
+			{
+				apiKey: auth.apiKey,
+				headers: auth.headers,
+				maxTokens: 512,
+				temperature: 0,
+				signal: AbortSignal.timeout(AgentSession.SIDE_CALL_TIMEOUT_MS),
+			},
 		);
-		const reply = await stream.result();
 		const text = reply.content
 			.filter((part): part is TextContent => part.type === "text")
 			.map((part) => part.text)
@@ -2951,6 +2991,10 @@ export class AgentSession {
 		try {
 			const pick = this._promotionModel();
 			if (!pick) return undefined;
+			// LM Studio and other local OpenAI servers often hang on the promotion side call.
+			if (this._localOpenAiServer(pick.model)) {
+				return undefined;
+			}
 			const ids = candidates.map((hit) => hit.id);
 			const chosen = parsePromotion(
 				await this._sideCall(
@@ -3008,6 +3052,7 @@ export class AgentSession {
 			const selection = selectSessionRole({
 				text: latestUserPrompt(prior),
 				resolved,
+				previousRole: sessionRoleForModel(resolved, this.model),
 			});
 			if (selection.source === "local") {
 				try {
@@ -3566,6 +3611,13 @@ export class AgentSession {
 			await this._learnFromCorrection(expandedText);
 			await this._injectMemory(expandedText);
 			this._appendDomainSkills(this._turnSelection);
+			if (this._usesSmallContext()) {
+				this.setActiveToolsByName([...SMALL_CONTEXT_TOOLS]);
+				const budget = contextBudget(this.model?.contextWindow ?? 0);
+				if (this.model && this.model.maxTokens > budget.outputTokens) {
+					this.model.maxTokens = budget.outputTokens;
+				}
+			}
 		} catch (error) {
 			preflightResult?.(false);
 			throw error;
@@ -4134,7 +4186,7 @@ export class AgentSession {
 			const { apiKey, headers } = await this._getCompactionRequestAuth(this.model);
 
 			const pathEntries = this.sessionManager.getBranch();
-			const settings = this.settingsManager.getCompactionSettings();
+			const settings = this._fittedCompactionSettings();
 
 			const preparation = prepareCompaction(pathEntries, settings);
 			if (!preparation) {
@@ -4280,7 +4332,7 @@ export class AgentSession {
 	 * @param skipAbortedCheck If false, include aborted messages (for pre-prompt check). Default: true
 	 */
 	private async _checkCompaction(assistantMessage: AssistantMessage, skipAbortedCheck = true): Promise<boolean> {
-		const settings = this.settingsManager.getCompactionSettings();
+		const settings = this._fittedCompactionSettings();
 		if (!settings.enabled) return false;
 
 		// Skip if message was aborted (user cancelled) - unless skipAbortedCheck is false
@@ -4363,7 +4415,7 @@ export class AgentSession {
 	 * Internal: Run auto-compaction with events.
 	 */
 	private async _runAutoCompaction(reason: "overflow" | "threshold", willRetry: boolean): Promise<boolean> {
-		const settings = this.settingsManager.getCompactionSettings();
+		const settings = this._fittedCompactionSettings();
 
 		this._emit({ type: "compaction_start", reason });
 		this._autoCompactionAbortController = new AbortController();

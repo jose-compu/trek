@@ -86,6 +86,8 @@ describe("0.8.0 runtime gate (#92)", () => {
 		const previousDir = process.env.TREK_MODELS_DIR;
 		delete process.env.TREK_LLAMA_SERVER;
 		delete process.env.TREK_MODELS_DIR;
+		const previousMlx = process.env.TREK_MLX;
+		process.env.TREK_MLX = "0";
 		try {
 			const resolved = resolveRuntime(localConfig(), { frontier: null });
 			const manager = createDefaultLlamaProcessManager();
@@ -101,6 +103,11 @@ describe("0.8.0 runtime gate (#92)", () => {
 				delete process.env.TREK_MODELS_DIR;
 			} else {
 				process.env.TREK_MODELS_DIR = previousDir;
+			}
+			if (previousMlx === undefined) {
+				delete process.env.TREK_MLX;
+			} else {
+				process.env.TREK_MLX = previousMlx;
 			}
 		}
 	});
@@ -316,6 +323,10 @@ describe("0.8.0 runtime gate (#92)", () => {
 		const hybrid = resolveRuntime(localConfig(), { frontier: { provider: "anthropic", modelId: "frontier" } });
 		expect(selectSessionRole({ text: "fix the typo", resolved: local }).role).toBe("workhorse");
 		expect(selectSessionRole({ text: "fix the typo", resolved: local }).thinking).toBe(false);
+		expect(selectSessionRole({ text: "build a web chess in /tmp/blah", resolved: local })).toMatchObject({
+			role: "planning",
+			reason: "building uses Planning",
+		});
 		expect(selectSessionRole({ text: "plan the research", resolved: local })).toMatchObject({
 			role: "planning",
 			thinking: true,

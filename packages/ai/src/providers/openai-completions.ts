@@ -414,7 +414,17 @@ export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenA
 				throw new Error(output.errorMessage || "Provider returned an error stop reason");
 			}
 			if (!hasFinishReason) {
-				throw new Error("Stream ended without finish_reason");
+				const hasOutput = output.content.some((block) => {
+					if (block.type === "text") return block.text.length > 0;
+					if (block.type === "thinking") return block.thinking.length > 0;
+					return block.type === "toolCall";
+				});
+				if (hasOutput) {
+					output.stopReason = "stop";
+					hasFinishReason = true;
+				} else {
+					throw new Error("Stream ended without finish_reason");
+				}
 			}
 
 			stream.push({ type: "done", reason: output.stopReason, message: output });

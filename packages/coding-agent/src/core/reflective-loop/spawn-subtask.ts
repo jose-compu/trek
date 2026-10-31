@@ -3,9 +3,8 @@
  * Routing uses the component router so the child step names a model.
  */
 
-import { routeComponent } from "../runtime/component-router.ts";
 import type { ResolvedRuntime } from "../runtime/resolve.ts";
-import type { RoleSelection } from "../runtime/select-role.ts";
+import { type RoleSelection, selectSessionRole } from "../runtime/select-role.ts";
 import type { SubtaskStack } from "./subtask-stack.ts";
 
 export interface DepthFirstSubtaskInput {
@@ -30,13 +29,7 @@ export function runDepthFirstSubtask(stack: SubtaskStack, input: DepthFirstSubta
 	stack.push({ description: input.description, parentSummary: input.summary });
 	try {
 		input.runChild?.();
-		const route = routeComponent({
-			component: "mechanical",
-			resolved: input.resolved,
-			depth: stack.depth,
-			retries: 0,
-			complexity: 0,
-		});
+		const route = selectSessionRole({ text: input.description, resolved: input.resolved });
 		return {
 			depth: stack.depth,
 			context: "summary_only",

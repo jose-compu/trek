@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { Agent, type AgentMessage, type ThinkingLevel } from "@trek/agent-core";
-import { clampThinkingLevel, type Message, type Model, streamSimple } from "@trek/ai";
+import { type AssistantMessageEventStream, clampThinkingLevel, type Message, type Model, streamSimple } from "@trek/ai";
 import { getAgentDir } from "../config.ts";
 import { resolvePath } from "../utils/paths.ts";
 import { AgentSession } from "./agent-session.ts";
@@ -16,7 +16,7 @@ import { REFLECTIVE_META_TOOL_NAMES } from "./reflective-loop/meta-tools.ts";
 import type { ResourceLoader } from "./resource-loader.ts";
 import { DefaultResourceLoader } from "./resource-loader.ts";
 import { LOCAL_LLAMA_PROVIDER, LOCAL_LLAMA_TIMEOUT_MS } from "./runtime/local-model.ts";
-import { localSuiteToolChoice, nudgeLocalWorkMessages } from "./runtime/local-work.ts";
+import { liftLocalToolText, localSuiteToolChoice, nudgeLocalWorkMessages } from "./runtime/local-work.ts";
 import { applyShortTraceContext, applyShortTraceOptions } from "./runtime/short-trace.ts";
 import { getDefaultSessionDir, SessionManager } from "./session-manager.ts";
 import { SettingsManager } from "./settings-manager.ts";
@@ -345,7 +345,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			const hasTools = (nudged.tools?.length ?? 0) > 0;
 			const requestContext = applyShortTraceContext(nudged);
 			const shortOptions = applyShortTraceOptions(options, hasTools);
-			return streamSimple(model, requestContext, {
+			const stream = streamSimple(model, requestContext, {
 				...shortOptions,
 				apiKey: auth.apiKey,
 				timeoutMs,
@@ -363,6 +363,12 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 				...(localToolChoice ? { toolChoice: localToolChoice } : {}),
 				...(model.provider === LOCAL_LLAMA_PROVIDER && model.maxTokens > 0 ? { maxTokens: model.maxTokens } : {}),
 			});
+			return local
+				? withLocalToolLift(
+						stream,
+						nudged.tools?.map((tool) => tool.name).filter((name): name is string => typeof name === "string"),
+					)
+				: stream;
 		},
 		onPayload: async (payload, _model) => {
 			const runner = extensionRunnerRef.current;
@@ -431,4 +437,39 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		extensionsResult,
 		modelFallbackMessage,
 	};
+}
+
+/** The agent reads the done message from result(). A JSON tool call in the text is rewritten first. */
+function withLocalToolLift(
+	inner: AssistantMessageEventStream,
+	allowedToolNames?: Iterable<string>,
+): AssistantMessageEventStream {
+	type FinalMessage = Awaited<ReturnType<AssistantMessageEventStream["result"]>>;
+	let resolveResult!: (message: FinalMessage) => void;
+	const resultPromise = new Promise<FinalMessage>((resolve) => {
+		resolveResult = resolve;
+	});
+	const outer = {
+		async *[Symbol.asyncIterator]() {
+			for await (const event of inner) {
+				if (event.type === "done") {
+					const message = liftLocalToolText(event.message, allowedToolNames);
+					resolveResult(message);
+					yield { ...event, message };
+					return;
+				}
+				if (event.type === "error") {
+					resolveResult(event.error);
+					yield event;
+					return;
+				}
+				yield event;
+			}
+			resolveResult(await inner.result());
+		},
+		result() {
+			return resultPromise;
+		},
+	};
+	return outer as unknown as AssistantMessageEventStream;
 }

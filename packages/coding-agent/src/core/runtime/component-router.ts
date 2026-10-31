@@ -10,12 +10,13 @@ import type { RouteComponent, RouteRole } from "./types.ts";
 
 const COMPONENT_ROLE: Record<RouteComponent, RouteRole> = {
 	worldModel: "planning",
-	toolIntent: "tooling",
+	toolIntent: "workhorse",
 	mechanical: "workhorse",
 	intend: "planning",
 };
 
-const TIER: RouteRole[] = ["workhorse", "tooling", "planning", "frontier"];
+/** Smaller chat models first. A retry moves up, not down onto Tooling. */
+const TIER: RouteRole[] = ["tooling", "workhorse", "planning", "frontier"];
 
 export interface ComponentRouteInput {
 	component: RouteComponent;
