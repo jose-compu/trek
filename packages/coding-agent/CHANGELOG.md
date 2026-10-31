@@ -4,22 +4,26 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-31
+
 ### Added
 
 - `/hierarchy` sets mode, suite, and one role in `~/.trek/models.yaml`. Frontier stays on the API. The next session reads the file. This command does not download weights or start llama.cpp.
 - `trek models benchmark` writes `trek-benchmark.json` and prints tokens per second, tool-call latency, and memory when a probe measures weights that are already on disk. Missing weights stay skipped. The command does not download GGUF files or start llama-server.
 - The bash tool suggests grep, sed, awk, rg, find, and jq recipes. They do not delete files, call a model, or use the network.
+- Local and hybrid sessions climb Tooling → Workhorse → Planning → Frontier. A role may emit `{"escalate":"next"|tier,"why":"…"}`; soft stuck phrases and repeated tool failures also elevate. The console shows a dim `↑ from → to` line. Workhorse acts; Planning writes a think brief; Frontier (API) takes deep work. `trek models set-lmstudio` binds one or two models already loaded in LM Studio.
+- Memory rerank uses MiniLM cross-encoder by default when a local suite is active.
+- Hierarchy docs describe the Decision (LFM d1) tier under Tooling. The d1 Decision Index loader ships in a follow-up.
+
+### Changed
+
+- Undo, keep-all, dry-run, the shortcut bar, previous model, and tree-filter back use alt chords. Terminal.app dropped Shift on the old chords, so undo arrived as suspend. `shift+tab` is unchanged. `?` opens the same list as `/hotkeys`.
 - Before a local session starts, Trek lists chat weights that are not on disk and downloads them only after a yes.
 - A local model whose window is under 4096 tokens uses a short prompt, only read, write, edit, and bash, and compacts against that window. The reply reserve stays inside the window.
 - LFM2.5 chat roles use an 8192-token floor when `TREK_LLAMA_CTX` is smaller. Compaction reserve and the kept tail stay inside that window.
 - On this Mac the LFM planning model uses the MLX 4-bit snapshot. The smaller LFM roles stay on llama.cpp, because MLX does not force a tool call and those models then describe the call instead of making it.
 - A local turn waits until the server has finished loading. The MLX planning request names the snapshot directory, not the GGUF file.
-- Local and hybrid sessions use `routeComponent`: Workhorse acts, Planning thinks, Frontier (API) takes deep thinking, planning, and hard debugging. api mode stays a single session model. Tooling mini-models are not loaded. `trek models set-lmstudio` binds one or two models already loaded in LM Studio.
 - Lesson promotion skips an extra side call on a local OpenAI server so the TUI does not sit on Working. Side calls use a 45s cap. OpenAI streams that end without finish_reason but with text still complete.
-
-### Changed
-
-- Undo, keep-all, dry-run, the shortcut bar, previous model, and tree-filter back use alt chords. Terminal.app dropped Shift on the old chords, so undo arrived as suspend. `shift+tab` is unchanged. `?` opens the same list as `/hotkeys`.
 
 ## [0.15.1] - 2026-10-31
 
