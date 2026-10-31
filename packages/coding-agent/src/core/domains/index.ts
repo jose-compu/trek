@@ -55,6 +55,7 @@ export {
 	type SelectDomainInput,
 	type SelectionReason,
 	selectDomain,
+	turnNeedsTools,
 } from "./select.ts";
 export { completeDomainCommand, formatDomainList, runDomainSessionCommand } from "./session-command.ts";
 export {

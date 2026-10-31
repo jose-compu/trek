@@ -278,6 +278,26 @@ describe("workflow gate", () => {
 		expect(selectDomain(loadDomainCatalog(harness.tempDir), { task: FINANCE_TURN }).workflow).toBe("control-break");
 	});
 
+	test("a fix or a blocked session does not inherit the review that refuses tools", async () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-workflow-fix-"));
+		const catalog = loadDomainCatalog(cwd);
+		expect(selectDomain(catalog, { task: `${ENGINEERING_TURN} Fix and push.` }).workflow).toBe("none");
+		expect(
+			selectDomain(catalog, { task: "what is happening? we are blocked", previous: ENGINEERING_TURN }).workflow,
+		).toBe("none");
+		expect(selectDomain(catalog, { task: "the amount is 1200", previous: ENGINEERING_TURN }).workflow).toBe(
+			"change-review",
+		);
+
+		const harness = await createHarness({ enableReflectiveLoop: true });
+		harnesses.push(harness);
+		harness.setResponses([fauxAssistantMessage("I will read the failing check.")]);
+		await harness.session.prompt(`${ENGINEERING_TURN} Fix and push the pull request.`);
+		expect(assistantCount(harness)).toBe(1);
+		expect(assistantText(harness)).toContain("failing check");
+		expect(harness.session.getWorkflowCheck()).toBeUndefined();
+	});
+
 	test("a complete engineering turn keeps the layer rule and does not ask", () => {
 		expect(missingWorkflowFacts("engineering", ENGINEERING_TURN)).toEqual([]);
 		expect(missingWorkflowFacts("engineering", "The build failed.")).toEqual(["build", "violation", "debt"]);
