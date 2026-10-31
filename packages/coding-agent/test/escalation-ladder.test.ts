@@ -78,6 +78,24 @@ describe("escalation ladder", () => {
 		expect(soft).toMatchObject({ tier: "workhorse", explicit: false });
 	});
 
+	it("in-tier answers do not escalate", () => {
+		const resolved = localResolved();
+		const answers = [
+			"OK",
+			"42",
+			"yes",
+			"A",
+			"s.toUpperCase()",
+			"src/index.ts",
+			"Fixed the typo in the title.",
+			"Use option A because latency is the priority.",
+		];
+		for (const text of answers) {
+			expect(parseEscalateAsk(text), text).toBeUndefined();
+			expect(parseEscalateSignal(text, "tooling", resolved), text).toBeUndefined();
+		}
+	});
+
 	it("session bind climbs when elevateTo is set; think only at planning+", () => {
 		const resolved = localResolved();
 		expect(selectSessionRole({ text: "list files", resolved }).role).toBe("tooling");

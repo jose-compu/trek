@@ -1,11 +1,13 @@
 /**
  * Optional live escalation matrix on real local GGUFs.
- * This path is experimental and critical: weak models must climb, not invent.
+ * This path is experimental and critical: weak models must climb when stuck,
+ * and must stay put when the prompt is in-tier (no escalate).
  *
- * CI skips (PI_NO_LOCAL_LLM=1). Enable with:
+ * CI skips (PI_NO_LOCAL_LLM=1 / TREK_LLAMA_LIVE unset). Enable with:
  *
  *   set -a && source ~/.trek/llama-live.env && set +a
  *   unset PI_NO_LOCAL_LLM
+ *   export TREK_LLAMA_LIVE=1
  *   npx vitest run test/escalation-live.test.ts --reporter=verbose
  *
  * Optional filters:
@@ -76,6 +78,64 @@ const TRIVIAL_NO_ESCALATE = `You cannot use tools.
 The user said: "fix the typo: helo -> hello in the title."
 This is a trivial rename. Do NOT escalate.
 Reply with exactly: OK`;
+
+/** In-tier tasks the current role should answer itself. No escalate JSON, no stuck phrases. */
+const NO_ESCALATE_CASES: { id: string; prompt: string; expect: RegExp; maxTokens?: number }[] = [
+	{
+		id: "typo",
+		prompt: TRIVIAL_NO_ESCALATE,
+		expect: /\bok\b/i,
+		maxTokens: 64,
+	},
+	{
+		id: "arithmetic",
+		prompt: `You cannot use tools.
+The user asked: "What is 17 + 25?"
+This is trivial. Do NOT escalate. Do not invent architecture.
+Reply with exactly one line: 42`,
+		expect: /\b42\b/,
+		maxTokens: 32,
+	},
+	{
+		id: "yes-no",
+		prompt: `You cannot use tools.
+The user asked: "Is TypeScript a typed language?"
+Answer from knowledge. Do NOT escalate.
+Reply with exactly one word: yes`,
+		expect: /\byes\b/i,
+		maxTokens: 32,
+	},
+	{
+		id: "clear-choice",
+		prompt: `You cannot use tools.
+The user must pick one option and gave a clear rule:
+- Prefer A when latency matters more than consistency.
+- Prefer B when consistency matters more than latency.
+Their priority is: latency over consistency.
+Choose A or B. Do NOT escalate. Do not invent a hybrid.
+Reply with exactly one letter: A`,
+		expect: /\bA\b/,
+		maxTokens: 32,
+	},
+	{
+		id: "one-liner-code",
+		prompt: `You cannot use tools.
+The user asked for a one-line JavaScript expression that returns the uppercase of string s.
+You can answer this yourself. Do NOT escalate. Do not apologise.
+Reply with exactly: s.toUpperCase()`,
+		expect: /s\.toUpperCase\(\)/,
+		maxTokens: 48,
+	},
+	{
+		id: "echo-path",
+		prompt: `You cannot use tools.
+The user said: "confirm the path is src/index.ts"
+Confirm. Do NOT escalate.
+Reply with exactly: src/index.ts`,
+		expect: /src\/index\.ts/,
+		maxTokens: 48,
+	},
+];
 
 function weightBytes(modelId: string): number {
 	if (!weightFileExists(modelId)) {
@@ -261,13 +321,32 @@ describe.skipIf(!live)("local models escalate when stuck (matrix)", () => {
 							expect(ladderAtOrAbove(ambSignal.tier, next)).toBe(true);
 						}
 
-						const trivial = await server.complete(TRIVIAL_NO_ESCALATE, 64);
-						console.log(`${suite}/${role} trivial:\n${trivial.slice(0, 160)}`);
-						expect(parseEscalateAsk(trivial), `must not escalate trivial: ${trivial}`).toBeUndefined();
-						expect(trivial.toLowerCase()).toMatch(/ok/);
-
 						// Demotion refuse is pure policy; assert once per battery.
 						expect(resolveEscalateTarget("workhorse", "tooling", hybrid)).toBe("planning");
+					} finally {
+						await server.stop();
+					}
+				},
+				300_000,
+			);
+
+			it.skipIf(!available)(
+				`${suite}/${role} (${modelId}) no-escalate: in-tier prompts stay put`,
+				async () => {
+					const server = new LiveRoleServer(port++, role, modelId!);
+					servers.push(server);
+					await server.start();
+					try {
+						for (const case_ of NO_ESCALATE_CASES) {
+							const reply = await server.complete(case_.prompt, case_.maxTokens ?? 64);
+							console.log(`${suite}/${role} no-escalate/${case_.id}:\n${reply.slice(0, 200)}`);
+							expect(parseEscalateAsk(reply), `must not escalate ${case_.id}: ${reply}`).toBeUndefined();
+							expect(
+								parseEscalateSignal(reply, floor, hybrid),
+								`must not signal escalate ${case_.id}: ${reply}`,
+							).toBeUndefined();
+							expect(reply, `expected shape for ${case_.id}: ${reply}`).toMatch(case_.expect);
+						}
 					} finally {
 						await server.stop();
 					}

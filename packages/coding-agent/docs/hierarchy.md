@@ -80,8 +80,9 @@ roles:
 
 - Unit: `test/escalation-ladder.test.ts`
 - Optional live GGUF matrix: `test/escalation-live.test.ts`
-  - Batteries per suite/role: `escalate:next`, named planning/frontier, ambiguous, trivial no-escalate
+  - Batteries per suite/role: `escalate:next`, named planning/frontier, ambiguous
+  - No-escalate battery: typo, arithmetic, yes/no, clear choice, one-liner code, path echo — model answers in-tier with no escalate JSON
   - Cross-role chain: Tooling → Workhorse on the same hard task
   - Filters: `TREK_ESCALATE_SUITE`, `TREK_ESCALATE_ROLE`, `TREK_LLAMA_MAX_BYTES`
-  - Enable: `source ~/.trek/llama-live.env && unset PI_NO_LOCAL_LLM`
+  - Enable: `set -a && source ~/.trek/llama-live.env && set +a && unset PI_NO_LOCAL_LLM && export TREK_LLAMA_LIVE=1`
 - Decision live (0.16): classify fixture prompts with `d1-omni-600M` when weights are present
