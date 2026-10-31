@@ -4,6 +4,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Added
+
+- `trek models benchmark` writes `trek-benchmark.json` and prints tokens per second, tool-call latency, and memory when a probe measures weights that are already on disk. Missing weights stay skipped. The command does not download GGUF files or start llama-server.
+
 ## [0.15.1] - 2026-10-31
 
 ### Fixed

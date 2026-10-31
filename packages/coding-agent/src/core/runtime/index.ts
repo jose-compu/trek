@@ -1,4 +1,11 @@
-export { type BenchmarkProbe, type BenchmarkRow, benchmarkRuntime, formatBenchmark } from "./benchmark.ts";
+export {
+	type BenchmarkProbe,
+	type BenchmarkRow,
+	type BenchmarkSample,
+	benchmarkRuntime,
+	formatBenchmark,
+	writeBenchmarkJson,
+} from "./benchmark.ts";
 export { type ComponentRouteInput, routeComponent } from "./component-router.ts";
 export { LOCAL_LLAMA_PROVIDER, LOCAL_LLAMA_TIMEOUT_MS, localLlamaChatModel } from "./local-model.ts";
 export {
