@@ -1,0 +1,8 @@
+{
+	"app.edits.undo": "shift+ctrl+z",
+	"app.edits.keepAll": "shift+ctrl+k",
+	"app.edits.dryRun": "shift+ctrl+y",
+	"app.shortcuts.toggle": "shift+ctrl+/",
+	"app.model.cycleBackward": "shift+ctrl+p",
+	"app.tree.filter.cycleBackward": "shift+ctrl+o"
+}
