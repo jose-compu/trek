@@ -2,6 +2,7 @@
  * trek models — 0.8.0 Runtime (issue #89).
  */
 
+import { join } from "node:path";
 import chalk from "chalk";
 import { APP_NAME, getAgentDir } from "./config.ts";
 import {
@@ -18,8 +19,10 @@ import {
 	type RoleSource,
 	readRuntimeConfigFile,
 	resolveRuntime,
+	weightFileExists,
 	withHierarchy,
 	withRoleOverride,
+	writeBenchmarkJson,
 	writeRuntimeConfigFile,
 } from "./core/runtime/index.ts";
 
@@ -188,8 +191,11 @@ function benchmark(): boolean {
 	const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: process.cwd() });
 	const resolved = resolveRuntime(config);
 	const rows = benchmarkRuntime(resolved, {
-		weightsAvailable: () => false,
+		weightsAvailable: (_role, id) => weightFileExists(id),
 	});
+	const out = join(process.cwd(), "trek-benchmark.json");
+	writeBenchmarkJson(out, rows);
 	console.log(formatBenchmark(rows));
+	console.log(out);
 	return true;
 }

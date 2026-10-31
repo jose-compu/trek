@@ -3,6 +3,7 @@
  * Missing weights are skipped. CI does not download GGUF files.
  */
 
+import { writeFileSync } from "node:fs";
 import type { ResolvedRuntime } from "./resolve.ts";
 import type { LocalServerRole } from "./types.ts";
 import { SESSION_LOCAL_ROLES } from "./types.ts";
@@ -13,11 +14,18 @@ export interface BenchmarkRow {
 	reason?: string;
 	tokensPerSecond?: number;
 	toolCallLatencyMs?: number;
+	memoryMb?: number;
+}
+
+export interface BenchmarkSample {
+	tokensPerSecond: number;
+	toolCallLatencyMs: number;
+	memoryMb: number;
 }
 
 export interface BenchmarkProbe {
 	weightsAvailable: (role: LocalServerRole, modelId: string) => boolean;
-	measure?: (role: LocalServerRole) => { tokensPerSecond: number; toolCallLatencyMs: number };
+	measure?: (role: LocalServerRole) => BenchmarkSample;
 }
 
 export function benchmarkRuntime(resolved: ResolvedRuntime, probe: BenchmarkProbe): BenchmarkRow[] {
@@ -41,6 +49,7 @@ export function benchmarkRuntime(resolved: ResolvedRuntime, probe: BenchmarkProb
 			status: "measured",
 			tokensPerSecond: sample.tokensPerSecond,
 			toolCallLatencyMs: sample.toolCallLatencyMs,
+			memoryMb: sample.memoryMb,
 		};
 	});
 }
@@ -51,7 +60,12 @@ export function formatBenchmark(rows: readonly BenchmarkRow[]): string {
 			if (row.status === "skipped") {
 				return `${row.role}: skipped (${row.reason ?? "skipped"})`;
 			}
-			return `${row.role}: ${row.tokensPerSecond} tok/s, tool-call ${row.toolCallLatencyMs} ms`;
+			const memory = row.memoryMb === undefined ? "" : `, memory ${row.memoryMb} MB`;
+			return `${row.role}: ${row.tokensPerSecond} tok/s, tool-call ${row.toolCallLatencyMs} ms${memory}`;
 		})
 		.join("\n");
+}
+
+export function writeBenchmarkJson(path: string, rows: readonly BenchmarkRow[]): void {
+	writeFileSync(path, `${JSON.stringify(rows, null, "\t")}\n`);
 }
