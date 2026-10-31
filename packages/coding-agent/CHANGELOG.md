@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-10-31
+
+### Fixed
+
+- A request to fix, push, or unblock does not start the engineering review. That review quoted a rule and then refused tools, so a failed check was never read. A review that does not ask for a fix still runs, and it does not invent a rule or a debt.
+
 ## [0.15.0] - 2026-10-31
 
 ### Added

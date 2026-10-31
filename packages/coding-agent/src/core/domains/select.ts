@@ -23,7 +23,22 @@ export interface SelectDomainInput {
 	previous?: string;
 }
 
+const NONE: DomainSelection = {
+	domain: "none",
+	workflow: "none",
+	selectionReason: "none",
+	nodeIds: [],
+	yaml: "",
+	parameters: [],
+};
+
+/** A fix, a push, or a blocked session needs tools. A review workflow must not take that turn. */
+export function turnNeedsTools(task: string): boolean {
+	return /\b(fix|push|blocked|unblock|what is happening|what happened)\b/i.test(task);
+}
+
 export function selectDomain(catalog: DomainCatalog, input: SelectDomainInput): DomainSelection {
+	if (turnNeedsTools(input.task)) return NONE;
 	const files = [...(input.files ?? []), ...namedFiles(input.task)];
 	const currentText = [input.task, ...files].join("\n");
 	const current = scoreDomains(catalog, currentText);
@@ -34,7 +49,7 @@ export function selectDomain(catalog: DomainCatalog, input: SelectDomainInput): 
 	if (previous && input.previous) {
 		return selectionFrom(previous.domain, "match", input.previous, previous.matched);
 	}
-	return { domain: "none", workflow: "none", selectionReason: "none", nodeIds: [], yaml: "", parameters: [] };
+	return NONE;
 }
 
 function namedFiles(task: string): string[] {

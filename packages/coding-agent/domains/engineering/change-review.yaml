@@ -4,16 +4,17 @@ description: |
 nodes:
   - id: state-constraint
     prompt: |
-      Quote the architecture violation in the words the user turn already uses. One line. If it is not named, say it is not in the turn.
+      Quote the architecture violation in the words the user turn already uses. One line. If it is not named, say it is not in the turn. Do not invent one.
   - id: check-build
     prompt: |
-      Quote the build, test, or dependency failure from the user turn. One line. If none is named, say none has been run.
+      Quote the build, test, or CI failure from the user turn. One line. If none is named, say none has been run. Do not invent one.
     depends_on: [state-constraint]
   - id: name-debt
     prompt: |
-      Quote the tech debt from the user turn. One line. If it is not named, say it is not in the turn.
+      Quote the tech debt from the user turn. One line. If it is not named, say it is not in the turn. Do not invent one.
     depends_on: [check-build]
   - id: apply-or-refuse
     prompt: |
-      Do not edit and do not run a tool. One line: refuse the change, or say the facts are not in the turn.
+      State the constraint the turn already names. One line. If none is named, say it is not in the turn.
+      Do not refuse a fix. Do not say tools are forbidden. Do not invent a rule or a debt.
     depends_on: [name-debt]

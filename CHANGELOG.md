@@ -1,10 +1,16 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.15.0`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.15.1`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.15.1] - 2026-10-31
+
+### Fixed
+
+- A request to fix, push, or unblock does not start the engineering review. That review quoted a rule and then refused tools, so a failed check was never read. A review that does not ask for a fix still runs, and it does not invent a rule or a debt.
 
 ## [0.15.0] - 2026-10-31
 
