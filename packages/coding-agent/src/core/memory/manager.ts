@@ -187,7 +187,7 @@ export class MemoryManager {
 		return `deleted ${hit.id}`;
 	}
 
-	/** Stored lessons nearest the query, reranked where the suite allows it. */
+	/** Stored lessons nearest the query, cross-encoder reranked when a reranker is attached. */
 	async lessonCandidates(query: string, limit = 20, scope?: LessonScope): Promise<MemoryHit[]> {
 		const settings = this.options.getSettings();
 		const found: MemoryHit[] = [];

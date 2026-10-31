@@ -62,9 +62,17 @@ describe("intention repair and spawn_subtask", () => {
 		expect(child.context).toBe("summary_only");
 		expect(child.summary).toBe("parent summary only");
 		expect(child.depth).toBe(1);
-		expect(child.role).toBe("workhorse");
-		expect(child.modelId).toBe("Ministral-3-3B-Instruct-2512");
+		expect(child.role).toBe("tooling");
+		expect(child.modelId).toBe("Qwen3.5-0.8B");
 		expect(stack.depth).toBe(0);
+
+		const built = runDepthFirstSubtask(stack, {
+			description: "build the chess page",
+			summary: "parent summary only",
+			resolved,
+		});
+		expect(built.role).toBe("planning");
+		expect(built.modelId).toBe("Ministral-3-8B-Reasoning-2512");
 
 		const dive = (n: number): void => {
 			runDepthFirstSubtask(stack, {

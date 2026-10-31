@@ -3,11 +3,15 @@
  * Spawn is injected so CI never starts a real server.
  */
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { localContextWindow } from "./context-budget.ts";
+import { lfmChatTemplatePath } from "./lfm-chat-template.ts";
+import { ensureMlxChatTemplate, mlxServerArgs, mlxServerBin, preferMlx, useMlx } from "./mlx-backend.ts";
 import type { ResolvedRuntime } from "./resolve.ts";
+import { toolDialect } from "./tool-dialect.ts";
 import { isLocalServerRole, type LocalServerRole } from "./types.ts";
 
 /** Prefer `<dir>/<id>.gguf`, then `<dir>/<id>`. Otherwise the id is passed through. */
@@ -166,34 +170,134 @@ function openLlamaServerLog(): number | undefined {
 	}
 }
 
+const LOCAL_SERVER_READY_MS = 180_000;
+
+export interface LocalServerProbe {
+	status: number;
+	body: string;
+}
+
+function syncSleep(ms: number): void {
+	Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function curlProbe(kind: "health" | "mlx", port: number): LocalServerProbe {
+	const args = ["-sS", "-m", kind === "mlx" ? "120" : "2", "-w", "\n%{http_code}"];
+	if (kind === "mlx") {
+		args.push(
+			"-H",
+			"content-type: application/json",
+			"-d",
+			JSON.stringify({
+				model: "default_model",
+				max_tokens: 1,
+				temperature: 0,
+				messages: [{ role: "user", content: "." }],
+			}),
+		);
+	}
+	args.push(kind === "health" ? `http://127.0.0.1:${port}/health` : `http://127.0.0.1:${port}/v1/chat/completions`);
+	const result = spawnSync("curl", args, { encoding: "utf8" });
+	if (result.error || result.status !== 0) {
+		return { status: 0, body: (result.stderr || result.error?.message || "unreachable").trim() };
+	}
+	const text = result.stdout ?? "";
+	const split = text.lastIndexOf("\n");
+	const status = Number(text.slice(split + 1).trim());
+	return { status: Number.isFinite(status) ? status : 0, body: text.slice(0, Math.max(0, split)) };
+}
+
+/**
+ * llama.cpp answers 503 "Loading model" until the GGUF is in memory.
+ * MLX answers /health before the snapshot is loaded, so the probe is a one-token completion.
+ */
+export function waitForLocalServer(
+	request: { port: number; modelId: string },
+	deps?: {
+		probe?: (kind: "health" | "mlx", port: number) => LocalServerProbe;
+		sleep?: (ms: number) => void;
+		now?: () => number;
+		timeoutMs?: number;
+	},
+): void {
+	const mlx = useMlx(request.modelId);
+	const probe = deps?.probe ?? curlProbe;
+	const sleep = deps?.sleep ?? syncSleep;
+	const now = deps?.now ?? Date.now;
+	const deadline = now() + (deps?.timeoutMs ?? LOCAL_SERVER_READY_MS);
+	let last = "no response";
+	let clock = now();
+	while (clock <= deadline) {
+		let result: LocalServerProbe;
+		try {
+			result = probe(mlx ? "mlx" : "health", request.port);
+		} catch (error) {
+			last = error instanceof Error ? error.message : String(error);
+			sleep(400);
+			clock = now();
+			continue;
+		}
+		if (result.status === 200) {
+			return;
+		}
+		last = `${result.status} ${result.body.slice(0, 120)}`.trim();
+		if (mlx && result.status === 404) {
+			throw new Error(`Local model ${request.modelId} rejected the request (${last}).`);
+		}
+		sleep(400);
+		clock = now();
+	}
+	throw new Error(`Local model ${request.modelId} did not finish loading (${last}).`);
+}
+
+/** Leave room in the reply for the tool call. An open reasoning budget fills max_tokens and never calls the tool. */
+const REASONING_BUDGET = new Map<string, string>([
+	["Ministral-3-8B-Reasoning-2512", "512"],
+	["Qwen3.5-9B", "512"],
+	["LFM2.5-8B-A1B", "512"],
+]);
+
 /** Real server only when TREK_LLAMA_SERVER and TREK_MODELS_DIR are set. Otherwise ensure() throws before spawn. */
+export function llamaServerArgs(request: SpawnRequest): string[] {
+	const args = ["--host", "127.0.0.1", "--port", String(request.port), "--jinja"];
+	if (toolDialect(request.modelId) === "lfm") {
+		args.push("--chat-template-file", lfmChatTemplatePath());
+	}
+	args.push("-m", resolveWeightPath(request.modelId), "-c", String(localContextWindow(request.modelId)));
+	const budget = REASONING_BUDGET.get(request.modelId);
+	if (budget) {
+		args.push("--reasoning-budget", budget);
+	}
+	const ngl = process.env.TREK_LLAMA_NGL?.trim();
+	if (ngl) {
+		args.push("-ngl", ngl);
+	}
+	return args;
+}
+
+/** llama.cpp, or MLX when this Mac has the 4-bit snapshot and mlx_lm.server. */
+export function localServerCommand(request: SpawnRequest): { command: string; args: string[] } {
+	if (useMlx(request.modelId)) {
+		ensureMlxChatTemplate(request.modelId);
+		const command = mlxServerBin();
+		if (!command) {
+			throw new Error("mlx_lm.server is not installed.");
+		}
+		return { command, args: mlxServerArgs(request.modelId, request.port) };
+	}
+	const command = process.env.TREK_LLAMA_SERVER;
+	if (!command) {
+		throw new Error("llama-server binary not found.");
+	}
+	return { command, args: llamaServerArgs(request) };
+}
+
 export function createDefaultLlamaProcessManager(): LlamaProcessManager {
 	return new LlamaProcessManager({
 		spawn: (request) => {
-			const binary = process.env.TREK_LLAMA_SERVER;
-			if (!binary) {
-				throw new Error("llama-server binary not found.");
-			}
-			// --jinja keeps the GGUF chat template, including tool calls. Without it, tool_choice is ignored.
-			const args = [
-				"--host",
-				"127.0.0.1",
-				"--port",
-				String(request.port),
-				"--jinja",
-				"-m",
-				resolveWeightPath(request.modelId),
-			];
-			const ctx = process.env.TREK_LLAMA_CTX?.trim();
-			if (ctx) {
-				args.push("-c", ctx);
-			}
-			const ngl = process.env.TREK_LLAMA_NGL?.trim();
-			if (ngl) {
-				args.push("-ngl", ngl);
-			}
+			const { command, args } = localServerCommand(request);
 			const logFd = openLlamaServerLog();
-			const child = spawn(binary, args, {
+			const child = spawn(command, args, {
 				stdio: logFd === undefined ? "ignore" : ["ignore", "ignore", logFd],
 			});
 			if (logFd !== undefined) {
@@ -204,13 +308,24 @@ export function createDefaultLlamaProcessManager(): LlamaProcessManager {
 			}
 			// The server must not keep `trek --print` alive after the prompt returns.
 			child.unref();
+			try {
+				waitForLocalServer({ port: request.port, modelId: request.modelId });
+			} catch (error) {
+				try {
+					child.kill("SIGTERM");
+				} catch {
+					// The process is already gone.
+				}
+				throw error;
+			}
 			return { pid: child.pid };
 		},
 		allocatePort: createPortAllocator(portStart()),
 		binaryAvailable: () => {
 			const binary = process.env.TREK_LLAMA_SERVER;
-			return typeof binary === "string" && binary.length > 0 && existsSync(binary);
+			const llama = typeof binary === "string" && binary.length > 0 && existsSync(binary);
+			return llama || (preferMlx() && Boolean(mlxServerBin()));
 		},
-		weightsAvailable: (_role, modelId) => weightFileExists(modelId),
+		weightsAvailable: (_role, modelId) => weightFileExists(modelId) || useMlx(modelId),
 	});
 }

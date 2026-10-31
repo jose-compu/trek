@@ -29,6 +29,7 @@ import type { AssistantMessage, ImageContent, Message, Model, TextContent } from
 import {
 	clampThinkingLevel,
 	cleanupSessionResources,
+	completeSimple,
 	getSupportedThinkingLevels,
 	isContextOverflow,
 	modelsAreEqual,
@@ -141,7 +142,7 @@ import {
 	parseHonestyReport,
 	stripHonestyFooter,
 } from "./honesty/index.ts";
-import { createEmbedder, type MemoryHit, MemoryManager } from "./memory/index.ts";
+import { createEmbedder, createReranker, type MemoryHit, MemoryManager } from "./memory/index.ts";
 import { type BashExecutionMessage, type CustomMessage, stripIdempotentPrefix } from "./messages.ts";
 import type { ModelRegistry } from "./model-registry.ts";
 import { hashContent, type LoadedPrologue, loadPrologue } from "./prologue.ts";
@@ -203,18 +204,38 @@ import {
 } from "./reproducibility/index.ts";
 import type { ResourceExtensionPaths, ResourceLoader } from "./resource-loader.ts";
 import {
+	applyPlanBlock,
+	contextBudget,
 	createDefaultLlamaProcessManager,
+	extractPlanBody,
+	fitCompactionSettings,
+	formatEscalateCard,
+	type LadderRole,
 	type LlamaProcessManager,
+	LMSTUDIO_PROVIDER,
 	LOCAL_LLAMA_PROVIDER,
 	LOCAL_SUITE_WORK_SECTION,
 	latestUserPrompt,
+	lmStudioChatModel,
 	loadRuntimeConfig,
 	localLlamaChatModel,
 	NO_PROMOTION_MODEL,
+	parseEscalateSignal,
+	planningBriefPrompt,
+	planningReplanEnabled,
+	planningReplanPrompt,
 	promotionRole,
 	type ResolvedRuntime,
 	resolveRuntime,
+	SMALL_CONTEXT_TOOLS,
 	selectSessionRole,
+	selectThinkRole,
+	sessionRoleForModel,
+	shouldReplanAfterTool,
+	smallContextPrompt,
+	startLadderRole,
+	stripEscalateSignal,
+	toolResultSnippet,
 } from "./runtime/index.ts";
 import {
 	type AntiPattern,
@@ -313,7 +334,9 @@ export type AgentSessionEvent =
 	| { type: "prompt_meta"; promptNumber: number; promptId: string; preview?: string }
 	| { type: "workflow_check"; text: string }
 	| { type: "anti_pattern"; text: string }
-	| { type: "lesson_stored"; text: string };
+	| { type: "lesson_stored"; text: string }
+	/** Discreet one-line ladder climb (Tooling → … → Frontier). */
+	| { type: "hierarchy_escalate"; text: string; from: string; to: string };
 
 /** Listener function for agent session events */
 export type AgentSessionEventListener = (event: AgentSessionEvent) => void;
@@ -840,6 +863,17 @@ export class AgentSession {
 			if (!isError && !this._dryRunEnabled) {
 				await this._recordTrekVersion(toolCall.name, args);
 			}
+
+			if (isError) {
+				this._toolErrorStreak += 1;
+				if (this._toolErrorStreak >= 2 && !this._pendingElevate) {
+					await this._climbLadder(`tool ${toolCall.name} failed twice`);
+				}
+			} else {
+				this._toolErrorStreak = 0;
+			}
+			this._toolsSincePlan += 1;
+			await this._maybeReplanAfterTool(toolCall.name, result, isError);
 
 			// Post-flight safety + typed output validation (#1/#2, #8): append visible notes.
 			const safetyNotes = this._collectPostFlightNotes(toolCall.name, args, result, isError);
@@ -1898,6 +1932,7 @@ export class AgentSession {
 				this._lastAssistantMessage = event.message;
 
 				const assistantMsg = event.message as AssistantMessage;
+				void this._noteWorkhorseElevation(assistantMsg);
 				this._appendAuditStep(assistantMsg);
 				if (assistantMsg.stopReason !== "error") {
 					this._overflowRecoveryAttempted = false;
@@ -2232,9 +2267,13 @@ export class AgentSession {
 	 * Changes take effect on the next agent turn.
 	 */
 	setActiveToolsByName(toolNames: string[]): void {
+		const allowed = this._usesSmallContext()
+			? toolNames.filter((name) => (SMALL_CONTEXT_TOOLS as readonly string[]).includes(name))
+			: toolNames;
+		const names = this._usesSmallContext() && allowed.length === 0 ? [...SMALL_CONTEXT_TOOLS] : allowed;
 		const tools: AgentTool[] = [];
 		const validToolNames: string[] = [];
-		for (const name of toolNames) {
+		for (const name of names) {
 			const tool = this._toolRegistry.get(name);
 			if (tool) {
 				tools.push(tool);
@@ -2346,6 +2385,7 @@ export class AgentSession {
 				sessionDir: this.sessionManager.getSessionDir() || undefined,
 				getSettings: () => this.settingsManager.getMemorySettings(),
 				embedder: createEmbedder(),
+				reranker: createReranker(),
 			});
 		}
 		return this._memory;
@@ -2505,7 +2545,20 @@ export class AgentSession {
 		return Array.from(unique);
 	}
 
+	private _usesSmallContext(): boolean {
+		const window = this.model?.contextWindow ?? 0;
+		return this.model?.provider === LOCAL_LLAMA_PROVIDER && contextBudget(window).small;
+	}
+
+	private _fittedCompactionSettings() {
+		const settings = this.settingsManager.getCompactionSettings();
+		return fitCompactionSettings(settings, this.model?.contextWindow ?? 0);
+	}
+
 	private _rebuildSystemPrompt(toolNames: string[]): string {
+		if (this._usesSmallContext()) {
+			return smallContextPrompt(this._cwd);
+		}
 		const validToolNames = toolNames.filter((name) => this._toolRegistry.has(name));
 		const toolSnippets: Record<string, string> = {};
 		const promptGuidelines: string[] = [];
@@ -2632,6 +2685,18 @@ export class AgentSession {
 	private _llama?: LlamaProcessManager;
 	/** Session model before a local role took the chat call. Not written to settings. */
 	private _apiSessionModel?: Model<any>;
+	/** Last chat role on the ladder (Tooling → Workhorse → Planning → Frontier). */
+	private _lastHierarchyRole?: LadderRole;
+	/** Active ladder floor for this prompt. Starts at Tooling. */
+	private _ladderRole?: LadderRole;
+	/** Tools since the last Planning brief; drives optional mid-turn replan. */
+	private _toolsSincePlan = 0;
+	/** True when this turn attached a Planning brief (replan is allowed). */
+	private _planningBriefActive = false;
+	/** Pending climb; consumed by the next brief / bind. */
+	private _pendingElevate?: { tier: LadderRole; why: string };
+	/** Consecutive tool errors in this prompt; two failures climb one ladder step. */
+	private _toolErrorStreak = 0;
 	private _apiThinkingLevel?: ThinkingLevel;
 
 	private _llamaManager(): LlamaProcessManager {
@@ -2657,21 +2722,248 @@ export class AgentSession {
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
-		const selection = selectSessionRole({ text, resolved });
-		if (selection.source !== "local") {
+		const previousRole = this._lastHierarchyRole ?? sessionRoleForModel(resolved, this.model);
+		const floor = this._pendingElevate?.tier ?? this._ladderRole ?? startLadderRole(resolved);
+		this._ladderRole = floor;
+		const selection = selectSessionRole({
+			text,
+			resolved,
+			previousRole,
+			ladderRole: floor,
+			elevateTo: this._pendingElevate?.tier,
+			overrides: config.routing?.components,
+		});
+		const think = selectThinkRole({
+			text,
+			resolved,
+			previousRole,
+			elevateTo: this._pendingElevate?.tier,
+			overrides: config.routing?.components,
+		});
+		this._lastHierarchyRole = selection.role;
+		if (selection.source === "api") {
 			this._restoreApiSessionModel();
 			return;
 		}
 		this._rememberApiSessionModel();
-		const registered = this._localRoleModel(selection.role, selection.modelId, resolved);
+		const registered =
+			selection.source === "lmstudio"
+				? this._lmStudioRoleModel(selection.modelId, resolved.roles[selection.role]?.baseUrl)
+				: this._localRoleModel(selection.role, selection.modelId, resolved);
 		const previous = this.model;
 		this.agent.state.model = registered;
 		if (!selection.thinking) {
 			this.agent.state.thinkingLevel = "off";
+		} else if (selection.thinking && this.agent.state.thinkingLevel === "off") {
+			this.agent.state.thinkingLevel = "medium";
 		}
 		if (!modelsAreEqual(previous, registered)) {
 			this.sessionManager.appendModelChange(registered.provider, registered.id);
 			await this._emitModelSelect(registered, previous, "set");
+		}
+		void think;
+	}
+
+	private async _attachPlanningBrief(text: string): Promise<void> {
+		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			return;
+		}
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const resolved = resolveRuntime(config);
+		const elevate = this._pendingElevate;
+		const think = selectThinkRole({
+			text,
+			resolved,
+			previousRole: this._lastHierarchyRole ?? sessionRoleForModel(resolved, this.model),
+			elevateTo: elevate?.tier,
+			overrides: config.routing?.components,
+		});
+		if (!think) {
+			this._planningBriefActive = false;
+			return;
+		}
+		const model = this._thinkSideModel(think, resolved);
+		if (!model) {
+			return;
+		}
+		try {
+			const brief = await this._sideCall(model, planningBriefPrompt(text, elevate?.why));
+			const trimmed = brief.trim();
+			if (!trimmed) {
+				return;
+			}
+			this.agent.state.systemPrompt = applyPlanBlock(
+				this.agent.state.systemPrompt,
+				think.role,
+				elevate ? `elevated: ${elevate.why}` : think.reason,
+				trimmed,
+			);
+			this._planningBriefActive = true;
+			this._toolsSincePlan = 0;
+		} catch (error) {
+			debugLog("runtime", "planning brief skipped", {
+				role: think.role,
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
+	}
+
+	private _thinkSideModel(
+		think: { role: LadderRole; source: string; modelId: string },
+		resolved: ResolvedRuntime,
+	): Model<any> | undefined {
+		if (think.source === "api") {
+			this._rememberApiSessionModel();
+			return this._apiSessionModel ?? this.model;
+		}
+		if (think.source === "lmstudio") {
+			return this._lmStudioRoleModel(think.modelId, resolved.roles[think.role]?.baseUrl);
+		}
+		const role = think.role === "frontier" ? "planning" : think.role;
+		return this._localRoleModel(role, think.modelId, resolved);
+	}
+
+	/** Climb one step (or to a named higher tier) and show a discreet card. */
+	private async _climbLadder(why: string, requested?: LadderRole | "next"): Promise<LadderRole | undefined> {
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const resolved = resolveRuntime(config);
+		const from = this._ladderRole ?? this._lastHierarchyRole ?? startLadderRole(resolved);
+		const signalText =
+			requested && requested !== "next"
+				? `{"escalate":"${requested}","why":${JSON.stringify(why)}}`
+				: `{"escalate":"next","why":${JSON.stringify(why)}}`;
+		const signal = parseEscalateSignal(signalText, from, resolved);
+		if (!signal) {
+			return undefined;
+		}
+		this._emitEscalateCard(from, signal.tier, signal.why);
+		this._pendingElevate = { tier: signal.tier, why: signal.why };
+		this._ladderRole = signal.tier;
+		this._lastHierarchyRole = signal.tier;
+		this._toolErrorStreak = 0;
+		return signal.tier;
+	}
+
+	private _emitEscalateCard(from: LadderRole, to: LadderRole, why?: string): void {
+		this._emit({
+			type: "hierarchy_escalate",
+			text: formatEscalateCard(from, to, why),
+			from,
+			to,
+		});
+	}
+
+	private async _noteWorkhorseElevation(message: AssistantMessage): Promise<void> {
+		const text = message.content
+			.filter((part): part is TextContent => part.type === "text" && typeof part.text === "string")
+			.map((part) => part.text)
+			.join("\n");
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const resolved = resolveRuntime(config);
+		const from = this._ladderRole ?? this._lastHierarchyRole ?? startLadderRole(resolved);
+		const signal = parseEscalateSignal(text, from, resolved);
+		if (!signal) {
+			return;
+		}
+		this._emitEscalateCard(from, signal.tier, signal.why);
+		this._pendingElevate = { tier: signal.tier, why: signal.why };
+		this._ladderRole = signal.tier;
+		const cleaned = stripEscalateSignal(text);
+		if (cleaned !== text.trim()) {
+			const nextContent = message.content.map((part) =>
+				part.type === "text" && typeof part.text === "string"
+					? { ...part, text: stripEscalateSignal(part.text) }
+					: part,
+			);
+			this._replaceMessageInPlace(message, { ...message, content: nextContent } as AgentMessage);
+		}
+		debugLog("runtime", "ladder elevated", { from, to: signal.tier, why: signal.why, explicit: signal.explicit });
+		if (signal.tier === "planning" || signal.tier === "frontier") {
+			await this._attachPlanningBrief(this._lastPromptTask || text);
+		}
+		await this._bindLocalCompletion(this._lastPromptTask || text);
+		this._pendingElevate = undefined;
+	}
+
+	private async _maybeReplanAfterTool(
+		toolName: string,
+		result: { content: Array<{ type: string; text?: string }> },
+		isError: boolean,
+	): Promise<void> {
+		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			return;
+		}
+		const elevated = Boolean(this._pendingElevate);
+		if (elevated) {
+			await this._bindLocalCompletion(this._lastPromptTask);
+			if (this._pendingElevate?.tier === "planning" || this._pendingElevate?.tier === "frontier") {
+				await this._attachPlanningBrief(this._lastPromptTask);
+			}
+			this._pendingElevate = undefined;
+		}
+		if (
+			!shouldReplanAfterTool({
+				toolsSincePlan: this._toolsSincePlan,
+				isError,
+				elevated: false,
+				planActive: this._planningBriefActive,
+				enabled: planningReplanEnabled(),
+			})
+		) {
+			return;
+		}
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const resolved = resolveRuntime(config);
+		const elevate = this._pendingElevate;
+		const floor = elevate?.tier ?? this._ladderRole;
+		if (floor !== "planning" && floor !== "frontier" && !this._planningBriefActive) {
+			return;
+		}
+		const think = selectThinkRole({
+			text: this._lastPromptTask,
+			resolved,
+			previousRole: this._lastHierarchyRole ?? sessionRoleForModel(resolved, this.model),
+			elevateTo: floor === "frontier" ? "frontier" : "planning",
+			overrides: config.routing?.components,
+		});
+		if (!think) {
+			return;
+		}
+		const model = this._thinkSideModel(think, resolved);
+		if (!model) {
+			return;
+		}
+		try {
+			const brief = await this._sideCall(
+				model,
+				planningReplanPrompt({
+					task: this._lastPromptTask,
+					priorPlan: extractPlanBody(this.agent.state.systemPrompt),
+					toolName,
+					resultSnippet: toolResultSnippet(result),
+					isError,
+					why: elevate?.why,
+				}),
+			);
+			const trimmed = brief.trim();
+			if (!trimmed) {
+				return;
+			}
+			this.agent.state.systemPrompt = applyPlanBlock(
+				this.agent.state.systemPrompt,
+				think.role,
+				elevate ? `replan elevated: ${elevate.why}` : `replan after ${toolName}`,
+				trimmed,
+			);
+			this._planningBriefActive = true;
+			this._toolsSincePlan = 0;
+			this._pendingElevate = undefined;
+			this._lastHierarchyRole = think.role;
+		} catch (error) {
+			debugLog("runtime", "planning replan skipped", {
+				role: think.role,
+				error: error instanceof Error ? error.message : String(error),
+			});
 		}
 	}
 
@@ -2714,13 +3006,44 @@ export class AgentSession {
 		return registered;
 	}
 
+	private _lmStudioRoleModel(modelId: string, baseUrl?: string): Model<any> {
+		const draft = lmStudioChatModel({ modelId, endpoint: baseUrl });
+		this._modelRegistry.registerProvider(LMSTUDIO_PROVIDER, {
+			baseUrl: draft.baseUrl,
+			apiKey: "lmstudio",
+			api: "openai-completions",
+			models: [
+				{
+					id: draft.id,
+					name: draft.name,
+					api: "openai-completions",
+					baseUrl: draft.baseUrl,
+					reasoning: false,
+					input: ["text"],
+					cost: draft.cost,
+					contextWindow: draft.contextWindow,
+					maxTokens: draft.maxTokens,
+					compat: draft.compat,
+				},
+			],
+		});
+		const registered = this._modelRegistry.find(LMSTUDIO_PROVIDER, draft.id);
+		if (!registered) {
+			throw new Error(`LM Studio model ${draft.name} was not registered.`);
+		}
+		return registered;
+	}
+
 	/** Frontier when assigned, else Planning. CI and faux runs use the session model. */
 	private _promotionModel(): { model: Model<any>; role: string; reason: string } | undefined {
 		if (process.env.TREK_PROMOTION_MODEL === "0") return undefined;
 		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
 		const pick = promotionRole(resolved);
 		if (!pick) return undefined;
-		const api = this.model?.provider === LOCAL_LLAMA_PROVIDER ? this._apiSessionModel : this.model;
+		const api =
+			this.model?.provider === LOCAL_LLAMA_PROVIDER || this.model?.provider === LMSTUDIO_PROVIDER
+				? this._apiSessionModel
+				: this.model;
 		if (pick.assignment.source === "api" || process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
 			return api ? { model: api, role: pick.role, reason: pick.reason } : undefined;
 		}
@@ -2728,18 +3051,31 @@ export class AgentSession {
 		return { model: this._localRoleModel(role, pick.assignment.id, resolved), role: pick.role, reason: pick.reason };
 	}
 
+	/** Side calls must not block the TUI on a slow local server. */
+	private static readonly SIDE_CALL_TIMEOUT_MS = 45_000;
+
+	private _localOpenAiServer(model: Model<any>): boolean {
+		const url = model.baseUrl ?? "";
+		return model.api === "openai-completions" && /127\.0\.0\.1|localhost/.test(url);
+	}
+
 	/** One model call outside the transcript, with no tools. */
 	private async _sideCall(model: Model<any>, prompt: string): Promise<string> {
 		const auth = await this._getCompactionRequestAuth(model);
-		const stream = await this.agent.streamFn(
+		const reply = await completeSimple(
 			model,
 			{
 				systemPrompt: "You are a Trek learning step. Reply with JSON only.",
 				messages: [{ role: "user", content: [{ type: "text", text: prompt }], timestamp: Date.now() }],
 			},
-			{ apiKey: auth.apiKey, headers: auth.headers },
+			{
+				apiKey: auth.apiKey,
+				headers: auth.headers,
+				maxTokens: 512,
+				temperature: 0,
+				signal: AbortSignal.timeout(AgentSession.SIDE_CALL_TIMEOUT_MS),
+			},
 		);
-		const reply = await stream.result();
 		const text = reply.content
 			.filter((part): part is TextContent => part.type === "text")
 			.map((part) => part.text)
@@ -2951,6 +3287,10 @@ export class AgentSession {
 		try {
 			const pick = this._promotionModel();
 			if (!pick) return undefined;
+			// LM Studio and other local OpenAI servers often hang on the promotion side call.
+			if (this._localOpenAiServer(pick.model)) {
+				return undefined;
+			}
 			const ids = candidates.map((hit) => hit.id);
 			const chosen = parsePromotion(
 				await this._sideCall(
@@ -2980,7 +3320,7 @@ export class AgentSession {
 	}
 
 	private _rememberApiSessionModel(): void {
-		if (this.model?.provider === LOCAL_LLAMA_PROVIDER) {
+		if (this.model?.provider === LOCAL_LLAMA_PROVIDER || this.model?.provider === LMSTUDIO_PROVIDER) {
 			return;
 		}
 		this._apiSessionModel = this.model;
@@ -2988,7 +3328,10 @@ export class AgentSession {
 	}
 
 	private _restoreApiSessionModel(): void {
-		if (!this._apiSessionModel || this.model?.provider !== LOCAL_LLAMA_PROVIDER) {
+		if (
+			!this._apiSessionModel ||
+			(this.model?.provider !== LOCAL_LLAMA_PROVIDER && this.model?.provider !== LMSTUDIO_PROVIDER)
+		) {
 			return;
 		}
 		this.agent.state.model = this._apiSessionModel;
@@ -3005,9 +3348,18 @@ export class AgentSession {
 		try {
 			const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 			const resolved = resolveRuntime(config);
+			const text = latestUserPrompt(prior);
 			const selection = selectSessionRole({
-				text: latestUserPrompt(prior),
+				text,
 				resolved,
+				previousRole: sessionRoleForModel(resolved, this.model),
+				overrides: config.routing?.components,
+			});
+			const think = selectThinkRole({
+				text,
+				resolved,
+				previousRole: sessionRoleForModel(resolved, this.model),
+				overrides: config.routing?.components,
 			});
 			if (selection.source === "local") {
 				try {
@@ -3019,7 +3371,9 @@ export class AgentSession {
 					});
 				}
 			}
-			return { role: selection.role, source: selection.source, routeReason: selection.reason };
+			const routeReason = think ? `${think.reason}; then ${selection.reason}` : selection.reason;
+			const source = selection.source === "lmstudio" ? "local" : selection.source;
+			return { role: selection.role, source, routeReason };
 		} catch (error) {
 			debugLog("runtime", "role annotation skipped", {
 				error: error instanceof Error ? error.message : String(error),
@@ -3563,9 +3917,23 @@ export class AgentSession {
 			}
 			this._turnSelection = this._selectTurn(expandedText);
 			this._previousTask = expandedText;
+			this._toolsSincePlan = 0;
+			this._planningBriefActive = false;
+			this._toolErrorStreak = 0;
+			this._ladderRole = undefined;
+			this._pendingElevate = undefined;
 			await this._learnFromCorrection(expandedText);
 			await this._injectMemory(expandedText);
 			this._appendDomainSkills(this._turnSelection);
+			if (this._usesSmallContext()) {
+				this.setActiveToolsByName([...SMALL_CONTEXT_TOOLS]);
+				const budget = contextBudget(this.model?.contextWindow ?? 0);
+				if (this.model && this.model.maxTokens > budget.outputTokens) {
+					this.model.maxTokens = budget.outputTokens;
+				}
+			}
+			await this._attachPlanningBrief(expandedText);
+			await this._bindLocalCompletion(expandedText);
 		} catch (error) {
 			preflightResult?.(false);
 			throw error;
@@ -4134,7 +4502,7 @@ export class AgentSession {
 			const { apiKey, headers } = await this._getCompactionRequestAuth(this.model);
 
 			const pathEntries = this.sessionManager.getBranch();
-			const settings = this.settingsManager.getCompactionSettings();
+			const settings = this._fittedCompactionSettings();
 
 			const preparation = prepareCompaction(pathEntries, settings);
 			if (!preparation) {
@@ -4280,7 +4648,7 @@ export class AgentSession {
 	 * @param skipAbortedCheck If false, include aborted messages (for pre-prompt check). Default: true
 	 */
 	private async _checkCompaction(assistantMessage: AssistantMessage, skipAbortedCheck = true): Promise<boolean> {
-		const settings = this.settingsManager.getCompactionSettings();
+		const settings = this._fittedCompactionSettings();
 		if (!settings.enabled) return false;
 
 		// Skip if message was aborted (user cancelled) - unless skipAbortedCheck is false
@@ -4363,7 +4731,7 @@ export class AgentSession {
 	 * Internal: Run auto-compaction with events.
 	 */
 	private async _runAutoCompaction(reason: "overflow" | "threshold", willRetry: boolean): Promise<boolean> {
-		const settings = this.settingsManager.getCompactionSettings();
+		const settings = this._fittedCompactionSettings();
 
 		this._emit({ type: "compaction_start", reason });
 		this._autoCompactionAbortController = new AbortController();

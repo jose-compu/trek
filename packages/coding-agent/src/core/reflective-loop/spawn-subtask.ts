@@ -5,7 +5,7 @@
 
 import { routeComponent } from "../runtime/component-router.ts";
 import type { ResolvedRuntime } from "../runtime/resolve.ts";
-import type { RoleSelection } from "../runtime/select-role.ts";
+import { classifyTask, type RoleSelection } from "../runtime/select-role.ts";
 import type { SubtaskStack } from "./subtask-stack.ts";
 
 export interface DepthFirstSubtaskInput {
@@ -30,12 +30,12 @@ export function runDepthFirstSubtask(stack: SubtaskStack, input: DepthFirstSubta
 	stack.push({ description: input.description, parentSummary: input.summary });
 	try {
 		input.runChild?.();
+		const classified = classifyTask(input.description);
 		const route = routeComponent({
-			component: "mechanical",
+			component: classified.kind === "deep" || classified.kind === "plan" ? "intend" : classified.component,
 			resolved: input.resolved,
+			complexity: classified.complexity,
 			depth: stack.depth,
-			retries: 0,
-			complexity: 0,
 		});
 		return {
 			depth: stack.depth,

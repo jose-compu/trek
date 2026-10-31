@@ -16,11 +16,13 @@ export type RuntimeRole = (typeof RUNTIME_ROLES)[number];
 export const LOCAL_SERVER_ROLES = ["tooling", "workhorse", "planning", "embedding", "reranker"] as const;
 export type LocalServerRole = (typeof LOCAL_SERVER_ROLES)[number];
 
-/** The three roles a local session actually starts. Embedding and reranker stay registered and are not started. */
+/** Chat processes a local session may start. Ladder: tooling → workhorse → planning. */
 export const SESSION_LOCAL_ROLES = ["tooling", "workhorse", "planning"] as const;
 export type SessionLocalRole = (typeof SESSION_LOCAL_ROLES)[number];
 
-export type RoleSource = "local" | "api";
+export type RoleSource = "local" | "api" | "lmstudio";
+
+export const DEFAULT_LMSTUDIO_BASE_URL = "http://127.0.0.1:1234/v1";
 
 export interface RoleAssignment {
 	source: RoleSource;
@@ -28,6 +30,8 @@ export interface RoleAssignment {
 	provider?: string;
 	thinking: boolean;
 	repo?: string;
+	/** LM Studio or another OpenAI-compatible server. Default is 127.0.0.1:1234/v1. */
+	baseUrl?: string;
 }
 
 export interface HierarchySettings {
@@ -61,6 +65,10 @@ export function isRouteComponent(value: string): value is RouteComponent {
 
 export function isRouteRole(value: string): value is RouteRole {
 	return value === "tooling" || value === "workhorse" || value === "planning" || value === "frontier";
+}
+
+export function isRoleSource(value: string): value is RoleSource {
+	return value === "local" || value === "api" || value === "lmstudio";
 }
 
 export const DEFAULT_QUANT = "q4_k_m";

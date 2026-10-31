@@ -56,6 +56,13 @@ export function requiresHuggingFaceToken(mode: HierarchyMode): boolean {
 	return mode !== "api";
 }
 
+function sessionNeedsLocalWeights(mode: HierarchyMode, roles: Partial<Record<RuntimeRole, RoleAssignment>>): boolean {
+	if (mode === "api") {
+		return false;
+	}
+	return SESSION_LOCAL_ROLES.some((role) => roles[role]?.source === "local");
+}
+
 export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOptions = {}): ResolvedRuntime {
 	const preset = suitePreset(config.hierarchy.suite);
 	const presetRoles: Partial<Record<RuntimeRole, RoleAssignment>> = { ...preset.roles };
@@ -71,6 +78,9 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 	const roles: Partial<Record<RuntimeRole, RoleAssignment>> = {};
 	if (effectiveMode === "api") {
 		roles.frontier = frontierRole(frontier);
+		// Memory embed + rerank stay local even when chat is API-only.
+		roles.embedding = overlay(preset.roles.embedding, config.roles.embedding);
+		roles.reranker = overlay(preset.roles.reranker, config.roles.reranker);
 	} else {
 		for (const [name, assignment] of Object.entries(preset.roles) as [RuntimeRole, RoleAssignment][]) {
 			roles[name] = overlay(assignment, config.roles[name]);
@@ -90,10 +100,10 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 		effectiveMode,
 		suite: config.hierarchy.suite,
 		quant: config.hierarchy.quant,
-		rerank: preset.rerank,
+		rerank: true,
 		presetRoles,
 		roles,
-		requiresHuggingFaceToken: requiresHuggingFaceToken(effectiveMode),
+		requiresHuggingFaceToken: sessionNeedsLocalWeights(effectiveMode, roles),
 		frontierAvailable,
 	};
 }

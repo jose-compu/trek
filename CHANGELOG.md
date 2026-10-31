@@ -1,10 +1,18 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.15.1`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.16.0`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.16.0] - 2026-10-31
+
+### Added
+
+- Console: `/hierarchy`, Terminal.app-safe chords, bash recipes, model benchmark report.
+- Local / hybrid ladder Tooling → Workhorse → Planning → Frontier with escalate and a dim elevation line. Decision (LFM d1) is documented; the Index loader follows.
+- The README banner is the 0.16 Console image.
 
 ## [0.15.1] - 2026-10-31
 

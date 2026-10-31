@@ -9,9 +9,11 @@ import { parse, stringify } from "yaml";
 import { CONFIG_DIR_NAME } from "../../config.ts";
 import {
 	assertPublicModelId,
+	DEFAULT_LMSTUDIO_BASE_URL,
 	defaultRuntimeConfig,
 	type HierarchySettings,
 	isHierarchyMode,
+	isRoleSource,
 	isRouteComponent,
 	isRouteRole,
 	isRuntimeRole,
@@ -108,10 +110,14 @@ function parseRouting(value: unknown, path: string): RuntimeConfig["routing"] {
 		if (!isRouteComponent(name)) {
 			throw new Error(`${path}: unknown routing component ${name}.`);
 		}
-		if (typeof role !== "string" || !isRouteRole(role)) {
+		if (typeof role !== "string") {
 			throw new Error(`${path}: routing.components.${name} must be a chat role.`);
 		}
-		components[name] = role;
+		const mapped = role === "tooling" ? "workhorse" : role;
+		if (!isRouteRole(mapped)) {
+			throw new Error(`${path}: routing.components.${name} must be a chat role.`);
+		}
+		components[name] = mapped;
 	}
 	return { components };
 }
@@ -162,8 +168,8 @@ function parseRole(value: unknown, label: string): RoleAssignment {
 		throw new Error(`${label} must be a mapping.`);
 	}
 	const record = value as Record<string, unknown>;
-	if (record.source !== "local" && record.source !== "api") {
-		throw new Error(`${label}: source must be local or api.`);
+	if (typeof record.source !== "string" || !isRoleSource(record.source)) {
+		throw new Error(`${label}: source must be local, api, or lmstudio.`);
 	}
 	if (typeof record.id !== "string") {
 		throw new Error(`${label}: id must be a string.`);
@@ -188,6 +194,14 @@ function parseRole(value: unknown, label: string): RoleAssignment {
 			throw new Error(`${label}: repo must be a string.`);
 		}
 		role.repo = record.repo;
+	}
+	if (record.baseUrl !== undefined) {
+		if (typeof record.baseUrl !== "string" || !record.baseUrl.trim()) {
+			throw new Error(`${label}: baseUrl must be a string.`);
+		}
+		role.baseUrl = record.baseUrl;
+	} else if (role.source === "lmstudio") {
+		role.baseUrl = DEFAULT_LMSTUDIO_BASE_URL;
 	}
 	return role;
 }
