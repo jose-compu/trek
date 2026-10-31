@@ -37,7 +37,16 @@
     gap: 18px;
     padding: 8px 8px 4px;
   }
-  .lockup { height: 54px; width: auto; }
+  .lockup {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 32px;
+    font-weight: 750;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+  }
+  .lockup .emoji { font-size: 40px; line-height: 1; }
   h1 {
     font-size: 42px;
     line-height: 0.95;
@@ -148,7 +157,7 @@
 <body>
   <div class="sheet">
     <header>
-      <img class="lockup" src="brand/logos/lockup-light-violet.png" alt="Trek Agent" />
+      <div class="lockup"><span class="emoji" aria-hidden="true">🏔️</span> Trek Agent</div>
       <h1>Cheatsheet<span>The session, the domain, the lesson.</span></h1>
       <div class="tagline">Powerful. Precise. Honest.</div>
     </header>
