@@ -4,6 +4,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Added
+
+- The bash tool suggests grep, sed, awk, rg, find, and jq recipes. They do not delete files, call a model, or use the network.
+
 ## [0.15.1] - 2026-10-31
 
 ### Fixed
