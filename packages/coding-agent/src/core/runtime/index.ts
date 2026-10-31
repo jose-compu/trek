@@ -7,13 +7,35 @@ export {
 	writeBenchmarkJson,
 } from "./benchmark.ts";
 export { type ComponentRouteInput, routeComponent } from "./component-router.ts";
+export {
+	type CompactionFitSettings,
+	type ContextBudget,
+	contextBudget,
+	fitCompactionSettings,
+	SMALL_CONTEXT_TOOLS,
+	SMALL_CONTEXT_WINDOW,
+	smallContextPrompt,
+} from "./context-budget.ts";
 export { LOCAL_LLAMA_PROVIDER, LOCAL_LLAMA_TIMEOUT_MS, localLlamaChatModel } from "./local-model.ts";
 export {
 	LOCAL_SUITE_WORK_SECTION,
 	LOCAL_WORK_TOOL_NUDGE,
+	liftLocalToolText,
 	localSuiteToolChoice,
 	nudgeLocalWorkMessages,
 } from "./local-work.ts";
+export {
+	downloadMlxWeight,
+	type MissingMlxWeight,
+	MLX_SOURCES,
+	missingMlxQuestion,
+	missingMlxWeights,
+	mlxServerArgs,
+	mlxWeightExists,
+	offerMissingMlx,
+	preferMlx,
+	useMlx,
+} from "./mlx-backend.ts";
 export {
 	formatPerformance,
 	HIERARCHY_PROBES,
@@ -30,9 +52,12 @@ export {
 	LlamaProcessManager,
 	type LlamaProcessManagerOptions,
 	type LlamaServerHandle,
+	llamaServerArgs,
 	llamaServerLogPath,
+	localServerCommand,
 	resolveWeightPath,
 	type SpawnRequest,
+	waitForLocalServer,
 	weightFileExists,
 } from "./process-manager.ts";
 export { NO_PROMOTION_MODEL, type PromotionRole, promotionRole } from "./promotion-model.ts";
@@ -60,6 +85,7 @@ export {
 	latestUserPrompt,
 	type RoleSelection,
 	selectSessionRole,
+	sessionRoleForModel,
 } from "./select-role.ts";
 export {
 	apiShortTraceFixture,
@@ -103,3 +129,13 @@ export {
 	SUITE_IDS,
 	type SuiteId,
 } from "./types.ts";
+export {
+	downloadWeight,
+	type MissingWeight,
+	missingLocalWeights,
+	missingWeightQuestion,
+	modelsDir,
+	offerMissingWeights,
+	WEIGHT_SOURCES,
+	type WeightSource,
+} from "./weight-download.ts";

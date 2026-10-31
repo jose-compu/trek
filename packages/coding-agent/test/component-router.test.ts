@@ -32,7 +32,7 @@ describe("component router", () => {
 		}
 	});
 
-	it("names the Tooling model on a tool-selection step and stores the reason", () => {
+	it("names the Work-horse on a tool-selection step and stores the reason", () => {
 		const resolved = localResolved();
 		const route = routeComponent({
 			component: "toolIntent",
@@ -41,9 +41,9 @@ describe("component router", () => {
 			retries: 0,
 			depth: 1,
 		});
-		expect(route.role).toBe("tooling");
-		expect(route.modelId).toBe("Qwen3.5-0.8B");
-		expect(route.reason).toMatch(/toolIntent uses tooling/);
+		expect(route.role).toBe("workhorse");
+		expect(route.modelId).toBe("Ministral-3-3B-Instruct-2512");
+		expect(route.reason).toMatch(/toolIntent uses workhorse/);
 
 		const assistant = fauxAssistantMessage("write the file");
 		assistant.model = route.modelId;
@@ -60,8 +60,8 @@ describe("component router", () => {
 			clock: () => new Date("2026-10-27T00:00:00.000Z"),
 		});
 		expect(isValidAuditStep(record)).toBe(true);
-		expect(record.model).toBe("Qwen3.5-0.8B");
-		expect(record.role).toBe("tooling");
+		expect(record.model).toBe("Ministral-3-3B-Instruct-2512");
+		expect(record.role).toBe("workhorse");
 		expect(record.routeReason).toBe(route.reason);
 	});
 
@@ -71,8 +71,8 @@ describe("component router", () => {
 		const retry = routeComponent({ component: "mechanical", resolved, retries: 2, depth: 1 });
 		expect(first.role).toBe("workhorse");
 		expect(first.modelId).toBe("Ministral-3-3B-Instruct-2512");
-		expect(retry.role).toBe("tooling");
-		expect(retry.modelId).toBe("Qwen3.5-0.8B");
+		expect(retry.role).toBe("planning");
+		expect(retry.modelId).toBe("Ministral-3-8B-Reasoning-2512");
 		expect(retry.reason).toMatch(/next tier after workhorse/);
 	});
 

@@ -32,6 +32,14 @@ import type { ModelRegistry } from "./core/model-registry.ts";
 import { resolveCliModel, resolveModelScope, type ScopedModel } from "./core/model-resolver.ts";
 import { restoreStdout, takeOverStdout } from "./core/output-guard.ts";
 import { formatDeterminismWarning } from "./core/reproducibility/index.ts";
+import {
+	downloadMlxWeight,
+	downloadWeight,
+	loadRuntimeConfig,
+	offerMissingMlx,
+	offerMissingWeights,
+	resolveRuntime,
+} from "./core/runtime/index.ts";
 import type { CreateAgentSessionOptions } from "./core/sdk.ts";
 import {
 	formatMissingSessionCwdPrompt,
@@ -930,6 +938,27 @@ export async function main(args: string[], options?: MainOptions) {
 	}
 	if (parsed.sandbox) {
 		session.setSandboxBash(true);
+	}
+
+	if (process.env.PI_NO_LOCAL_LLM !== "1") {
+		const runtimeConfig = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: sessionManager.getCwd() });
+		try {
+			await offerMissingWeights({
+				resolved: resolveRuntime(runtimeConfig),
+				confirm: promptConfirm,
+				download: downloadWeight,
+				interactive: Boolean(process.stdin.isTTY),
+			});
+			await offerMissingMlx({
+				resolved: resolveRuntime(runtimeConfig),
+				confirm: promptConfirm,
+				download: (item) => downloadMlxWeight(item),
+				interactive: Boolean(process.stdin.isTTY),
+			});
+		} catch (error) {
+			console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+			process.exit(1);
+		}
 	}
 
 	try {

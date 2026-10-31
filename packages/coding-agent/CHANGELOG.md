@@ -9,6 +9,13 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 - `/hierarchy` sets mode, suite, and one role in `~/.trek/models.yaml`. Frontier stays on the API. The next session reads the file. This command does not download weights or start llama.cpp.
 - `trek models benchmark` writes `trek-benchmark.json` and prints tokens per second, tool-call latency, and memory when a probe measures weights that are already on disk. Missing weights stay skipped. The command does not download GGUF files or start llama-server.
 - The bash tool suggests grep, sed, awk, rg, find, and jq recipes. They do not delete files, call a model, or use the network.
+- Before a local session starts, Trek lists chat weights that are not on disk and downloads them only after a yes.
+- A local model whose window is under 4096 tokens uses a short prompt, only read, write, edit, and bash, and compacts against that window. The reply reserve stays inside the window.
+- LFM2.5 chat roles use an 8192-token floor when `TREK_LLAMA_CTX` is smaller. Compaction reserve and the kept tail stay inside that window.
+- On this Mac the LFM planning model uses the MLX 4-bit snapshot. The smaller LFM roles stay on llama.cpp, because MLX does not force a tool call and those models then describe the call instead of making it.
+- A local turn waits until the server has finished loading. The MLX planning request names the snapshot directory, not the GGUF file.
+- A build, a game, or a follow-up to one stays on Planning. A typo, rename, or format stays on the workhorse. The tooling model is not the session model. A reasoning model keeps a 512-token thinking budget so the tool call still fits. A tool call written as JSON in the reply, including a list after a narration, is run.
+- Lesson promotion skips an extra side call on a local OpenAI server so the TUI does not sit on Working. Side calls use a 45s cap. OpenAI streams that end without finish_reason but with text still complete.
 
 ### Changed
 

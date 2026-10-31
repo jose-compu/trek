@@ -4,6 +4,8 @@
  */
 
 import type { Model } from "@trek/ai";
+import { contextBudget, localContextWindow } from "./context-budget.ts";
+import { mlxModelDir, useMlx } from "./mlx-backend.ts";
 import { resolveWeightPath } from "./process-manager.ts";
 
 export const LOCAL_LLAMA_PROVIDER = "local";
@@ -15,10 +17,11 @@ export const LOCAL_LLAMA_PROVIDER = "local";
 export const LOCAL_LLAMA_TIMEOUT_MS = 120_000;
 
 export function localLlamaChatModel(input: { modelId: string; endpoint: string }): Model<"openai-completions"> {
-	const ctx = Number(process.env.TREK_LLAMA_CTX);
-	const contextWindow = Number.isFinite(ctx) && ctx > 0 ? ctx : 2048;
+	const contextWindow = localContextWindow(input.modelId);
+	const budget = contextBudget(contextWindow);
 	return {
-		id: resolveWeightPath(input.modelId),
+		// MLX loads the snapshot directory. The GGUF path is not a model there and comes back 404.
+		id: useMlx(input.modelId) ? mlxModelDir(input.modelId) : resolveWeightPath(input.modelId),
 		name: input.modelId,
 		api: "openai-completions",
 		provider: LOCAL_LLAMA_PROVIDER,
@@ -27,7 +30,7 @@ export function localLlamaChatModel(input: { modelId: string; endpoint: string }
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow,
-		maxTokens: Math.min(4096, contextWindow),
+		maxTokens: budget.small ? budget.outputTokens : Math.min(4096, contextWindow),
 		compat: {
 			supportsStore: false,
 			supportsDeveloperRole: false,
