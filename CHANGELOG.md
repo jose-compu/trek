@@ -12,7 +12,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 - Console: `/hierarchy`, Terminal.app-safe chords, bash recipes, model benchmark report.
 - Local / hybrid ladder Tooling → Workhorse → Planning → Frontier with escalate and a dim elevation line. Decision (LFM d1) is documented; the Index loader follows.
-- The README banner is the 0.16 Console image.
+- The README banner is the 0.16 Console image with the 🏔️ mark.
 
 ## [0.15.1] - 2026-10-31
 
