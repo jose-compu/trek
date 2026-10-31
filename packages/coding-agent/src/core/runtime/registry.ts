@@ -203,6 +203,9 @@ export function withHierarchy(
 }
 
 export function withRoleOverride(config: RuntimeConfig, role: RuntimeRole, assignment: RoleAssignment): RuntimeConfig {
+	if (role === "frontier" && assignment.source === "local") {
+		throw new Error("Frontier stays on the API.");
+	}
 	assertPublicModelId(assignment.id);
 	return {
 		hierarchy: config.hierarchy,
