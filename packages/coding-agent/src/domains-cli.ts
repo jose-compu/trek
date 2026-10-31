@@ -6,9 +6,12 @@ import { resolve } from "node:path";
 import chalk from "chalk";
 import { APP_NAME } from "./config.ts";
 import { addDomain, disableDomain, enableDomain, loadDomainCatalog } from "./core/domains/catalog.ts";
+import { formatLessonPattern, lessonPatternFor } from "./core/domains/lesson-pattern.ts";
+import { runPatternCommand } from "./core/domains/pattern-command.ts";
 import { runArchonWorkflow } from "./core/domains/run.ts";
 import { overrideSelection } from "./core/domains/select.ts";
 import { formatDomainList, runDomainSessionCommand } from "./core/domains/session-command.ts";
+import { dismissLesson, formatLessonsTable, loadLessonRecord } from "./core/reflective-loop/crystallize.ts";
 
 export async function handleDomainsCommand(args: string[]): Promise<boolean> {
 	if (args[0] !== "domains") {
@@ -35,6 +38,17 @@ export async function handleDomainsCommand(args: string[]): Promise<boolean> {
 			requireId(args[2], "domains disable <id>");
 			disableDomain(cwd, args[2]);
 			printDomains(cwd);
+			return true;
+		}
+		if (sub === "lessons") {
+			requireId(args[2], "domains lessons <id>");
+			const pattern = lessonPatternFor(cwd, args[2]);
+			if (!pattern) throw new Error(`no lesson pattern for ${args[2]}`);
+			console.log(formatLessonPattern(pattern));
+			return true;
+		}
+		if (sub === "patterns") {
+			console.log(runPatternCommand(cwd, args.slice(2).join(" ")));
 			return true;
 		}
 		if (sub === "add") {
@@ -120,13 +134,71 @@ function requireId(id: string | undefined, usage: string): asserts id is string 
 	}
 }
 
+export async function handleLessonsCommand(args: string[]): Promise<boolean> {
+	if (args[0] !== "lessons") return false;
+	const sub = args[1] ?? "list";
+	const cwd = process.cwd();
+	try {
+		if (sub === "--help" || sub === "-h") {
+			printLessonsHelp();
+			return true;
+		}
+		if (sub === "list") {
+			console.log(formatLessonsTable(cwd, args[2]));
+			return true;
+		}
+		if (sub === "show") {
+			requireId(args[2], "lessons show <id>");
+			const lesson = loadLessonRecord(cwd, args[2]);
+			if (!lesson) throw new Error(`unknown lesson ${args[2]}`);
+			console.log(JSON.stringify(lesson, null, "\t"));
+			return true;
+		}
+		if (sub === "dismiss") {
+			requireId(args[2], "lessons dismiss <id>");
+			console.log(dismissLesson(cwd, args[2]));
+			return true;
+		}
+	} catch (error) {
+		console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+		process.exitCode = 1;
+		return true;
+	}
+	console.error(chalk.red(`Unknown lessons command ${sub}.`));
+	printLessonsHelp();
+	process.exitCode = 1;
+	return true;
+}
+
+function printLessonsHelp(): void {
+	console.log(`${APP_NAME} lessons list [domain]`);
+	console.log(`${APP_NAME} lessons show <id>`);
+	console.log(`${APP_NAME} lessons dismiss <id>`);
+}
+
+export async function handlePatternsCommand(args: string[]): Promise<boolean> {
+	if (args[0] !== "patterns") return false;
+	const cwd = process.cwd();
+	try {
+		console.log(runPatternCommand(cwd, args.slice(1).join(" ")));
+		return true;
+	} catch (error) {
+		console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+		process.exitCode = 1;
+		return true;
+	}
+}
+
 function printDomainsHelp(): void {
 	console.log(`${APP_NAME} domains list`);
 	console.log(`${APP_NAME} domains enable <id>`);
 	console.log(`${APP_NAME} domains disable <id>`);
+	console.log(`${APP_NAME} domains lessons <id>`);
+	console.log(`${APP_NAME} domains patterns`);
 	console.log(`${APP_NAME} domains add <id> <file.yaml>`);
 	console.log("  Meta, AI, Security, and Engineering stay on.");
 	console.log("  A domain added later starts disabled.");
+	console.log("  patterns edits .trek/domains/<id>/lessons.yaml and leaves the bundled file alone.");
 }
 
 function printWorkflowsHelp(): void {

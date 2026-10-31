@@ -52,6 +52,8 @@ export interface RunPromptCycleOptions {
 	getPostFlightVerdict?: () => LawsVerdictRecord | undefined;
 	/** Called after domain selection and before Act, so the tooling prompt can see one workflow. */
 	onDomainSelected?: (selection: DomainSelection) => void;
+	/** When set, the cycle does not select again. */
+	selection?: DomainSelection;
 	/** Checkpoint mode closes act until this returns true. Other modes omit it. */
 	phaseAllowed?: (phase: ReflectivePhase) => boolean;
 }
@@ -149,7 +151,8 @@ export class ReflectiveLoopController {
 		const guarded = runOutputGuard(intention);
 		intention = guarded.intention;
 		components.push(...guarded.components);
-		const selection = this.selectForTurn(options.task, options.cwd);
+		const selection = options.selection ?? this.selectForTurn(options.task, options.cwd);
+		if (options.selection) this.previousTask = options.task;
 		phases.intend = {
 			phase: "intend",
 			summary: `${modelSummary}; ${focusSummary}; ${intention.summary}; ${formatSelection(selection)}`,

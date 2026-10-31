@@ -1,0 +1,34 @@
+domain: coding
+categories:
+  - bug_pattern
+  - anti_pattern
+  - refactor_opportunity
+  - idiom_gap
+  - tooling_issue
+  - debugging_insight
+areas:
+  - syntax
+  - logic
+  - data_structures
+  - algorithms
+  - error_handling
+  - testing
+  - tooling
+severity:
+  default: medium
+  bug_pattern: high
+before_after: true
+promotion_targets:
+  - id: style-guide
+    title: style guide
+  - id: lint-rule
+    title: lint rule
+  - id: snippet-library
+    title: snippet library
+  - id: debug-playbook
+    title: debug playbook
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  - '\b(?:api[_-]?key|secret|token)\s*[:=]\s*\S{8,}'

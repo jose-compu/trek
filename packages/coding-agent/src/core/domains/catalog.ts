@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFile
 import { dirname, join } from "node:path";
 import { getPackageDir } from "../../config.ts";
 import { type ArchonWorkflow, parseArchonWorkflow } from "./archon.ts";
+import { warmLessonPatterns } from "./lesson-pattern.ts";
 
 export interface DomainDefinition {
 	id: string;
@@ -46,6 +47,7 @@ export function bundledDomainsRoot(): string {
 }
 
 export function loadDomainCatalog(cwd: string, bundledRoot = bundledDomainsRoot()): DomainCatalog {
+	warmLessonPatterns(cwd, bundledRoot);
 	const state = readState(cwd);
 	const disabled = new Set(state.disabled);
 	const bundled = readDomainDir(bundledRoot, false);

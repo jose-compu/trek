@@ -114,14 +114,47 @@ describe("domains 0.12.0", () => {
 		expect(prompts[1]).toContain("do not invent a side");
 	});
 
-	test("a selected finance workflow calls each prompt node", async () => {
+	test("an empty earlier reply is marked none", async () => {
+		const workflow = parseArchonWorkflow(
+			[
+				"name: chain",
+				"description: two prompt steps",
+				"nodes:",
+				"  - id: one",
+				"    prompt: Name the asset.",
+				"  - id: two",
+				"    prompt: Say what is exposed.",
+				"    depends_on: [one]",
+				"",
+			].join("\n"),
+		);
+		const prompts: string[] = [];
+		await runArchonWorkflow(workflow, {
+			cwd: process.cwd(),
+			userMessage: "A secret exposed in the log.",
+			runPrompt: async (prompt) => {
+				prompts.push(prompt);
+				return "";
+			},
+		});
+		expect(prompts[1]).toContain("$one.output:");
+		expect(prompts[1]).toContain("(none)");
+		expect(prompts[1]).toContain("Do not call a tool.");
+	});
+
+	test("a selected finance workflow calls each prompt node without tools", async () => {
 		const harness = await createHarness({ enableReflectiveLoop: true });
 		harnesses.push(harness);
+		const toolCounts: number[] = [];
+		const reply = (text: string) => (context: { tools?: unknown[] }) => {
+			toolCounts.push(context.tools?.length ?? 0);
+			return fauxAssistantMessage(text);
+		};
 		harness.setResponses([
-			fauxAssistantMessage("account 4100, March, 1200"),
-			fauxAssistantMessage("the sides are not in the turn"),
-			fauxAssistantMessage("the SOX control is the bank rec"),
-			fauxAssistantMessage("the correcting entry is not posted"),
+			reply("account 4100, March, 1200"),
+			reply("the sides are not in the turn"),
+			reply("the SOX control is the bank rec"),
+			reply("the correcting entry is not posted"),
 		]);
 		await harness.session.prompt(
 			"The reconciliation break for account 4100 in March is 1200. The SOX control is the bank rec.",
@@ -132,6 +165,7 @@ describe("domains 0.12.0", () => {
 		expect(replies).toContain("the SOX control is the bank rec");
 		expect(replies).toContain("the correcting entry is not posted");
 		expect(replies).not.toContain("workflow check");
+		expect(toolCounts).toEqual([0, 0, 0, 0]);
 	});
 
 	test("a session command uses the same store and does not run a workflow", () => {
@@ -182,6 +216,15 @@ describe("domains 0.12.0", () => {
 			],
 		);
 		expect(absent).toEqual([]);
+		const carried = checkWorkflowNodes("A secret exposed in the log.", [
+			{
+				id: "secrets-and-access",
+				prompt: "Say what is exposed and who can reach it.",
+				output: "The unused admin port is exposed.",
+				upstream: "The asset is the unused admin port.",
+			},
+		]);
+		expect(carried).toEqual([]);
 		const skipped = checkWorkflowNodes("account 4100", [
 			{ id: "name-account", prompt: "Name the account, the period, and the amount of the break.", output: "" },
 		]);

@@ -1,4 +1,4 @@
-![Trek Agent 0.14 Learning](./assets/banner-0.14.png)
+![Trek Agent 0.15 Domain Learning](./assets/banner-0.15.png)
 
 # Trek Agent v0.14.1
 
@@ -133,7 +133,7 @@ trek models
 ```bash
 ./scripts/bootstrap-llama.sh lfm
 set -a && source ~/.trek/llama-live.env && set +a
-unset XAI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY PI_NO_LOCAL_LLM
+unset XAI_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY TREK_NO_LOCAL_LLM PI_NO_LOCAL_LLM
 cd /path/to/your/project
 trek
 ```
@@ -155,7 +155,7 @@ trek --provider xai
 
 `set-mode local` with one of the Frontier keys above already in the environment is the same effective mode. Frontier detection order is `XAI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, then `GEMINI_API_KEY` or `GOOGLE_API_KEY`. `trek models` should print `effective: hybrid`.
 
-Product weight download in the CLI is 0.16.0. Optional probes are `./scripts/bootstrap-llama.sh` and `./scripts/test-llama-live.sh`. `./test.sh` clears API keys and sets `PI_NO_LOCAL_LLM=1`, so it does not start llama.cpp.
+Product weight download in the CLI is 0.16.0. Optional probes are `./scripts/bootstrap-llama.sh` and `./scripts/test-llama-live.sh`. `./test.sh` clears API keys and skips llama.cpp. The variable is `TREK_NO_LOCAL_LLM=1`. The script still exports the legacy `PI_NO_LOCAL_LLM=1`.
 
 ## Trace CLI
 

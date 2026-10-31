@@ -1,0 +1,32 @@
+domain: legal
+categories:
+  - clause_risk
+  - compliance_gap
+  - precedent_shift
+  - contract_deviation
+  - regulatory_change
+  - litigation_exposure
+areas:
+  - contracts
+  - compliance
+  - litigation
+  - intellectual_property
+  - privacy
+  - regulatory
+  - corporate_governance
+severity:
+  default: medium
+  litigation_exposure: high
+before_after: true
+promotion_targets:
+  - id: clause-library
+    title: clause library
+  - id: contract-playbook
+    title: contract playbook
+  - id: risk-register
+    title: risk register
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

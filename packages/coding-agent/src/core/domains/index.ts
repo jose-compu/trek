@@ -13,6 +13,26 @@ export {
 	saveDomainWorkflow,
 } from "./catalog.ts";
 export {
+	acceptTypedLesson,
+	clearLessonPatternCache,
+	formatLessonPattern,
+	type LessonPattern,
+	type LessonScope,
+	lessonAllowed,
+	lessonIsBlocked,
+	lessonIsOffered,
+	lessonPatternFor,
+	lessonTag,
+	readDomainSkills,
+	readLessonPatternYaml,
+	repairLessonPrompt,
+	restoreLessonOverlay,
+	saveLessonOverlay,
+	type TypedLessonResult,
+	warmLessonPatterns,
+	writeDomainSkill,
+} from "./lesson-pattern.ts";
+export {
 	checkWorkflowNodes,
 	formatWorkflowCheck,
 	type WorkflowNodeCheck,
@@ -26,6 +46,7 @@ export {
 	workflowFactQuestion,
 	workflowFactRefusal,
 } from "./parameters.ts";
+export { completePatternCommand, runPatternCommand } from "./pattern-command.ts";
 export { runArchonWorkflow, type WorkflowNodeResult } from "./run.ts";
 export {
 	type DomainSelection,

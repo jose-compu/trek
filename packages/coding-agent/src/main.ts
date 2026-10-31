@@ -43,7 +43,12 @@ import { assertValidSessionId, SessionManager } from "./core/session-manager.ts"
 import { SettingsManager } from "./core/settings-manager.ts";
 import { printTimings, resetTimings, time } from "./core/timings.ts";
 import { hasProjectTrustInputs, ProjectTrustStore } from "./core/trust-manager.ts";
-import { handleDomainsCommand, handleWorkflowsCommand } from "./domains-cli.ts";
+import {
+	handleDomainsCommand,
+	handleLessonsCommand,
+	handlePatternsCommand,
+	handleWorkflowsCommand,
+} from "./domains-cli.ts";
 import { handleHistoryCommand, handleRevertCommand } from "./history-cli.ts";
 import { runMigrations, showDeprecationWarnings } from "./migrations.ts";
 import { handleModelsCommand } from "./models-cli.ts";
@@ -596,6 +601,14 @@ export async function main(args: string[], options?: MainOptions) {
 	}
 
 	if (await handleModelsCommand(args)) {
+		return;
+	}
+
+	if (await handleLessonsCommand(args)) {
+		return;
+	}
+
+	if (await handlePatternsCommand(args)) {
 		return;
 	}
 

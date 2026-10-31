@@ -1,0 +1,32 @@
+domain: supply-chain
+categories:
+  - forecast_error
+  - supplier_risk
+  - logistics_delay
+  - inventory_mismatch
+  - quality_deviation
+  - demand_signal_shift
+areas:
+  - procurement
+  - inventory
+  - logistics
+  - manufacturing
+  - quality
+  - demand_planning
+  - warehousing
+severity:
+  default: medium
+  supplier_risk: high
+before_after: false
+promotion_targets:
+  - id: supplier-scorecard
+    title: supplier scorecard
+  - id: safety-stock-policy
+    title: safety stock policy
+  - id: routing-playbook
+    title: routing playbook
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

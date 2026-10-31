@@ -1,0 +1,32 @@
+domain: hr
+categories:
+  - policy_gap
+  - compliance_risk
+  - process_inefficiency
+  - candidate_experience
+  - retention_signal
+  - onboarding_friction
+areas:
+  - recruiting
+  - onboarding
+  - compensation
+  - compliance
+  - performance
+  - offboarding
+  - dei
+severity:
+  default: medium
+  compliance_risk: high
+before_after: false
+promotion_targets:
+  - id: onboarding-checklist
+    title: onboarding checklist
+  - id: interview-scorecard
+    title: interview scorecard
+  - id: compliance-calendar
+    title: compliance calendar
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

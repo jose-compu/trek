@@ -1,0 +1,24 @@
+domain: science
+categories:
+  - methodology_flaw
+  - data_quality
+  - reproducibility_issue
+  - statistical_error
+  - hypothesis_revision
+  - experiment_design
+areas:
+  []
+severity:
+  default: medium
+  reproducibility_issue: high
+before_after: false
+promotion_targets:
+  - id: experiment-checklist
+    title: experiment checklist
+  - id: model-card
+    title: model card
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

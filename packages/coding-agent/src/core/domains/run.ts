@@ -93,7 +93,8 @@ function renderPrompt(
 	const lines = [
 		"Answer only this Archon node.",
 		"One line. No preamble.",
-		"If a fact is not in the user turn, the known facts, or an upstream output, say it is not in the turn.",
+		"Do not call a tool. The earlier node replies are below.",
+		"If a fact is not in the user turn, the known facts, or an earlier reply, say it is not in the turn.",
 		"",
 		"User turn:",
 		userMessage,
@@ -107,7 +108,8 @@ function renderPrompt(
 	lines.push("", `Node ${node.id}:`, body);
 	for (const dep of node.dependsOn) {
 		if (!node.body.includes(`$${dep}.output`)) {
-			lines.push("", `$${dep}.output:`, outputs.get(dep) ?? "");
+			const reply = outputs.get(dep)?.trim();
+			lines.push("", `$${dep}.output:`, reply && reply.length > 0 ? reply : "(none)");
 		}
 	}
 	return lines.join("\n");

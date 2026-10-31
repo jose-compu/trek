@@ -1,0 +1,31 @@
+domain: support
+categories:
+  - resolution_delay
+  - misdiagnosis
+  - escalation_gap
+  - knowledge_gap
+  - sla_breach
+  - customer_churn_signal
+areas:
+  - triage
+  - diagnosis
+  - resolution
+  - follow_up
+  - documentation
+  - escalation
+severity:
+  default: medium
+  sla_breach: high
+before_after: false
+promotion_targets:
+  - id: kb-article
+    title: KB article
+  - id: troubleshooting-tree
+    title: troubleshooting tree
+  - id: escalation-matrix
+    title: escalation matrix
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

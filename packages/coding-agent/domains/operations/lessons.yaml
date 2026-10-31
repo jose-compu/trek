@@ -1,0 +1,32 @@
+domain: operations
+categories:
+  - process_bottleneck
+  - incident_pattern
+  - capacity_issue
+  - automation_gap
+  - sla_breach
+  - toil_accumulation
+areas:
+  - incident_management
+  - change_management
+  - capacity_planning
+  - automation
+  - monitoring
+  - runbooks
+  - on_call
+severity:
+  default: medium
+  sla_breach: high
+before_after: false
+promotion_targets:
+  - id: runbook
+    title: runbook
+  - id: postmortem
+    title: postmortem
+  - id: slo-definition
+    title: SLO definition
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

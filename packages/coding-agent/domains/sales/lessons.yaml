@@ -1,0 +1,32 @@
+domain: sales
+categories:
+  - pipeline_leak
+  - objection_pattern
+  - pricing_error
+  - forecast_miss
+  - competitor_shift
+  - deal_velocity_drop
+areas:
+  - prospecting
+  - qualification
+  - discovery
+  - proposal
+  - negotiation
+  - closing
+  - renewal
+severity:
+  default: medium
+  pricing_error: high
+before_after: false
+promotion_targets:
+  - id: objection-scripts
+    title: objection scripts
+  - id: battle-cards
+    title: battle cards
+  - id: pricing-playbook
+    title: pricing playbook
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

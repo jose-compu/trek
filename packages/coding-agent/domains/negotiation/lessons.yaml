@@ -1,0 +1,33 @@
+domain: negotiation
+categories:
+  - concession_leak
+  - batna_weakness
+  - framing_miss
+  - objection_handling_gap
+  - escalation_misalignment
+  - value_articulation_gap
+  - anchor_error
+  - agreement_risk
+areas:
+  - preparation
+  - discovery
+  - framing
+  - bargaining
+  - concessions
+  - closing
+  - stakeholder_alignment
+  - escalation
+  - contract_terms
+  - follow_up
+severity:
+  default: medium
+  agreement_risk: high
+before_after: false
+promotion_targets:
+  - id: negotiation-playbook
+    title: negotiation playbook
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

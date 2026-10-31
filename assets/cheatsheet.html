@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Trek Agent cheatsheet</title>
+<style>
+  :root {
+    --ink: #16161d;
+    --muted: #5e5e6c;
+    --faint: #8a8a98;
+    --line: #e6e6ee;
+    --violet: #6d4aff;
+    --violet-soft: #f3efff;
+    --page: #f4f4f7;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 1400px;
+    height: 1120px;
+    overflow: hidden;
+    background: var(--page);
+    color: var(--ink);
+    font-family: "Inter", "SF Pro Display", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+  }
+  .sheet {
+    width: 1400px;
+    height: 1120px;
+    padding: 28px 36px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 8px 8px 4px;
+  }
+  .lockup { height: 54px; width: auto; }
+  h1 {
+    font-size: 42px;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    font-weight: 750;
+  }
+  h1 span {
+    display: block;
+    margin-top: 4px;
+    color: var(--violet);
+    font-size: 22px;
+    font-weight: 650;
+    letter-spacing: -0.03em;
+  }
+  .tagline {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 16px;
+    font-weight: 550;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 18px 20px 16px;
+  }
+  .card.wide { grid-column: 1 / -1; }
+  h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    letter-spacing: -0.03em;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+  .n {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: var(--violet);
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+  }
+  p, li { font-size: 15px; line-height: 1.35; color: #2a2a33; }
+  .lead { color: var(--muted); margin: -4px 0 10px; }
+  ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  li { display: flex; gap: 8px; }
+  li::before { content: ""; width: 5px; height: 5px; border-radius: 99px; background: var(--violet); margin-top: 7px; flex: none; }
+  code, .k {
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--violet-soft);
+    color: #3b2d86;
+    border-radius: 6px;
+    padding: 1px 6px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th {
+    text-align: left;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 650;
+    padding: 0 8px 8px 0;
+  }
+  td { padding: 5px 10px 5px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td:first-child { font-weight: 650; white-space: nowrap; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .box {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+  .box strong { display: block; font-size: 14px; margin-bottom: 4px; }
+  .box span { display: block; color: var(--muted); font-size: 13px; line-height: 1.35; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-size: 13px;
+    color: #2a2a33;
+  }
+  .chip b { color: var(--violet); font-weight: 700; }
+  footer {
+    display: flex;
+    justify-content: space-between;
+    color: var(--faint);
+    font-size: 13px;
+    padding: 0 8px;
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  }
+</style>
+</head>
+<body>
+  <div class="sheet">
+    <header>
+      <img class="lockup" src="brand/logos/lockup-light-violet.png" alt="Trek Agent" />
+      <h1>Cheatsheet<span>The session, the domain, the lesson.</span></h1>
+      <div class="tagline">Powerful. Precise. Honest.</div>
+    </header>
+    <div class="grid">
+      <section class="card">
+        <h2><span class="n">1</span> Open a session</h2>
+        <ul>
+          <li><code>trek</code> in the project. Memory and the reflective loop are on.</li>
+          <li><code>TREK_NO_LOCAL_LLM=1</code> uses the API model. <code>PI_NO_LOCAL_LLM</code> is still accepted.</li>
+          <li><code>/login</code> <code>/model</code> <code>/new</code> <code>/quit</code></li>
+          <li>Enter sends. The prompt stays in the transcript when Working... starts.</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h2><span class="n">2</span> One turn</h2>
+        <ul>
+          <li>The words in the turn choose the domain. A menu does not.</li>
+          <li>The workflow runs one node at a time. A prompt node does not call a tool.</li>
+          <li>The next node receives the earlier reply. An empty reply is <code>(none)</code>.</li>
+          <li>A fact that is not in the turn is said to be not in the turn.</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h2><span class="n">3</span> Domains</h2>
+        <p class="lead">Twenty domains. Four stay on: Meta, AI, Security, Engineering.</p>
+        <ul>
+          <li><code>/domains</code> lists them. <code>/domains enable finance</code> <code>/domains disable finance</code></li>
+          <li><code>/workflows show finance</code> prints the steps. It does not run them.</li>
+          <li>Detection still chooses the workflow on the next prompt.</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h2><span class="n">4</span> Lessons</h2>
+        <ul>
+          <li>A failed turn, or a correction that starts with <code>No.</code>, may store one lesson.</li>
+          <li>The lesson takes the domain of that turn: category, area, before, and after.</li>
+          <li><code>/lessons</code> <code>/lessons finance</code> shows id, category, area, severity, count, status.</li>
+          <li><code>/crystallize &lt;id&gt;</code> writes a skill only after you confirm, and only for that domain.</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h2><span class="n">5</span> Patterns</h2>
+        <p class="lead">Edits go to <code>.trek/domains/&lt;id&gt;/lessons.yaml</code>. The bundled file stays as it shipped.</p>
+        <ul>
+          <li><code>/patterns</code> <code>/patterns finance</code></li>
+          <li><code>/patterns edit finance categories add tax_gap</code></li>
+          <li><code>/patterns edit finance targets add sox-memo SOX memo</code></li>
+          <li><code>/patterns edit finance never add west-cistern</code></li>
+          <li><code>/patterns restore finance</code> steps back one edit.</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h2><span class="n">6</span> Never stored</h2>
+        <ul>
+          <li>Keys and private keys are refused in every domain.</li>
+          <li>A finance lesson also drops an account number.</li>
+          <li>A lesson that still matches is not stored.</li>
+          <li>A finance lesson is not recalled on a robotics turn. Meta, AI, Security, and Engineering may be.</li>
+        </ul>
+      </section>
+      <section class="card wide">
+        <h2><span class="n">7</span> Commands and keys</h2>
+        <div class="pair">
+          <table>
+            <thead><tr><th>In the session</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><code>/patterns</code></td><td>List or edit a domain pattern</td></tr>
+              <tr><td><code>/lessons finance</code></td><td>Lessons stored for that domain</td></tr>
+              <tr><td><code>/crystallize &lt;id&gt;</code></td><td>Offer a skill, then wait for Yes</td></tr>
+              <tr><td><code>/memory</code></td><td>Status, index, add, or remove a path</td></tr>
+              <tr><td><code>/confirm bash</code></td><td>Allow the next call of one gated tool</td></tr>
+              <tr><td><code>/hotkeys</code></td><td>The full shortcut list</td></tr>
+            </tbody>
+          </table>
+          <table>
+            <thead><tr><th>Key</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td>Esc</td><td>Interrupt the turn</td></tr>
+              <tr><td>Ctrl+C</td><td>Clear the editor. Twice quits.</td></tr>
+              <tr><td>Ctrl+D</td><td>Quit when the editor is empty</td></tr>
+              <tr><td>Shift+Tab</td><td>Cycle the thinking level</td></tr>
+              <tr><td>Ctrl+P / Ctrl+L</td><td>Next model / open the model list</td></tr>
+              <tr><td>Alt+Enter</td><td>Queue a follow-up</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="chips">
+          <span class="chip"><b>trek lessons list</b> outside the session</span>
+          <span class="chip"><b>trek patterns finance</b></span>
+          <span class="chip"><b>trek domains lessons finance</b></span>
+          <span class="chip"><b>trek workflows show finance</b></span>
+          <span class="chip"><b>trek models</b></span>
+        </div>
+      </section>
+    </div>
+    <footer>
+      <span>github.com/jose-compu/trek</span>
+      <span>Ships with 0.18</span>
+    </footer>
+  </div>
+</body>
+</html>

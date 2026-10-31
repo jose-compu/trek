@@ -6,6 +6,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Type } from "typebox";
+import { lessonIsOffered, lessonPatternFor } from "../domains/lesson-pattern.ts";
 import type { ToolDefinition } from "../extensions/types.ts";
 import type { Lesson } from "./lesson.ts";
 
@@ -82,6 +83,12 @@ function indexPath(cwd: string): string {
 	return join(cwd, ".trek", "lessons", "index.json");
 }
 
+function writeIndex(cwd: string, index: LessonIndex): void {
+	const path = indexPath(cwd);
+	mkdirSync(join(cwd, ".trek", "lessons"), { recursive: true });
+	writeFileSync(path, `${JSON.stringify(index, null, "\t")}\n`);
+}
+
 function emptyIndex(): LessonIndex {
 	return { order: [], lessons: {} };
 }
@@ -101,9 +108,52 @@ export function saveLessonRecord(cwd: string, id: string, lesson: Lesson): void 
 	const index = readIndex(cwd);
 	index.lessons[id] = lesson;
 	if (!index.order.includes(id)) index.order.push(id);
-	const path = indexPath(cwd);
-	mkdirSync(join(cwd, ".trek", "lessons"), { recursive: true });
-	writeFileSync(path, `${JSON.stringify(index, null, "\t")}\n`);
+	writeIndex(cwd, index);
+}
+
+/** Same recurrence key increments count. No second row. */
+export function recurLesson(cwd: string, lesson: Lesson): StoredLesson | undefined {
+	const key = lesson.recurrence_key;
+	if (!key) return undefined;
+	const index = readIndex(cwd);
+	const id = index.order.find((item) => index.lessons[item]?.recurrence_key === key);
+	if (!id) return undefined;
+	const current = index.lessons[id];
+	if (!current) return undefined;
+	current.count = (current.count ?? 1) + 1;
+	const note = lesson.source_turn?.replace(/\s+/g, " ").trim().slice(0, 80);
+	if (note) current.see_also = [...(current.see_also ?? []), note].slice(-8);
+	index.lessons[id] = current;
+	writeIndex(cwd, index);
+	return { id, ...current };
+}
+
+export function dismissLesson(cwd: string, id: string): string {
+	const index = readIndex(cwd);
+	const lesson = index.lessons[id];
+	if (!lesson) return `unknown lesson ${id}`;
+	lesson.status = "dismissed";
+	index.lessons[id] = lesson;
+	writeIndex(cwd, index);
+	return `dismissed ${id}`;
+}
+
+export function markLessonPromoted(cwd: string, id: string): void {
+	const index = readIndex(cwd);
+	const lesson = index.lessons[id];
+	if (!lesson) return;
+	lesson.status = "promoted";
+	index.lessons[id] = lesson;
+	writeIndex(cwd, index);
+}
+
+export function dismissedLessonIds(cwd: string): Set<string> {
+	const index = readIndex(cwd);
+	const ids = new Set<string>();
+	for (const id of index.order) {
+		if (index.lessons[id]?.status === "dismissed") ids.add(id);
+	}
+	return ids;
 }
 
 export function loadLessonRecord(cwd: string, id: string): StoredLesson | undefined {
@@ -154,15 +204,33 @@ export function removeCrystallizedSkill(cwd: string, id: string): string {
 	return `removed ${id}`;
 }
 
-export function formatLessonsTable(cwd: string): string {
-	const rows = listLessonRecords(cwd).map((lesson) => [
-		lesson.id,
-		lesson.domain,
-		skillIsLive(cwd, lesson.id) ? "yes" : "no",
-		lesson.rule,
-	]);
-	if (rows.length === 0) return "No lessons stored.";
-	return renderTextTable(["id", "domain", "skill", "rule"], rows, [16, 12, 5, 48]);
+export function formatLessonsTable(cwd: string, domain?: string): string {
+	const wanted = domain?.trim();
+	const rows = listLessonRecords(cwd)
+		.filter((lesson) => !wanted || lesson.domain === wanted)
+		.map((lesson) => [
+			lesson.id,
+			lesson.category ?? "",
+			lesson.area ?? "",
+			lesson.severity ?? "",
+			String(lesson.count ?? 1),
+			lessonStatus(cwd, lesson),
+			lesson.rule,
+		]);
+	if (rows.length === 0) return wanted ? `No lessons stored for ${wanted}.` : "No lessons stored.";
+	return renderTextTable(
+		["id", "category", "area", "severity", "count", "status", "rule"],
+		rows,
+		[16, 22, 16, 10, 5, 10, 36],
+	);
+}
+
+function lessonStatus(cwd: string, lesson: StoredLesson): string {
+	if (lesson.status === "dismissed") return "dismissed";
+	if (lesson.status === "promoted" || skillIsLive(cwd, lesson.id)) return "promoted";
+	const pattern = lesson.category ? lessonPatternFor(cwd, lesson.domain) : undefined;
+	if (pattern && lessonIsOffered(lesson, pattern)) return "offer";
+	return "pending";
 }
 
 export function withLessonIds(summary: string, ids: readonly string[]): string {

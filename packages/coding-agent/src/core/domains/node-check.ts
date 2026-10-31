@@ -9,6 +9,8 @@ export interface WorkflowNodeCheck {
 	id: string;
 	prompt: string;
 	output: string;
+	/** Replies from depends_on. A later node may use them. */
+	upstream?: string;
 }
 
 export interface WorkflowNodeFinding {
@@ -29,7 +31,7 @@ export function checkWorkflowNodes(userMessage: string, nodes: readonly Workflow
 			findings.push({ id: node.id, kind: "skipped", detail: "empty" });
 			continue;
 		}
-		const ground = `${userMessage}\n${node.prompt}`.toLowerCase();
+		const ground = `${userMessage}\n${node.prompt}\n${node.upstream ?? ""}`.toLowerCase();
 		const groundWords = new Set(ground.match(WORD) ?? []);
 		const ungrounded = new Set<string>();
 		let sawSubstance = false;
