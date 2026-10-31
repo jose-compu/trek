@@ -1,13 +1,31 @@
 import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import type { ThinkingLevel } from "@trek/agent-core";
+import type { Model } from "@trek/ai";
+import { getAgentDir } from "../config.ts";
 import { resolvePath } from "../utils/paths.ts";
 import type { AgentSession } from "./agent-session.ts";
 import type { AgentSessionRuntimeDiagnostic, AgentSessionServices } from "./agent-session-services.ts";
 import type { ReplacedSessionContext, SessionShutdownEvent, SessionStartEvent } from "./extensions/index.ts";
 import { emitSessionShutdownEvent } from "./extensions/runner.ts";
+import type { EffortMode } from "./reflective-loop/index.ts";
+import { loadRuntimeConfig, resolveRuntime } from "./runtime/index.ts";
+import type { OperatorMode } from "./safety/index.ts";
 import type { CreateAgentSessionResult } from "./sdk.ts";
 import { assertSessionCwdExists } from "./session-cwd.ts";
 import { SessionManager } from "./session-manager.ts";
+
+/** Session knobs that `/new` must inherit from the parent (not reset to defaults). */
+interface ParentSessionConfig {
+	modelProvider?: string;
+	modelId?: string;
+	thinkingLevel: ThinkingLevel;
+	effort: EffortMode;
+	sandboxBash: boolean;
+	operatorMode: OperatorMode | undefined;
+	scopedModels: Array<{ model: Model<any>; thinkingLevel?: ThinkingLevel }>;
+	autoCompactionEnabled: boolean;
+}
 
 /**
  * Result returned by runtime creation.
@@ -209,6 +227,44 @@ export class AgentSessionRuntime {
 		return { cancelled: false };
 	}
 
+	private snapshotParentConfig(session: AgentSession): ParentSessionConfig {
+		return {
+			modelProvider: session.model?.provider,
+			modelId: session.model?.id,
+			thinkingLevel: session.thinkingLevel,
+			effort: session.getEffort(),
+			sandboxBash: session.isSandboxBash(),
+			operatorMode: session.getOperatorMode(),
+			scopedModels: session.scopedModels.map((entry) => ({
+				model: entry.model,
+				thinkingLevel: entry.thinkingLevel,
+			})),
+			autoCompactionEnabled: session.autoCompactionEnabled,
+		};
+	}
+
+	/** Apply parent model/thinking/hierarchy/etc. after `/new` builds a blank session. */
+	private async restoreParentConfig(snapshot: ParentSessionConfig): Promise<void> {
+		if (snapshot.modelProvider && snapshot.modelId) {
+			const model = this.session.modelRegistry.find(snapshot.modelProvider, snapshot.modelId);
+			if (model) {
+				await this.session.setModel(model);
+			}
+		}
+		this.session.setThinkingLevel(snapshot.thinkingLevel);
+		this.session.setEffort(snapshot.effort);
+		this.session.setSandboxBash(snapshot.sandboxBash);
+		this.session.setOperatorMode(snapshot.operatorMode);
+		this.session.setScopedModels(snapshot.scopedModels);
+		this.session.setAutoCompactionEnabled(snapshot.autoCompactionEnabled);
+
+		// Local/hybrid: re-bind the ladder (Decision → Tooling…) like the parent startup.
+		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this.cwd }));
+		if (resolved.effectiveMode !== "api" && process.env.PI_NO_LOCAL_LLM !== "1") {
+			await this.session.activateLocalModel();
+		}
+	}
+
 	async newSession(options?: {
 		parentSession?: string;
 		setup?: (sessionManager: SessionManager) => Promise<void>;
@@ -220,11 +276,11 @@ export class AgentSessionRuntime {
 		}
 
 		const previousSessionFile = this.session.sessionFile;
+		const parentConfig = this.snapshotParentConfig(this.session);
 		const sessionDir = this.session.sessionManager.getSessionDir();
-		const sessionManager = SessionManager.create(this.cwd, sessionDir);
-		if (options?.parentSession) {
-			sessionManager.newSession({ parentSession: options.parentSession });
-		}
+		// Default parent link so the new session inherits lineage from the current one.
+		const parentSession = options?.parentSession ?? previousSessionFile;
+		const sessionManager = SessionManager.create(this.cwd, sessionDir, parentSession ? { parentSession } : undefined);
 
 		await this.teardownCurrent("new", sessionManager.getSessionFile());
 		this.apply(
@@ -240,6 +296,7 @@ export class AgentSessionRuntime {
 			this.session.agent.state.messages = this.session.sessionManager.buildSessionContext().messages;
 		}
 		await this.finishSessionReplacement(options?.withSession);
+		await this.restoreParentConfig(parentConfig);
 		return { cancelled: false };
 	}
 

@@ -217,6 +217,39 @@ describe("AgentSession compaction characterization", () => {
 		await expect(sessionInternals._runAutoCompaction("threshold", false)).resolves.toBe(true);
 	});
 
+	it("cancels auto-compaction when abortCompaction is called after start", async () => {
+		const harness = await createHarness({
+			extensionFactories: [
+				(pi) => {
+					pi.on("session_before_compact", async (event) => {
+						return await new Promise<{ cancel: true }>((resolve) => {
+							event.signal.addEventListener("abort", () => resolve({ cancel: true }), { once: true });
+						});
+					});
+				},
+			],
+		});
+		harnesses.push(harness);
+
+		await harness.session.prompt("one");
+		await harness.session.prompt("two");
+
+		const sessionInternals = harness.session as unknown as SessionWithCompactionInternals;
+		const ends: Array<{ aborted: boolean; errorMessage?: string }> = [];
+		harness.session.subscribe((event) => {
+			if (event.type === "compaction_end") {
+				ends.push({ aborted: event.aborted, errorMessage: event.errorMessage });
+			}
+			if (event.type === "compaction_start") {
+				// Abort as soon as the UI would show "escape to cancel".
+				queueMicrotask(() => harness.session.abortCompaction());
+			}
+		});
+
+		await expect(sessionInternals._runAutoCompaction("threshold", false)).resolves.toBe(false);
+		expect(ends.some((e) => e.aborted && !e.errorMessage)).toBe(true);
+	});
+
 	it("does not retry overflow recovery more than once", async () => {
 		const harness = await createHarness();
 		harnesses.push(harness);
@@ -238,9 +271,7 @@ describe("AgentSession compaction characterization", () => {
 		await sessionInternals._checkCompaction({ ...overflowMessage, timestamp: Date.now() + 1 });
 
 		expect(runAutoCompactionSpy).toHaveBeenCalledTimes(1);
-		expect(compactionErrors).toContain(
-			"Context overflow recovery failed after one compact-and-retry attempt. Try reducing context or switching to a larger-context model.",
-		);
+		expect(compactionErrors).toContain("context full");
 	});
 
 	it("ignores stale pre-compaction assistant usage on pre-prompt checks", async () => {

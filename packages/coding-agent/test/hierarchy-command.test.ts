@@ -36,6 +36,22 @@ describe("/hierarchy", () => {
 		expect(loaded.roles.workhorse).toEqual({ source: "local", id: "Qwen3.5-4B", thinking: false });
 	});
 
+	it("can set Decision to the shared LFM d1 id on a non-LFM suite", () => {
+		const { agentDir, cwd } = isolated();
+		runHierarchyCommand(agentDir, cwd, "suite mistral");
+		const written = runHierarchyCommand(
+			agentDir,
+			cwd,
+			"role decision --id LiquidAI/d1-omni-600M --source local --thinking off",
+		);
+		expect(written).toContain("decision local LiquidAI/d1-omni-600M");
+		expect(loadRuntimeConfig({ agentDir, cwd }).roles.decision).toEqual({
+			source: "local",
+			id: "LiquidAI/d1-omni-600M",
+			thinking: false,
+		});
+	});
+
 	it("refuses a local frontier and leaves the file unchanged", () => {
 		const { agentDir, cwd } = isolated();
 		runHierarchyCommand(agentDir, cwd, "mode api");
