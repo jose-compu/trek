@@ -4,6 +4,22 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-31
+
+### Added
+
+- A lesson belongs to one domain. Each of the twenty domains ships a pattern: categories, areas, severity, fields, promotion targets, a threshold, and what is never stored. `.trek/domains/<id>/lessons.yaml` replaces the bundled pattern. `/patterns` lists and edits that file. The first edit can be restored.
+- The lesson is checked locally. A secret is not stored. A repeat raises the count and is not written again. One repair call runs only when the typed record is not usable.
+- Recall uses a lesson only in its domain. Meta, AI, Security, and Engineering stay available. A lesson with no domain is unchanged.
+- At the threshold the session offers a domain skill. `/crystallize` still waits for Yes. Yes writes `.trek/domains/<id>/skills/<target>.md` and loads it on the next session in that domain. Below the threshold the lesson stays a lesson. A 0.14 lesson with no category still writes `.trek/skills/lessons/<name>/SKILL.md`.
+- `/lessons <domain>` lists that domain.
+
+### Changed
+
+- A workflow node calls a tool only when that node allows it. The earlier node reply is in the prompt. If there is none, the prompt says so.
+- The prompt stays on screen when Working... appears.
+- An Archon node card keeps the grey background. Rules are dim, labels use the accent, and values are lighter.
+
 ## [0.14.1] - 2026-10-30
 
 ### Changed
