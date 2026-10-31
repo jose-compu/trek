@@ -68,10 +68,10 @@ This is a deep distributed-systems research question with safety-critical tradeo
 Escalate to frontier. Emit exactly one JSON line:
 {"escalate":"frontier","why":"<short reason>"}`;
 
-const AMBIGUOUS = `You cannot use tools.
+const AMBIGUOUS = `You cannot use tools. You are not allowed to design anything.
 The user said only: "make it better somehow, you figure out the architecture."
-You do not have enough requirements. Do not invent layers, services, or a design.
-You MUST escalate now. Emit exactly one JSON line and nothing else:
+There are no requirements, no stack, and no files. Inventing layers or services is a failure.
+Refuse to design. Escalate in this exact form and stop (no markdown, no bullets, no prose):
 {"escalate":"next","why":"underspecified architecture request"}`;
 
 const TRIVIAL_NO_ESCALATE = `You cannot use tools.
@@ -312,7 +312,7 @@ describe.skipIf(!live)("local models escalate when stuck (matrix)", () => {
 							expect(namedSignal?.tier).toBe("frontier");
 						}
 
-						const ambiguous = await server.complete(AMBIGUOUS);
+						const ambiguous = await server.complete(AMBIGUOUS, 96);
 						console.log(`${suite}/${role} ambiguous:\n${ambiguous.slice(0, 360)}`);
 						const ambAsk = parseEscalateAsk(ambiguous);
 						const ambSignal = parseEscalateSignal(ambiguous, floor, hybrid);
