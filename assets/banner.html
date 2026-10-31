@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8" />
 <title>Trek Agent 0.16</title>
-<!-- Logos are clipped from brand/trek-identity.jpg by scripts/clip-brand-logos.sh. Do not redraw them here. -->
 <style>
   :root {
     --void: #07070c;
@@ -32,12 +31,17 @@
   }
   .mark {
     position: absolute;
-    right: 28px;
+    right: 48px;
     top: 70px;
     width: 360px;
     height: 360px;
-    object-fit: contain;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 280px;
+    line-height: 1;
     pointer-events: none;
+    filter: drop-shadow(0 0 48px rgba(124, 92, 255, 0.45));
   }
   .inner {
     position: relative;
@@ -49,7 +53,16 @@
   }
   .copy { max-width: 920px; }
   .head { display: flex; align-items: center; gap: 18px; }
-  .lockup { height: 52px; width: auto; }
+  .lockup {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 34px;
+    font-weight: 750;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
+  .lockup .emoji { font-size: 40px; line-height: 1; }
   .badge {
     border: 1.5px solid var(--glow);
     color: #ddd6fe;
@@ -112,11 +125,11 @@
 </head>
 <body>
   <div class="banner">
-    <img class="mark" src="brand/logos/mark-hero.png" alt="" />
+    <div class="mark" aria-hidden="true">🏔️</div>
     <div class="inner">
       <div class="copy">
         <header class="head">
-          <img class="lockup" src="brand/logos/lockup-dark-full.png" alt="Trek Agent" />
+          <div class="lockup"><span class="emoji" aria-hidden="true">🏔️</span> Trek Agent</div>
           <div class="badge">v0.16.0</div>
           <div class="tagline">Powerful. Precise. Honest.</div>
         </header>
