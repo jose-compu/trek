@@ -6,10 +6,16 @@
 import { describe, expect, it } from "vitest";
 import {
 	defaultRuntimeConfig,
+	formatDescalateCard,
 	formatEscalateCard,
+	isToolArgumentValidationError,
 	nextLadderRole,
+	parseDescalateAsk,
+	parseDescalateSignal,
 	parseEscalateAsk,
 	parseEscalateSignal,
+	prevLadderRole,
+	resolveDescalateTarget,
 	resolveEscalateTarget,
 	resolveRuntime,
 	selectSessionRole,
@@ -89,6 +95,8 @@ describe("escalation ladder", () => {
 			"src/index.ts",
 			"Fixed the typo in the title.",
 			"Use option A because latency is the priority.",
+			// Tiny models refuse elevation in prose — must not soft-climb.
+			"Escalate to tooling? No.\n(No command ran.)\nThe edit was successful.",
 		];
 		for (const text of answers) {
 			expect(parseEscalateAsk(text), text).toBeUndefined();
@@ -129,5 +137,41 @@ describe("escalation ladder", () => {
 		);
 		expect(toFrontier?.tier).toBe("frontier");
 		expect(formatEscalateCard("planning", "frontier", toFrontier?.why)).toMatch(/↑ planning → frontier/);
+	});
+
+	it("treats schema validation failures as immediate escalate signals", () => {
+		const writeMissingPath = `Validation failed for tool "write":
+  - path: must have required properties path
+
+Received arguments:
+{
+  "content": "const now = new Date();"
+}`;
+		expect(isToolArgumentValidationError(writeMissingPath)).toBe(true);
+		expect(isToolArgumentValidationError("bash: command not found: foo")).toBe(false);
+		expect(isToolArgumentValidationError("File not found: src/x.ts")).toBe(false);
+	});
+
+	it("drops Planning → Workhorse on descalate and refuses escalate demotion", () => {
+		const resolved = localResolved();
+		expect(prevLadderRole("planning", resolved)).toBe("workhorse");
+		expect(prevLadderRole("tooling", resolved)).toBeUndefined();
+		expect(resolveDescalateTarget("planning", "workhorse", resolved)).toBe("workhorse");
+		expect(resolveDescalateTarget("planning", "next", resolved)).toBe("workhorse");
+		expect(parseDescalateAsk('{"descalate":"workhorse","why":"simple typo"}')).toEqual({
+			requested: "workhorse",
+			why: "simple typo",
+			explicit: true,
+		});
+		expect(parseDescalateSignal('{"descalate":"next","why":"easy edit"}', "planning", resolved)?.tier).toBe(
+			"workhorse",
+		);
+		expect(parseDescalateSignal("hand off to tooling", "planning", resolved)?.tier).toBe("tooling");
+		expect(parseDescalateSignal("descalate to tooling", "planning", resolved)?.tier).toBe("tooling");
+		// Escalate JSON still cannot demote (weak model protection).
+		expect(resolveEscalateTarget("workhorse", "tooling", resolved)).toBe("planning");
+		expect(parseEscalateAsk('{"descalate":"tooling","why":"x"}')).toBeUndefined();
+		expect(stripEscalateSignal('done\n{"descalate":"next","why":"x"}\nmore')).toBe("done\n\nmore");
+		expect(formatDescalateCard("planning", "workhorse", "simple typo")).toBe("↓ planning → workhorse · simple typo");
 	});
 });

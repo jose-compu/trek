@@ -1,7 +1,10 @@
 /**
  * Local suite presets (PROMPT §6, §20, issue #91).
  * Applied only when hierarchy.mode is local or hybrid.
- * Ladder: Tooling → Workhorse → Planning (+ Frontier in hybrid).
+ * Ladder: Decision → Tooling → Workhorse → Planning (+ Frontier in hybrid).
+ *
+ * Decision is always Liquid d1 (LFM family). Mistral / Qwen / mistral-pro have no
+ * suite-native Decision model, so they reuse the same LFM `d1-omni-600M` weights.
  */
 
 import type { RoleAssignment, SuiteId } from "./types.ts";
@@ -11,6 +14,8 @@ export interface SuitePreset {
 	/** Rerank on by default in every suite. Memory uses a local MiniLM CE when the suite has no family pair. */
 	rerank: boolean;
 	roles: {
+		/** Liquid d1 classifier (not llama-server). Shared LFM default across suites. */
+		decision: RoleAssignment;
 		tooling: RoleAssignment;
 		embedding: RoleAssignment;
 		reranker: RoleAssignment;
@@ -28,7 +33,14 @@ function local(id: string, thinking: boolean, repo?: string): RoleAssignment {
 	};
 }
 
+/** Shared Decision Index id (LFM). Used by every suite that lacks a native Decision model. */
+export const DEFAULT_DECISION_MODEL_ID = "LiquidAI/d1-omni-600M";
+
+/** Default Decision Index assignment across suites (open weights; classify-only). */
+const DECISION = local(DEFAULT_DECISION_MODEL_ID, false, DEFAULT_DECISION_MODEL_ID);
+
 const mistralRoles = {
+	decision: DECISION,
 	tooling: local("Qwen3.5-0.8B", false),
 	embedding: local("sentence-transformers/all-MiniLM-L6-v2", false),
 	reranker: local("cross-encoder/ms-marco-MiniLM-L-6-v2", false),
@@ -54,6 +66,7 @@ export const SUITE_PRESETS: Record<SuiteId, SuitePreset> = {
 		id: "qwen",
 		rerank: true,
 		roles: {
+			decision: DECISION,
 			tooling: local("Qwen3.5-0.8B", false),
 			embedding: local("Qwen3-Embedding-0.6B", false),
 			reranker: local("Qwen3-Reranker-0.6B", false),
@@ -65,6 +78,7 @@ export const SUITE_PRESETS: Record<SuiteId, SuitePreset> = {
 		id: "lfm",
 		rerank: true,
 		roles: {
+			decision: DECISION,
 			tooling: local("LFM2.5-350M", false),
 			embedding: local("LFM2-ColBERT-350M", false),
 			/** ColBERT has no sibling CE; MiniLM is the default second-pass scorer. */

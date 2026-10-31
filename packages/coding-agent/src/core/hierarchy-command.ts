@@ -13,6 +13,7 @@ import {
 	type RoleAssignment,
 	type RuntimeRole,
 	readRuntimeConfigFile,
+	resolveRuntime,
 	withHierarchy,
 	withRoleOverride,
 	writeRuntimeConfigFile,
@@ -63,7 +64,7 @@ export function hierarchyAgentDir(): string {
 function setRole(path: string, agentDir: string, cwd: string, rest: string[]): string {
 	const roleName = rest[0];
 	if (!roleName || !isRuntimeRole(roleName)) {
-		return "Usage: /hierarchy role <tooling|workhorse|planning|frontier|embedding|reranker> --id <id>";
+		return "Usage: /hierarchy role <decision|tooling|workhorse|planning|frontier|embedding|reranker> --id <id>";
 	}
 	const id = flagValue(rest, "--id");
 	if (!id) {
@@ -80,6 +81,9 @@ function setRole(path: string, agentDir: string, cwd: string, rest: string[]): s
 	}
 	const thinkingFlag = flagValue(rest, "--thinking");
 	let thinking = roleName === "planning" || roleName === "frontier";
+	if (roleName === "decision") {
+		thinking = false;
+	}
 	if (thinkingFlag !== undefined) {
 		if (thinkingFlag !== "on" && thinkingFlag !== "off") {
 			return "role --thinking must be on or off.";
@@ -94,9 +98,10 @@ function setRole(path: string, agentDir: string, cwd: string, rest: string[]): s
 
 function status(agentDir: string, cwd: string, path: string): string {
 	const config = loadRuntimeConfig({ agentDir, cwd });
+	const resolved = resolveRuntime(config);
 	const lines = [`mode ${config.hierarchy.mode}`, `suite ${config.hierarchy.suite}`, `file ${path}`];
-	for (const role of ["tooling", "workhorse", "planning", "frontier", "embedding", "reranker"] as const) {
-		const assignment = config.roles[role];
+	for (const role of ["decision", "tooling", "workhorse", "planning", "frontier", "embedding", "reranker"] as const) {
+		const assignment = resolved.roles[role] ?? config.roles[role];
 		lines.push(assignment ? `${role} ${assignment.source} ${assignment.id}` : `${role} unset`);
 	}
 	return lines.join("\n");

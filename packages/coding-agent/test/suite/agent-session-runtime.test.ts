@@ -593,4 +593,22 @@ describe("AgentSessionRuntime characterization", () => {
 		expect(runtime.session.model?.id).toBe("faux-2");
 		expect(runtime.session.thinkingLevel).toBe("off");
 	});
+
+	it("preserves parent model, thinking, and parentSession on /new", async () => {
+		const { runtime, faux } = await createRuntimeForTest(() => {});
+		await runtime.session.setModel(faux.getModel("faux-2")!);
+		runtime.session.setThinkingLevel("off");
+		runtime.session.setEffort("loose");
+		runtime.session.setSandboxBash(true);
+		const parentFile = runtime.session.sessionFile;
+
+		const result = await runtime.newSession();
+		expect(result.cancelled).toBe(false);
+		expect(runtime.session.model?.id).toBe("faux-2");
+		expect(runtime.session.thinkingLevel).toBe("off");
+		expect(runtime.session.getEffort()).toBe("loose");
+		expect(runtime.session.isSandboxBash()).toBe(true);
+		expect(runtime.session.sessionFile).not.toBe(parentFile);
+		expect(runtime.session.sessionManager.getHeader()?.parentSession).toBe(parentFile);
+	});
 });
