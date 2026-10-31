@@ -1,0 +1,38 @@
+domain: ai
+categories:
+  - model_selection
+  - prompt_optimization
+  - inference_latency
+  - fine_tune_regression
+  - context_management
+  - modality_gap
+  - hallucination_rate
+  - cost_efficiency
+areas:
+  - model_config
+  - prompt_engineering
+  - fine_tuning
+  - rag_pipeline
+  - inference
+  - embeddings
+  - multimodal
+  - evaluation
+  - guardrails
+severity:
+  default: medium
+  hallucination_rate: high
+before_after: false
+promotion_targets:
+  - id: model-selection-matrix
+    title: model selection matrix
+  - id: prompt-library
+    title: prompt library
+  - id: rag-architecture
+    title: RAG architecture
+  - id: guardrail-policy
+    title: guardrail policy
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  - "\b(?:user prompt|pii)\b"

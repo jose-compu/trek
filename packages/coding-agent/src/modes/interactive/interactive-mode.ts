@@ -290,6 +290,8 @@ export class InteractiveMode {
 	private isInitialized = false;
 	private onInputCallback?: (text: string) => void;
 	private pendingUserInputs: string[] = [];
+	/** The prompt painted when Enter is pressed, before the turn is stored. */
+	private earlyPrompt: { text: string; spacer?: Component; component: Component } | undefined;
 	private loadingAnimation: Loader | undefined = undefined;
 	private workingMessage: string | undefined = undefined;
 	private workingVisible = true;
@@ -495,6 +497,14 @@ export class InteractiveMode {
 			if (!command) continue;
 			command.getArgumentCompletions = (prefix: string) => {
 				const items = this.session.completeDomainCommand(name, prefix);
+				return items.length > 0 ? items : null;
+			};
+		}
+
+		const patternCommand = slashCommands.find((item) => item.name === "patterns");
+		if (patternCommand) {
+			patternCommand.getArgumentCompletions = (prefix: string) => {
+				const items = this.session.completePatternCommand(prefix);
 				return items.length > 0 ? items : null;
 			};
 		}
@@ -1878,6 +1888,41 @@ export class InteractiveMode {
 		return this.workingMessage ?? this.defaultWorkingMessage;
 	}
 
+	/** Put the submitted prompt in the transcript before lesson writes and the model call. */
+	private showSubmittedPrompt(text: string): void {
+		this.discardEarlyPrompt();
+		const spacer = this.chatContainer.children.length > 0 ? new Spacer(1) : undefined;
+		if (spacer) this.chatContainer.addChild(spacer);
+		const component = new UserMessageComponent(text, this.getMarkdownThemeWithSettings());
+		this.chatContainer.addChild(component);
+		this.earlyPrompt = { text, spacer, component };
+		this.ui.requestRender();
+	}
+
+	/**
+	 * The stored user message has arrived.
+	 * Keep the early copy when the text matches. Replace it when expansion changed the text.
+	 */
+	private consumeEarlyPrompt(text: string): boolean {
+		const early = this.earlyPrompt;
+		if (!early) return false;
+		this.earlyPrompt = undefined;
+		const stillShown = this.chatContainer.children.includes(early.component);
+		if (stillShown && (early.text === text || text.length === 0)) return true;
+		if (stillShown) {
+			this.chatContainer.removeChild(early.component);
+			if (early.spacer) this.chatContainer.removeChild(early.spacer);
+		}
+		return false;
+	}
+
+	private discardEarlyPrompt(early = this.earlyPrompt): void {
+		if (!early) return;
+		if (early === this.earlyPrompt) this.earlyPrompt = undefined;
+		this.chatContainer.removeChild(early.component);
+		if (early.spacer) this.chatContainer.removeChild(early.spacer);
+	}
+
 	/** Show the spinner before the model call. Lesson writes and promotion run first. */
 	private showWorkingNow(): void {
 		if (!this.workingVisible || this.loadingAnimation) return;
@@ -2808,14 +2853,25 @@ export class InteractiveMode {
 				return;
 			}
 			if (
+				text === "/patterns" ||
+				text.startsWith("/patterns ") ||
 				text === "/domains" ||
 				text.startsWith("/domains ") ||
 				text === "/workflows" ||
 				text.startsWith("/workflows ")
 			) {
-				const name = text.startsWith("/workflows") ? "workflows" : "domains";
-				const arg = text.slice(name === "workflows" ? "/workflows".length : "/domains".length).trim();
+				const name = text.startsWith("/workflows")
+					? "workflows"
+					: text.startsWith("/patterns")
+						? "patterns"
+						: "domains";
+				const arg = text.slice(`/${name}`.length).trim();
 				this.editor.setText("");
+				if (name === "patterns" || arg === "patterns" || arg.startsWith("patterns ")) {
+					const patternArg = name === "patterns" ? arg : arg.slice("patterns".length).trim();
+					this.showPatternCommand(patternArg);
+					return;
+				}
 				this.showDomainCommand(name, arg);
 				return;
 			}
@@ -2899,6 +2955,7 @@ export class InteractiveMode {
 			// Normal message submission
 			// First, move any pending bash components to chat
 			this.flushPendingBashComponents();
+			this.showSubmittedPrompt(text);
 			this.showWorkingNow();
 
 			if (this.onInputCallback) {
@@ -2989,7 +3046,9 @@ export class InteractiveMode {
 					this.addMessageToChat(event.message);
 					this.ui.requestRender();
 				} else if (event.message.role === "user") {
-					this.addMessageToChat(event.message);
+					if (!this.consumeEarlyPrompt(this.getUserMessageText(event.message))) {
+						this.addMessageToChat(event.message);
+					}
 					this.updatePendingMessagesDisplay();
 					this.ui.requestRender();
 				} else if (event.message.role === "assistant") {
@@ -3924,6 +3983,13 @@ export class InteractiveMode {
 
 	showDomainCommand(name: "domains" | "workflows", arg: string): void {
 		const text = this.session.runDomainCommand(name, arg);
+		this.chatContainer.addChild(new Spacer(1));
+		this.chatContainer.addChild(new Text(theme.fg("muted", text), 1, 0));
+		this.ui.requestRender();
+	}
+
+	showPatternCommand(arg: string): void {
+		const text = this.session.runPatternCommand(arg);
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new Text(theme.fg("muted", text), 1, 0));
 		this.ui.requestRender();

@@ -1,0 +1,32 @@
+domain: marketing
+categories:
+  - messaging_miss
+  - channel_underperformance
+  - audience_drift
+  - brand_inconsistency
+  - attribution_gap
+  - content_decay
+areas:
+  - content
+  - campaigns
+  - seo
+  - social
+  - email
+  - paid_media
+  - analytics
+severity:
+  default: medium
+  brand_inconsistency: high
+before_after: false
+promotion_targets:
+  - id: brand-guidelines
+    title: brand guidelines
+  - id: channel-playbook
+    title: channel playbook
+  - id: personas
+    title: personas
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

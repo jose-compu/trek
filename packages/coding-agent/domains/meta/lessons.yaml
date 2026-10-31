@@ -1,0 +1,30 @@
+domain: meta
+categories:
+  - prompt_drift
+  - rule_conflict
+  - skill_gap
+  - hook_failure
+  - context_bloat
+  - instruction_ambiguity
+areas:
+  - agent_config
+  - skill_authoring
+  - hook_scripts
+  - prompt_files
+  - rule_files
+  - memory_management
+  - extension_api
+severity:
+  default: medium
+  rule_conflict: high
+before_after: false
+promotion_targets:
+  - id: agent-rules
+    title: agent rules
+  - id: skill-files
+    title: skill files
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

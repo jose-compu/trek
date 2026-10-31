@@ -341,6 +341,10 @@ ${chalk.bold("Commands:")}
   ${APP_NAME} domains enable <id>       Enable a domain that is not always on
   ${APP_NAME} domains disable <id>      Disable a domain. Meta, AI, Security, and Engineering stay on
   ${APP_NAME} domains add <id> <yaml>   Add a domain and its Archon workflow. It starts disabled
+  ${APP_NAME} patterns                  List domain patterns, categories, promotion targets, and never-store
+  ${APP_NAME} patterns <id>             Show one pattern
+  ${APP_NAME} patterns edit <id> ...    Edit categories, targets, never-store, areas, or threshold
+  ${APP_NAME} patterns restore <id>     Restore the previous local pattern
   ${APP_NAME} workflows list            List the workflow for each domain
   ${APP_NAME} workflows show <id>       Print one Archon workflow
   ${APP_NAME} workflows run <id>        Run that workflow. The next turn detects again

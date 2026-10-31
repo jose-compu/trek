@@ -1,0 +1,29 @@
+domain: engineering
+categories:
+  - architecture_debt
+  - code_smell
+  - performance_regression
+  - dependency_issue
+  - testing_gap
+  - design_flaw
+areas:
+  - design
+  - implementation
+  - code_review
+  - ci_cd
+  - deployment
+  - monitoring
+severity:
+  default: medium
+  design_flaw: high
+before_after: true
+promotion_targets:
+  - id: architecture-rules
+    title: architecture rules
+  - id: ci-checklist
+    title: CI checklist
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

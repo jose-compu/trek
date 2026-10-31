@@ -1,0 +1,37 @@
+domain: finance
+categories:
+  - reconciliation_error
+  - forecast_variance
+  - control_weakness
+  - regulatory_gap
+  - valuation_error
+  - cash_flow_anomaly
+areas:
+  - accounting
+  - treasury
+  - tax
+  - audit
+  - budgeting
+  - reporting
+  - accounts_payable
+  - accounts_receivable
+severity:
+  default: medium
+  reconciliation_error: high
+  control_weakness: high
+before_after: true
+promotion_targets:
+  - id: close-checklist
+    title: close checklist
+  - id: reconciliation-procedure
+    title: reconciliation procedure
+  - id: control-matrix
+    title: control matrix
+  - id: audit-response
+    title: audit response
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  - "\\b\\d{9,17}\\b"
+  - "\\b\\d{3}-\\d{2}-\\d{4}\\b"

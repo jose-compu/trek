@@ -1,0 +1,37 @@
+domain: robotics
+categories:
+  - localization_drift
+  - planning_failure
+  - control_instability
+  - sensor_fusion_error
+  - hardware_interface_issue
+  - safety_boundary_violation
+  - sim_to_real_gap
+  - power_thermal_constraint
+areas:
+  - perception
+  - localization
+  - mapping
+  - planning
+  - control
+  - manipulation
+  - navigation
+  - safety
+  - simulation
+  - hardware_integration
+severity:
+  default: medium
+  safety_boundary_violation: high
+before_after: false
+promotion_targets:
+  - id: safety-checklist
+    title: safety checklist
+  - id: calibration-playbook
+    title: calibration playbook
+  - id: tuning-runbook
+    title: tuning runbook
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

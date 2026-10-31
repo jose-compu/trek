@@ -1,0 +1,32 @@
+domain: security
+categories:
+  - vulnerability
+  - misconfiguration
+  - access_violation
+  - compliance_gap
+  - incident_response
+  - threat_intelligence
+areas:
+  - authentication
+  - authorization
+  - encryption
+  - network
+  - endpoint
+  - compliance
+  - cloud
+severity:
+  default: medium
+  vulnerability: critical
+before_after: false
+promotion_targets:
+  - id: hardening-checklist
+    title: hardening checklist
+  - id: playbooks
+    title: playbooks
+  - id: compliance-list
+    title: compliance list
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  - '\b(?:exploit|payload)\s*[:=]\s*\S{8,}'

@@ -11,6 +11,8 @@ import type { AgentMessage } from "@trek/agent-core";
 import { loadManifest, manifestPath, saveManifest } from "logosdb-mcp-server/dist/file-index-manifest.js";
 import { hybridRerank } from "logosdb-mcp-server/dist/hybrid.js";
 import { NamespaceStore } from "logosdb-mcp-server/dist/store.js";
+import { type LessonScope, lessonAllowed, lessonTag } from "../domains/lesson-pattern.ts";
+import { dismissedLessonIds } from "../reflective-loop/crystallize.ts";
 import { type MemorySettings, memoryIsActive } from "../settings-manager.ts";
 import {
 	annotateHandoff,
@@ -186,14 +188,22 @@ export class MemoryManager {
 	}
 
 	/** Stored lessons nearest the query, reranked where the suite allows it. */
-	async lessonCandidates(query: string, limit = 20): Promise<MemoryHit[]> {
+	async lessonCandidates(query: string, limit = 20, scope?: LessonScope): Promise<MemoryHit[]> {
 		const settings = this.options.getSettings();
 		const found: MemoryHit[] = [];
 		for (const layer of ["project", "global"] as const) {
 			if (!settings[layer]) continue;
 			found.push(...(await this.recall(query, layer, true, limit * 2)).filter((hit) => hit.kind === "lesson"));
 		}
-		return found.sort((a, b) => b.score - a.score).slice(0, limit);
+		const inactive = scope ? dismissedLessonIds(scope.cwd) : undefined;
+		const eligible = scope
+			? found.filter(
+					(hit) =>
+						!inactive?.has(hit.id) &&
+						lessonAllowed(lessonTag(hit.text), scope.selected, scope.catalogIds, scope.alwaysOn),
+				)
+			: found;
+		return eligible.sort((a, b) => b.score - a.score).slice(0, limit);
 	}
 
 	/**
@@ -203,6 +213,7 @@ export class MemoryManager {
 	async buildInjection(
 		query: string,
 		promote?: (query: string, candidates: MemoryHit[]) => Promise<string[] | undefined>,
+		scope?: LessonScope,
 	): Promise<MemoryInjection> {
 		if (!this.live()) return { text: "", lessonIds: [] };
 		const q = query.trim().slice(0, 512);
@@ -217,7 +228,7 @@ export class MemoryManager {
 		if (promote) {
 			let candidates: MemoryHit[] = [];
 			try {
-				candidates = await this.lessonCandidates(q);
+				candidates = await this.lessonCandidates(q, 20, scope);
 			} catch {
 				candidates = [];
 			}

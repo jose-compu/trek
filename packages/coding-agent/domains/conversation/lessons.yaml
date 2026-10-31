@@ -1,0 +1,22 @@
+domain: conversation
+categories:
+  - tone_mismatch
+  - misunderstanding
+  - escalation_failure
+  - context_loss
+  - sentiment_drift
+  - hallucination
+areas:
+  []
+severity:
+  default: medium
+  escalation_failure: high
+before_after: false
+promotion_targets:
+  - id: conversation-guidelines
+    title: conversation guidelines
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

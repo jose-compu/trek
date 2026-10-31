@@ -3,11 +3,26 @@
  * The Planning/Frontier model chooses which stored lessons enter the prompt (L2).
  */
 
+export type LessonSeverity = "low" | "medium" | "high" | "critical";
+
+export type LessonStatus = "pending" | "promoted" | "dismissed";
+
 export interface Lesson {
 	trigger: string;
 	mistake: string;
 	rule: string;
 	domain: string;
+	category?: string;
+	area?: string;
+	severity?: LessonSeverity;
+	before?: string;
+	after?: string;
+	fields?: Record<string, string>;
+	count?: number;
+	see_also?: string[];
+	status?: LessonStatus;
+	recurrence_key?: string;
+	source_turn?: string;
 }
 
 export interface LessonEvidence {
@@ -75,11 +90,22 @@ export function turnFailures(messages: readonly TurnMessage[], limit = 3): strin
 	return failures;
 }
 
-export function lessonPrompt(evidence: LessonEvidence): string {
+export interface LessonPromptPattern {
+	domain: string;
+	categories: readonly string[];
+	areas: readonly string[];
+	beforeAfter: boolean;
+}
+
+export function lessonPrompt(evidence: LessonEvidence, pattern?: LessonPromptPattern): string {
 	const lines = [
 		"Write one lesson from this turn so the next session does not repeat the mistake.",
-		'Reply with JSON only: {"trigger": "...", "mistake": "...", "rule": "...", "domain": "..."}.',
-		"trigger: the kind of task where this applies. mistake: what went wrong. rule: one imperative sentence to follow next time. domain: one lowercase word.",
+		pattern
+			? 'Reply with JSON only: {"trigger":"...","mistake":"...","rule":"...","category":"...","area":"...","severity":"low|medium|high|critical","before":"...","after":"..."}. '
+			: 'Reply with JSON only: {"trigger": "...", "mistake": "...", "rule": "...", "domain": "..."}.',
+		pattern
+			? `The domain is ${pattern.domain}. category must be one of: ${pattern.categories.join(", ")}. ${pattern.areas.length > 0 ? `area must be one of: ${pattern.areas.join(", ")}.` : "Omit area."} ${pattern.beforeAfter ? "before and after are required." : ""} severity may be raised above the default, not lowered.`
+			: "trigger: the kind of task where this applies. mistake: what went wrong. rule: one imperative sentence to follow next time. domain: one lowercase word.",
 		"Use only facts from this turn. No preamble.",
 		"",
 		`Task: ${evidence.task.slice(0, 600)}`,
@@ -125,6 +151,8 @@ export function formatLesson(lesson: Lesson): string {
 	const parts = [`Rule: ${lesson.rule}`];
 	if (lesson.trigger) parts.push(`When: ${lesson.trigger}`);
 	if (lesson.mistake) parts.push(`Mistake: ${lesson.mistake}`);
+	if (lesson.category) parts.push(`Category: ${lesson.category}`);
+	if (lesson.area) parts.push(`Area: ${lesson.area}`);
 	return parts.join("\n");
 }
 

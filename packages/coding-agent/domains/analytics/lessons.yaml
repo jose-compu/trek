@@ -1,0 +1,32 @@
+domain: analytics
+categories:
+  - data_quality
+  - metric_drift
+  - pipeline_failure
+  - visualization_mislead
+  - definition_mismatch
+  - freshness_issue
+areas:
+  - ingestion
+  - transformation
+  - modeling
+  - reporting
+  - visualization
+  - governance
+  - data_catalog
+severity:
+  default: medium
+  pipeline_failure: high
+before_after: false
+promotion_targets:
+  - id: data-dictionary
+    title: data dictionary
+  - id: pipeline-runbook
+    title: pipeline runbook
+  - id: data-quality-sla
+    title: data quality SLA
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

@@ -66,18 +66,28 @@ import {
 import { DEFAULT_THINKING_LEVEL } from "./defaults.ts";
 import {
 	type ArchonWorkflow,
+	acceptTypedLesson,
 	checkWorkflowNodes,
 	completeDomainCommand,
+	completePatternCommand as completePatternArguments,
+	type DomainSelection,
+	runPatternCommand as executePatternCommand,
 	formatWorkflowCheck,
 	isSpecificFact,
+	lessonIsBlocked,
+	lessonIsOffered,
+	lessonPatternFor,
 	loadDomainCatalog,
 	missingWorkflowFacts,
 	parseArchonWorkflow,
 	parseWorkflowEdit,
+	readDomainSkills,
+	repairLessonPrompt,
 	restoreDomainWorkflow,
 	runArchonWorkflow,
 	runDomainSessionCommand,
 	saveDomainWorkflow,
+	selectDomain,
 	tryWorkflowYaml,
 	unwrapWorkflowYaml,
 	workflowDraftPrompt,
@@ -85,6 +95,7 @@ import {
 	workflowEditQuestion,
 	workflowFactQuestion,
 	workflowFactRefusal,
+	writeDomainSkill,
 } from "./domains/index.ts";
 import {
 	type BatchSummary,
@@ -158,12 +169,14 @@ import {
 	gatherBranches,
 	isCorrection,
 	isReflectiveLoopEnabled,
+	type Lesson,
 	type LessonEvidence,
 	lessonIdsFromEntries,
 	lessonPromotionEnabled,
 	lessonPrompt,
 	lessonsEnabled,
 	loadLessonRecord,
+	markLessonPromoted,
 	mutatedPath,
 	parseCrystallize,
 	parseLesson,
@@ -171,6 +184,7 @@ import {
 	planBranches,
 	promotionPrompt,
 	ReflectiveLoopController,
+	recurLesson,
 	removeCrystallizedSkill,
 	SerialQueue,
 	saveLessonRecord,
@@ -459,6 +473,18 @@ export class AgentSession {
 	private _pendingNextTurnMessages: CustomMessage[] = [];
 	/** Lesson ids stored during this prompt, shown once the turn finishes. */
 	private _lessonNotices: string[] = [];
+	/** Domain chosen once for this prompt, before memory injection. */
+	private _turnSelection: DomainSelection = {
+		domain: "none",
+		workflow: "none",
+		selectionReason: "none",
+		nodeIds: [],
+		yaml: "",
+		parameters: [],
+	};
+	private _previousTask = "";
+	private _catalogIds = new Set<string>();
+	private _alwaysOnIds = new Set<string>();
 
 	// Compaction state
 	private _compactionAbortController: AbortController | undefined = undefined;
@@ -2226,11 +2252,19 @@ export class AgentSession {
 		return runDomainSessionCommand(this._cwd, name, arg);
 	}
 
+	runPatternCommand(arg: string): string {
+		return executePatternCommand(this._cwd, arg);
+	}
+
 	completeDomainCommand(
 		name: "domains" | "workflows",
 		argumentPrefix: string,
 	): Array<{ value: string; label: string; description?: string }> {
 		return completeDomainCommand(this._cwd, name, argumentPrefix);
+	}
+
+	completePatternCommand(argumentPrefix: string): Array<{ value: string; label: string; description?: string }> {
+		return completePatternArguments(this._cwd, argumentPrefix);
 	}
 
 	getWorkflowCheck(): string | undefined {
@@ -2317,13 +2351,54 @@ export class AgentSession {
 		return this._memory;
 	}
 
+	private _selectTurn(task: string): DomainSelection {
+		const none: DomainSelection = {
+			domain: "none",
+			workflow: "none",
+			selectionReason: "none",
+			nodeIds: [],
+			yaml: "",
+			parameters: [],
+		};
+		try {
+			const catalog = loadDomainCatalog(this._cwd);
+			this._catalogIds = new Set(catalog.domains.map((domain) => domain.id));
+			this._alwaysOnIds = new Set(catalog.domains.filter((domain) => domain.alwaysOn).map((domain) => domain.id));
+			return selectDomain(catalog, { task, previous: this._previousTask });
+		} catch {
+			return none;
+		}
+	}
+
+	private _lessonScope(): {
+		cwd: string;
+		selected: string;
+		catalogIds: Set<string>;
+		alwaysOn: Set<string>;
+	} {
+		return {
+			cwd: this._cwd,
+			selected: this._turnSelection.domain,
+			catalogIds: this._catalogIds,
+			alwaysOn: this._alwaysOnIds,
+		};
+	}
+
+	private _appendDomainSkills(selection: DomainSelection): void {
+		const skills = readDomainSkills(this._cwd, selection.domain);
+		if (!skills) return;
+		this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n<domain-skills domain="${selection.domain}">\n${skills}\n</domain-skills>`;
+	}
+
 	private async _injectMemory(query: string): Promise<void> {
 		this._lastRetrievedLessonIds = [];
 		if (!this.memoryActive()) return;
 		this.startMemory();
 		try {
-			const block = await this.memory().buildInjection(query, (q, candidates) =>
-				this._promoteLessons(q, candidates),
+			const block = await this.memory().buildInjection(
+				query,
+				(q, candidates) => this._promoteLessons(q, candidates),
+				this._lessonScope(),
 			);
 			if (!block.text) return;
 			this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n${block.text}`;
@@ -2673,11 +2748,33 @@ export class AgentSession {
 	}
 
 	/** The work-horse writes one lesson into project memory (L3). */
-	private async _writeLesson(evidence: LessonEvidence): Promise<void> {
+	private async _writeLesson(evidence: LessonEvidence, domain?: string): Promise<void> {
 		if (!lessonsEnabled() || !this.memoryActive() || !this.model) return;
 		try {
-			const lesson = parseLesson(await this._sideCall(this.model, lessonPrompt(evidence)));
+			const pattern = domain ? lessonPatternFor(this._cwd, domain) : undefined;
+			const lesson = await this._draftLesson(evidence, pattern);
 			if (!lesson) return;
+			lesson.source_turn = evidence.task.slice(0, 80);
+			if (lessonIsBlocked(lesson, pattern)) {
+				this.sessionManager.appendCustomEntry("trek:lesson_dropped", {
+					reason: "redacted",
+					domain: lesson.domain,
+				});
+				debugLog("memory", "lesson redacted", { domain: lesson.domain });
+				return;
+			}
+			const again = recurLesson(this._cwd, lesson);
+			if (again) {
+				this._lessonNotices.push(again.id);
+				this.sessionManager.appendCustomEntry("trek:lesson", {
+					id: again.id,
+					kind: evidence.kind,
+					modelId: this.model.id,
+					lesson: again,
+					recurred: true,
+				});
+				return;
+			}
 			this.startMemory();
 			const stored = await this.memory().remember(formatLesson(lesson), lesson.domain);
 			const id = /^stored (project:\d+)$/.exec(stored)?.[1];
@@ -2695,6 +2792,29 @@ export class AgentSession {
 		}
 	}
 
+	/** One side call. A typed pattern gets one repair call only when the first reply is invalid. */
+	private async _draftLesson(
+		evidence: LessonEvidence,
+		pattern: ReturnType<typeof lessonPatternFor>,
+	): Promise<Lesson | undefined> {
+		if (!this.model) return undefined;
+		const first = await this._sideCall(this.model, lessonPrompt(evidence, pattern));
+		if (!pattern) return parseLesson(first);
+		const accepted = acceptTypedLesson(first, pattern);
+		if (accepted.lesson) return accepted.lesson;
+		const repaired = acceptTypedLesson(
+			await this._sideCall(this.model, repairLessonPrompt(pattern, accepted.reason ?? "invalid")),
+			pattern,
+		);
+		if (!repaired.lesson) {
+			this.sessionManager.appendCustomEntry("trek:lesson_dropped", {
+				reason: repaired.reason ?? "invalid",
+				domain: pattern.domain,
+			});
+		}
+		return repaired.lesson;
+	}
+
 	/**
 	 * L2 to L1. The promotion model drafts the skill. A no stops.
 	 * A yes writes only when the user confirms. No handler means nothing is written.
@@ -2702,6 +2822,11 @@ export class AgentSession {
 	async crystallizeLesson(id: string): Promise<string> {
 		const lesson = loadLessonRecord(this._cwd, id);
 		if (!lesson) return `unknown lesson ${id}`;
+		const pattern = lesson.category ? lessonPatternFor(this._cwd, lesson.domain) : undefined;
+		if (pattern && lesson.category) {
+			if (lesson.status === "dismissed") return `dismissed ${id}`;
+			if (!lessonIsOffered(lesson, pattern)) return `${id} is below the promotion threshold.`;
+		}
 		const pick = this._promotionModel();
 		if (!pick) return NO_PROMOTION_MODEL;
 		try {
@@ -2721,6 +2846,19 @@ export class AgentSession {
 			});
 			if (verdict.promote === "no") return verdict.reason;
 			if (!yes) return CRYSTALLIZE_NEEDS_YES;
+			if (pattern && lesson.category) {
+				const target = pattern.promotionTargets[0];
+				if (!target) return `${lesson.domain} has no promotion target.`;
+				const path = writeDomainSkill(
+					this._cwd,
+					lesson.domain,
+					target.id,
+					target.title,
+					verdict.skill ?? lesson.rule,
+				);
+				markLessonPromoted(this._cwd, id);
+				return `Wrote ${path}. It loads when ${lesson.domain} is selected.`;
+			}
 			const path = writeCrystallizedSkill(this._cwd, id, lesson, verdict.skill ?? lesson.rule);
 			return `Wrote ${path}. It loads on the next session.`;
 		} catch (error) {
@@ -2735,7 +2873,7 @@ export class AgentSession {
 			.split(/\s+/)
 			.filter((part) => part.length > 0);
 		try {
-			if (name === "lessons") return formatLessonsTable(this._cwd);
+			if (name === "lessons") return formatLessonsTable(this._cwd, arg.trim() || undefined);
 			if (parts[0] === "remove") {
 				if (!parts[1]) return "usage: /crystallize remove <id>";
 				return removeCrystallizedSkill(this._cwd, parts[1]);
@@ -2759,12 +2897,15 @@ export class AgentSession {
 		if (!lessonsEnabled() || !this.memoryActive()) return;
 		const failures = turnFailures(this.agent.state.messages.slice(turnStart));
 		if (failures.length === 0) return;
-		await this._writeLesson({
-			kind: "error",
-			task: this._lastPromptTask,
-			failures,
-			reply: stripHonestyFooter(this._lastAssistantText()),
-		});
+		await this._writeLesson(
+			{
+				kind: "error",
+				task: this._lastPromptTask,
+				failures,
+				reply: stripHonestyFooter(this._lastAssistantText()),
+			},
+			this._turnSelection.domain,
+		);
 	}
 
 	private async _learnFromCorrection(text: string): Promise<void> {
@@ -2786,13 +2927,22 @@ export class AgentSession {
 						.map((part) => part.text)
 						.join("\n")
 				: "";
-		await this._writeLesson({
-			kind: "correction",
-			task,
-			failures: turnFailures(messages.slice(lastUser)),
-			reply: stripHonestyFooter(this._lastAssistantText()),
-			correction: text,
-		});
+		let domain = "none";
+		try {
+			domain = selectDomain(loadDomainCatalog(this._cwd), { task }).domain;
+		} catch {
+			domain = "none";
+		}
+		await this._writeLesson(
+			{
+				kind: "correction",
+				task,
+				failures: turnFailures(messages.slice(lastUser)),
+				reply: stripHonestyFooter(this._lastAssistantText()),
+				correction: text,
+			},
+			domain,
+		);
 	}
 
 	/** L3 to L2: the Planning/Frontier model picks which lessons enter the prompt. */
@@ -2936,15 +3086,11 @@ export class AgentSession {
 			userMessage: this._lastPromptTask,
 			facts,
 			runPrompt: async (prompt, node) => {
-				if (node.allowedTools) {
-					this.setActiveToolsByName(node.allowedTools);
-				}
+				this.setActiveToolsByName(node.allowedTools ?? []);
 				try {
 					await this.agent.prompt(prompt);
 				} finally {
-					if (node.allowedTools) {
-						this.setActiveToolsByName(previousTools);
-					}
+					this.setActiveToolsByName(previousTools);
 				}
 				return stripHonestyFooter(this._lastAssistantText()).trim();
 			},
@@ -2955,6 +3101,7 @@ export class AgentSession {
 				id: node.id,
 				prompt: node.body,
 				output: results.find((result) => result.id === node.id)?.output ?? "",
+				upstream: node.dependsOn.map((id) => results.find((result) => result.id === id)?.output ?? "").join("\n"),
 			})),
 		);
 		this._noteAntiPatterns(turnStart);
@@ -3414,8 +3561,11 @@ export class AgentSession {
 				// Ensure we're using the base prompt (in case previous turn had modifications)
 				this.agent.state.systemPrompt = this._baseSystemPrompt;
 			}
+			this._turnSelection = this._selectTurn(expandedText);
+			this._previousTask = expandedText;
 			await this._learnFromCorrection(expandedText);
 			await this._injectMemory(expandedText);
+			this._appendDomainSkills(this._turnSelection);
 		} catch (error) {
 			preflightResult?.(false);
 			throw error;
@@ -3440,6 +3590,7 @@ export class AgentSession {
 				task: this._lastPromptTask,
 				promptId,
 				cwd: this._cwd,
+				selection: this._turnSelection,
 				messageCount: this.agent.state.messages.length,
 				getMessageCount: () => this.agent.state.messages.length,
 				act: () => this._actOnTurn(messages),
@@ -3461,7 +3612,7 @@ export class AgentSession {
 					this._calledFacts = selection.parameters
 						.filter((fact) => isSpecificFact(fact.name, fact.value))
 						.map((fact) => ({ name: fact.name, value: fact.value }));
-					this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n<workflow domain="${selection.domain}" name="${selection.workflow}">\nCall each node as its own step, in depends_on order. $USER_MESSAGE is the user turn. $id.output is that node's reply. If a fact is not in the user turn or an upstream output, say it is not in the turn.\n</workflow>`;
+					this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n<workflow domain="${selection.domain}" name="${selection.workflow}">\nThe session runs each node. Answer only the node you are given. Do not call a tool unless that node allows it. If a fact is not in the user turn or an earlier node reply, say it is not in the turn.\n</workflow>`;
 					this._emitWorkflowCard(selection);
 				},
 				phaseAllowed: (phase) => phaseIsOpen(this._operatorMode, phase, this._openPhases),

@@ -1,0 +1,37 @@
+domain: domotics
+categories:
+  - automation_conflict
+  - sensor_drift
+  - device_unreachable
+  - integration_break
+  - energy_optimization
+  - safety_rule_gap
+  - occupancy_mismatch
+  - latency_jitter
+areas:
+  - lighting
+  - climate
+  - security
+  - access_control
+  - energy
+  - sensors
+  - routines
+  - voice_assistants
+  - integrations
+  - network
+severity:
+  default: medium
+  safety_rule_gap: high
+before_after: false
+promotion_targets:
+  - id: automation-rule-library
+    title: automation rule library
+  - id: device-matrix
+    title: device matrix
+  - id: safety-automations
+    title: safety automations
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []

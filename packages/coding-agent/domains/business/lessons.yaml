@@ -1,0 +1,37 @@
+domain: business
+categories:
+  - process_breakdown
+  - policy_gap
+  - kpi_misalignment
+  - decision_latency
+  - handoff_failure
+  - stakeholder_misalignment
+  - documentation_drift
+  - compliance_oversight
+areas:
+  - planning
+  - execution
+  - governance
+  - reporting
+  - operations
+  - budgeting
+  - procurement
+  - vendor_management
+  - risk_management
+  - communication
+severity:
+  default: medium
+  compliance_oversight: high
+before_after: false
+promotion_targets:
+  - id: process-playbook
+    title: process playbook
+  - id: kpi-registry
+    title: KPI registry
+  - id: raci
+    title: RACI
+promotion_threshold:
+  count: 3
+  severity: critical
+redact:
+  []
