@@ -55,7 +55,7 @@ describe("component router", () => {
 			toolNames: ["write"],
 			skillNames: [],
 			role: route.role,
-			source: route.source,
+			source: route.source === "api" ? "api" : "local",
 			routeReason: route.reason,
 			clock: () => new Date("2026-10-27T00:00:00.000Z"),
 		});
@@ -109,9 +109,12 @@ describe("component router", () => {
 		const hybrid = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "mistral" }), {
 			frontier: { provider: "anthropic", modelId: "frontier" },
 		});
-		const heavy = routeComponent({ component: "intend", resolved: hybrid, depth: 0, complexity: 0.2 });
+		const regular = routeComponent({ component: "intend", resolved: hybrid, depth: 0, complexity: 0.2 });
+		expect(regular.role).toBe("planning");
+		expect(regular.reason).toMatch(/intend uses planning/);
+		const heavy = routeComponent({ component: "intend", resolved: hybrid, depth: 0, complexity: 0.85 });
 		expect(heavy.role).toBe("frontier");
-		expect(heavy.reason).toMatch(/depth-0 Intend/);
+		expect(heavy.reason).toMatch(/complexity 0\.85 escalates/);
 		const cheap = routeComponent({
 			component: "toolIntent",
 			resolved: hybrid,

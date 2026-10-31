@@ -56,6 +56,13 @@ export function requiresHuggingFaceToken(mode: HierarchyMode): boolean {
 	return mode !== "api";
 }
 
+function sessionNeedsLocalWeights(mode: HierarchyMode, roles: Partial<Record<RuntimeRole, RoleAssignment>>): boolean {
+	if (mode === "api") {
+		return false;
+	}
+	return SESSION_LOCAL_ROLES.some((role) => roles[role]?.source === "local");
+}
+
 export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOptions = {}): ResolvedRuntime {
 	const preset = suitePreset(config.hierarchy.suite);
 	const presetRoles: Partial<Record<RuntimeRole, RoleAssignment>> = { ...preset.roles };
@@ -93,7 +100,7 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 		rerank: preset.rerank,
 		presetRoles,
 		roles,
-		requiresHuggingFaceToken: requiresHuggingFaceToken(effectiveMode),
+		requiresHuggingFaceToken: sessionNeedsLocalWeights(effectiveMode, roles),
 		frontierAvailable,
 	};
 }
@@ -141,7 +148,7 @@ export function formatRuntimeStatus(resolved: ResolvedRuntime): string {
 		`huggingFaceToken: ${resolved.requiresHuggingFaceToken ? "required for local weights" : "not required"}`,
 		`rerank: ${resolved.rerank ? "on" : "off"}`,
 	];
-	const order: RuntimeRole[] = ["tooling", "workhorse", "planning", "embedding", "reranker", "frontier"];
+	const order: RuntimeRole[] = ["workhorse", "planning", "embedding", "reranker", "frontier"];
 	for (const name of order) {
 		const active = resolved.roles[name];
 		const preset = resolved.presetRoles[name];

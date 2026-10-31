@@ -1,16 +1,16 @@
 /**
- * Coarse session role (issue #90). Per-component assignment is routeComponent.
- * api: the configured session model, recorded as frontier.
- * local / hybrid: Act uses Workhorse. Plan/research uses Planning.
- * Frontier is the fourth layer only in hybrid.
+ * Session routing uses routeComponent. Workhorse acts. Planning thinks.
+ * Frontier (API) takes deep thinking, planning, and hard debugging when present.
+ * api mode keeps a single session model.
  */
 
+import { routeComponent } from "./component-router.ts";
 import type { ResolvedRuntime } from "./resolve.ts";
-import type { RoleSource } from "./types.ts";
+import type { RoleSource, RouteComponent } from "./types.ts";
 
 export const FRONTIER_COMPLEXITY_THRESHOLD = 0.7;
 
-/** A from-scratch or multi-step task. The tooling model is never the session model. */
+/** A from-scratch or multi-step task. */
 const HARD_TASK =
 	/\b(build|create|implement|scaffold|website|game|app|application|design|architect|refactor|rewrite|project)\b/i;
 
@@ -20,6 +20,17 @@ const MAKE_ARTIFACT =
 
 /** A one-line correction stays on the workhorse, including after a Planning turn. */
 const SMALL_EDIT = /\b(typo|format|lint|rename|spell(?:ing)?)\b/i;
+
+const DEEP_WORK =
+	/\b(debug|diagnos|root[- ]cause|hard bug|investigate|architect(?:ure)?|deep (?:think|plan|dive)|research)\b/i;
+
+export type TaskKind = "mechanical" | "act" | "plan" | "deep";
+
+export interface TaskClass {
+	kind: TaskKind;
+	component: RouteComponent;
+	complexity: number;
+}
 
 export function isSmallEdit(text: string): boolean {
 	const trimmed = text.trim();
@@ -40,8 +51,22 @@ export function promptNeedsPlanning(text: string): boolean {
 	return trimmed.length >= 400 && /\b(file|files|html|javascript|css|function|component|page)\b/i.test(trimmed);
 }
 
+export function classifyTask(text: string): TaskClass {
+	const trimmed = text.trim();
+	if (isSmallEdit(trimmed)) {
+		return { kind: "mechanical", component: "mechanical", complexity: 0.1 };
+	}
+	if (/(?:^|\s)\/frontier\b/i.test(trimmed) || DEEP_WORK.test(trimmed)) {
+		return { kind: "deep", component: "intend", complexity: 0.85 };
+	}
+	if (/\b(plan|planning|research)\b/i.test(trimmed) || promptNeedsPlanning(trimmed)) {
+		return { kind: "plan", component: "intend", complexity: 0.4 };
+	}
+	return { kind: "act", component: "toolIntent", complexity: 0.2 };
+}
+
 export interface RoleSelection {
-	role: "tooling" | "workhorse" | "planning" | "frontier";
+	role: "workhorse" | "planning" | "frontier";
 	source: RoleSource;
 	modelId: string;
 	provider?: string;
@@ -49,59 +74,110 @@ export interface RoleSelection {
 	reason: string;
 }
 
+export function selectThinkRole(input: {
+	text: string;
+	resolved: ResolvedRuntime;
+	complexity?: number;
+	retries?: number;
+	previousRole?: RoleSelection["role"];
+	overrides?: Parameters<typeof routeComponent>[0]["overrides"];
+}): RoleSelection | undefined {
+	if (input.resolved.effectiveMode === "api") {
+		return undefined;
+	}
+	const classified = classifyTask(input.text ?? "");
+	let kind = classified.kind;
+	if (input.previousRole === "frontier" && (input.text ?? "").trim().length > 0 && kind !== "mechanical") {
+		kind = "deep";
+	} else if (input.previousRole === "planning" && (input.text ?? "").trim().length > 0 && kind !== "mechanical") {
+		kind = kind === "deep" ? "deep" : "plan";
+	}
+	if (kind === "mechanical" || kind === "act") {
+		return undefined;
+	}
+	const complexity = input.complexity ?? (kind === "deep" ? 0.85 : Math.max(classified.complexity, 0.4));
+	return routeComponent({
+		component: "intend",
+		resolved: input.resolved,
+		complexity,
+		retries: input.retries ?? 0,
+		depth: 0,
+		overrides: input.overrides,
+	});
+}
+
 export function selectSessionRole(input: {
 	text: string;
 	resolved: ResolvedRuntime;
 	complexity?: number;
-	/** The role already bound for this session. A follow-up stays on Planning. */
+	retries?: number;
+	/** The role already bound for this session. A follow-up stays on a Planning task. */
 	previousRole?: RoleSelection["role"];
+	overrides?: Parameters<typeof routeComponent>[0]["overrides"];
 }): RoleSelection {
 	const { resolved } = input;
 	if (resolved.effectiveMode === "api") {
-		return fromRole(resolved, "frontier", "api mode uses the configured session model");
+		return routeComponent({
+			component: "toolIntent",
+			resolved,
+		});
 	}
 
 	const text = input.text ?? "";
-	const complexity = input.complexity ?? 0;
-	const wantsFrontier = /(?:^|\s)\/frontier\b/i.test(text) || complexity > FRONTIER_COMPLEXITY_THRESHOLD;
-	const wantsPlanning = /\b(plan|planning|research)\b/i.test(text);
-	const planning = resolved.roles.planning;
+	const classified = classifyTask(text);
+	let kind = classified.kind;
+	if (input.previousRole === "frontier" && text.trim().length > 0 && kind !== "mechanical") {
+		kind = "deep";
+	} else if (input.previousRole === "planning" && text.trim().length > 0 && kind !== "mechanical") {
+		kind = kind === "deep" ? "deep" : "plan";
+	}
 
-	if (wantsFrontier && resolved.effectiveMode === "hybrid" && resolved.roles.frontier) {
-		return fromRole(resolved, "frontier", "hybrid Frontier layer for a heavier step");
+	const complexity =
+		input.complexity ??
+		(kind === "deep" ? 0.85 : kind === "plan" ? Math.max(classified.complexity, 0.4) : classified.complexity);
+
+	if (kind === "deep") {
+		return routeComponent({
+			component: "intend",
+			resolved,
+			complexity,
+			retries: input.retries ?? 0,
+			depth: 0,
+			overrides: input.overrides,
+		});
 	}
-	if (wantsFrontier && resolved.effectiveMode === "local") {
-		if (planning) {
-			return fromRole(resolved, "planning", "frontier is not available in local mode; using Planning");
-		}
+	if (kind === "plan") {
+		return routeComponent({
+			component: "toolIntent",
+			resolved,
+			complexity,
+			retries: input.retries ?? 0,
+			depth: 1,
+			overrides: input.overrides,
+		});
 	}
-	if (!planning) {
-		return fromRole(resolved, "workhorse", "Planning is missing; Work-horse is the fallback");
-	}
-	if (isSmallEdit(text)) {
-		return fromRole(resolved, "workhorse", "a small edit uses Work-horse");
-	}
-	if (wantsPlanning) {
-		return fromRole(resolved, "planning", "plan or research step uses Planning");
-	}
-	if (promptNeedsPlanning(text)) {
-		return fromRole(resolved, "planning", "building uses Planning");
-	}
-	if (input.previousRole === "planning" && text.trim().length > 0) {
-		return fromRole(resolved, "planning", "continuing a Planning task");
-	}
-	return fromRole(resolved, "workhorse", "Act path uses Work-horse");
+	return routeComponent({
+		component: classified.component,
+		resolved,
+		complexity,
+		retries: input.retries ?? 0,
+		depth: 1,
+		overrides: input.overrides,
+	});
 }
 
-/** Map the bound local chat model back to its suite role. Tooling is not a session default. */
+/** Map the bound chat model back to its suite role. */
 export function sessionRoleForModel(
 	resolved: ResolvedRuntime,
 	model: { provider?: string; id?: string; name?: string } | undefined,
 ): RoleSelection["role"] | undefined {
-	if (!model || model.provider !== "local") {
+	if (!model || (model.provider !== "local" && model.provider !== "lmstudio")) {
+		if (model?.provider && model.provider !== "local") {
+			return resolved.roles.frontier ? "frontier" : undefined;
+		}
 		return undefined;
 	}
-	for (const role of ["planning", "workhorse", "tooling"] as const) {
+	for (const role of ["planning", "workhorse"] as const) {
 		const id = resolved.roles[role]?.id;
 		if (!id) {
 			continue;
@@ -122,24 +198,6 @@ export function latestUserPrompt(messages: readonly { role: string; content?: un
 		return contentText(message.content);
 	}
 	return "";
-}
-
-function fromRole(resolved: ResolvedRuntime, role: RoleSelection["role"], reason: string): RoleSelection {
-	const assignment = resolved.roles[role];
-	if (!assignment) {
-		throw new Error(`Role ${role} is not assigned.`);
-	}
-	const selection: RoleSelection = {
-		role,
-		source: assignment.source,
-		modelId: assignment.id,
-		thinking: assignment.thinking,
-		reason,
-	};
-	if (assignment.provider) {
-		selection.provider = assignment.provider;
-	}
-	return selection;
 }
 
 function contentText(content: unknown): string {

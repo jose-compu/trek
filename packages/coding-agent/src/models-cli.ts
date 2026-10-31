@@ -7,6 +7,7 @@ import chalk from "chalk";
 import { APP_NAME, getAgentDir } from "./config.ts";
 import {
 	benchmarkRuntime,
+	DEFAULT_LMSTUDIO_BASE_URL,
 	defaultRuntimeConfig,
 	formatBenchmark,
 	formatRuntimeStatus,
@@ -30,11 +31,13 @@ function printHelp(): void {
 	console.log(`${APP_NAME} models list`);
 	console.log(`${APP_NAME} models set-mode api|local|hybrid`);
 	console.log(`${APP_NAME} models set-suite mistral|mistral-pro|qwen|lfm`);
-	console.log(`${APP_NAME} models set-role <role> --id <id> [--source local|api] [--thinking on|off]`);
+	console.log(`${APP_NAME} models set-role <role> --id <id> [--source local|api|lmstudio] [--thinking on|off]`);
+	console.log(`${APP_NAME} models set-lmstudio --id <id> | --workhorse <id> --planning <id>`);
 	console.log(`${APP_NAME} models benchmark`);
 	console.log("  Role registry in ~/.trek/models.yaml. Project .trek/models.yaml overrides it.");
-	console.log("  Default mode is api: no llama.cpp process. Local and hybrid are opt-in.");
-	console.log("  This command does not download weights (0.16.0).");
+	console.log("  Default mode is api: one session model. Local and hybrid are opt-in.");
+	console.log("  Workhorse acts. Planning thinks. Frontier is API for deep work.");
+	console.log("  LM Studio: one id for a single loaded model, or workhorse and planning ids.");
 	console.log("  --provider and --model still choose the session model in api mode.");
 }
 
@@ -69,6 +72,9 @@ export async function handleModelsCommand(args: string[]): Promise<boolean> {
 	}
 	if (sub === "set-role") {
 		return setRole(rest.slice(1));
+	}
+	if (sub === "set-lmstudio") {
+		return setLmStudio(rest.slice(1));
 	}
 	if (sub === "benchmark") {
 		return benchmark();
@@ -134,7 +140,7 @@ function setRole(rest: string[]): boolean {
 	const roleName = rest[0];
 	if (!roleName || !isRuntimeRole(roleName)) {
 		console.error(
-			chalk.red("Usage: trek models set-role <tooling|workhorse|planning|frontier|embedding|reranker> --id <id>"),
+			chalk.red("Usage: trek models set-role <workhorse|planning|frontier|embedding|reranker> --id <id>"),
 		);
 		process.exitCode = 1;
 		return true;
@@ -147,9 +153,13 @@ function setRole(rest: string[]): boolean {
 	}
 	const sourceFlag = flagValue(rest, "--source");
 	const source: RoleSource =
-		sourceFlag === "api" || sourceFlag === "local" ? sourceFlag : roleName === "frontier" ? "api" : "local";
-	if (sourceFlag !== undefined && sourceFlag !== "api" && sourceFlag !== "local") {
-		console.error(chalk.red("set-role --source must be local or api."));
+		sourceFlag === "api" || sourceFlag === "local" || sourceFlag === "lmstudio"
+			? sourceFlag
+			: roleName === "frontier"
+				? "api"
+				: "local";
+	if (sourceFlag !== undefined && sourceFlag !== "api" && sourceFlag !== "local" && sourceFlag !== "lmstudio") {
+		console.error(chalk.red("set-role --source must be local, api, or lmstudio."));
 		process.exitCode = 1;
 		return true;
 	}
@@ -172,17 +182,56 @@ function setRole(rest: string[]): boolean {
 	if (repo) {
 		assignment.repo = repo;
 	}
+	const baseUrl = flagValue(rest, "--base-url");
+	if (baseUrl) {
+		assignment.baseUrl = baseUrl;
+	} else if (source === "lmstudio") {
+		assignment.baseUrl = DEFAULT_LMSTUDIO_BASE_URL;
+	}
+	const role = roleName === "tooling" ? "workhorse" : roleName;
 	try {
 		const current = loadGlobal();
 		if (process.exitCode) {
 			return true;
 		}
-		writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), withRoleOverride(current, roleName, assignment));
+		writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), withRoleOverride(current, role, assignment));
 	} catch (error) {
 		console.error(chalk.red(error instanceof Error ? error.message : String(error)));
 		process.exitCode = 1;
 		return true;
 	}
+	printStatus();
+	return true;
+}
+
+function setLmStudio(rest: string[]): boolean {
+	const single = flagValue(rest, "--id");
+	const workhorseId = flagValue(rest, "--workhorse") ?? single;
+	const planningId = flagValue(rest, "--planning") ?? single;
+	if (!workhorseId || !planningId) {
+		console.error(chalk.red("Usage: trek models set-lmstudio --id <id> | --workhorse <id> --planning <id>"));
+		process.exitCode = 1;
+		return true;
+	}
+	const baseUrl = flagValue(rest, "--base-url") ?? DEFAULT_LMSTUDIO_BASE_URL;
+	const current = loadGlobal();
+	if (process.exitCode) {
+		return true;
+	}
+	let next = withHierarchy(current, { mode: current.hierarchy.mode === "api" ? "local" : current.hierarchy.mode });
+	next = withRoleOverride(next, "workhorse", {
+		source: "lmstudio",
+		id: workhorseId,
+		thinking: false,
+		baseUrl,
+	});
+	next = withRoleOverride(next, "planning", {
+		source: "lmstudio",
+		id: planningId,
+		thinking: true,
+		baseUrl,
+	});
+	writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), next);
 	printStatus();
 	return true;
 }

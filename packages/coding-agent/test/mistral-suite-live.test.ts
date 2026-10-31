@@ -2,7 +2,7 @@
  * Optional end-to-end tool calls for the Mistral suites.
  * ./test.sh sets PI_NO_LOCAL_LLM=1, so CI skips this file.
  *
- * Models already on disk (tooling, workhorse, planning):
+ * Models already on disk (workhorse, planning):
  *   set -a && source ~/.trek/llama-live.env && set +a
  *   unset PI_NO_LOCAL_LLM
  *   node ../../node_modules/vitest/dist/cli.js --run test/mistral-suite-live.test.ts --reporter=verbose
@@ -67,7 +67,6 @@ interface Completion {
 }
 
 const ON_DISK = [
-	{ role: "tooling", id: "Qwen3.5-0.8B" },
 	{ role: "workhorse", id: "Ministral-3-3B-Instruct-2512" },
 	{ role: "planning", id: "Ministral-3-8B-Reasoning-2512" },
 ] as const;

@@ -16,7 +16,13 @@ export {
 	SMALL_CONTEXT_WINDOW,
 	smallContextPrompt,
 } from "./context-budget.ts";
-export { LOCAL_LLAMA_PROVIDER, LOCAL_LLAMA_TIMEOUT_MS, localLlamaChatModel } from "./local-model.ts";
+export {
+	LMSTUDIO_PROVIDER,
+	LOCAL_LLAMA_PROVIDER,
+	LOCAL_LLAMA_TIMEOUT_MS,
+	lmStudioChatModel,
+	localLlamaChatModel,
+} from "./local-model.ts";
 export {
 	LOCAL_SUITE_WORK_SECTION,
 	LOCAL_WORK_TOOL_NUDGE,
@@ -81,11 +87,15 @@ export {
 	sessionLocalRoles,
 } from "./resolve.ts";
 export {
+	classifyTask,
 	FRONTIER_COMPLEXITY_THRESHOLD,
 	latestUserPrompt,
 	type RoleSelection,
 	selectSessionRole,
+	selectThinkRole,
 	sessionRoleForModel,
+	type TaskClass,
+	type TaskKind,
 } from "./select-role.ts";
 export {
 	apiShortTraceFixture,
@@ -105,6 +115,7 @@ export {
 export { SUITE_PRESETS, type SuitePreset, suitePreset } from "./suites.ts";
 export {
 	assertPublicModelId,
+	DEFAULT_LMSTUDIO_BASE_URL,
 	DEFAULT_QUANT,
 	defaultRuntimeConfig,
 	HIERARCHY_MODES,
@@ -112,6 +123,7 @@ export {
 	type HierarchySettings,
 	isHierarchyMode,
 	isLocalServerRole,
+	isRoleSource,
 	isRuntimeRole,
 	isSuiteId,
 	LOCAL_SERVER_ROLES,

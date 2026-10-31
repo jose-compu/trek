@@ -10,12 +10,12 @@
  *   TREK_GROK_MODEL overrides grok-4.20-0309-reasoning.
  *
  * Local llama.cpp, one server per suite role whose GGUF is present
- * (tooling, workhorse, planning):
+ * (workhorse, planning):
  *   ./scripts/bootstrap-llama.sh
  *   ./scripts/test-llama-live.sh
  * Weights are `<id>.gguf` under TREK_MODELS_DIR (default ~/.trek/models).
  * Files over TREK_LLAMA_MAX_BYTES (default 4 GiB) are not loaded. Those roles
- * are scored with the Frontier API instead. Mistral tooling is Qwen3.5-0.8B.
+ * are scored with the Frontier API instead.
  */
 
 import { existsSync, statSync } from "node:fs";
@@ -40,7 +40,7 @@ import {
 import type { SessionLocalRole, SuiteId } from "../src/core/runtime/types.ts";
 
 const SUITES: SuiteId[] = ["mistral", "mistral-pro", "qwen", "lfm"];
-const LOCAL_ROLES: SessionLocalRole[] = ["tooling", "workhorse", "planning"];
+const LOCAL_ROLES: SessionLocalRole[] = ["workhorse", "planning"];
 let nextLlamaPort = Number(process.env.TREK_LLAMA_PORT_START ?? 18180);
 
 const grokLive = Boolean(process.env.XAI_API_KEY?.trim());

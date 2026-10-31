@@ -190,10 +190,10 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(manager.list()).toEqual([]);
 	});
 
-	it("set-mode local with mocked ports starts three roles once each", () => {
+	it("set-mode local with mocked ports starts workhorse and planning once each", () => {
 		const resolved = resolveRuntime(localConfig(), { frontier: null });
 		expect(resolved.effectiveMode).toBe("local");
-		expect(sessionLocalRoles(resolved)).toEqual(["tooling", "workhorse", "planning"]);
+		expect(sessionLocalRoles(resolved)).toEqual(["workhorse", "planning"]);
 		const calls: string[] = [];
 		let pid = 100;
 		const manager = new LlamaProcessManager({
@@ -210,8 +210,8 @@ describe("0.8.0 runtime gate (#92)", () => {
 			manager.ensure(role, resolved);
 			manager.ensure(role, resolved);
 		}
-		expect(calls).toEqual(["tooling:18080", "workhorse:18081", "planning:18082"]);
-		expect(manager.list()).toHaveLength(3);
+		expect(calls).toEqual(["workhorse:18080", "planning:18081"]);
+		expect(manager.list()).toHaveLength(2);
 		const stopped: number[] = [];
 		const stopping = new LlamaProcessManager({
 			spawn: () => ({ pid: 4242 }),
@@ -268,8 +268,8 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(resolved.effectiveMode).toBe("hybrid");
 		expect(resolved.roles.frontier?.source).toBe("api");
 		expect(resolved.roles.frontier?.provider).toBe("openai");
-		expect(resolved.roles.tooling?.source).toBe("local");
-		expect(sessionLocalRoles(resolved)).toEqual(["tooling", "workhorse", "planning"]);
+		expect(resolved.roles.workhorse?.source).toBe("local");
+		expect(sessionLocalRoles(resolved)).toEqual(["workhorse", "planning"]);
 		expect(detectFrontier({ XAI_API_KEY: "x", OPENAI_API_KEY: "o" })?.provider).toBe("xai");
 	});
 
@@ -278,7 +278,7 @@ describe("0.8.0 runtime gate (#92)", () => {
 		const qwen = resolveRuntime(localConfig("qwen"), { frontier: null });
 		const lfm = resolveRuntime(localConfig("lfm"), { frontier: null });
 		const pro = resolveRuntime(localConfig("mistral-pro"), { frontier: null });
-		expect(mistral.roles.tooling?.id).toBe("Qwen3.5-0.8B");
+		expect(mistral.roles.tooling).toBeUndefined();
 		expect(mistral.roles.workhorse?.id).toBe("Ministral-3-3B-Instruct-2512");
 		expect(mistral.roles.planning?.id).toBe("Ministral-3-8B-Reasoning-2512");
 		expect(mistral.rerank).toBe(true);
@@ -318,23 +318,23 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(model.compat?.supportsReasoningEffort).toBe(false);
 	});
 
-	it("selects Work-horse, Planning, and Frontier without a component router", () => {
+	it("routes Act to Workhorse and deep work to Frontier through routeComponent", () => {
 		const local = resolveRuntime(localConfig(), { frontier: null });
 		const hybrid = resolveRuntime(localConfig(), { frontier: { provider: "anthropic", modelId: "frontier" } });
 		expect(selectSessionRole({ text: "fix the typo", resolved: local }).role).toBe("workhorse");
 		expect(selectSessionRole({ text: "fix the typo", resolved: local }).thinking).toBe(false);
 		expect(selectSessionRole({ text: "build a web chess in /tmp/blah", resolved: local })).toMatchObject({
-			role: "planning",
-			reason: "building uses Planning",
+			role: "workhorse",
+			reason: /toolIntent uses workhorse/,
 		});
-		expect(selectSessionRole({ text: "plan the research", resolved: local })).toMatchObject({
-			role: "planning",
-			thinking: true,
+		expect(selectSessionRole({ text: "plan the login page", resolved: local })).toMatchObject({
+			role: "workhorse",
 			source: "local",
 		});
+		expect(selectSessionRole({ text: "debug the hard bug", resolved: local }).role).toBe("planning");
 		expect(selectSessionRole({ text: "/frontier dig in", resolved: hybrid }).role).toBe("frontier");
 		expect(selectSessionRole({ text: "fix", resolved: hybrid, complexity: 0.8 }).source).toBe("api");
-		expect(selectSessionRole({ text: "/frontier", resolved: local }).reason).toMatch(/not available in local mode/);
+		expect(selectSessionRole({ text: "/frontier", resolved: local }).role).toBe("planning");
 		const api = resolveRuntime(defaultRuntimeConfig(), { frontier: null });
 		expect(selectSessionRole({ text: "plan the research", resolved: api })).toMatchObject({
 			role: "frontier",
@@ -347,7 +347,7 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(formatBenchmark(benchmarkRuntime(api, { weightsAvailable: () => true }))).toMatch(/api mode/);
 		const local = resolveRuntime(localConfig(), { frontier: null });
 		const rows = benchmarkRuntime(local, { weightsAvailable: () => false });
-		expect(rows).toHaveLength(3);
+		expect(rows).toHaveLength(2);
 		expect(rows.every((row) => row.status === "skipped")).toBe(true);
 	});
 
@@ -361,17 +361,17 @@ describe("0.8.0 runtime gate (#92)", () => {
 			writeRuntimeConfigFile(projectModelsYamlPath(cwd), {
 				hierarchy: { mode: "local", suite: "mistral", quant: "q4_k_m" },
 				roles: {
-					tooling: { source: "local", id: "Qwen3.5-0.8B", thinking: false },
+					workhorse: { source: "local", id: "Ministral-3-3B-Instruct-2512", thinking: false },
 				},
 			});
 			const loaded = loadRuntimeConfig({ agentDir, cwd });
 			const resolved = resolveRuntime(loaded, { frontier: null });
-			expect(resolved.roles.tooling?.id).toBe("Qwen3.5-0.8B");
 			expect(resolved.roles.workhorse?.id).toBe("Ministral-3-3B-Instruct-2512");
+			expect(resolved.roles.planning?.id).toBe("Ministral-3-8B-Reasoning-2512");
 			expect(() =>
 				writeRuntimeConfigFile(join(root, "models.yaml"), {
 					...globalConfig,
-					roles: { tooling: { source: "local", id: "@private/needle", thinking: false } },
+					roles: { workhorse: { source: "local", id: "@private/needle", thinking: false } },
 				}),
 			).toThrow(/private or unpublished/);
 		} finally {

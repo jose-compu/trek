@@ -14,7 +14,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 - LFM2.5 chat roles use an 8192-token floor when `TREK_LLAMA_CTX` is smaller. Compaction reserve and the kept tail stay inside that window.
 - On this Mac the LFM planning model uses the MLX 4-bit snapshot. The smaller LFM roles stay on llama.cpp, because MLX does not force a tool call and those models then describe the call instead of making it.
 - A local turn waits until the server has finished loading. The MLX planning request names the snapshot directory, not the GGUF file.
-- A build, a game, or a follow-up to one stays on Planning. A typo, rename, or format stays on the workhorse. The tooling model is not the session model. A reasoning model keeps a 512-token thinking budget so the tool call still fits. A tool call written as JSON in the reply, including a list after a narration, is run.
+- Local and hybrid sessions use `routeComponent`: Workhorse acts, Planning thinks, Frontier (API) takes deep thinking, planning, and hard debugging. api mode stays a single session model. Tooling mini-models are not loaded. `trek models set-lmstudio` binds one or two models already loaded in LM Studio.
 - Lesson promotion skips an extra side call on a local OpenAI server so the TUI does not sit on Working. Side calls use a 45s cap. OpenAI streams that end without finish_reason but with text still complete.
 
 ### Changed

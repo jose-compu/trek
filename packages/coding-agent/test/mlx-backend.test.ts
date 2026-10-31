@@ -48,7 +48,7 @@ describe("MLX on Apple Silicon", () => {
 		process.env.TREK_MODELS_DIR = dir;
 		process.env.TREK_MLX_SERVER = "/bin/echo";
 		const missing = missingMlxWeights(resolved);
-		expect(missing.map((item) => item.id)).toEqual(["LFM2.5-350M", "LFM2.5-1.2B-Instruct", "LFM2.5-8B-A1B"]);
+		expect(missing.map((item) => item.id)).toEqual(["LFM2.5-1.2B-Instruct", "LFM2.5-8B-A1B"]);
 		const declined = await offerMissingMlx({
 			resolved,
 			confirm: async () => false,

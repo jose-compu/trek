@@ -3,16 +3,12 @@ import { llamaServerArgs } from "../src/core/runtime/process-manager.ts";
 import { suiteChatDialects, TOOL_DIALECTS, toolDialect } from "../src/core/runtime/tool-dialect.ts";
 
 const EXPECTED: Record<string, string> = {
-	"mistral:tooling": "qwen",
 	"mistral:workhorse": "mistral",
 	"mistral:planning": "mistral",
-	"mistral-pro:tooling": "qwen",
 	"mistral-pro:workhorse": "mistral",
 	"mistral-pro:planning": "mistral",
-	"qwen:tooling": "qwen",
 	"qwen:workhorse": "qwen",
 	"qwen:planning": "qwen",
-	"lfm:tooling": "lfm",
 	"lfm:workhorse": "lfm",
 	"lfm:planning": "lfm",
 };
@@ -20,7 +16,7 @@ const EXPECTED: Record<string, string> = {
 describe("suite tool dialects", () => {
 	it("assigns each chat role its family dialect", () => {
 		const rows = suiteChatDialects();
-		expect(rows).toHaveLength(12);
+		expect(rows).toHaveLength(8);
 		for (const row of rows) {
 			expect(row.dialect, `${row.suite} ${row.role} ${row.id}`).toBe(EXPECTED[`${row.suite}:${row.role}`]);
 			expect(TOOL_DIALECTS[row.dialect].length).toBeGreaterThan(0);

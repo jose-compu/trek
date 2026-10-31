@@ -15,8 +15,8 @@ const COMPONENT_ROLE: Record<RouteComponent, RouteRole> = {
 	intend: "planning",
 };
 
-/** Smaller chat models first. A retry moves up, not down onto Tooling. */
-const TIER: RouteRole[] = ["tooling", "workhorse", "planning", "frontier"];
+/** Smaller chat models first. A retry moves up. */
+const TIER: RouteRole[] = ["workhorse", "planning", "frontier"];
 
 export interface ComponentRouteInput {
 	component: RouteComponent;
@@ -38,9 +38,8 @@ export function routeComponent(input: ComponentRouteInput): RoleSelection {
 	const base = COMPONENT_ROLE[input.component];
 	const complexity = input.complexity ?? 0;
 	const retries = input.retries ?? 0;
-	const depth = input.depth ?? 0;
 	const lowBudget = input.budgetRemaining !== undefined && input.budgetRemaining < 0.2;
-	const heavy = complexity > FRONTIER_COMPLEXITY_THRESHOLD || (input.component === "intend" && depth === 0);
+	const heavy = complexity > FRONTIER_COMPLEXITY_THRESHOLD;
 
 	if (heavy) {
 		return assign(input.resolved, escalationTarget(input.resolved), escalationReason(input));
@@ -69,9 +68,6 @@ function escalationTarget(resolved: ResolvedRuntime): RouteRole {
 }
 
 function escalationReason(input: ComponentRouteInput): string {
-	if (input.component === "intend" && (input.depth ?? 0) === 0) {
-		return "depth-0 Intend escalates";
-	}
 	return `complexity ${input.complexity ?? 0} escalates`;
 }
 

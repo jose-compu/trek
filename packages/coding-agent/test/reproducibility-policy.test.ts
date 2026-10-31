@@ -173,6 +173,8 @@ describe("session JSONL trek:reproducibility (#70)", () => {
 	});
 
 	it("refuses anthropic in strict_audit", async () => {
+		const previous = process.env.PI_NO_LOCAL_LLM;
+		process.env.PI_NO_LOCAL_LLM = "1";
 		const harness = await createHarness({
 			settings: { reproducibility: { mode: "strict_audit", seed: 42 } },
 		});
@@ -180,6 +182,14 @@ describe("session JSONL trek:reproducibility (#70)", () => {
 		const model = harness.getModel();
 		harness.session.agent.state.model = { ...model, provider: "anthropic", id: "claude-sonnet-4-6" };
 		harness.setResponses([fauxAssistantMessage("nope")]);
-		await expect(harness.session.prompt("hi")).rejects.toThrow(/strict_audit refuses/);
+		try {
+			await expect(harness.session.prompt("hi")).rejects.toThrow(/strict_audit refuses/);
+		} finally {
+			if (previous === undefined) {
+				delete process.env.PI_NO_LOCAL_LLM;
+			} else {
+				process.env.PI_NO_LOCAL_LLM = previous;
+			}
+		}
 	});
 });

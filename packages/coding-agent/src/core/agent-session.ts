@@ -208,9 +208,11 @@ import {
 	createDefaultLlamaProcessManager,
 	fitCompactionSettings,
 	type LlamaProcessManager,
+	LMSTUDIO_PROVIDER,
 	LOCAL_LLAMA_PROVIDER,
 	LOCAL_SUITE_WORK_SECTION,
 	latestUserPrompt,
+	lmStudioChatModel,
 	loadRuntimeConfig,
 	localLlamaChatModel,
 	NO_PROMOTION_MODEL,
@@ -219,6 +221,7 @@ import {
 	resolveRuntime,
 	SMALL_CONTEXT_TOOLS,
 	selectSessionRole,
+	selectThinkRole,
 	sessionRoleForModel,
 	smallContextPrompt,
 } from "./runtime/index.ts";
@@ -2655,6 +2658,8 @@ export class AgentSession {
 	private _llama?: LlamaProcessManager;
 	/** Session model before a local role took the chat call. Not written to settings. */
 	private _apiSessionModel?: Model<any>;
+	/** Last think role, so a build follow-up still plans even though Act is Workhorse. */
+	private _lastHierarchyRole?: "workhorse" | "planning" | "frontier";
 	private _apiThinkingLevel?: ThinkingLevel;
 
 	private _llamaManager(): LlamaProcessManager {
@@ -2680,17 +2685,29 @@ export class AgentSession {
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
+		const previousRole = this._lastHierarchyRole ?? sessionRoleForModel(resolved, this.model);
 		const selection = selectSessionRole({
 			text,
 			resolved,
-			previousRole: sessionRoleForModel(resolved, this.model),
+			previousRole,
+			overrides: config.routing?.components,
 		});
-		if (selection.source !== "local") {
+		const think = selectThinkRole({
+			text,
+			resolved,
+			previousRole,
+			overrides: config.routing?.components,
+		});
+		this._lastHierarchyRole = think?.role ?? selection.role;
+		if (selection.source === "api") {
 			this._restoreApiSessionModel();
 			return;
 		}
 		this._rememberApiSessionModel();
-		const registered = this._localRoleModel(selection.role, selection.modelId, resolved);
+		const registered =
+			selection.source === "lmstudio"
+				? this._lmStudioRoleModel(selection.modelId, resolved.roles[selection.role]?.baseUrl)
+				: this._localRoleModel(selection.role, selection.modelId, resolved);
 		const previous = this.model;
 		this.agent.state.model = registered;
 		if (!selection.thinking) {
@@ -2699,6 +2716,52 @@ export class AgentSession {
 		if (!modelsAreEqual(previous, registered)) {
 			this.sessionManager.appendModelChange(registered.provider, registered.id);
 			await this._emitModelSelect(registered, previous, "set");
+		}
+	}
+
+	private async _attachPlanningBrief(text: string): Promise<void> {
+		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			return;
+		}
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const resolved = resolveRuntime(config);
+		const think = selectThinkRole({
+			text,
+			resolved,
+			previousRole: this._lastHierarchyRole ?? sessionRoleForModel(resolved, this.model),
+			overrides: config.routing?.components,
+		});
+		if (!think) {
+			return;
+		}
+		let model: Model<any> | undefined;
+		if (think.source === "api") {
+			this._rememberApiSessionModel();
+			model = this._apiSessionModel ?? this.model;
+		} else if (think.source === "lmstudio") {
+			model = this._lmStudioRoleModel(think.modelId, resolved.roles[think.role]?.baseUrl);
+		} else {
+			const role = think.role === "frontier" ? "planning" : think.role;
+			model = this._localRoleModel(role, think.modelId, resolved);
+		}
+		if (!model) {
+			return;
+		}
+		try {
+			const brief = await this._sideCall(
+				model,
+				`Reply with a short plan only. JSON: {"goal":"...","files":["..."],"next":"read|write|edit|bash ..."}\nDo not call tools. Do not write file contents.\n\nTask:\n${text}`,
+			);
+			const trimmed = brief.trim();
+			if (!trimmed) {
+				return;
+			}
+			this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n<plan role="${think.role}" reason="${think.reason}">\n${trimmed}\n</plan>`;
+		} catch (error) {
+			debugLog("runtime", "planning brief skipped", {
+				role: think.role,
+				error: error instanceof Error ? error.message : String(error),
+			});
 		}
 	}
 
@@ -2741,13 +2804,44 @@ export class AgentSession {
 		return registered;
 	}
 
+	private _lmStudioRoleModel(modelId: string, baseUrl?: string): Model<any> {
+		const draft = lmStudioChatModel({ modelId, endpoint: baseUrl });
+		this._modelRegistry.registerProvider(LMSTUDIO_PROVIDER, {
+			baseUrl: draft.baseUrl,
+			apiKey: "lmstudio",
+			api: "openai-completions",
+			models: [
+				{
+					id: draft.id,
+					name: draft.name,
+					api: "openai-completions",
+					baseUrl: draft.baseUrl,
+					reasoning: false,
+					input: ["text"],
+					cost: draft.cost,
+					contextWindow: draft.contextWindow,
+					maxTokens: draft.maxTokens,
+					compat: draft.compat,
+				},
+			],
+		});
+		const registered = this._modelRegistry.find(LMSTUDIO_PROVIDER, draft.id);
+		if (!registered) {
+			throw new Error(`LM Studio model ${draft.name} was not registered.`);
+		}
+		return registered;
+	}
+
 	/** Frontier when assigned, else Planning. CI and faux runs use the session model. */
 	private _promotionModel(): { model: Model<any>; role: string; reason: string } | undefined {
 		if (process.env.TREK_PROMOTION_MODEL === "0") return undefined;
 		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
 		const pick = promotionRole(resolved);
 		if (!pick) return undefined;
-		const api = this.model?.provider === LOCAL_LLAMA_PROVIDER ? this._apiSessionModel : this.model;
+		const api =
+			this.model?.provider === LOCAL_LLAMA_PROVIDER || this.model?.provider === LMSTUDIO_PROVIDER
+				? this._apiSessionModel
+				: this.model;
 		if (pick.assignment.source === "api" || process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
 			return api ? { model: api, role: pick.role, reason: pick.reason } : undefined;
 		}
@@ -3024,7 +3118,7 @@ export class AgentSession {
 	}
 
 	private _rememberApiSessionModel(): void {
-		if (this.model?.provider === LOCAL_LLAMA_PROVIDER) {
+		if (this.model?.provider === LOCAL_LLAMA_PROVIDER || this.model?.provider === LMSTUDIO_PROVIDER) {
 			return;
 		}
 		this._apiSessionModel = this.model;
@@ -3032,7 +3126,10 @@ export class AgentSession {
 	}
 
 	private _restoreApiSessionModel(): void {
-		if (!this._apiSessionModel || this.model?.provider !== LOCAL_LLAMA_PROVIDER) {
+		if (
+			!this._apiSessionModel ||
+			(this.model?.provider !== LOCAL_LLAMA_PROVIDER && this.model?.provider !== LMSTUDIO_PROVIDER)
+		) {
 			return;
 		}
 		this.agent.state.model = this._apiSessionModel;
@@ -3049,10 +3146,18 @@ export class AgentSession {
 		try {
 			const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 			const resolved = resolveRuntime(config);
+			const text = latestUserPrompt(prior);
 			const selection = selectSessionRole({
-				text: latestUserPrompt(prior),
+				text,
 				resolved,
 				previousRole: sessionRoleForModel(resolved, this.model),
+				overrides: config.routing?.components,
+			});
+			const think = selectThinkRole({
+				text,
+				resolved,
+				previousRole: sessionRoleForModel(resolved, this.model),
+				overrides: config.routing?.components,
 			});
 			if (selection.source === "local") {
 				try {
@@ -3064,7 +3169,9 @@ export class AgentSession {
 					});
 				}
 			}
-			return { role: selection.role, source: selection.source, routeReason: selection.reason };
+			const routeReason = think ? `${think.reason}; then ${selection.reason}` : selection.reason;
+			const source = selection.source === "lmstudio" ? "local" : selection.source;
+			return { role: selection.role, source, routeReason };
 		} catch (error) {
 			debugLog("runtime", "role annotation skipped", {
 				error: error instanceof Error ? error.message : String(error),
@@ -3618,6 +3725,8 @@ export class AgentSession {
 					this.model.maxTokens = budget.outputTokens;
 				}
 			}
+			await this._attachPlanningBrief(expandedText);
+			await this._bindLocalCompletion(expandedText);
 		} catch (error) {
 			preflightResult?.(false);
 			throw error;

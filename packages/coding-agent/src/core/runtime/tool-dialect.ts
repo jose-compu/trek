@@ -22,7 +22,7 @@ export const TOOL_DIALECTS = {
 
 export type ToolDialect = keyof typeof TOOL_DIALECTS;
 
-const CHAT_ROLES = ["tooling", "workhorse", "planning"] as const;
+const CHAT_ROLES = ["workhorse", "planning"] as const;
 
 export function toolDialect(modelId: string): ToolDialect | undefined {
 	if (modelId.startsWith("LFM2.5")) {

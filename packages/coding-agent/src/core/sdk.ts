@@ -15,7 +15,7 @@ import { mergeProviderAttributionHeaders } from "./provider-attribution.ts";
 import { REFLECTIVE_META_TOOL_NAMES } from "./reflective-loop/meta-tools.ts";
 import type { ResourceLoader } from "./resource-loader.ts";
 import { DefaultResourceLoader } from "./resource-loader.ts";
-import { LOCAL_LLAMA_PROVIDER, LOCAL_LLAMA_TIMEOUT_MS } from "./runtime/local-model.ts";
+import { LMSTUDIO_PROVIDER, LOCAL_LLAMA_PROVIDER, LOCAL_LLAMA_TIMEOUT_MS } from "./runtime/local-model.ts";
 import { liftLocalToolText, localSuiteToolChoice, nudgeLocalWorkMessages } from "./runtime/local-work.ts";
 import { applyShortTraceContext, applyShortTraceOptions } from "./runtime/short-trace.ts";
 import { getDefaultSessionDir, SessionManager } from "./session-manager.ts";
@@ -325,7 +325,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			// SDKs treat timeout=0 as 0ms (immediate timeout), not "no timeout".
 			// Use max int32 to effectively disable the timeout.
 			const effectiveTimeoutMs = httpIdleTimeoutMs === 0 ? 2147483647 : httpIdleTimeoutMs;
-			const local = model.provider === LOCAL_LLAMA_PROVIDER;
+			const local = model.provider === LOCAL_LLAMA_PROVIDER || model.provider === LMSTUDIO_PROVIDER;
 			const timeoutMs = local
 				? LOCAL_LLAMA_TIMEOUT_MS
 				: (options?.timeoutMs ?? providerRetrySettings.timeoutMs ?? effectiveTimeoutMs);
@@ -338,9 +338,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			const websocketConnectTimeoutMs =
 				options?.websocketConnectTimeoutMs ?? settingsManager.getWebSocketConnectTimeoutMs();
 			const localToolChoice =
-				model.provider === LOCAL_LLAMA_PROVIDER && context.tools && context.tools.length > 0
-					? localSuiteToolChoice(context.messages)
-					: undefined;
+				local && context.tools && context.tools.length > 0 ? localSuiteToolChoice(context.messages) : undefined;
 			const nudged = local ? { ...context, messages: nudgeLocalWorkMessages(context.messages) } : context;
 			const hasTools = (nudged.tools?.length ?? 0) > 0;
 			const requestContext = applyShortTraceContext(nudged);

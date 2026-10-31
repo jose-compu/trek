@@ -29,12 +29,11 @@ describe("missing model download", () => {
 		const dir = mkdtempSync(join(tmpdir(), "trek-weights-"));
 		dirs.push(dir);
 		expect(missingLocalWeights(localLfm(), dir).map((item) => item.id)).toEqual([
-			"LFM2.5-350M",
 			"LFM2.5-1.2B-Instruct",
 			"LFM2.5-8B-A1B",
 		]);
-		writeFileSync(join(dir, "LFM2.5-350M.gguf"), "GGUF");
-		expect(missingLocalWeights(localLfm(), dir).map((item) => item.role)).toEqual(["workhorse", "planning"]);
+		writeFileSync(join(dir, "LFM2.5-1.2B-Instruct.gguf"), "GGUF");
+		expect(missingLocalWeights(localLfm(), dir).map((item) => item.role)).toEqual(["planning"]);
 	});
 
 	it("does not download unless the answer is yes", async () => {
@@ -60,7 +59,7 @@ describe("missing model download", () => {
 			download,
 		});
 		expect(accepted).toBe("downloaded");
-		expect(fetched).toEqual(["LFM2.5-350M", "LFM2.5-1.2B-Instruct", "LFM2.5-8B-A1B"]);
+		expect(fetched).toEqual(["LFM2.5-1.2B-Instruct", "LFM2.5-8B-A1B"]);
 	});
 
 	it("does not ask or download when the terminal is not interactive", async () => {

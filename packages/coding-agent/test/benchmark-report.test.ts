@@ -24,13 +24,13 @@ describe("benchmark report", () => {
 			frontier: null,
 		});
 		const rows = benchmarkRuntime(local, {
-			weightsAvailable: (role) => role === "tooling",
+			weightsAvailable: (role) => role === "workhorse",
 			measure: () => ({ tokensPerSecond: 12, toolCallLatencyMs: 40, memoryMb: 512 }),
 		});
 		const measured = rows.filter((row) => row.status === "measured");
 		const skipped = rows.filter((row) => row.status === "skipped");
 		expect(measured).toEqual([
-			{ role: "tooling", status: "measured", tokensPerSecond: 12, toolCallLatencyMs: 40, memoryMb: 512 },
+			{ role: "workhorse", status: "measured", tokensPerSecond: 12, toolCallLatencyMs: 40, memoryMb: 512 },
 		]);
 		expect(skipped.length).toBeGreaterThan(0);
 		expect(skipped.every((row) => row.reason === "weights not on disk")).toBe(true);

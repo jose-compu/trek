@@ -1,6 +1,6 @@
 /**
- * Optional. For each local suite, the role the router picks is loaded and
- * must return a write of index.html. Tooling is not loaded for these prompts.
+ * Optional. For each local suite, the Act role the router picks is loaded and
+ * must return a write of index.html. Planning is the think hop, not this server.
  * ./test.sh sets PI_NO_LOCAL_LLM=1, so CI skips this file.
  *
  *   set -a && source ~/.trek/llama-live.env && set +a
@@ -33,7 +33,7 @@ const live =
 const SUITES: SuiteId[] = ["mistral", "mistral-pro", "qwen", "lfm"];
 
 const TASKS = [
-	{ label: "build", text: "build a web chess in javascript in /tmp/chess", role: "planning" as const },
+	{ label: "build", text: "build a web chess in javascript in /tmp/chess", role: "workhorse" as const },
 	{ label: "typo", text: "fix the typo in the title", role: "workhorse" as const },
 ];
 
@@ -91,7 +91,7 @@ describe.skipIf(!live)("suite roles on real weights", () => {
 				const resolved = runtime(suite);
 				const selected = selectSessionRole({ text: task.text, resolved });
 				expect(selected.role).toBe(task.role);
-				expect(selected.modelId).not.toBe(resolved.roles.tooling?.id);
+				expect(selected.modelId).toBe(resolved.roles.workhorse?.id);
 				if (!onDisk(selected.modelId)) {
 					console.log(`skip ${suite} ${selected.role} ${selected.modelId}: weight not on disk`);
 					return;

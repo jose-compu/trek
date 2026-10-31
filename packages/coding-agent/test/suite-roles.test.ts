@@ -1,13 +1,12 @@
 /**
- * Every local suite: hard work uses Planning, a typo uses the workhorse.
- * The tooling model is never the session model.
+ * Every local suite: Workhorse acts, Planning thinks, Frontier is API deep work.
  * Run: npx vitest run test/suite-roles.test.ts --reporter=verbose
  */
 
 import { describe, expect, it } from "vitest";
 import { defaultRuntimeConfig, resolveRuntime, withHierarchy } from "../src/core/runtime/index.ts";
 import { liftLocalToolText } from "../src/core/runtime/local-work.ts";
-import { selectSessionRole, sessionRoleForModel } from "../src/core/runtime/select-role.ts";
+import { selectSessionRole, selectThinkRole, sessionRoleForModel } from "../src/core/runtime/select-role.ts";
 import type { SuiteId } from "../src/core/runtime/types.ts";
 
 const SUITES: SuiteId[] = ["mistral", "mistral-pro", "qwen", "lfm"];
@@ -74,16 +73,14 @@ describe("local suite roles", () => {
 	});
 
 	for (const suite of SUITES) {
-		it(`${suite}: a build and a follow-up use Planning, a typo uses the workhorse`, () => {
+		it(`${suite}: a build thinks on Planning and acts on the workhorse`, () => {
 			const runtime = resolved(suite);
 			const planning = runtime.roles.planning;
 			const workhorse = runtime.roles.workhorse;
-			const tooling = runtime.roles.tooling;
 			expect(planning?.id).toBeTruthy();
 			expect(workhorse?.id).toBeTruthy();
-			expect(tooling?.id).toBeTruthy();
-			expect(planning?.id).not.toBe(tooling?.id);
-			expect(workhorse?.id).not.toBe(tooling?.id);
+			expect(runtime.roles.tooling).toBeUndefined();
+			expect(planning?.id).not.toBe(workhorse?.id);
 
 			for (const text of [
 				"build a web chess in javascript in /tmp/chess",
@@ -91,24 +88,28 @@ describe("local suite roles", () => {
 				"write a chess game",
 				"implement the login page",
 			]) {
-				const selected = selectSessionRole({ text, resolved: runtime });
-				expect(selected.role, text).toBe("planning");
-				expect(selected.modelId, text).toBe(planning?.id);
-				expect(selected.modelId, text).not.toBe(tooling?.id);
+				const act = selectSessionRole({ text, resolved: runtime });
+				const think = selectThinkRole({ text, resolved: runtime });
+				expect(act.role, text).toBe("workhorse");
+				expect(act.modelId, text).toBe(workhorse?.id);
+				expect(think?.role, text).toBe("planning");
+				expect(think?.modelId, text).toBe(planning?.id);
 			}
 
 			const typo = selectSessionRole({ text: "fix the typo in the title", resolved: runtime });
 			expect(typo.role).toBe("workhorse");
 			expect(typo.modelId).toBe(workhorse?.id);
+			expect(selectThinkRole({ text: "fix the typo in the title", resolved: runtime })).toBeUndefined();
 
 			const follow = selectSessionRole({
 				text: "add castling",
 				resolved: runtime,
 				previousRole: "planning",
 			});
-			expect(follow.role).toBe("planning");
-			expect(follow.modelId).toBe(planning?.id);
-			expect(follow.reason).toMatch(/continuing a Planning task/);
+			expect(follow.role).toBe("workhorse");
+			expect(selectThinkRole({ text: "add castling", resolved: runtime, previousRole: "planning" })?.role).toBe(
+				"planning",
+			);
 
 			const drop = selectSessionRole({
 				text: "fix the typo",
