@@ -4,6 +4,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Changed
+
+- Undo, keep-all, dry-run, the shortcut bar, previous model, and tree-filter back use alt chords. Terminal.app dropped Shift on the old chords, so undo arrived as suspend. `shift+tab` is unchanged. `?` opens the same list as `/hotkeys`.
+
 ## [0.15.1] - 2026-10-31
 
 ### Fixed

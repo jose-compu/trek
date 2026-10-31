@@ -23,13 +23,13 @@ describe("scripted mock operator", () => {
 		}
 	});
 
-	it("two-prompt edit then shift+ctrl+z restores last batch", async () => {
+	it("two-prompt edit then alt+z restores last batch", async () => {
 		const harness = await createHarness();
 		harnesses.push(harness);
 		const file = join(harness.tempDir, "n.ts");
 		writeFileSync(file, "x=0\n", "utf-8");
 		const op = new ScriptedOperator(harness);
-		expect(op.chord("app.edits.undo")).toBe("shift+ctrl+z");
+		expect(op.chord("app.edits.undo")).toBe("alt+z");
 		await op.run([
 			{ user: "to 1", faux: editTurn("0", "1") },
 			{ user: "to 2", faux: editTurn("1", "2"), after: ["app.edits.undo"] },
@@ -57,7 +57,7 @@ describe("scripted mock operator", () => {
 		const file = join(harness.tempDir, "n.ts");
 		writeFileSync(file, "x=0\n", "utf-8");
 		const op = new ScriptedOperator(harness);
-		expect(op.chord("app.edits.keepAll")).toBe("shift+ctrl+k");
+		expect(op.chord("app.edits.keepAll")).toBe("alt+k");
 		await op.submit("to 1", editTurn("0", "1"));
 		await op.shortcut("app.edits.keepAll");
 		await op.shortcut("app.edits.undo");
@@ -71,7 +71,7 @@ describe("scripted mock operator", () => {
 		const file = join(harness.tempDir, "n.ts");
 		writeFileSync(file, "x=0\n", "utf-8");
 		const op = new ScriptedOperator(harness);
-		expect(op.chord("app.edits.dryRun")).toBe("shift+ctrl+y");
+		expect(op.chord("app.edits.dryRun")).toBe("alt+u");
 		await op.shortcut("app.edits.dryRun");
 		await op.submit("to 9", editTurn("0", "9"));
 		expect(readFileSync(file, "utf-8")).toContain("0");

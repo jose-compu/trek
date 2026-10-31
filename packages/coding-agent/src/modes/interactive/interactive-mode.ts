@@ -2770,7 +2770,7 @@ export class InteractiveMode {
 				this.editor.setText("");
 				return;
 			}
-			if (text === "/hotkeys") {
+			if (text === "/hotkeys" || text === "?") {
 				this.handleHotkeysCommand();
 				this.editor.setText("");
 				return;
