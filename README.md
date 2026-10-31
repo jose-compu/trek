@@ -1,4 +1,4 @@
-![Trek Agent 0.16 Console](./assets/banner-0.16.png)
+![Trek Agent 0.16 Console — 🏔️](./assets/banner-0.16.png)
 
 # Trek Agent v0.16.0
 
