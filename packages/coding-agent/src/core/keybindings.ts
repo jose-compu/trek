@@ -82,7 +82,7 @@ export const KEYBINDINGS = {
 		description: "Cycle to next model",
 	},
 	"app.model.cycleBackward": {
-		defaultKeys: "shift+ctrl+p",
+		defaultKeys: "alt+p",
 		description: "Cycle to previous model",
 	},
 	"app.model.select": { defaultKeys: "ctrl+l", description: "Open model selector" },
@@ -108,19 +108,19 @@ export const KEYBINDINGS = {
 		description: "Restore queued messages",
 	},
 	"app.edits.undo": {
-		defaultKeys: "shift+ctrl+z",
+		defaultKeys: "alt+z",
 		description: "Undo last edit batch (opens selector when multiple batches)",
 	},
 	"app.edits.keepAll": {
-		defaultKeys: "shift+ctrl+k",
+		defaultKeys: "alt+k",
 		description: "Keep all pending agent edits",
 	},
 	"app.edits.dryRun": {
-		defaultKeys: "shift+ctrl+y",
+		defaultKeys: "alt+u",
 		description: "Toggle dry-run mode (preview edits without applying)",
 	},
 	"app.shortcuts.toggle": {
-		defaultKeys: "shift+ctrl+/",
+		defaultKeys: "alt+/",
 		description: "Toggle shortcut cheat sheet below editor",
 	},
 	"app.clipboard.pasteImage": {
@@ -216,7 +216,7 @@ export const KEYBINDINGS = {
 		description: "Tree filter: cycle forward",
 	},
 	"app.tree.filter.cycleBackward": {
-		defaultKeys: "shift+ctrl+o",
+		defaultKeys: "alt+o",
 		description: "Tree filter: cycle backward",
 	},
 } as const satisfies KeybindingDefinitions;

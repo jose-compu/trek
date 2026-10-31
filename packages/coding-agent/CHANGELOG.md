@@ -6,7 +6,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ### Added
 
+- `/hierarchy` sets mode, suite, and one role in `~/.trek/models.yaml`. Frontier stays on the API. The next session reads the file. This command does not download weights or start llama.cpp.
 - The bash tool suggests grep, sed, awk, rg, find, and jq recipes. They do not delete files, call a model, or use the network.
+
+### Changed
+
+- Undo, keep-all, dry-run, the shortcut bar, previous model, and tree-filter back use alt chords. Terminal.app dropped Shift on the old chords, so undo arrived as suspend. `shift+tab` is unchanged. `?` opens the same list as `/hotkeys`.
 
 ## [0.15.1] - 2026-10-31
 
