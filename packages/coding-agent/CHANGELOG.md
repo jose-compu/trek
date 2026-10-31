@@ -8,6 +8,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 - `/hierarchy` sets mode, suite, and one role in `~/.trek/models.yaml`. Frontier stays on the API. The next session reads the file. This command does not download weights or start llama.cpp.
 - `trek models benchmark` writes `trek-benchmark.json` and prints tokens per second, tool-call latency, and memory when a probe measures weights that are already on disk. Missing weights stay skipped. The command does not download GGUF files or start llama-server.
+- The bash tool suggests grep, sed, awk, rg, find, and jq recipes. They do not delete files, call a model, or use the network.
 
 ### Changed
 
