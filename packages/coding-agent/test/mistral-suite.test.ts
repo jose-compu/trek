@@ -14,27 +14,30 @@ describe("Mistral local suite", () => {
 	it("keeps Mistral chat roles on the Mistral dialect", () => {
 		const rows = suiteChatDialects().filter((row) => row.suite === "mistral" || row.suite === "mistral-pro");
 		expect(rows).toEqual([
+			{ suite: "mistral", role: "tooling", id: "Qwen3.5-0.8B", dialect: "qwen" },
 			{ suite: "mistral", role: "workhorse", id: "Ministral-3-3B-Instruct-2512", dialect: "mistral" },
 			{ suite: "mistral", role: "planning", id: "Ministral-3-8B-Reasoning-2512", dialect: "mistral" },
+			{ suite: "mistral-pro", role: "tooling", id: "Qwen3.5-0.8B", dialect: "qwen" },
 			{ suite: "mistral-pro", role: "workhorse", id: "Devstral-Small-2507", dialect: "mistral" },
 			{ suite: "mistral-pro", role: "planning", id: "Ministral-3-8B-Reasoning-2512", dialect: "mistral" },
 		]);
 		expect(toolDialect("Ministral-3-3B-Instruct-2512")).toBe("mistral");
 		expect(toolDialect("Devstral-Small-2507")).toBe("mistral");
+		expect(toolDialect("Qwen3.5-0.8B")).toBe("qwen");
 	});
 
-	it("sends a build to the workhorse for Act and a small fix to the workhorse", () => {
+	it("starts Act on Tooling for a build and a small fix", () => {
 		const mistral = resolved("mistral");
 		expect(selectSessionRole({ text: "build a web chess in /tmp/blah", resolved: mistral })).toMatchObject({
-			role: "workhorse",
-			modelId: "Ministral-3-3B-Instruct-2512",
+			role: "tooling",
+			modelId: "Qwen3.5-0.8B",
 		});
 		expect(selectSessionRole({ text: "fix the typo", resolved: mistral })).toMatchObject({
-			role: "workhorse",
-			modelId: "Ministral-3-3B-Instruct-2512",
+			role: "tooling",
+			modelId: "Qwen3.5-0.8B",
 		});
 		expect(selectSessionRole({ text: "build the site", resolved: resolved("mistral-pro") }).modelId).toBe(
-			"Devstral-Small-2507",
+			"Qwen3.5-0.8B",
 		);
 	});
 
@@ -72,9 +75,13 @@ describe("Mistral local suite", () => {
 		).toBeUndefined();
 	});
 
-	it("lists Devstral as the missing pro workhorse when the directory is empty", () => {
+	it("lists Tooling and Devstral when the pro suite directory is empty", () => {
 		const missing = missingLocalWeights(resolved("mistral-pro"), "/tmp/trek-mistral-empty");
-		expect(missing.map((item) => item.id)).toEqual(["Devstral-Small-2507", "Ministral-3-8B-Reasoning-2512"]);
+		expect(missing.map((item) => item.id)).toEqual([
+			"Qwen3.5-0.8B",
+			"Devstral-Small-2507",
+			"Ministral-3-8B-Reasoning-2512",
+		]);
 	});
 });
 
