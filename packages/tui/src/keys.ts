@@ -1159,8 +1159,9 @@ export function matchesKey(data: string, keyId: KeyId): boolean {
 			if (data === `\x1b${rawCtrl}`) return true;
 		}
 
-		if (modifier === MODIFIERS.alt && !_kittyProtocolActive && (isLetter || isDigit)) {
-			// Legacy: alt+letter/digit is ESC followed by the key
+		if (modifier === MODIFIERS.alt && !_kittyProtocolActive && (isLetter || isDigit || key === "/")) {
+			// Legacy: alt+letter/digit/slash is ESC followed by the key.
+			// Terminal.app sends alt+/ as ESC /.
 			if (data === `\x1b${key}`) return true;
 		}
 
@@ -1296,8 +1297,8 @@ export function parseKey(data: string): string | undefined {
 		if (code >= 1 && code <= 26) {
 			return `ctrl+alt+${String.fromCharCode(code + 96)}`;
 		}
-		// Legacy alt+letter/digit (ESC followed by the key)
-		if ((code >= 97 && code <= 122) || (code >= 48 && code <= 57)) {
+		// Legacy alt+letter/digit/slash (ESC followed by the key)
+		if ((code >= 97 && code <= 122) || (code >= 48 && code <= 57) || code === 47) {
 			return `alt+${String.fromCharCode(code)}`;
 		}
 	}
