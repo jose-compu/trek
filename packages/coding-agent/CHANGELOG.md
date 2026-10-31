@@ -6,7 +6,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ### Added
 
+- `/hierarchy` sets mode, suite, and one role in `~/.trek/models.yaml`. Frontier stays on the API. The next session reads the file. This command does not download weights or start llama.cpp.
 - `trek models benchmark` writes `trek-benchmark.json` and prints tokens per second, tool-call latency, and memory when a probe measures weights that are already on disk. Missing weights stay skipped. The command does not download GGUF files or start llama-server.
+
+### Changed
+
+- Undo, keep-all, dry-run, the shortcut bar, previous model, and tree-filter back use alt chords. Terminal.app dropped Shift on the old chords, so undo arrived as suspend. `shift+tab` is unchanged. `?` opens the same list as `/hotkeys`.
 
 ## [0.15.1] - 2026-10-31
 

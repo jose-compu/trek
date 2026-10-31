@@ -72,6 +72,7 @@ import type {
 	ExtensionWidgetOptions,
 } from "../../core/extensions/index.ts";
 import { FooterDataProvider, type ReadonlyFooterDataProvider } from "../../core/footer-data-provider.ts";
+import { runHierarchyCommand } from "../../core/hierarchy-command.ts";
 import { configureHttpDispatcher, formatHttpIdleTimeoutMs } from "../../core/http-dispatcher.ts";
 import { type AppKeybinding, KeybindingsManager } from "../../core/keybindings.ts";
 import { createCompactionSummaryMessage } from "../../core/messages.ts";
@@ -2770,9 +2771,15 @@ export class InteractiveMode {
 				this.editor.setText("");
 				return;
 			}
-			if (text === "/hotkeys") {
+			if (text === "/hotkeys" || text === "?") {
 				this.handleHotkeysCommand();
 				this.editor.setText("");
+				return;
+			}
+			if (text === "/hierarchy" || text.startsWith("/hierarchy ")) {
+				const arg = text === "/hierarchy" ? "" : text.slice("/hierarchy ".length);
+				this.editor.setText("");
+				this.showHierarchyCommand(arg);
 				return;
 			}
 			if (text === "/fork") {
@@ -3990,6 +3997,13 @@ export class InteractiveMode {
 
 	showPatternCommand(arg: string): void {
 		const text = this.session.runPatternCommand(arg);
+		this.chatContainer.addChild(new Spacer(1));
+		this.chatContainer.addChild(new Text(theme.fg("muted", text), 1, 0));
+		this.ui.requestRender();
+	}
+
+	showHierarchyCommand(arg: string): void {
+		const text = runHierarchyCommand(getAgentDir(), process.cwd(), arg);
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new Text(theme.fg("muted", text), 1, 0));
 		this.ui.requestRender();
