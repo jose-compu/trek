@@ -1,0 +1,38 @@
+name: Lacan Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: lacan-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lacan Scan
+        uses: jose-compu/lacan-scan@v3
+        with:
+          path: .
+          fail-on: HIGH
+          output: sarif,cli
+          sarif-file: lacan.sarif
+          version: "3"
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('lacan.sarif') != ''
+        with:
+          sarif_file: lacan.sarif
+          category: lacan
