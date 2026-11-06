@@ -2,14 +2,14 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import chalk from "chalk";
 import { CONFIG_DIR_NAME } from "../config.ts";
-import { loadThemeFromPath, type Theme } from "../modes/interactive/theme/theme.ts";
+import type { Theme } from "../modes/interactive/theme/theme.ts";
 import type { ResourceDiagnostic } from "./diagnostics.ts";
 
 export type { ResourceCollision, ResourceDiagnostic } from "./diagnostics.ts";
 
 import { canonicalizePath, isLocalPath, resolvePath } from "../utils/paths.ts";
 import { createEventBus, type EventBus } from "./event-bus.ts";
-import { createExtensionRuntime, loadExtensionFromFactory, loadExtensions } from "./extensions/loader.ts";
+import { createExtensionRuntime } from "./extensions/extension-runtime.ts";
 import type { Extension, ExtensionFactory, ExtensionRuntime, LoadExtensionsResult } from "./extensions/types.ts";
 import { DefaultPackageManager, type PathMetadata } from "./package-manager.ts";
 import type { PromptTemplate } from "./prompt-templates.ts";
@@ -18,6 +18,20 @@ import { SettingsManager } from "./settings-manager.ts";
 import type { Skill } from "./skills.ts";
 import { loadSkills } from "./skills.ts";
 import { createSourceInfo, type SourceInfo } from "./source-info.ts";
+
+type ThemeModule = typeof import("../modes/interactive/theme/theme.ts");
+type LoaderModule = typeof import("./extensions/loader.ts");
+
+let themeModule: ThemeModule | undefined;
+
+async function loadThemeModule(): Promise<ThemeModule> {
+	themeModule ??= await import("../modes/interactive/theme/theme.ts");
+	return themeModule;
+}
+
+async function loadLoaderModule(): Promise<LoaderModule> {
+	return import("./extensions/loader.ts");
+}
 
 export interface ResourceExtensionPaths {
 	skillPaths?: Array<{ path: string; metadata: PathMetadata }>;
@@ -323,6 +337,9 @@ export class DefaultResourceLoader implements ResourceLoader {
 
 	async reload(): Promise<void> {
 		await this.settingsManager.reload();
+		if (!this.noThemes) {
+			await loadThemeModule();
+		}
 		const resolvedPaths = await this.packageManager.resolve();
 		const cliExtensionPaths = await this.packageManager.resolveExtensionSources(this.additionalExtensionPaths, {
 			temporary: true,
@@ -398,6 +415,7 @@ export class DefaultResourceLoader implements ResourceLoader {
 			? cliEnabledExtensions
 			: this.mergePaths(cliEnabledExtensions, enabledExtensions);
 
+		const { loadExtensions } = await loadLoaderModule();
 		const extensionsResult = await loadExtensions(extensionPaths, this.cwd, this.eventBus);
 		const inlineExtensions = await this.loadExtensionFactories(extensionsResult.runtime);
 		extensionsResult.extensions.push(...inlineExtensions.extensions);
@@ -780,8 +798,12 @@ export class DefaultResourceLoader implements ResourceLoader {
 	}
 
 	private loadThemeFromFile(filePath: string, themes: Theme[], diagnostics: ResourceDiagnostic[]): void {
+		if (!themeModule) {
+			diagnostics.push({ type: "warning", message: "theme loader is not initialized", path: filePath });
+			return;
+		}
 		try {
-			themes.push(loadThemeFromPath(filePath));
+			themes.push(themeModule.loadThemeFromPath(filePath));
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "failed to load theme";
 			diagnostics.push({ type: "warning", message, path: filePath });
@@ -795,6 +817,7 @@ export class DefaultResourceLoader implements ResourceLoader {
 		const extensions: Extension[] = [];
 		const errors: Array<{ path: string; error: string }> = [];
 
+		const { loadExtensionFromFactory } = await loadLoaderModule();
 		for (const [index, factory] of this.extensionFactories.entries()) {
 			const extensionPath = `<inline:${index + 1}>`;
 			try {

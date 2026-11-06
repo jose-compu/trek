@@ -5,7 +5,8 @@
 import type { AgentMessage } from "@trek/agent-core";
 import type { ImageContent, Model } from "@trek/ai";
 import type { KeyId } from "@trek/tui";
-import { type Theme, theme } from "../../modes/interactive/theme/theme.ts";
+import type { Theme } from "../../modes/interactive/theme/theme.ts";
+import { theme } from "../../modes/interactive/theme/theme-proxy.ts";
 import type { ResourceDiagnostic } from "../diagnostics.ts";
 import type { KeybindingsConfig } from "../keybindings.ts";
 import type { ModelRegistry } from "../model-registry.ts";

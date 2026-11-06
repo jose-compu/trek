@@ -4,6 +4,16 @@
 	"description": "Terminal User Interface library with differential rendering for efficient text-based applications",
 	"type": "module",
 	"main": "dist/index.js",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./terminal-image": {
+			"types": "./dist/terminal-image.d.ts",
+			"import": "./dist/terminal-image.js"
+		}
+	},
 	"scripts": {
 		"clean": "shx rm -rf dist",
 		"build": "tsgo -p tsconfig.build.json",

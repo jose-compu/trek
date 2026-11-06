@@ -7,7 +7,8 @@ import { AgentSession } from "./agent-session.ts";
 import { formatNoModelsAvailableMessage } from "./auth-guidance.ts";
 import { AuthStorage } from "./auth-storage.ts";
 import { DEFAULT_THINKING_LEVEL } from "./defaults.ts";
-import type { ExtensionRunner, LoadExtensionsResult, SessionStartEvent, ToolDefinition } from "./extensions/index.ts";
+import type { ExtensionRunner } from "./extensions/runner.ts";
+import type { LoadExtensionsResult, SessionStartEvent, ToolDefinition } from "./extensions/types.ts";
 import { convertToLlm } from "./messages.ts";
 import { ModelRegistry } from "./model-registry.ts";
 import { findInitialModel } from "./model-resolver.ts";
@@ -103,12 +104,11 @@ export type {
 	ExtensionCommandContext,
 	ExtensionContext,
 	ExtensionFactory,
-	SlashCommandInfo,
-	SlashCommandSource,
 	ToolDefinition,
-} from "./extensions/index.ts";
+} from "./extensions/types.ts";
 export type { PromptTemplate } from "./prompt-templates.ts";
 export type { Skill } from "./skills.ts";
+export type { SlashCommandInfo, SlashCommandSource } from "./slash-commands.ts";
 export type { Tool } from "./tools/index.ts";
 
 export {

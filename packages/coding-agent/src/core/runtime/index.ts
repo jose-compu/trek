@@ -74,12 +74,12 @@ export {
 	startLadderRole,
 	stripEscalateSignal,
 } from "./escalate.ts";
+export { localLlamaChatModel } from "./local-llama-model.ts";
 export {
 	LMSTUDIO_PROVIDER,
 	LOCAL_LLAMA_PROVIDER,
 	LOCAL_LLAMA_TIMEOUT_MS,
 	lmStudioChatModel,
-	localLlamaChatModel,
 } from "./local-model.ts";
 export {
 	LOCAL_SUITE_WORK_SECTION,

@@ -1,12 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import {
-	type EditorTheme,
-	getCapabilities,
-	type MarkdownTheme,
-	type SelectListTheme,
-	type SettingsListTheme,
-} from "@trek/tui";
+import type { EditorTheme, MarkdownTheme, SelectListTheme, SettingsListTheme } from "@trek/tui";
+import { getCapabilities } from "@trek/tui/terminal-image";
 import chalk from "chalk";
 import { type Static, Type } from "typebox";
 import { Compile } from "typebox/compile";
@@ -14,6 +9,9 @@ import { getCustomThemesDir, getThemesDir } from "../../../config.ts";
 import type { SourceInfo } from "../../../core/source-info.ts";
 import { closeWatcher, watchWithErrorHandler } from "../../../utils/fs-watch.ts";
 import { highlight, supportsLanguage } from "../../../utils/syntax-highlight.ts";
+import { setGlobalTheme, theme } from "./theme-proxy.ts";
+
+export { theme };
 
 // ============================================================================
 // Types & Schema
@@ -740,24 +738,8 @@ export function getDefaultTheme(): string {
 // Global Theme Instance
 // ============================================================================
 
-// Use globalThis to share theme across module loaders (tsx + jiti in dev mode)
-const THEME_KEY = Symbol.for("@trek/coding-agent:theme");
-const THEME_KEY_OLD = Symbol.for("@trek/coding-agent:theme");
-
-// Export theme as a getter that reads from globalThis
-// This ensures all module instances (tsx, jiti) see the same theme
-export const theme: Theme = new Proxy({} as Theme, {
-	get(_target, prop) {
-		const t = (globalThis as Record<symbol, Theme>)[THEME_KEY];
-		if (!t) throw new Error("Theme not initialized. Call initTheme() first.");
-		return (t as unknown as Record<string | symbol, unknown>)[prop];
-	},
-});
-
-function setGlobalTheme(t: Theme): void {
-	(globalThis as Record<symbol, Theme>)[THEME_KEY] = t;
-	(globalThis as Record<symbol, Theme>)[THEME_KEY_OLD] = t;
-}
+// Theme instance is shared via theme-proxy.ts so headless paths can import
+// the proxy without loading TUI / highlight.js.
 
 let currentThemeName: string | undefined;
 let themeWatcher: fs.FSWatcher | undefined;
