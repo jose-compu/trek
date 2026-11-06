@@ -3,6 +3,7 @@ import { isContextOverflow } from "@trek/ai";
 import { Container, Markdown, type MarkdownTheme, Spacer, Text } from "@trek/tui";
 import { honestyDisplay, stripHonestyFooter } from "../../../core/honesty/index.ts";
 import { getMarkdownTheme, theme } from "../theme/theme.ts";
+import { compactViewportLines } from "./compact-card.ts";
 
 const OSC133_ZONE_START = "\x1b]133;A\x07";
 const OSC133_ZONE_END = "\x1b]133;B\x07";
@@ -58,6 +59,7 @@ export class AssistantMessageComponent extends Container {
 	private hideThinkingBlock: boolean;
 	private markdownTheme: MarkdownTheme;
 	private hiddenThinkingLabel: string;
+	private expanded = false;
 	private lastMessage?: AssistantMessage;
 	private hasToolCalls = false;
 
@@ -66,12 +68,14 @@ export class AssistantMessageComponent extends Container {
 		hideThinkingBlock = false,
 		markdownTheme: MarkdownTheme = getMarkdownTheme(),
 		hiddenThinkingLabel = "Thinking...",
+		expanded = false,
 	) {
 		super();
 
 		this.hideThinkingBlock = hideThinkingBlock;
 		this.markdownTheme = markdownTheme;
 		this.hiddenThinkingLabel = hiddenThinkingLabel;
+		this.expanded = expanded;
 
 		// Container for text/thinking content
 		this.contentContainer = new Container();
@@ -103,6 +107,13 @@ export class AssistantMessageComponent extends Container {
 		}
 	}
 
+	setExpanded(expanded: boolean): void {
+		this.expanded = expanded;
+		if (this.lastMessage) {
+			this.updateContent(this.lastMessage);
+		}
+	}
+
 	override render(width: number): string[] {
 		const lines = super.render(width);
 		if (this.hasToolCalls || lines.length === 0) {
@@ -124,7 +135,10 @@ export class AssistantMessageComponent extends Container {
 			(c) => (c.type === "text" && c.text.trim()) || (c.type === "thinking" && c.thinking.trim()),
 		);
 
-		if (hasVisibleContent) {
+		const firstVisible = message.content.find(
+			(c) => (c.type === "text" && c.text.trim()) || (c.type === "thinking" && c.thinking.trim()),
+		);
+		if (hasVisibleContent && (this.expanded || this.hideThinkingBlock || firstVisible?.type !== "thinking")) {
 			this.contentContainer.addChild(new Spacer(1));
 		}
 
@@ -157,6 +171,14 @@ export class AssistantMessageComponent extends Container {
 					this.contentContainer.addChild(
 						new Text(theme.italic(theme.fg("thinkingText", this.hiddenThinkingLabel)), 1, 0),
 					);
+					if (hasVisibleContentAfter) {
+						this.contentContainer.addChild(new Spacer(1));
+					}
+				} else if (!this.expanded) {
+					this.contentContainer.addChild(new Text(theme.italic(theme.fg("thinkingText", "thinking")), 1, 0));
+					for (const line of compactViewportLines(content.thinking)) {
+						this.contentContainer.addChild(new Text(theme.italic(theme.fg("thinkingText", line)), 1, 0));
+					}
 					if (hasVisibleContentAfter) {
 						this.contentContainer.addChild(new Spacer(1));
 					}

@@ -1,4 +1,11 @@
-export { type AntiPattern, type AntiPatternInput, detectAntiPatterns } from "./anti-pattern.ts";
+export {
+	type AntiPattern,
+	type AntiPatternInput,
+	type AntiPatternToolResult,
+	detectAntiPatterns,
+	type JailbreakFromToolOutputMode,
+	shouldFlagJailbreakFromToolOutput,
+} from "./anti-pattern.ts";
 export { curiosityQuestion } from "./curiosity.ts";
 export {
 	checkLaw0,

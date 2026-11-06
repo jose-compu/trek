@@ -362,7 +362,7 @@ describe("lessons in a session", () => {
 			lesson: { rule: "Deploy to staging first." },
 		});
 		expect(harness.eventsOfType("lesson_stored").map((event) => event.text)).toEqual([
-			`lesson ${customEntries(harness, "trek:lesson")[0]?.id}`,
+			`lesson ${customEntries(harness, "trek:lesson")[0]?.id} Deploy To Staging First`,
 		]);
 	});
 });

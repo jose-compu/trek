@@ -69,6 +69,7 @@ export {
 	promotionPrompt,
 	turnFailures,
 } from "./lesson.ts";
+export { formatLessonNotice, lessonNoticeTitle } from "./lesson-title.ts";
 export { ReflectiveLoopController, type RunPromptCycleOptions } from "./loop-controller.ts";
 export {
 	BRANCH_EXCLUDED_TOOL_NAMES,

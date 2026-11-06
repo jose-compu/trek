@@ -166,6 +166,7 @@ import {
 	effortLimitsFor,
 	FileClaims,
 	formatLesson,
+	formatLessonNotice,
 	formatLessonsTable,
 	gatherBranches,
 	isCorrection,
@@ -173,6 +174,7 @@ import {
 	type Lesson,
 	type LessonEvidence,
 	lessonIdsFromEntries,
+	lessonNoticeTitle,
 	lessonPromotionEnabled,
 	lessonPrompt,
 	lessonsEnabled,
@@ -256,6 +258,7 @@ import {
 	decideTool,
 	detectAntiPatterns,
 	formatSchemaMismatchNote,
+	type JailbreakFromToolOutputMode,
 	type OperatorMode,
 	operatorBlockReason,
 	phaseIsOpen,
@@ -345,7 +348,7 @@ export type AgentSessionEvent =
 	| { type: "auto_retry_end"; success: boolean; attempt: number; finalError?: string }
 	| { type: "prompt_meta"; promptNumber: number; promptId: string; preview?: string }
 	| { type: "workflow_check"; text: string }
-	| { type: "anti_pattern"; text: string }
+	| { type: "anti_pattern"; text: string; askMute?: boolean }
 	| { type: "lesson_stored"; text: string }
 	/** Discreet one-line ladder climb (Tooling → … → Frontier). */
 	| { type: "hierarchy_escalate"; text: string; from: string; to: string }
@@ -509,7 +512,8 @@ export class AgentSession {
 	/** Messages queued to be included with the next user prompt as context ("asides"). */
 	private _pendingNextTurnMessages: CustomMessage[] = [];
 	/** Lesson ids stored during this prompt, shown once the turn finishes. */
-	private _lessonNotices: string[] = [];
+	private _lessonNotices: { id: string; title: string }[] = [];
+	private _mutedAntiPatterns = new Set<AntiPattern>();
 	/** Domain chosen once for this prompt, before memory injection. */
 	private _turnSelection: DomainSelection = {
 		domain: "none",
@@ -701,6 +705,17 @@ export class AgentSession {
 			this._effort = this._reflectiveLoop.effort;
 		}
 		this.setEffort(this.settingsManager.getEffort());
+		for (const pattern of this.settingsManager.getMutedAntiPatterns()) {
+			if (
+				pattern === "goal-drift" ||
+				pattern === "sycophancy" ||
+				pattern === "loop" ||
+				pattern === "scope-creep" ||
+				pattern === "jailbreak-from-tool-output"
+			) {
+				this._mutedAntiPatterns.add(pattern);
+			}
+		}
 
 		// Always subscribe to agent events for internal handling
 		// (session persistence, extensions, auto-compaction, retry logic)
@@ -1617,18 +1632,32 @@ export class AgentSession {
 	private _noteAntiPatterns(turnStart: number): void {
 		const assistantTexts: string[] = [];
 		const toolOutputs: string[] = [];
+		const toolResults: { name: string; text: string }[] = [];
 		for (const message of this.agent.state.messages.slice(turnStart)) {
 			if (message.role === "assistant") {
 				for (const part of message.content) {
 					if (part.type === "text") assistantTexts.push(part.text);
 				}
 			} else if (message.role === "toolResult") {
+				const chunks: string[] = [];
 				for (const part of message.content) {
-					if (part.type === "text" && part.text) toolOutputs.push(part.text);
+					if (part.type === "text" && part.text) {
+						toolOutputs.push(part.text);
+						chunks.push(part.text);
+					}
+				}
+				if (chunks.length > 0) {
+					toolResults.push({ name: message.toolName, text: chunks.join("\n") });
 				}
 			}
 		}
-		const found = detectAntiPatterns({ toolCalls: this._toolSignatures, assistantTexts, toolOutputs });
+		const found = detectAntiPatterns({
+			toolCalls: this._toolSignatures,
+			assistantTexts,
+			toolOutputs,
+			toolResults,
+			jailbreakFromToolOutput: this.getJailbreakFromToolOutputMode(),
+		}).filter((pattern) => !this._mutedAntiPatterns.has(pattern));
 		this._antiPatterns = found;
 		if (found.length === 0) return;
 		const text = `anti-pattern: ${found.join(", ")}`;
@@ -1637,7 +1666,23 @@ export class AgentSession {
 		if (part && part.type === "text" && !part.text.includes("anti-pattern:")) {
 			part.text = `${part.text}\n\n${text}`;
 		}
-		this._emit({ type: "anti_pattern", text });
+		this._emit({
+			type: "anti_pattern",
+			text,
+			askMute: found.includes("jailbreak-from-tool-output"),
+		});
+	}
+
+	getJailbreakFromToolOutputMode(): JailbreakFromToolOutputMode {
+		return this.settingsManager.getJailbreakFromToolOutputMode();
+	}
+
+	muteAntiPattern(pattern: AntiPattern): void {
+		this._mutedAntiPatterns.add(pattern);
+	}
+
+	isAntiPatternMuted(pattern: AntiPattern): boolean {
+		return this._mutedAntiPatterns.has(pattern);
 	}
 
 	/** Engage the operator HALT/off-switch: blocks tool calls at the next boundary (#7). */
@@ -3583,7 +3628,7 @@ export class AgentSession {
 			}
 			const again = recurLesson(this._cwd, lesson);
 			if (again) {
-				this._lessonNotices.push(again.id);
+				this._lessonNotices.push({ id: again.id, title: lessonNoticeTitle(again) });
 				this.sessionManager.appendCustomEntry("trek:lesson", {
 					id: again.id,
 					kind: evidence.kind,
@@ -3598,7 +3643,7 @@ export class AgentSession {
 			const id = /^stored (project:\d+)$/.exec(stored)?.[1];
 			if (!id) return;
 			saveLessonRecord(this._cwd, id, lesson);
-			this._lessonNotices.push(id);
+			this._lessonNotices.push({ id, title: lessonNoticeTitle(lesson) });
 			this.sessionManager.appendCustomEntry("trek:lesson", {
 				id,
 				kind: evidence.kind,
@@ -4111,9 +4156,8 @@ export class AgentSession {
 
 	private _emitLessonNotice(): void {
 		if (this._lessonNotices.length === 0) return;
-		const ids = this._lessonNotices.splice(0);
-		const label = ids.length === 1 ? "lesson" : "lessons";
-		this._emit({ type: "lesson_stored", text: `${label} ${ids.join(", ")}` });
+		const entries = this._lessonNotices.splice(0);
+		this._emit({ type: "lesson_stored", text: formatLessonNotice(entries) });
 	}
 
 	private async _maybeGitCommitPrompt(): Promise<void> {

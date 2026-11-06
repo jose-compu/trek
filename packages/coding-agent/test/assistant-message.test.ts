@@ -4,7 +4,7 @@ import {
 	AssistantMessageComponent,
 	shouldRenderAssistantTextBlock,
 } from "../src/modes/interactive/components/assistant-message.ts";
-import { initTheme } from "../src/modes/interactive/theme/theme.ts";
+import { getMarkdownTheme, initTheme } from "../src/modes/interactive/theme/theme.ts";
 
 const OSC133_ZONE_START = "\x1b]133;A\x07";
 const OSC133_ZONE_END = "\x1b]133;B\x07";
@@ -77,5 +77,34 @@ describe("AssistantMessageComponent", () => {
 		const blocks = ["First answer.", "Second answer."];
 		expect(shouldRenderAssistantTextBlock("First answer.", blocks)).toBe(true);
 		expect(shouldRenderAssistantTextBlock("Second answer.", blocks)).toBe(true);
+	});
+
+	test("compact thinking is a header plus the last 3 lines", () => {
+		initTheme("dark");
+		const component = new AssistantMessageComponent(
+			createAssistantMessage([{ type: "thinking", thinking: "one\ntwo\nthree\nfour\nfive" }]),
+			false,
+			getMarkdownTheme(),
+			"Thinking...",
+			false,
+		);
+		const lines = component
+			.render(80)
+			.map((line) =>
+				line
+					.replace(/\x1b\[[0-9;]*m/g, "")
+					.replace(/\x1b\]133;[ABC]\x07/g, "")
+					.trim(),
+			)
+			.filter(Boolean);
+		expect(lines[0]).toContain("thinking");
+		expect(lines).toEqual(expect.arrayContaining(["three", "four", "five"]));
+		expect(lines).not.toContain("one");
+		expect(lines.length).toBeLessThanOrEqual(4);
+
+		component.setExpanded(true);
+		const expanded = component.render(80).join("\n");
+		expect(expanded).toContain("one");
+		expect(expanded).toContain("five");
 	});
 });

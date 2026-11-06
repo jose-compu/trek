@@ -4,6 +4,7 @@ export { AssistantMessageComponent } from "./assistant-message.ts";
 export { BashExecutionComponent } from "./bash-execution.ts";
 export { BorderedLoader } from "./bordered-loader.ts";
 export { BranchSummaryMessageComponent } from "./branch-summary-message.ts";
+export { COMPACT_VIEWPORT_LINES, compactCardLines, compactViewportLines } from "./compact-card.ts";
 export { CompactionSummaryMessageComponent } from "./compaction-summary-message.ts";
 export { CustomEditor } from "./custom-editor.ts";
 export { CustomMessageComponent } from "./custom-message.ts";

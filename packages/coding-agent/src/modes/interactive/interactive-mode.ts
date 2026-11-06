@@ -2333,6 +2333,20 @@ export class InteractiveMode {
 		return result === "Yes";
 	}
 
+	private async askMuteJailbreakWarning(): Promise<void> {
+		const yes = await this.showExtensionConfirm(
+			"anti-pattern: jailbreak-from-tool-output",
+			"Mute this warning for this session?",
+		);
+		if (yes) {
+			this.session.muteAntiPattern("jailbreak-from-tool-output");
+			this.chatContainer.addChild(
+				new Text(theme.fg("dim", "Muted jailbreak-from-tool-output for this session."), 1, 0),
+			);
+			this.ui.requestRender();
+		}
+	}
+
 	private async promptForMissingSessionCwd(error: MissingSessionCwdError): Promise<string | undefined> {
 		const confirmed = await this.showExtensionConfirm(
 			"Session cwd not found",
@@ -3039,10 +3053,17 @@ export class InteractiveMode {
 				break;
 
 			case "workflow_check":
+				this.chatContainer.addChild(new Spacer(1));
+				this.chatContainer.addChild(new Text(theme.fg("warning", event.text), 1, 0));
+				this.ui.requestRender();
+				break;
 			case "anti_pattern":
 				this.chatContainer.addChild(new Spacer(1));
 				this.chatContainer.addChild(new Text(theme.fg("warning", event.text), 1, 0));
 				this.ui.requestRender();
+				if (event.askMute) {
+					void this.askMuteJailbreakWarning();
+				}
 				break;
 
 			case "lesson_stored":
@@ -3079,6 +3100,7 @@ export class InteractiveMode {
 						this.hideThinkingBlock,
 						this.getMarkdownThemeWithSettings(),
 						this.hiddenThinkingLabel,
+						this.toolOutputExpanded,
 					);
 					this.streamingMessage = event.message;
 					this.chatContainer.addChild(this.streamingComponent);
@@ -3485,6 +3507,7 @@ export class InteractiveMode {
 					this.hideThinkingBlock,
 					this.getMarkdownThemeWithSettings(),
 					this.hiddenThinkingLabel,
+					this.toolOutputExpanded,
 				);
 				this.chatContainer.addChild(assistantComponent);
 				break;

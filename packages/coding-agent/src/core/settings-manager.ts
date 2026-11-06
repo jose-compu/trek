@@ -147,6 +147,11 @@ export interface Settings {
 	memory?: MemorySettings;
 	/** Audit / reproducibility policy (#70). */
 	reproducibility?: ReproducibilitySettings;
+	/** Safety / anti-pattern display. */
+	safety?: {
+		jailbreakFromToolOutput?: "off" | "narrow" | "strict";
+		muteAntiPatterns?: string[];
+	};
 }
 
 /** Deep merge settings: project/overrides take precedence, nested objects merge recursively */
@@ -851,6 +856,18 @@ export class SettingsManager {
 
 	getHideThinkingBlock(): boolean {
 		return this.settings.hideThinkingBlock ?? false;
+	}
+
+	getJailbreakFromToolOutputMode(): "off" | "narrow" | "strict" {
+		const mode = this.settings.safety?.jailbreakFromToolOutput;
+		if (mode === "off" || mode === "strict" || mode === "narrow") {
+			return mode;
+		}
+		return "narrow";
+	}
+
+	getMutedAntiPatterns(): string[] {
+		return this.settings.safety?.muteAntiPatterns ?? [];
 	}
 
 	setHideThinkingBlock(hide: boolean): void {

@@ -124,7 +124,7 @@ Modifier combinations: `ctrl+shift+x`, `alt+ctrl+x`, `ctrl+shift+alt+x`, `ctrl+1
 
 | Keybinding id | Default | Description |
 |--------|---------|-------------|
-| `app.tools.expand` | `ctrl+o` | Collapse or expand tool output |
+| `app.tools.expand` | `ctrl+o` | Expand or collapse tool/thinking cards (compact default is 1–4 lines) |
 | `app.message.followUp` | `alt+enter` | Queue follow-up message |
 | `app.message.dequeue` | `alt+up` | Restore queued messages to editor |
 
