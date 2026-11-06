@@ -916,7 +916,7 @@ export class AgentSession {
 			const runner = this._extensionRunner;
 			if (!runner.hasHandlers("tool_result")) {
 				if (safetyNotes.length === 0 && !effortStop) {
-				return undefined;
+					return undefined;
 				}
 				return { content, details: result.details, isError, ...(effortStop ? { terminate: true } : {}) };
 			}
@@ -933,7 +933,7 @@ export class AgentSession {
 
 			if (!hookResult) {
 				if (safetyNotes.length === 0 && !effortStop) {
-				return undefined;
+					return undefined;
 				}
 				return { content, details: result.details, isError, ...(effortStop ? { terminate: true } : {}) };
 			}
@@ -2207,6 +2207,11 @@ export class AgentSession {
 	 * Call this when completely done with the session.
 	 */
 	dispose(): void {
+		try {
+			this.sessionManager.dispose();
+		} catch {
+			// Dispose must succeed even if the session file is already closed.
+		}
 		try {
 			this._memory?.close();
 		} catch {
@@ -4406,7 +4411,7 @@ export class AgentSession {
 			if (lastAssistant && (await this._checkCompaction(lastAssistant, false))) {
 				try {
 					if (await this._safeAgentContinue()) {
-					while (await this._handlePostAgentRun()) {
+						while (await this._handlePostAgentRun()) {
 							if (!(await this._safeAgentContinue())) {
 								break;
 							}
@@ -4536,7 +4541,7 @@ export class AgentSession {
 				phaseAllowed: (phase) => phaseIsOpen(this._operatorMode, phase, this._openPhases),
 			});
 		} else {
-		await this._runAgentPrompt(messages);
+			await this._runAgentPrompt(messages);
 		}
 		this._emitLessonNotice();
 	}
@@ -5445,7 +5450,7 @@ export class AgentSession {
 				if (lastMsg?.role === "assistant") {
 					const assistant = lastMsg as AssistantMessage;
 					if (assistant.stopReason === "error") {
-					this.agent.state.messages = messages.slice(0, -1);
+						this.agent.state.messages = messages.slice(0, -1);
 					}
 					this._trimTrailingAssistantsForRetry();
 				}

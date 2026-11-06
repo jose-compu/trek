@@ -34,5 +34,5 @@ cd packages/coding-agent && npx vitest --run test/performance-baselines.test.ts 
 |--------|-------|---------|
 | CLI / TUI / RPC startup | #109 | `profile:tui`, `profile:rpc` |
 | O→I→A→R cycle | #110 | `profile:e2e` `reflective_loop_ms` |
-| Session JSONL / trace writes | #111 | measured with the same faux turn |
+| Session JSONL / trace writes | #111 | `test/session-manager/jsonl-write-path.test.ts` (`METRIC jsonl_append_400_ms`) |
 | End-to-end first prompt | #113 | `profile:e2e` `first_prompt_ms` |
