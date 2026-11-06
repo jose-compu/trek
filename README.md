@@ -68,7 +68,7 @@ Three stores. A row cannot cross a boundary.
 
 Project `.trek/settings.json` overrides the global settings file. `topK` is an integer from 1 to 50. Each injected hit is cut at 400 characters. At most one thinking row is injected, and only when its score is at least the weakest file or lesson already chosen.
 
-The indexer walks a project directory (a marker such as `.git` or `package.json`, not your home directory). It skips `.git`, `node_modules`, `dist`, `.trek`, lockfiles, binaries, and files over 200 KB. Gitignore applies unless you `/memory add` the path. Embeddings are MiniLM in `local` / `hybrid`. API mode does not load MiniLM unless `TREK_MEMORY_LOCAL=1`. A file over 200 KB has to be split. `/memory add` and `/memory remove` are stored in `.trek/memory/paths.json`. Several TUI sessions may run at once; `llama-server` probes a free port from 18080.
+The indexer walks a project directory (a marker such as `.git` or `package.json`, not your home directory). It skips `.git`, `node_modules`, `dist`, `.trek`, lockfiles, binaries, and files over 200 KB. Gitignore applies unless you `/memory add` the path. Embeddings are MiniLM in `local` / `hybrid`. API mode does not load MiniLM unless `TREK_MEMORY_LOCAL=1`. A file over 200 KB has to be split. `/memory add` and `/memory remove` are stored in `.trek/memory/paths.json`. Several TUI sessions may run at once; `llama-server` probes a free port from 18080 (`TREK_LLAMA_PORT_START`).
 
 ## Domains
 
