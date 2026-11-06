@@ -564,4 +564,39 @@ describe("ToolExecutionComponent parity", () => {
 		expect(expanded).toContain("one");
 		expect(expanded).toContain("five");
 	});
+
+	test("compact bash shows the first command line and hides Took", async () => {
+		const operations: BashOperations = {
+			exec: async (_command, _cwd, { onData }) => {
+				onData(Buffer.from("ok\n"));
+				return { exitCode: 0 };
+			},
+		};
+		const tool = createBashToolDefinition(process.cwd(), { operations });
+		const command = "python3 - <<'PY'\nprint('https://example.test/image.jpg')\nPY";
+		const result = await tool.execute("tool-bash-heredoc", { command }, undefined, undefined, {} as never);
+		const component = new ToolExecutionComponent(
+			"bash",
+			"tool-bash-heredoc",
+			{ command },
+			{},
+			tool,
+			createFakeTui(),
+			process.cwd(),
+		);
+		component.markExecutionStarted();
+		component.updateResult({ ...result, isError: false }, false);
+
+		const compact = stripAnsi(component.render(120).join("\n"));
+		expect(compact).toContain("$ python3 - <<'PY'");
+		expect(compact).not.toContain("example.test");
+		expect(compact).not.toMatch(/Took\s+\d+\.\d+s/);
+
+		component.setExpanded(true);
+		const expanded = stripAnsi(component.render(120).join("\n"));
+		expect(expanded).toContain("$ python3 - <<'PY'");
+		expect(expanded).toContain("print('https://example.test/image.jpg')");
+		expect(expanded).toContain("PY");
+		expect(expanded).toMatch(/Took\s+\d+\.\d+s/);
+	});
 });

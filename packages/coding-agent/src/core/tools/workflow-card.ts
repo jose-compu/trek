@@ -1,5 +1,6 @@
 import { Text } from "@trek/tui";
 import { Type } from "typebox";
+import { cardGlyph } from "../../modes/interactive/components/card-glyph.ts";
 import type { Theme, ThemeColor } from "../../modes/interactive/theme/theme.ts";
 import type { FilledParameter } from "../domains/parameters.ts";
 import type { ToolDefinition } from "../extensions/types.ts";
@@ -27,7 +28,10 @@ const schema = Type.Object({
 });
 
 export function formatWorkflowCall(args: WorkflowCallArgs, theme: Theme): string {
-	const title = typeof theme.bold === "function" ? theme.bold("workflow") : "workflow";
+	const title =
+		typeof theme.bold === "function"
+			? theme.bold(`${cardGlyph("workflow")} workflow`)
+			: `${cardGlyph("workflow")} workflow`;
 	const lines = [
 		`${theme.fg("success", title)}  ${theme.fg("success", args.domain)}${theme.fg("dim", "/")} ${theme.fg("mdLink", args.workflow)}  ${theme.fg("muted", args.reason)}`,
 	];

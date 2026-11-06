@@ -9,11 +9,29 @@ export function visibleCardText(line: string): string {
 	return line.replace(ANSI_SGR, "").replace(OSC133, "").trim();
 }
 
+const DURATION_LINE = /^(Took|Elapsed)\s+\d+\.\d+s$/;
+
+export function isCompactDurationLine(line: string): boolean {
+	return DURATION_LINE.test(visibleCardText(line));
+}
+
+function dropTrailingDuration(lines: string[]): string[] {
+	const next = [...lines];
+	while (next.length > 0 && isCompactDurationLine(next[next.length - 1] ?? "")) {
+		next.pop();
+		while (next.length > 0 && visibleCardText(next[next.length - 1] ?? "") === "") {
+			next.pop();
+		}
+	}
+	return next;
+}
+
 /**
  * Collapse a rendered card to 1–4 lines: the first visible line (type + cmd)
  * plus up to `viewport` content lines. Empty viewport → header only.
  * Success cards use a tail viewport (streaming output moves up).
  * Error cards use a head viewport so the failure lead is visible.
+ * Duration (`Took` / `Elapsed`) is expanded-only.
  */
 export function compactCardLines(
 	lines: readonly string[],
@@ -39,7 +57,10 @@ export function compactCardLines(
 	if (restStart >= end) {
 		return [header];
 	}
-	const rest = lines.slice(restStart, end);
+	const rest = dropTrailingDuration(lines.slice(restStart, end));
+	if (rest.length === 0) {
+		return [header];
+	}
 	if (rest.length <= viewport) {
 		return [header, ...rest];
 	}

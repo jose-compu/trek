@@ -5,6 +5,7 @@ import { Text } from "@trek/tui";
 import { spawn } from "child_process";
 import path from "path";
 import { type Static, Type } from "typebox";
+import { toolCardTitle } from "../../modes/interactive/components/card-glyph.ts";
 import { keyHint } from "../../modes/interactive/components/keybinding-hints.ts";
 import type { Theme } from "../../modes/interactive/theme/theme.ts";
 import { ensureTool } from "../../utils/tools-manager.ts";
@@ -76,7 +77,7 @@ function formatGrepCall(
 	const limit = args?.limit;
 	const invalidArg = invalidArgText(theme);
 	let text =
-		theme.fg("toolTitle", theme.bold("grep")) +
+		toolCardTitle(theme, "grep") +
 		" " +
 		(pattern === null ? invalidArg : theme.fg("accent", `/${pattern || ""}/`)) +
 		theme.fg("toolOutput", ` in ${path === null ? invalidArg : path}`);

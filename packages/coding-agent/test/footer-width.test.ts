@@ -1,9 +1,15 @@
+import type { AssistantMessage } from "@trek/ai";
 import { visibleWidth } from "@trek/tui";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { AgentSession } from "../src/core/agent-session.ts";
 import type { ReadonlyFooterDataProvider } from "../src/core/footer-data-provider.ts";
-import { FooterComponent, formatCwdForFooter } from "../src/modes/interactive/components/footer.ts";
+import {
+	FooterComponent,
+	formatCwdForFooter,
+	liveAssistantOutputTokens,
+} from "../src/modes/interactive/components/footer.ts";
 import { initTheme } from "../src/modes/interactive/theme/theme.ts";
+import { stripAnsi } from "../src/utils/ansi.ts";
 
 type AssistantUsage = {
 	input: number;
@@ -122,5 +128,34 @@ describe("FooterComponent width handling", () => {
 		for (const line of lines) {
 			expect(visibleWidth(line)).toBeLessThanOrEqual(width);
 		}
+	});
+
+	it("adds streaming output to the stats line before the message is persisted", () => {
+		const footer = new FooterComponent(createSession({ sessionName: "" }), createFooterData(1));
+		const live = {
+			role: "assistant",
+			content: [{ type: "text", text: "x".repeat(400) }],
+			timestamp: 1,
+			usage: {
+				input: 50,
+				output: 0,
+				cacheRead: 0,
+				cacheWrite: 0,
+				totalTokens: 0,
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+			},
+		} as AssistantMessage;
+		expect(liveAssistantOutputTokens(live)).toBe(100);
+		footer.setLiveAssistant(live);
+		const text = stripAnsi(footer.render(120).join("\n"));
+		expect(text).toContain("↑50");
+		expect(text).toContain("↓100");
+
+		footer.setLiveAssistant({
+			...live,
+			content: [{ type: "text", text: "x".repeat(800) }],
+		});
+		const next = stripAnsi(footer.render(120).join("\n"));
+		expect(next).toContain("↓200");
 	});
 });
