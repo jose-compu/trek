@@ -1,10 +1,9 @@
 import { constants } from "node:fs";
 import { access as fsAccess } from "node:fs/promises";
 import type { AgentTool } from "@trek/agent-core";
-import { Container, Text, truncateToWidth } from "@trek/tui";
+import { Container, Text } from "@trek/tui";
 import { spawn } from "child_process";
 import { type Static, Type } from "typebox";
-import { keyHint } from "../../modes/interactive/components/keybinding-hints.ts";
 import { truncateToVisualLines } from "../../modes/interactive/components/visual-truncate.ts";
 import { theme } from "../../modes/interactive/theme/theme.ts";
 import { waitForChildProcess } from "../../utils/child-process.ts";
@@ -152,7 +151,7 @@ export interface BashToolOptions {
 	dryRun?: () => boolean;
 }
 
-const BASH_PREVIEW_LINES = 5;
+const BASH_PREVIEW_LINES = 3;
 const DIAGNOSTIC_LINE = /^\s*error:\s+\S+:\d+:\d+:/;
 
 /** Located compiler errors, such as `error: File.lean:19:0: ...`. Generic build lines are omitted. */
@@ -270,13 +269,7 @@ function rebuildBashResultRenderComponent(
 							: preview.skippedCount;
 						state.cachedWidth = width;
 					}
-					if (state.cachedSkipped && state.cachedSkipped > 0) {
-						const hint =
-							theme.fg("muted", `... (${state.cachedSkipped} earlier lines,`) +
-							` ${keyHint("app.tools.expand", "to expand")})`;
-						return ["", truncateToWidth(hint, width, "..."), ...(state.cachedLines ?? [])];
-					}
-					return ["", ...(state.cachedLines ?? [])];
+					return [...(state.cachedLines ?? [])];
 				},
 				invalidate: () => {
 					state.cachedWidth = undefined;

@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Changed
+
+- Compact console cards by default: header plus a 0–3 line scrolling viewport (1 line when empty). `ctrl+o` restores full card chrome and output ([#169](https://github.com/jose-compu/trek/issues/169)).
+- Lesson notices include a brief title from the stored rule (`✔ lesson project:1020 Avoid Verbose Output`) ([#171](https://github.com/jose-compu/trek/issues/171)).
+- `jailbreak-from-tool-output` is narrow by default (ignores read/edit/write and quoted fixture text); a flag asks to mute for the session ([#170](https://github.com/jose-compu/trek/issues/170)).
+
 ## [0.16.1] - 2026-10-31
 
 ### Added

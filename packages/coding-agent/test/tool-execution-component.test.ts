@@ -508,4 +508,60 @@ describe("ToolExecutionComponent parity", () => {
 			expect(collapsed.indexOf(":120-329")).toBeLessThan(collapsed.indexOf("to expand"));
 		});
 	}
+
+	test("compact success read is a single line with no reserved viewport", () => {
+		const component = new ToolExecutionComponent(
+			"read",
+			"tool-one-line-read",
+			{ path: "notes.txt" },
+			{},
+			createReadToolDefinition(process.cwd()),
+			createFakeTui(),
+			process.cwd(),
+		);
+		component.updateResult(
+			{ content: [{ type: "text", text: "hidden content" }], details: undefined, isError: false },
+			false,
+		);
+		const lines = stripAnsi(component.render(120).join("\n"))
+			.split("\n")
+			.filter((line) => line.trim().length > 0);
+		expect(lines).toHaveLength(1);
+		expect(lines[0]).toContain("read");
+		expect(lines[0]).toContain("notes.txt");
+	});
+
+	test("compact bash keeps at most 4 lines and tails the output", async () => {
+		const operations: BashOperations = {
+			exec: async (_command, _cwd, { onData }) => {
+				onData(Buffer.from("one\ntwo\nthree\nfour\nfive\n"));
+				return { exitCode: 0 };
+			},
+		};
+		const tool = createBashToolDefinition(process.cwd(), { operations });
+		const result = await tool.execute("tool-bash-compact", { command: "echo" }, undefined, undefined, {} as never);
+		const component = new ToolExecutionComponent(
+			"bash",
+			"tool-bash-compact",
+			{ command: "echo" },
+			{},
+			tool,
+			createFakeTui(),
+			process.cwd(),
+		);
+		component.updateResult({ ...result, isError: false }, false);
+		const lines = stripAnsi(component.render(120).join("\n"))
+			.split("\n")
+			.filter((line) => line.trim().length > 0);
+		expect(lines.length).toBeGreaterThanOrEqual(1);
+		expect(lines.length).toBeLessThanOrEqual(4);
+		expect(lines[0]).toContain("echo");
+		expect(lines.join("\n")).toContain("five");
+		expect(lines.join("\n")).not.toContain("one");
+
+		component.setExpanded(true);
+		const expanded = stripAnsi(component.render(120).join("\n"));
+		expect(expanded).toContain("one");
+		expect(expanded).toContain("five");
+	});
 });

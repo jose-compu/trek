@@ -4,6 +4,7 @@ import { createAllToolDefinitions, type ToolName } from "../../../core/tools/ind
 import { getTextOutput as getRenderedTextOutput } from "../../../core/tools/render-utils.ts";
 import { convertToPng } from "../../../utils/image-convert.ts";
 import { theme } from "../theme/theme.ts";
+import { compactCardLines } from "./compact-card.ts";
 
 export interface ToolExecutionOptions {
 	showImages?: boolean;
@@ -60,7 +61,7 @@ export class ToolExecutionComponent extends Container {
 		this.ui = ui;
 		this.cwd = cwd;
 
-		this.addChild(new Spacer(1));
+		// Compact cards have no reserved blank line. Expanded prepends a spacer in render().
 
 		// Always create all shell variants. contentBox is used for default renderer-based composition.
 		// selfRenderContainer is used when the tool renders its own framing.
@@ -223,31 +224,44 @@ export class ToolExecutionComponent extends Container {
 			return [];
 		}
 
+		let lines: string[];
 		if (this.hasRendererDefinition() && this.getRenderShell() === "self") {
 			const contentLines = this.selfRenderContainer.render(width);
 			if (contentLines.length === 0 && this.imageComponents.length === 0) {
 				return [];
 			}
 
-			const lines: string[] = [];
+			lines = [];
 			if (contentLines.length > 0) {
-				lines.push("");
+				if (this.expanded) {
+					lines.push("");
+				}
 				lines.push(...contentLines);
 			}
-			for (let i = 0; i < this.imageComponents.length; i++) {
-				const spacer = this.imageSpacers[i];
-				if (spacer) {
-					lines.push(...spacer.render(width));
-				}
-				const imageComponent = this.imageComponents[i];
-				if (imageComponent) {
-					lines.push(...imageComponent.render(width));
+			if (this.expanded) {
+				for (let i = 0; i < this.imageComponents.length; i++) {
+					const spacer = this.imageSpacers[i];
+					if (spacer) {
+						lines.push(...spacer.render(width));
+					}
+					const imageComponent = this.imageComponents[i];
+					if (imageComponent) {
+						lines.push(...imageComponent.render(width));
+					}
 				}
 			}
-			return lines;
+		} else {
+			lines = super.render(width);
+			if (this.expanded && lines.length > 0 && lines[0] !== "") {
+				lines = ["", ...lines];
+			}
 		}
 
-		return super.render(width);
+		if (!this.expanded) {
+			const mode = !this.result || this.result.isError ? "head" : "tail";
+			return compactCardLines(lines, undefined, mode);
+		}
+		return lines;
 	}
 
 	private updateDisplay(): void {
@@ -327,7 +341,7 @@ export class ToolExecutionComponent extends Container {
 		}
 		this.imageSpacers = [];
 
-		if (this.result) {
+		if (this.result && this.expanded) {
 			const imageBlocks = this.result.content.filter((c) => c.type === "image");
 			const caps = getCapabilities();
 			for (let i = 0; i < imageBlocks.length; i++) {

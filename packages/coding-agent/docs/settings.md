@@ -94,6 +94,24 @@ See [Memory](memory.md).
 
 `--memory off` overrides this for one process and does not write the file. Paths added or removed with `/memory` are stored in `.trek/memory/paths.json`, not in settings.
 
+### Safety
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `safety.jailbreakFromToolOutput` | string | `"narrow"` | `"narrow"` ignores jailbreak-shaped strings in `read` / `edit` / `write` and quoted fixture text. `"strict"` flags any match. `"off"` never flags. On a real flag, the TUI asks to mute for the session. |
+| `safety.muteAntiPatterns` | string[] | `[]` | Anti-pattern ids that stay muted (e.g. `["jailbreak-from-tool-output"]`). |
+
+```json
+{
+  "safety": {
+    "jailbreakFromToolOutput": "narrow",
+    "muteAntiPatterns": []
+  }
+}
+```
+
+`ctrl+o` (`app.tools.expand`) expands compact 1–4 line tool and thinking cards to the full card.
+
 ### Compaction
 
 | Setting | Type | Default | Description |
