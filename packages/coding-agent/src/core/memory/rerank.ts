@@ -1,20 +1,26 @@
 /**
  * Cross-encoder policy. Hybrid lexical fusion is separate and always local.
- * Rerank is on by default in api, local, and hybrid for every suite.
- * Production loads MiniLM; tests use a cheap lexical scorer.
+ * Production loads MiniLM only when local weights are requested.
+ * Tests use a cheap lexical scorer.
  */
 
 import { suitePreset } from "../runtime/suites.ts";
 import type { HierarchyMode, SuiteId } from "../runtime/types.ts";
+import { type MemoryModelOptions, shouldLoadMemoryOnnx, useFakeEmbedder } from "./embedder.ts";
 
 export interface Reranker {
 	/** Return a permutation of document indexes, best first. */
 	rerank(query: string, documents: string[]): Promise<number[]>;
 }
 
-/** Always construct. Suite/mode only pick which weights the hierarchy lists. */
-export function shouldConstructCrossEncoder(_input?: { effectiveMode: HierarchyMode; suite: SuiteId }): boolean {
-	return true;
+/** MiniLM CE: local/hybrid, or API when `TREK_MEMORY_LOCAL=1`. */
+export function shouldConstructCrossEncoder(input?: {
+	effectiveMode: HierarchyMode;
+	suite: SuiteId;
+	env?: NodeJS.ProcessEnv;
+}): boolean {
+	if (!input) return false;
+	return shouldLoadMemoryOnnx(input.env ?? process.env, input.effectiveMode);
 }
 
 /** Preferred local cross-encoder id for a suite (or the MiniLM default). */
@@ -23,7 +29,7 @@ export function suiteRerankerId(suite: SuiteId): string {
 }
 
 export function useFakeReranker(env: NodeJS.ProcessEnv = process.env): boolean {
-	return env.VITEST === "true" || env.TREK_MEMORY_EMBEDDER === "fake" || env.TREK_MEMORY_RERANKER === "fake";
+	return useFakeEmbedder(env) || env.TREK_MEMORY_RERANKER === "fake";
 }
 
 /** Lexical overlap for tests. Stable, no model download. */
@@ -58,17 +64,26 @@ export function fakeReranker(): Reranker & { calls: Array<{ query: string; docum
 
 const MINILM_CE = "Xenova/ms-marco-MiniLM-L-6-v2";
 
+function identityReranker(): Reranker {
+	return {
+		async rerank(_query: string, documents: string[]) {
+			return identityOrder(documents.length);
+		},
+	};
+}
+
 /** Lazy MiniLM cross-encoder. A failed load keeps retrieval order. */
-export function createReranker(env: NodeJS.ProcessEnv = process.env): Reranker {
+export function createReranker(env: NodeJS.ProcessEnv = process.env, options: MemoryModelOptions = {}): Reranker {
 	if (useFakeReranker(env)) return fakeReranker();
-	return lazyMiniLmCrossEncoder();
+	if (!shouldLoadMemoryOnnx(env, options.mode)) return identityReranker();
+	return lazyMiniLmCrossEncoder(env.TREK_MEMORY_DOWNLOAD === "1");
 }
 
 function identityOrder(n: number): number[] {
 	return Array.from({ length: n }, (_, index) => index);
 }
 
-function lazyMiniLmCrossEncoder(): Reranker {
+function lazyMiniLmCrossEncoder(allowDownload: boolean): Reranker {
 	let failed = false;
 	let classifier:
 		| ((input: {
@@ -85,6 +100,7 @@ function lazyMiniLmCrossEncoder(): Reranker {
 						pipeline: (
 							task: string,
 							model: string,
+							opts?: { local_files_only?: boolean },
 						) => Promise<
 							(input: {
 								text: string;
@@ -92,7 +108,9 @@ function lazyMiniLmCrossEncoder(): Reranker {
 							}) => Promise<Array<{ label: string; score: number }> | { label: string; score: number }>
 						>;
 					};
-					classifier = await transformers.pipeline("text-classification", MINILM_CE);
+					classifier = await transformers.pipeline("text-classification", MINILM_CE, {
+						local_files_only: !allowDownload,
+					});
 				}
 				const scored: Array<{ index: number; score: number }> = [];
 				for (let index = 0; index < documents.length; index++) {

@@ -94,9 +94,11 @@ The query is the latest user message, cut at 512 characters. Up to `topK` hits a
 
 Lesson ids from that block are written on the audit step as `retrievedLessonIds`.
 
-Embeddings are MiniLM (`Xenova/all-MiniLM-L6-v2`, 384 dimensions), loaded on first use. If the model cannot load, recall returns no hits and the turn continues. Tests use a fake embedder and do not download it.
+Embeddings are MiniLM (`Xenova/all-MiniLM-L6-v2`, 384 dimensions) in `local` and `hybrid`. **API mode does not load MiniLM or ONNX** unless `TREK_MEMORY_LOCAL=1`. Downloads are off unless `TREK_MEMORY_DOWNLOAD=1`. If the model cannot load, recall returns no hits and the turn continues. Tests use a fake embedder and do not download it.
 
-A cross-encoder is allowed only for a local or hybrid Mistral, Mistral Pro, or Qwen suite. API mode and the LFM suite do not construct one. The session does not start a reranker process.
+A MiniLM cross-encoder is constructed in `local` and `hybrid`, or in API when `TREK_MEMORY_LOCAL=1`. The session does not start a reranker llama-server process.
+
+Several TUI sessions may run at once. API sessions do not contend on MiniLM. `llama-server` ports are probed from `18080` (or `TREK_LLAMA_PORT_START`) so a second local session does not bind the same port. See [Performance](performance.md#concurrent-sessions).
 
 ## Lessons
 

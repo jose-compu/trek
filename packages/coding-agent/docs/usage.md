@@ -8,10 +8,10 @@ This page collects day-to-day usage details that do not fit on the quickstart pa
 
 The interface has four main areas:
 
-- **Startup header** - shortcuts, loaded context files, prompt templates, skills, and extensions
-- **Messages** - user messages, assistant responses, tool calls, tool results, notifications, errors, and extension UI
+- **Startup header** - shortcuts, loaded context files, prompt templates, skills, and extensions. Compact start hides the TREK AGENT banner; `ctrl+o` restores the banner, header, and loaded resources
+- **Messages** - user messages, assistant responses, tool calls, tool results, notifications, errors, and extension UI. Tool and thinking cards default to 1–4 lines; `ctrl+o` expands them
 - **Editor** - where you type; border color indicates the current thinking level
-- **Footer** - working directory, session name, token/cache usage, cost, context usage, and current model
+- **Footer** - working directory as `/path:trek-agent@X.Y.Z`, session name, token/cache usage, cost, context usage, and current model
 
 The editor can be replaced temporarily by built-in UI such as `/settings` or by custom extension UI.
 

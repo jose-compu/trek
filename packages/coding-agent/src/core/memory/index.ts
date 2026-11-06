@@ -1,5 +1,13 @@
 export { annotateFile, annotateLesson, annotateThinking, kindOf, type MemoryKind } from "./annotate.ts";
-export { createEmbedder, type Embedder, fakeEmbedder, useFakeEmbedder } from "./embedder.ts";
+export {
+	createEmbedder,
+	type Embedder,
+	fakeEmbedder,
+	type MemoryModelOptions,
+	noopEmbedder,
+	shouldLoadMemoryOnnx,
+	useFakeEmbedder,
+} from "./embedder.ts";
 export { isIndexableProject, listProjectFiles } from "./index-files.ts";
 export {
 	type MemoryHit,

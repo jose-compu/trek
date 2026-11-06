@@ -173,7 +173,7 @@ Current sheet:
 - **Patterns.** Edits go to `.trek/domains/<id>/lessons.yaml`. `/patterns`, `/patterns finance`, `/patterns edit finance categories add tax_gap`, `/patterns edit finance targets add sox-memo SOX memo`, `/patterns edit finance never add west-cistern`, `/patterns restore finance`.
 - **Never stored.** Keys and private keys are refused in every domain. A finance lesson also drops an account number. A matching lesson is not stored. A finance lesson is not recalled on a robotics turn. Meta, AI, Security, and Engineering may be.
 - **Commands.** `/patterns`, `/lessons finance`, `/crystallize <id>`, `/memory`, `/confirm bash`, `/hotkeys`.
-- **Keys.** Esc interrupts. Ctrl+C clears the editor and twice quits. Ctrl+D quits when the editor is empty. Shift+Tab cycles thinking. Ctrl+P cycles the model. Ctrl+L opens the model list. Alt+Enter queues a follow-up.
+- **Keys.** Esc interrupts. Ctrl+C clears the editor and twice quits. Ctrl+D quits when the editor is empty. Shift+Tab cycles thinking. Ctrl+P cycles the model. Ctrl+L opens the model list. Ctrl+O expands compact cards. Alt+Enter queues a follow-up.
 - **Outside the session.** `trek lessons list`, `trek patterns finance`, `trek domains lessons finance`, `trek workflows show finance`, `trek models`.
 
 ## User Override

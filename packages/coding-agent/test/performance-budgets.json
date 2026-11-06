@@ -1,7 +1,7 @@
 {
 	"version": 1,
 	"updated": "2026-11-06",
-	"comment": "CI fails when a metric exceeds budget_ms. Raise a number in this file on purpose when the slower time is accepted. recorded_ms is a local snapshot, not the gate.",
+	"comment": "CI fails when a metric exceeds budgets_ms. Raise a number in this file on purpose when the slower time is accepted. recorded_ms is a local snapshot, not the gate.",
 	"budgets_ms": {
 		"first_prompt_ms": 2000,
 		"reflective_loop_ms": 2000,
