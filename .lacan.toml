@@ -1,0 +1,10 @@
+# Lacan Scan suppressions — https://github.com/jose-compu/lacan-scan#skip-false-positives
+# Loaded automatically. Action jose-compu/lacan-scan@v5. Values must stay on one line.
+
+skip-rules = ["AIS102"]
+
+[ignore]
+AIS008 = ["*.md", "packages/coding-agent/docs/", "packages/coding-agent/test/", "packages/coding-agent/scripts/guardrails-live-cli.sh", ".lacan.toml"]
+AIS101 = ["*.test.ts", "packages/agent/test/", "packages/coding-agent/examples/", "packages/tui/test/"]
+AIS103 = ["packages/coding-agent/src/core/runtime/lfm-chat-template.ts", "packages/coding-agent/dist/"]
+AIS301 = ["*.md", "packages/coding-agent/docs/", "packages/coding-agent/examples/", "packages/coding-agent/src/core/agent-session.ts", "packages/coding-agent/src/core/extensions/types.ts", "packages/coding-agent/dist/"]
