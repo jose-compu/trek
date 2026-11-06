@@ -50,7 +50,7 @@ export function loadDomainCatalog(cwd: string, bundledRoot = bundledDomainsRoot(
 	warmLessonPatterns(cwd, bundledRoot);
 	const state = readState(cwd);
 	const disabled = new Set(state.disabled);
-	const bundled = readDomainDir(bundledRoot, false);
+	const bundled = readBundledDomainDir(bundledRoot);
 	const added = readAddedDomains(cwd);
 	const local = new Map(added.map((domain) => [domain.id, domain]));
 	const domains = bundled.map((domain) => {
@@ -279,6 +279,16 @@ function requireDomain(catalog: DomainCatalog, id: string): DomainDefinition {
 		throw new Error(`unknown domain ${id}`);
 	}
 	return domain;
+}
+
+const bundledDomainDirCache = new Map<string, DomainDefinition[]>();
+
+function readBundledDomainDir(root: string): DomainDefinition[] {
+	const hit = bundledDomainDirCache.get(root);
+	if (hit) return hit;
+	const domains = readDomainDir(root, false);
+	bundledDomainDirCache.set(root, domains);
+	return domains;
 }
 
 function readAddedDomains(cwd: string): DomainDefinition[] {

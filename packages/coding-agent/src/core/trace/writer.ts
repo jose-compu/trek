@@ -65,5 +65,16 @@ export function getReflectiveCycleTraces(entries: SessionEntry[]): ReflectiveCyc
 }
 
 export function getReflectiveCycleCount(sessionManager: SessionManager): number {
-	return getReflectiveCycleTraces(sessionManager.getEntries()).length;
+	const entries = sessionManager.getEntries();
+	const checkpoint = getLatestCycleCheckpoint(entries);
+	if (checkpoint) {
+		return checkpoint.cycleNumber;
+	}
+	let count = 0;
+	for (const entry of entries) {
+		if (entry.type === "custom" && entry.customType === REFLECTIVE_CYCLE_CUSTOM_TYPE) {
+			count++;
+		}
+	}
+	return count;
 }

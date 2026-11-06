@@ -11,6 +11,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 ### Changed
 
 - Cold-start: defer TUI, highlight.js, extension loader, local llama/MLX, and subcommand graphs until they are needed. `trek --version` no longer loads the session stack ([#109](https://github.com/jose-compu/trek/issues/109)).
+- Reflective loop: next cycle id comes from the latest checkpoint (or an in-memory sequence), not a full JSONL parse; bundled domain YAML is parsed once per process ([#110](https://github.com/jose-compu/trek/issues/110)).
 - Compact console cards by default: header plus a 0–3 line scrolling viewport (1 line when empty). `ctrl+o` restores full card chrome and output ([#169](https://github.com/jose-compu/trek/issues/169)).
 - Compact TUI start hides the TREK AGENT banner; `ctrl+o` keeps it persistent with the full header and loaded resources ([#177](https://github.com/jose-compu/trek/issues/177)). The footer cwd line is `/path:trek-agent@X.Y.Z` ([#178](https://github.com/jose-compu/trek/issues/178)).
 - Bash does not block the turn on a still-running command: after 8s (or as soon as it prints a listen/bind line) the process stays up and the tool returns a pid. `block_until_ms: 0` waits for exit. `timeout` still kills. Later server logs no longer crash Trek (`Cannot append to a finished output accumulator`).

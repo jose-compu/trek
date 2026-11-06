@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { EffortRegulator } from "../src/core/reflective-loop/effort-regulator.ts";
 import { ReflectiveLoopController } from "../src/core/reflective-loop/loop-controller.ts";
 import { checkPolicyConstraints } from "../src/core/reflective-loop/policy-constraints.ts";
-import { getReflectiveCycleTraces } from "../src/core/reflective-loop/session-trace.ts";
+import { getReflectiveCycleCount, getReflectiveCycleTraces } from "../src/core/reflective-loop/session-trace.ts";
 import { SubtaskStack } from "../src/core/reflective-loop/subtask-stack.ts";
 import { DEFAULT_MAX_SUBTASK_DEPTH } from "../src/core/reflective-loop/types.ts";
 import { SessionManager } from "../src/core/session-manager.ts";
@@ -141,5 +141,27 @@ describe("reflective loop 0.3.0", () => {
 
 		expect(trace.toolNames).toEqual(["read", "bash"]);
 		expect(trace.lawsVerdict.post?.allowed).toBe(true);
+	});
+
+	test("a second cycle uses the checkpoint instead of scanning every trace", async () => {
+		const manager = SessionManager.inMemory(process.cwd());
+		const controller = new ReflectiveLoopController(manager);
+		await controller.runPromptCycle({
+			task: "read README",
+			cwd: process.cwd(),
+			messageCount: 0,
+			getMessageCount: () => 1,
+			act: async () => {},
+		});
+		expect(getReflectiveCycleCount(manager)).toBe(1);
+		const second = await controller.runPromptCycle({
+			task: "read LICENSE",
+			cwd: process.cwd(),
+			messageCount: 1,
+			getMessageCount: () => 2,
+			act: async () => {},
+		});
+		expect(second.cycleId).toBe("c-0002");
+		expect(getReflectiveCycleCount(manager)).toBe(2);
 	});
 });
