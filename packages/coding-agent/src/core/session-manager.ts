@@ -2,10 +2,10 @@ import { type AgentMessage, uuidv7 } from "@trek/agent-core";
 import type { ImageContent, Message, TextContent } from "@trek/ai";
 import { randomUUID } from "crypto";
 import {
-	appendFileSync,
 	closeSync,
 	createReadStream,
 	existsSync,
+	fsyncSync,
 	mkdirSync,
 	openSync,
 	readdirSync,
@@ -246,6 +246,10 @@ function generateId(byId: { has(id: string): boolean }): string {
 	}
 	// Fallback to full UUID if somehow we have collisions
 	return randomUUID();
+}
+
+function entryIsAssistant(entry: FileEntry): boolean {
+	return entry.type === "message" && entry.message.role === "assistant";
 }
 
 /** Migrate v1 → v2: add id/parentId tree structure. Mutates in place. */
@@ -787,6 +791,9 @@ export class SessionManager {
 	private cwd: string;
 	private persist: boolean;
 	private flushed: boolean = false;
+	private hasAssistant: boolean = false;
+	private appendFd: number | undefined;
+	private appendCloseTimer: ReturnType<typeof setImmediate> | undefined;
 	private fileEntries: FileEntry[] = [];
 	private byId: Map<string, SessionEntry> = new Map();
 	private labelsById: Map<string, string> = new Map();
@@ -816,6 +823,7 @@ export class SessionManager {
 
 	/** Switch to a different session file (used for resume and branching) */
 	setSessionFile(sessionFile: string): void {
+		this._closeAppendFd();
 		this.sessionFile = resolvePath(sessionFile);
 		if (existsSync(this.sessionFile)) {
 			this.fileEntries = loadEntriesFromFile(this.sessionFile);
@@ -848,6 +856,7 @@ export class SessionManager {
 	}
 
 	newSession(options?: NewSessionOptions): string | undefined {
+		this._closeAppendFd();
 		if (options?.id !== undefined) {
 			assertValidSessionId(options.id);
 		}
@@ -866,6 +875,7 @@ export class SessionManager {
 		this.labelsById.clear();
 		this.leafId = null;
 		this.flushed = false;
+		this.hasAssistant = false;
 
 		if (this.persist) {
 			const fileTimestamp = timestamp.replace(/[:.]/g, "-");
@@ -879,10 +889,14 @@ export class SessionManager {
 		this.labelsById.clear();
 		this.labelTimestampsById.clear();
 		this.leafId = null;
+		this.hasAssistant = false;
 		for (const entry of this.fileEntries) {
 			if (entry.type === "session") continue;
 			this.byId.set(entry.id, entry);
 			this.leafId = entry.id;
+			if (entryIsAssistant(entry)) {
+				this.hasAssistant = true;
+			}
 			if (entry.type === "label") {
 				if (entry.label) {
 					this.labelsById.set(entry.targetId, entry.label);
@@ -897,6 +911,7 @@ export class SessionManager {
 
 	private _rewriteFile(): void {
 		if (!this.persist || !this.sessionFile) return;
+		this._closeAppendFd();
 		const fd = openSync(this.sessionFile, "w");
 		try {
 			for (const entry of this.fileEntries) {
@@ -905,6 +920,49 @@ export class SessionManager {
 		} finally {
 			closeSync(fd);
 		}
+	}
+
+	private _cancelAppendClose(): void {
+		if (this.appendCloseTimer === undefined) return;
+		clearImmediate(this.appendCloseTimer);
+		this.appendCloseTimer = undefined;
+	}
+
+	private _closeAppendFd(options?: { fsync?: boolean }): void {
+		this._cancelAppendClose();
+		if (this.appendFd === undefined) return;
+		try {
+			if (options?.fsync) {
+				fsyncSync(this.appendFd);
+			}
+		} catch {
+			// Some filesystems refuse fsync; still close.
+		}
+		try {
+			closeSync(this.appendFd);
+		} catch {
+			// Already closed.
+		}
+		this.appendFd = undefined;
+	}
+
+	private _writeJsonlChunk(chunk: string): void {
+		if (!this.sessionFile) return;
+		this._cancelAppendClose();
+		if (this.appendFd === undefined) {
+			this.appendFd = openSync(this.sessionFile, "a");
+		}
+		writeFileSync(this.appendFd, chunk);
+		this.appendCloseTimer = setImmediate(() => {
+			this.appendCloseTimer = undefined;
+			this._closeAppendFd();
+		});
+		this.appendCloseTimer.unref();
+	}
+
+	/** Flush pending JSONL bytes and close the append descriptor. Safe to call more than once. */
+	dispose(): void {
+		this._closeAppendFd({ fsync: true });
 	}
 
 	isPersisted(): boolean {
@@ -932,12 +990,15 @@ export class SessionManager {
 	}
 
 	_persist(entry: SessionEntry): void {
-		if (!this.persist || !this.sessionFile) return;
+		this._persistBatch([entry]);
+	}
 
-		const hasAssistant = this.fileEntries.some((e) => e.type === "message" && e.message.role === "assistant");
-		if (!hasAssistant) {
+	private _persistBatch(entries: SessionEntry[]): void {
+		if (!this.persist || !this.sessionFile || entries.length === 0) return;
+
+		if (!this.hasAssistant) {
 			if (this.flushed) {
-				appendFileSync(this.sessionFile, `${JSON.stringify(entry)}\n`);
+				this._writeJsonlChunk(`${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`);
 			} else {
 				// Mark as not flushed so when assistant arrives, all entries get written
 				this.flushed = false;
@@ -946,6 +1007,7 @@ export class SessionManager {
 		}
 
 		if (!this.flushed) {
+			this._closeAppendFd();
 			const fd = openSync(this.sessionFile, "wx");
 			try {
 				for (const e of this.fileEntries) {
@@ -955,16 +1017,26 @@ export class SessionManager {
 				closeSync(fd);
 			}
 			this.flushed = true;
-		} else {
-			appendFileSync(this.sessionFile, `${JSON.stringify(entry)}\n`);
+			return;
 		}
+
+		this._writeJsonlChunk(`${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`);
 	}
 
 	private _appendEntry(entry: SessionEntry): void {
-		this.fileEntries.push(entry);
-		this.byId.set(entry.id, entry);
-		this.leafId = entry.id;
-		this._persist(entry);
+		this._appendEntries([entry]);
+	}
+
+	private _appendEntries(entries: SessionEntry[]): void {
+		for (const entry of entries) {
+			this.fileEntries.push(entry);
+			this.byId.set(entry.id, entry);
+			this.leafId = entry.id;
+			if (entryIsAssistant(entry)) {
+				this.hasAssistant = true;
+			}
+		}
+		this._persistBatch(entries);
 	}
 
 	/** Append a message as child of current leaf, then advance leaf. Returns entry id.
@@ -1037,16 +1109,31 @@ export class SessionManager {
 
 	/** Append a custom entry (for extensions) as child of current leaf, then advance leaf. Returns entry id. */
 	appendCustomEntry(customType: string, data?: unknown): string {
-		const entry: CustomEntry = {
-			type: "custom",
-			customType,
-			data,
-			id: generateId(this.byId),
-			parentId: this.leafId,
-			timestamp: new Date().toISOString(),
-		};
-		this._appendEntry(entry);
-		return entry.id;
+		return this.appendCustomEntries([{ customType, data }])[0]!;
+	}
+
+	/** Append several custom entries in one JSONL write. */
+	appendCustomEntries(records: Array<{ customType: string; data?: unknown }>): string[] {
+		if (records.length === 0) return [];
+		const now = new Date().toISOString();
+		const reserved = new Set(this.byId.keys());
+		const entries: CustomEntry[] = [];
+		let parentId = this.leafId;
+		for (const record of records) {
+			const id = generateId(reserved);
+			reserved.add(id);
+			entries.push({
+				type: "custom",
+				customType: record.customType,
+				data: record.data,
+				id,
+				parentId,
+				timestamp: now,
+			});
+			parentId = id;
+		}
+		this._appendEntries(entries);
+		return entries.map((entry) => entry.id);
 	}
 
 	/** Append a session info entry (e.g., display name). Returns entry id. */
@@ -1433,6 +1520,7 @@ export class SessionManager {
 		}
 
 		if (this.persist) {
+			this._closeAppendFd();
 			// Build label entries
 			const lastEntryId = pathWithoutLabels[pathWithoutLabels.length - 1]?.id || null;
 			let parentId = lastEntryId;
@@ -1461,8 +1549,7 @@ export class SessionManager {
 			// first assistant response, matching the newSession() contract
 			// and avoiding the duplicate-header bug when _persist()'s
 			// no-assistant guard later resets flushed to false.
-			const hasAssistant = this.fileEntries.some((e) => e.type === "message" && e.message.role === "assistant");
-			if (hasAssistant) {
+			if (this.hasAssistant) {
 				this._rewriteFile();
 				this.flushed = true;
 			} else {
@@ -1588,14 +1675,13 @@ export class SessionManager {
 			cwd: resolvedTargetCwd,
 			parentSession: resolvedSourcePath,
 		};
-		writeFileSync(newSessionFile, `${JSON.stringify(newHeader)}\n`, { flag: "wx" });
-
-		// Copy all non-header entries from source
+		const lines = [JSON.stringify(newHeader)];
 		for (const entry of sourceEntries) {
 			if (entry.type !== "session") {
-				appendFileSync(newSessionFile, `${JSON.stringify(entry)}\n`);
+				lines.push(JSON.stringify(entry));
 			}
 		}
+		writeFileSync(newSessionFile, `${lines.join("\n")}\n`, { flag: "wx" });
 
 		return new SessionManager(resolvedTargetCwd, dir, newSessionFile, true);
 	}

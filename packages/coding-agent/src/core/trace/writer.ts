@@ -20,12 +20,17 @@ export function appendCycleCheckpoint(sessionManager: SessionManager, checkpoint
 }
 
 export function persistCycleBoundary(sessionManager: SessionManager, trace: ReflectiveCycleTrace): void {
-	appendReflectiveCycleTrace(sessionManager, trace);
-	appendCycleCheckpoint(sessionManager, {
-		cycleId: trace.cycleId,
-		cycleNumber: trace.cycleNumber,
-		promptId: trace.promptId,
-	});
+	sessionManager.appendCustomEntries([
+		{ customType: REFLECTIVE_CYCLE_CUSTOM_TYPE, data: trace },
+		{
+			customType: CYCLE_CHECKPOINT_CUSTOM_TYPE,
+			data: {
+				cycleId: trace.cycleId,
+				cycleNumber: trace.cycleNumber,
+				promptId: trace.promptId,
+			} satisfies CycleCheckpoint,
+		},
+	]);
 }
 
 function parseCycleCheckpoint(data: unknown): CycleCheckpoint | undefined {
