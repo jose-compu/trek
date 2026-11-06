@@ -1,9 +1,10 @@
 import type { AssistantMessage } from "@trek/ai";
 import { isContextOverflow } from "@trek/ai";
-import { Container, Markdown, type MarkdownTheme, Spacer, Text } from "@trek/tui";
+import { type Component, Container, Markdown, type MarkdownTheme, Spacer, Text } from "@trek/tui";
 import { honestyDisplay, stripHonestyFooter } from "../../../core/honesty/index.ts";
 import { getMarkdownTheme, theme } from "../theme/theme.ts";
-import { compactViewportLines } from "./compact-card.ts";
+import { cardGlyph } from "./card-glyph.ts";
+import { COMPACT_VIEWPORT_LINES, visibleCardText } from "./compact-card.ts";
 
 const OSC133_ZONE_START = "\x1b]133;A\x07";
 const OSC133_ZONE_END = "\x1b]133;B\x07";
@@ -43,6 +44,23 @@ function honestyCardLines(status: {
 		lines.push(`${theme.fg("dim", "            ")}${theme.fg(keyTone, key.padEnd(12))}${theme.fg("text", value)}`);
 	}
 	return lines;
+}
+
+/** Compact thinking: last 3 wrapped terminal rows, not 3 source paragraphs. */
+class CompactThinkingViewport implements Component {
+	private thinking: string;
+
+	constructor(thinking: string) {
+		this.thinking = thinking;
+	}
+
+	invalidate(): void {}
+
+	render(width: number): string[] {
+		const styled = theme.italic(theme.fg("thinkingText", this.thinking.trim()));
+		const wrapped = new Text(styled, 1, 0).render(width).filter((line) => visibleCardText(line) !== "");
+		return wrapped.slice(-COMPACT_VIEWPORT_LINES);
+	}
 }
 
 function collectTrimmedTextBlocks(content: AssistantMessage["content"]): string[] {
@@ -175,15 +193,17 @@ export class AssistantMessageComponent extends Container {
 						this.contentContainer.addChild(new Spacer(1));
 					}
 				} else if (!this.expanded) {
-					this.contentContainer.addChild(new Text(theme.italic(theme.fg("thinkingText", "thinking")), 1, 0));
-					for (const line of compactViewportLines(content.thinking)) {
-						this.contentContainer.addChild(new Text(theme.italic(theme.fg("thinkingText", line)), 1, 0));
-					}
+					this.contentContainer.addChild(
+						new Text(theme.italic(theme.fg("thinkingText", `${cardGlyph("thinking")} thinking`)), 1, 0),
+					);
+					this.contentContainer.addChild(new CompactThinkingViewport(content.thinking));
 					if (hasVisibleContentAfter) {
 						this.contentContainer.addChild(new Spacer(1));
 					}
 				} else {
-					// Thinking traces in thinkingText color, italic
+					this.contentContainer.addChild(
+						new Text(theme.italic(theme.fg("thinkingText", `${cardGlyph("thinking")} thinking`)), 1, 0),
+					);
 					this.contentContainer.addChild(
 						new Markdown(content.thinking.trim(), 1, 0, this.markdownTheme, {
 							color: (text: string) => theme.fg("thinkingText", text),

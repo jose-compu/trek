@@ -107,4 +107,39 @@ describe("AssistantMessageComponent", () => {
 		expect(expanded).toContain("one");
 		expect(expanded).toContain("five");
 	});
+
+	test("compact thinking is 3 wrapped visual lines, not 3 source paragraphs", () => {
+		initTheme("dark");
+		const paragraph =
+			"The French build script will be reused as a base, with design and fonts rewritten for Argentina. " +
+			"A switcher will be added to both papers. The directory structure will place Argentina under gazettes. " +
+			"Rebuilding France would refetch news, so the generated index will be patched instead.";
+		const compact = new AssistantMessageComponent(
+			createAssistantMessage([{ type: "thinking", thinking: paragraph }]),
+			false,
+			getMarkdownTheme(),
+			"Thinking...",
+			false,
+		);
+		const expanded = new AssistantMessageComponent(
+			createAssistantMessage([{ type: "thinking", thinking: paragraph }]),
+			false,
+			getMarkdownTheme(),
+			"Thinking...",
+			true,
+		);
+		const compactLines = compact
+			.render(48)
+			.map((line) =>
+				line
+					.replace(/\x1b\[[0-9;]*m/g, "")
+					.replace(/\x1b\]133;[ABC]\x07/g, "")
+					.trim(),
+			)
+			.filter(Boolean);
+		expect(compactLines[0]).toContain("thinking");
+		expect(compactLines.length).toBeLessThanOrEqual(4);
+		expect(expanded.render(48).filter((line) => line.trim()).length).toBeGreaterThan(compactLines.length);
+		expect(expanded.render(48).join("\n")).toContain("French build script");
+	});
 });

@@ -22,6 +22,11 @@ describe("compactCardLines", () => {
 			"in file",
 		]);
 	});
+
+	test("drops Took / Elapsed from the compact viewport", () => {
+		expect(compactCardLines(["$ echo hi", "hi", "", "Took 0.3s"])).toEqual(["$ echo hi", "hi"]);
+		expect(compactCardLines(["$ sleep 1", "Elapsed 1.0s"])).toEqual(["$ sleep 1"]);
+	});
 });
 
 describe("compactViewportLines", () => {

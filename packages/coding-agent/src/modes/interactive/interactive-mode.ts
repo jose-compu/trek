@@ -3103,6 +3103,7 @@ export class InteractiveMode {
 						this.toolOutputExpanded,
 					);
 					this.streamingMessage = event.message;
+					this.footer.setLiveAssistant(event.message);
 					this.chatContainer.addChild(this.streamingComponent);
 					this.streamingComponent.updateContent(this.streamingMessage);
 					this.ui.requestRender();
@@ -3112,6 +3113,7 @@ export class InteractiveMode {
 			case "message_update":
 				if (this.streamingComponent && event.message.role === "assistant") {
 					this.streamingMessage = event.message;
+					this.footer.setLiveAssistant(event.message);
 					this.streamingComponent.updateContent(this.streamingMessage);
 
 					for (const content of this.streamingMessage.content) {
@@ -3178,6 +3180,7 @@ export class InteractiveMode {
 					}
 					this.streamingComponent = undefined;
 					this.streamingMessage = undefined;
+					this.footer.setLiveAssistant(undefined);
 					this.footer.invalidate();
 				}
 				this.ui.requestRender();

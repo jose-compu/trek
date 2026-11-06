@@ -25,6 +25,7 @@ describe("ShortcutBarComponent", () => {
 		const lines = bar.render(200);
 		expect(lines.length).toBe(1);
 		expect(lines[0]).toMatch(/undo|dry-run|stop/i);
+		expect(lines[0]).toMatch(/ctrl\+o|expand/i);
 	});
 
 	test("expanded mode renders multiple sections", () => {

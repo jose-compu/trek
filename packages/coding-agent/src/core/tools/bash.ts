@@ -4,6 +4,7 @@ import type { AgentTool } from "@trek/agent-core";
 import { Container, Text } from "@trek/tui";
 import { spawn } from "child_process";
 import { type Static, Type } from "typebox";
+import { cardGlyph } from "../../modes/interactive/components/card-glyph.ts";
 import { truncateToVisualLines } from "../../modes/interactive/components/visual-truncate.ts";
 import { theme } from "../../modes/interactive/theme/theme.ts";
 import { waitForChildProcess } from "../../utils/child-process.ts";
@@ -207,12 +208,19 @@ function formatDuration(ms: number): string {
 	return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function formatBashCall(args: { command?: string; timeout?: number } | undefined): string {
+function firstCommandLine(command: string): string {
+	return command.split(/\r?\n/).find((line) => line.length > 0) ?? command;
+}
+
+function formatBashCall(args: { command?: string; timeout?: number } | undefined, compact = false): string {
 	const command = str(args?.command);
 	const timeout = args?.timeout as number | undefined;
 	const timeoutSuffix = timeout ? theme.fg("muted", ` (timeout ${timeout}s)`) : "";
-	const commandDisplay = command === null ? invalidArgText(theme) : command ? command : theme.fg("toolOutput", "...");
-	return theme.fg("toolTitle", theme.bold(`$ ${commandDisplay}`)) + timeoutSuffix;
+	let commandDisplay = command === null ? invalidArgText(theme) : command ? command : theme.fg("toolOutput", "...");
+	if (compact && command) {
+		commandDisplay = firstCommandLine(command);
+	}
+	return theme.fg("toolTitle", theme.bold(`${cardGlyph("bash")} $ ${commandDisplay}`)) + timeoutSuffix;
 }
 
 function rebuildBashResultRenderComponent(
@@ -297,7 +305,7 @@ function rebuildBashResultRenderComponent(
 		component.addChild(new Text(`\n${theme.fg("warning", `[${warnings.join(". ")}]`)}`, 0, 0));
 	}
 
-	if (startedAt !== undefined) {
+	if (options.expanded && startedAt !== undefined) {
 		const label = options.isPartial ? "Elapsed" : "Took";
 		const endTime = endedAt ?? Date.now();
 		component.addChild(new Text(`\n${theme.fg("muted", `${label} ${formatDuration(endTime - startedAt)}`)}`, 0, 0));
@@ -460,7 +468,7 @@ export function createBashToolDefinition(
 				state.endedAt = undefined;
 			}
 			const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
-			text.setText(formatBashCall(args));
+			text.setText(formatBashCall(args, !context.expanded));
 			return text;
 		},
 		renderResult(result, options, _theme, context) {

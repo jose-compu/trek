@@ -1,6 +1,8 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
+import type { AssistantMessage } from "@trek/ai";
 import { type Component, truncateToWidth, visibleWidth } from "@trek/tui";
 import type { AgentSession } from "../../../core/agent-session.ts";
+import { estimateTokens } from "../../../core/compaction/compaction.ts";
 import type { ReadonlyFooterDataProvider } from "../../../core/footer-data-provider.ts";
 import { theme } from "../theme/theme.ts";
 
@@ -27,6 +29,27 @@ function formatTokens(count: number): string {
 	return `${Math.round(count / 1000000)}M`;
 }
 
+export function liveAssistantOutputTokens(message: AssistantMessage): number {
+	if (message.usage.output > 0) return message.usage.output;
+	return estimateTokens(message);
+}
+
+function liveAssistantCost(
+	message: AssistantMessage,
+	model: { cost?: { input: number; output: number; cacheRead: number; cacheWrite: number } } | undefined,
+): number {
+	if (message.usage.cost.total > 0) return message.usage.cost.total;
+	if (!model?.cost) return 0;
+	const output = liveAssistantOutputTokens(message);
+	return (
+		(model.cost.input * message.usage.input +
+			model.cost.output * output +
+			model.cost.cacheRead * message.usage.cacheRead +
+			model.cost.cacheWrite * message.usage.cacheWrite) /
+		1_000_000
+	);
+}
+
 export function formatCwdForFooter(cwd: string, home: string | undefined): string {
 	if (!home) return cwd;
 
@@ -49,6 +72,7 @@ export class FooterComponent implements Component {
 	private autoCompactEnabled = true;
 	private session: AgentSession;
 	private footerData: ReadonlyFooterDataProvider;
+	private liveAssistant: AssistantMessage | undefined;
 
 	constructor(session: AgentSession, footerData: ReadonlyFooterDataProvider) {
 		this.session = session;
@@ -57,6 +81,10 @@ export class FooterComponent implements Component {
 
 	setSession(session: AgentSession): void {
 		this.session = session;
+	}
+
+	setLiveAssistant(message: AssistantMessage | undefined): void {
+		this.liveAssistant = message;
 	}
 
 	setAutoCompactEnabled(enabled: boolean): void {
@@ -88,14 +116,32 @@ export class FooterComponent implements Component {
 		let totalCacheRead = 0;
 		let totalCacheWrite = 0;
 		let totalCost = 0;
+		const entries = this.session.sessionManager.getEntries();
 
-		for (const entry of this.session.sessionManager.getEntries()) {
+		for (const entry of entries) {
 			if (entry.type === "message" && entry.message.role === "assistant") {
 				totalInput += entry.message.usage.input;
 				totalOutput += entry.message.usage.output;
 				totalCacheRead += entry.message.usage.cacheRead;
 				totalCacheWrite += entry.message.usage.cacheWrite;
 				totalCost += entry.message.usage.cost.total;
+			}
+		}
+
+		const live = this.liveAssistant;
+		if (live) {
+			const alreadyCounted = entries.some(
+				(entry) =>
+					entry.type === "message" &&
+					entry.message.role === "assistant" &&
+					entry.message.timestamp === live.timestamp,
+			);
+			if (!alreadyCounted) {
+				totalInput += live.usage.input;
+				totalOutput += liveAssistantOutputTokens(live);
+				totalCacheRead += live.usage.cacheRead;
+				totalCacheWrite += live.usage.cacheWrite;
+				totalCost += liveAssistantCost(live, state.model);
 			}
 		}
 

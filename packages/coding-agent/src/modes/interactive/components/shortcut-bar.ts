@@ -19,6 +19,7 @@ const COMPACT_SHORTCUTS: ShortcutEntry[] = [
 	"app.edits.undo",
 	"app.edits.keepAll",
 	"app.edits.dryRun",
+	"app.tools.expand",
 	{ raw: "/", description: "commands" },
 	{ raw: "!", description: "bash" },
 	"app.shortcuts.toggle",
@@ -88,7 +89,7 @@ function formatEntry(entry: ShortcutEntry): string {
 			"app.model.select": "select model",
 			"app.thinking.cycle": "thinking",
 			"app.thinking.toggle": "thinking blocks",
-			"app.tools.expand": "expand tools",
+			"app.tools.expand": "expand",
 			"app.editor.external": "ext. editor",
 			"app.clipboard.pasteImage": "paste image",
 		};
