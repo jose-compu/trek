@@ -37,7 +37,6 @@ import {
 	streamSimple,
 } from "@trek/ai";
 import { getAgentDir } from "../config.ts";
-import { theme } from "../modes/interactive/theme/theme.ts";
 import { debugLog } from "../utils/debug-log.ts";
 import { stripFrontmatter } from "../utils/frontmatter.ts";
 import { resolvePath } from "../utils/paths.ts";
@@ -105,24 +104,26 @@ import {
 	type SerializedCheckpoints,
 	type UndoResult,
 } from "./edit-checkpoints/index.ts";
-import { exportSessionToHtml, type ToolHtmlRenderer } from "./export-html/index.ts";
-import { createToolHtmlRenderer } from "./export-html/tool-renderer.ts";
+import {
+	type ExtensionErrorListener,
+	ExtensionRunner,
+	emitSessionShutdownEvent,
+	type ShutdownHandler,
+} from "./extensions/runner.ts";
 import {
 	type ContextUsage,
 	type ExtensionCommandContextActions,
-	type ExtensionErrorListener,
 	type ExtensionMode,
-	ExtensionRunner,
 	type ExtensionUIContext,
 	type InputSource,
 	type MessageEndEvent,
 	type MessageStartEvent,
 	type MessageUpdateEvent,
 	type ReplacedSessionContext,
+	resolveReversibilityTier,
 	type SessionBeforeCompactResult,
 	type SessionBeforeTreeResult,
 	type SessionStartEvent,
-	type ShutdownHandler,
 	type ToolDefinition,
 	type ToolExecutionEndEvent,
 	type ToolExecutionStartEvent,
@@ -131,10 +132,8 @@ import {
 	type TreePreparation,
 	type TurnEndEvent,
 	type TurnStartEvent,
-	wrapRegisteredTools,
-} from "./extensions/index.ts";
-import { emitSessionShutdownEvent } from "./extensions/runner.ts";
-import { resolveReversibilityTier } from "./extensions/types.ts";
+} from "./extensions/types.ts";
+import { wrapRegisteredTools } from "./extensions/wrapper.ts";
 import {
 	HONESTY_PROMPT_SECTION,
 	type HonestyReport,
@@ -206,51 +205,44 @@ import {
 } from "./reproducibility/index.ts";
 import type { ResourceExtensionPaths, ResourceLoader } from "./resource-loader.ts";
 import {
-	applyPlanBlock,
 	contextBudget,
-	createDefaultLlamaProcessManager,
-	decisionTemplateInventPrompt,
-	detectTopicReset,
-	extractPlanBody,
 	fitCompactionSettings,
-	formatDecisionSolveCard,
+	SMALL_CONTEXT_TOOLS,
+	smallContextPrompt,
+} from "./runtime/context-budget.ts";
+import { formatDecisionSolveCard, runDecisionIndex } from "./runtime/decision-index.ts";
+import { decisionTemplateInventPrompt } from "./runtime/decision-templates.ts";
+import {
 	formatDescalateCard,
 	formatEscalateCard,
 	type HierarchyRole,
 	isToolArgumentValidationError,
 	type LadderRole,
-	type LlamaProcessManager,
-	LMSTUDIO_PROVIDER,
-	LOCAL_LLAMA_PROVIDER,
-	LOCAL_SUITE_WORK_SECTION,
-	latestUserPrompt,
-	lmStudioChatModel,
-	loadRuntimeConfig,
-	localLlamaChatModel,
-	NO_PROMOTION_MODEL,
 	nextLadderRole,
 	parseDescalateSignal,
 	parseEscalateSignal,
-	parseNewTopicSignal,
+	prevLadderRole,
+	startLadderRole,
+	stripEscalateSignal,
+} from "./runtime/escalate.ts";
+import { localLlamaChatModel } from "./runtime/local-llama-model.ts";
+import { LMSTUDIO_PROVIDER, LOCAL_LLAMA_PROVIDER, lmStudioChatModel } from "./runtime/local-model.ts";
+import { LOCAL_SUITE_WORK_SECTION } from "./runtime/local-work.ts";
+import { detectTopicReset, parseNewTopicSignal, stripNewTopicSignal } from "./runtime/new-topic.ts";
+import {
+	applyPlanBlock,
+	extractPlanBody,
 	planningBriefPrompt,
 	planningReplanEnabled,
 	planningReplanPrompt,
-	prevLadderRole,
-	promotionRole,
-	type ResolvedRuntime,
-	resolveRuntime,
-	runDecisionIndex,
-	SMALL_CONTEXT_TOOLS,
-	selectSessionRole,
-	selectThinkRole,
-	sessionRoleForModel,
 	shouldReplanAfterTool,
-	smallContextPrompt,
-	startLadderRole,
-	stripEscalateSignal,
-	stripNewTopicSignal,
 	toolResultSnippet,
-} from "./runtime/index.ts";
+} from "./runtime/planning-brief.ts";
+import { createDefaultLlamaProcessManager, type LlamaProcessManager } from "./runtime/process-manager.ts";
+import { NO_PROMOTION_MODEL, promotionRole } from "./runtime/promotion-model.ts";
+import { loadRuntimeConfig } from "./runtime/registry.ts";
+import { type ResolvedRuntime, resolveRuntime } from "./runtime/resolve.ts";
+import { latestUserPrompt, selectSessionRole, selectThinkRole, sessionRoleForModel } from "./runtime/select-role.ts";
 import {
 	type AntiPattern,
 	applyTone,
@@ -924,7 +916,7 @@ export class AgentSession {
 			const runner = this._extensionRunner;
 			if (!runner.hasHandlers("tool_result")) {
 				if (safetyNotes.length === 0 && !effortStop) {
-					return undefined;
+				return undefined;
 				}
 				return { content, details: result.details, isError, ...(effortStop ? { terminate: true } : {}) };
 			}
@@ -941,7 +933,7 @@ export class AgentSession {
 
 			if (!hookResult) {
 				if (safetyNotes.length === 0 && !effortStop) {
-					return undefined;
+				return undefined;
 				}
 				return { content, details: result.details, isError, ...(effortStop ? { terminate: true } : {}) };
 			}
@@ -4414,7 +4406,7 @@ export class AgentSession {
 			if (lastAssistant && (await this._checkCompaction(lastAssistant, false))) {
 				try {
 					if (await this._safeAgentContinue()) {
-						while (await this._handlePostAgentRun()) {
+					while (await this._handlePostAgentRun()) {
 							if (!(await this._safeAgentContinue())) {
 								break;
 							}
@@ -4544,7 +4536,7 @@ export class AgentSession {
 				phaseAllowed: (phase) => phaseIsOpen(this._operatorMode, phase, this._openPhases),
 			});
 		} else {
-			await this._runAgentPrompt(messages);
+		await this._runAgentPrompt(messages);
 		}
 		this._emitLessonNotice();
 	}
@@ -5453,7 +5445,7 @@ export class AgentSession {
 				if (lastMsg?.role === "assistant") {
 					const assistant = lastMsg as AssistantMessage;
 					if (assistant.stopReason === "error") {
-						this.agent.state.messages = messages.slice(0, -1);
+					this.agent.state.messages = messages.slice(0, -1);
 					}
 					this._trimTrailingAssistantsForRetry();
 				}
@@ -6503,9 +6495,13 @@ export class AgentSession {
 	 */
 	async exportToHtml(outputPath?: string): Promise<string> {
 		const themeName = this.settingsManager.getTheme();
+		const [{ exportSessionToHtml }, { createToolHtmlRenderer }, { theme }] = await Promise.all([
+			import("./export-html/index.ts"),
+			import("./export-html/tool-renderer.ts"),
+			import("../modes/interactive/theme/theme-proxy.ts"),
+		]);
 
-		// Create tool renderer if we have an extension runner (for custom tool HTML rendering)
-		const toolRenderer: ToolHtmlRenderer = createToolHtmlRenderer({
+		const toolRenderer = createToolHtmlRenderer({
 			getToolDefinition: (name) => this.getToolDefinition(name),
 			theme,
 			cwd: this.sessionManager.getCwd(),

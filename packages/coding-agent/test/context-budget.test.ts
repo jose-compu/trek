@@ -6,7 +6,7 @@ import {
 	localContextWindow,
 	smallContextPrompt,
 } from "../src/core/runtime/context-budget.ts";
-import { localLlamaChatModel } from "../src/core/runtime/local-model.ts";
+import { localLlamaChatModel } from "../src/core/runtime/local-llama-model.ts";
 
 describe("context budget", () => {
 	it("keeps reserve and recent tokens inside a 2048 window", () => {

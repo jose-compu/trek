@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultRuntimeConfig, resolveRuntime, withHierarchy } from "../src/core/runtime/index.ts";
-import { localLlamaChatModel } from "../src/core/runtime/local-model.ts";
+import { localLlamaChatModel } from "../src/core/runtime/local-llama-model.ts";
 import { missingMlxWeights, offerMissingMlx, preferMlx, useMlx } from "../src/core/runtime/mlx-backend.ts";
 import { localServerCommand, waitForLocalServer } from "../src/core/runtime/process-manager.ts";
 

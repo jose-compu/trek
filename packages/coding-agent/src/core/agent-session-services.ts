@@ -4,7 +4,7 @@ import type { Model } from "@trek/ai";
 import { getAgentDir } from "../config.ts";
 import { resolvePath } from "../utils/paths.ts";
 import { AuthStorage } from "./auth-storage.ts";
-import type { SessionStartEvent, ToolDefinition } from "./extensions/index.ts";
+import type { SessionStartEvent, ToolDefinition } from "./extensions/types.ts";
 import { ModelRegistry } from "./model-registry.ts";
 import { DefaultResourceLoader, type DefaultResourceLoaderOptions, type ResourceLoader } from "./resource-loader.ts";
 import { type CreateAgentSessionOptions, type CreateAgentSessionResult, createAgentSession } from "./sdk.ts";

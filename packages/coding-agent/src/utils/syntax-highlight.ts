@@ -1,5 +1,21 @@
-import hljs from "highlight.js/lib/index.js";
+import { createRequire } from "node:module";
 import { decodeHtmlEntityAt } from "./html.ts";
+
+interface Hljs {
+	highlight(code: string, options: { language: string; ignoreIllegals?: boolean }): { value: string };
+	highlightAuto(code: string, languageSubset?: string[]): { value: string };
+	getLanguage(name: string): unknown;
+}
+
+let hljs: Hljs | undefined;
+
+function getHljs(): Hljs {
+	if (!hljs) {
+		const required = createRequire(import.meta.url)("highlight.js/lib/index.js") as Hljs & { default?: Hljs };
+		hljs = required.default ?? required;
+	}
+	return hljs;
+}
 
 export type HighlightFormatter = (text: string) => string;
 export type HighlightTheme = Partial<Record<string, HighlightFormatter>>;
@@ -132,15 +148,16 @@ export function renderHighlightedHtml(html: string, theme: HighlightTheme = {}):
 }
 
 export function highlight(code: string, options: HighlightOptions = {}): string {
+	const engine = getHljs();
 	const html = options.language
-		? hljs.highlight(code, {
+		? engine.highlight(code, {
 				language: options.language,
 				ignoreIllegals: options.ignoreIllegals,
 			}).value
-		: hljs.highlightAuto(code, options.languageSubset).value;
+		: engine.highlightAuto(code, options.languageSubset).value;
 	return renderHighlightedHtml(html, options.theme);
 }
 
 export function supportsLanguage(name: string): boolean {
-	return hljs.getLanguage(name) !== undefined;
+	return getHljs().getLanguage(name) !== undefined;
 }

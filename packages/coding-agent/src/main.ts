@@ -7,24 +7,16 @@
 
 import { createInterface } from "node:readline";
 import { type ImageContent, modelsAreEqual } from "@trek/ai";
-import { ProcessTerminal, setKeybindings, TUI } from "@trek/tui";
 import chalk from "chalk";
 import { type Args, type Mode, parseArgs, printHelp } from "./cli/args.ts";
-import { assertBatchFileReadable, loadBatchPrompts } from "./cli/batch-prompts.ts";
 import { processFileArguments } from "./cli/file-processor.ts";
 import { buildInitialMessage } from "./cli/initial-message.ts";
 import { listModels } from "./cli/list-models.ts";
-import { selectSession } from "./cli/session-picker.ts";
 import { ENV_SESSION_DIR, expandTildePath, getAgentDir, getPackageDir, isTrekEnvTruthy, VERSION } from "./config.ts";
-import { type CreateAgentSessionRuntimeFactory, createAgentSessionRuntime } from "./core/agent-session-runtime.ts";
-import {
-	type AgentSessionRuntimeDiagnostic,
-	createAgentSessionFromServices,
-	createAgentSessionServices,
-} from "./core/agent-session-services.ts";
+import type { CreateAgentSessionRuntimeFactory } from "./core/agent-session-runtime.ts";
+import type { AgentSessionRuntimeDiagnostic } from "./core/agent-session-services.ts";
 import { formatNoModelsAvailableMessage } from "./core/auth-guidance.ts";
 import { AuthStorage } from "./core/auth-storage.ts";
-import { exportFromFile } from "./core/export-html/index.ts";
 import type { ExtensionFactory } from "./core/extensions/types.ts";
 import { configureHttpDispatcher } from "./core/http-dispatcher.ts";
 import { KeybindingsManager } from "./core/keybindings.ts";
@@ -32,14 +24,6 @@ import type { ModelRegistry } from "./core/model-registry.ts";
 import { resolveCliModel, resolveModelScope, type ScopedModel } from "./core/model-resolver.ts";
 import { restoreStdout, takeOverStdout } from "./core/output-guard.ts";
 import { formatDeterminismWarning } from "./core/reproducibility/index.ts";
-import {
-	downloadMlxWeight,
-	downloadWeight,
-	loadRuntimeConfig,
-	offerMissingMlx,
-	offerMissingWeights,
-	resolveRuntime,
-} from "./core/runtime/index.ts";
 import type { CreateAgentSessionOptions } from "./core/sdk.ts";
 import {
 	formatMissingSessionCwdPrompt,
@@ -51,25 +35,82 @@ import { assertValidSessionId, SessionManager } from "./core/session-manager.ts"
 import { SettingsManager } from "./core/settings-manager.ts";
 import { printTimings, resetTimings, time } from "./core/timings.ts";
 import { hasProjectTrustInputs, ProjectTrustStore } from "./core/trust-manager.ts";
-import {
-	handleDomainsCommand,
-	handleLessonsCommand,
-	handlePatternsCommand,
-	handleWorkflowsCommand,
-} from "./domains-cli.ts";
-import { handleHistoryCommand, handleRevertCommand } from "./history-cli.ts";
 import { runMigrations, showDeprecationWarnings } from "./migrations.ts";
-import { handleModelsCommand } from "./models-cli.ts";
-import { InteractiveMode, runBatchMode, runPrintMode, runRpcMode } from "./modes/index.ts";
-import { ExtensionSelectorComponent } from "./modes/interactive/components/extension-selector.ts";
-import { initTheme, stopThemeWatcher } from "./modes/interactive/theme/theme.ts";
-import { handleConfigCommand, handlePackageCommand } from "./package-manager-cli.ts";
-import { handleProcessesCommand } from "./processes-cli.ts";
-import { handleTelegramCommand } from "./telegram-cli.ts";
-import { handleTraceCommand } from "./trace-cli.ts";
 import { debugLog, getActiveDebugLogPath, setDebugEnabled } from "./utils/debug-log.ts";
 import { isLocalPath, normalizePath, resolvePath } from "./utils/paths.ts";
 import { cleanupWindowsSelfUpdateQuarantine } from "./utils/windows-self-update.ts";
+
+type ThemeApi = typeof import("./modes/interactive/theme/theme.ts");
+let themeApi: ThemeApi | undefined;
+
+async function loadThemeApi(): Promise<ThemeApi> {
+	themeApi ??= await import("./modes/interactive/theme/theme.ts");
+	return themeApi;
+}
+
+function stopThemeWatcherIfLoaded(): void {
+	themeApi?.stopThemeWatcher();
+}
+
+/** Subcommands stay off the interactive/RPC import graph until argv asks for them. */
+async function handleSubcommands(args: string[]): Promise<boolean> {
+	switch (args[0]) {
+		case "install":
+		case "remove":
+		case "uninstall":
+		case "update":
+		case "list": {
+			const { handlePackageCommand } = await import("./package-manager-cli.ts");
+			return handlePackageCommand(args);
+		}
+		case "config": {
+			const { handleConfigCommand } = await import("./package-manager-cli.ts");
+			return handleConfigCommand(args);
+		}
+		case "history": {
+			const { handleHistoryCommand } = await import("./history-cli.ts");
+			return handleHistoryCommand(args);
+		}
+		case "revert": {
+			const { handleRevertCommand } = await import("./history-cli.ts");
+			return handleRevertCommand(args);
+		}
+		case "processes": {
+			const { handleProcessesCommand } = await import("./processes-cli.ts");
+			return handleProcessesCommand(args);
+		}
+		case "trace": {
+			const { handleTraceCommand } = await import("./trace-cli.ts");
+			return handleTraceCommand(args);
+		}
+		case "telegram": {
+			const { handleTelegramCommand } = await import("./telegram-cli.ts");
+			return handleTelegramCommand(args);
+		}
+		case "models": {
+			const { handleModelsCommand } = await import("./models-cli.ts");
+			return handleModelsCommand(args);
+		}
+		case "lessons": {
+			const { handleLessonsCommand } = await import("./domains-cli.ts");
+			return handleLessonsCommand(args);
+		}
+		case "patterns": {
+			const { handlePatternsCommand } = await import("./domains-cli.ts");
+			return handlePatternsCommand(args);
+		}
+		case "domains": {
+			const { handleDomainsCommand } = await import("./domains-cli.ts");
+			return handleDomainsCommand(args);
+		}
+		case "workflows": {
+			const { handleWorkflowsCommand } = await import("./domains-cli.ts");
+			return handleWorkflowsCommand(args);
+		}
+		default:
+			return false;
+	}
+}
 
 /**
  * Read all content from piped stdin.
@@ -326,8 +367,10 @@ async function createSessionManager(
 	}
 
 	if (parsed.resume) {
+		const { initTheme, stopThemeWatcher } = await loadThemeApi();
 		initTheme(settingsManager.getTheme(), true);
 		try {
+			const { selectSession } = await import("./cli/session-picker.ts");
 			const selectedPath = await selectSession(
 				(onProgress) => SessionManager.list(cwd, sessionDir, onProgress),
 				(onProgress) => SessionManager.listAll(sessionDir, onProgress),
@@ -461,7 +504,10 @@ async function promptForMissingSessionCwd(
 	issue: SessionCwdIssue,
 	settingsManager: SettingsManager,
 ): Promise<string | undefined> {
+	const { initTheme } = await loadThemeApi();
 	initTheme(settingsManager.getTheme());
+	const { ProcessTerminal, setKeybindings, TUI } = await import("@trek/tui");
+	const { ExtensionSelectorComponent } = await import("./modes/interactive/components/extension-selector.ts");
 	setKeybindings(KeybindingsManager.create());
 
 	return new Promise((resolve) => {
@@ -500,7 +546,10 @@ async function promptForProjectTrust(
 	cwd: string,
 	settingsManager: SettingsManager,
 ): Promise<ProjectTrustPromptResult | undefined> {
+	const { initTheme } = await loadThemeApi();
 	initTheme(settingsManager.getTheme());
+	const { ProcessTerminal, setKeybindings, TUI } = await import("@trek/tui");
+	const { ExtensionSelectorComponent } = await import("./modes/interactive/components/extension-selector.ts");
 	setKeybindings(KeybindingsManager.create());
 
 	return new Promise((resolve) => {
@@ -584,51 +633,7 @@ export async function main(args: string[], options?: MainOptions) {
 		cleanupWindowsSelfUpdateQuarantine(getPackageDir());
 	}
 
-	if (await handlePackageCommand(args)) {
-		return;
-	}
-
-	if (await handleHistoryCommand(args)) {
-		return;
-	}
-
-	if (await handleProcessesCommand(args)) {
-		return;
-	}
-
-	if (await handleRevertCommand(args)) {
-		return;
-	}
-
-	if (await handleTraceCommand(args)) {
-		return;
-	}
-
-	if (await handleTelegramCommand(args)) {
-		return;
-	}
-
-	if (await handleModelsCommand(args)) {
-		return;
-	}
-
-	if (await handleLessonsCommand(args)) {
-		return;
-	}
-
-	if (await handlePatternsCommand(args)) {
-		return;
-	}
-
-	if (await handleDomainsCommand(args)) {
-		return;
-	}
-
-	if (await handleWorkflowsCommand(args)) {
-		return;
-	}
-
-	if (await handleConfigCommand(args)) {
+	if (await handleSubcommands(args)) {
 		return;
 	}
 
@@ -665,6 +670,7 @@ export async function main(args: string[], options?: MainOptions) {
 		let result: string;
 		try {
 			const outputPath = parsed.messages.length > 0 ? parsed.messages[0] : undefined;
+			const { exportFromFile } = await import("./core/export-html/index.ts");
 			result = await exportFromFile(parsed.export, outputPath);
 		} catch (error: unknown) {
 			const message = error instanceof Error ? error.message : "Failed to export session";
@@ -687,6 +693,7 @@ export async function main(args: string[], options?: MainOptions) {
 
 	if (parsed.batch !== undefined && typeof parsed.batch === "string" && parsed.batch !== "-") {
 		try {
+			const { assertBatchFileReadable } = await import("./cli/batch-prompts.ts");
 			await assertBatchFileReadable(parsed.batch);
 		} catch {
 			console.error(chalk.red(`Error: batch file not found or unreadable: ${parsed.batch}`));
@@ -755,6 +762,9 @@ export async function main(args: string[], options?: MainOptions) {
 	const resolvedPromptTemplatePaths = resolveCliPaths(cwd, parsed.promptTemplates);
 	const resolvedThemePaths = resolveCliPaths(cwd, parsed.themes);
 	const authStorage = AuthStorage.create();
+	const { createAgentSessionRuntime, createAgentSessionFromServices, createAgentSessionServices } = await import(
+		"./core/agent-session-runtime.ts"
+	);
 	const createRuntime: CreateAgentSessionRuntimeFactory = async ({
 		cwd,
 		agentDir,
@@ -888,8 +898,11 @@ export async function main(args: string[], options?: MainOptions) {
 		stdinContent,
 	);
 	time("prepareInitialMessage");
-	initTheme(settingsManager.getTheme(), appMode === "interactive");
-	time("initTheme");
+	if (appMode !== "rpc") {
+		const { initTheme } = await loadThemeApi();
+		initTheme(settingsManager.getTheme(), appMode === "interactive");
+		time("initTheme");
+	}
 
 	// Show deprecation warnings in interactive mode
 	if (appMode === "interactive" && deprecationWarnings.length > 0) {
@@ -941,6 +954,14 @@ export async function main(args: string[], options?: MainOptions) {
 	}
 
 	if (process.env.PI_NO_LOCAL_LLM !== "1") {
+		const {
+			downloadMlxWeight,
+			downloadWeight,
+			loadRuntimeConfig,
+			offerMissingMlx,
+			offerMissingWeights,
+			resolveRuntime,
+		} = await import("./core/runtime/index.ts");
 		const runtimeConfig = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: sessionManager.getCwd() });
 		try {
 			await offerMissingWeights({
@@ -990,8 +1011,10 @@ export async function main(args: string[], options?: MainOptions) {
 
 	if (appMode === "rpc") {
 		printTimings();
+		const { runRpcMode } = await import("./modes/rpc/rpc-mode.ts");
 		await runRpcMode(runtime);
 	} else if (appMode === "interactive") {
+		const { InteractiveMode } = await import("./modes/interactive/interactive-mode.ts");
 		const interactiveMode = new InteractiveMode(runtime, {
 			migratedProviders,
 			modelFallbackMessage,
@@ -1005,7 +1028,7 @@ export async function main(args: string[], options?: MainOptions) {
 			time("interactiveMode.init");
 			printTimings();
 			interactiveMode.stop();
-			stopThemeWatcher();
+			stopThemeWatcherIfLoaded();
 			if (process.stdout.writableLength > 0) {
 				await new Promise<void>((resolve) => process.stdout.once("drain", resolve));
 			}
@@ -1018,6 +1041,8 @@ export async function main(args: string[], options?: MainOptions) {
 		printTimings();
 		await interactiveMode.run();
 	} else if (appMode === "batch") {
+		const { loadBatchPrompts } = await import("./cli/batch-prompts.ts");
+		const { runBatchMode } = await import("./modes/batch-mode.ts");
 		const batchPrompts = await loadBatchPrompts(parsed.batch!);
 		printTimings();
 		const exitCode = await runBatchMode(runtime, {
@@ -1025,7 +1050,7 @@ export async function main(args: string[], options?: MainOptions) {
 			output: parsed.output ?? "text",
 			initialImages,
 		});
-		stopThemeWatcher();
+		stopThemeWatcherIfLoaded();
 		restoreStdout();
 		if (exitCode !== 0) {
 			process.exitCode = exitCode;
@@ -1033,6 +1058,7 @@ export async function main(args: string[], options?: MainOptions) {
 		return;
 	} else {
 		printTimings();
+		const { runPrintMode } = await import("./modes/print-mode.ts");
 		const exitCode = await runPrintMode(runtime, {
 			mode: toPrintOutputMode(appMode),
 			verbose: parsed.verbose,
@@ -1040,7 +1066,7 @@ export async function main(args: string[], options?: MainOptions) {
 			initialMessage,
 			initialImages,
 		});
-		stopThemeWatcher();
+		stopThemeWatcherIfLoaded();
 		restoreStdout();
 		if (exitCode !== 0) {
 			process.exitCode = exitCode;
