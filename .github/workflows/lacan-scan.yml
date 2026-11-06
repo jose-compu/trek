@@ -1,5 +1,5 @@
-# Static AI-safety scan (Lacan). Findings at/above fail-on fail the job unless --soft-fail.
-# Trek hits many doc/test/template string matches (AIS008/301/103, etc.); soft-fail keeps CI green while SARIF is triaged.
+# Static AI-safety scan (Lacan). Findings at/above fail-on fail the job.
+# False positives are skipped in `.lacan.toml` (loaded automatically).
 name: Lacan Scan
 
 on:
@@ -22,16 +22,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Lacan Scan
-        uses: jose-compu/lacan-scan@v3
+        uses: jose-compu/lacan-scan@v5
         with:
           path: .
           fail-on: HIGH
           output: sarif,cli
           sarif-file: lacan.sarif
-          version: "3"
-          args: --soft-fail
+          version: "5"
 
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v3
