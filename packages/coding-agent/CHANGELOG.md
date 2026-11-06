@@ -4,6 +4,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Added
+
+- Performance baselines: `profile:tui` / `profile:rpc` `--json`, and `npm run profile:e2e` for a faux-provider first prompt and reflective-loop wall clock ([#113](https://github.com/jose-compu/trek/issues/113)).
+
 ### Changed
 
 - Compact console cards by default: header plus a 0–3 line scrolling viewport (1 line when empty). `ctrl+o` restores full card chrome and output ([#169](https://github.com/jose-compu/trek/issues/169)).
