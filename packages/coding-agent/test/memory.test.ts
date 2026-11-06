@@ -303,11 +303,18 @@ describe("memory disabled", () => {
 });
 
 describe("rerank policy", () => {
-	it("constructs a reranker for every mode and suite, and calls it on recall", async () => {
+	it("constructs a MiniLM reranker for local and hybrid, not for api unless opted in, and calls it on recall", async () => {
 		expect(shouldConstructCrossEncoder({ effectiveMode: "local", suite: "mistral" })).toBe(true);
 		expect(shouldConstructCrossEncoder({ effectiveMode: "local", suite: "qwen" })).toBe(true);
 		expect(shouldConstructCrossEncoder({ effectiveMode: "local", suite: "lfm" })).toBe(true);
-		expect(shouldConstructCrossEncoder({ effectiveMode: "api", suite: "mistral" })).toBe(true);
+		expect(shouldConstructCrossEncoder({ effectiveMode: "api", suite: "mistral" })).toBe(false);
+		expect(
+			shouldConstructCrossEncoder({
+				effectiveMode: "api",
+				suite: "mistral",
+				env: { TREK_MEMORY_LOCAL: "1" },
+			}),
+		).toBe(true);
 		expect(shouldConstructCrossEncoder({ effectiveMode: "hybrid", suite: "lfm" })).toBe(true);
 
 		const cwd = project("rerank");

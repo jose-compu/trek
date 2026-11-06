@@ -131,6 +131,8 @@ export {
 export {
 	createDefaultLlamaProcessManager,
 	createPortAllocator,
+	createProbingPortAllocator,
+	isTcpPortFree,
 	LlamaProcessManager,
 	type LlamaProcessManagerOptions,
 	type LlamaServerHandle,

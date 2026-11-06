@@ -7,6 +7,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 ### Added
 
 - Performance baselines: `profile:tui` / `profile:rpc` `--json`, and `npm run profile:e2e` for a faux-provider first prompt and reflective-loop wall clock ([#113](https://github.com/jose-compu/trek/issues/113)).
+- Performance docs: profile JSON shape, budgets, compact console, concurrent sessions ([#114](https://github.com/jose-compu/trek/issues/114)).
 
 ### Changed
 
@@ -19,6 +20,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 - Bash does not block the turn on a still-running command: after 8s (or as soon as it prints a listen/bind line) the process stays up and the tool returns a pid. `block_until_ms: 0` waits for exit. `timeout` still kills. Later server logs no longer crash Trek (`Cannot append to a finished output accumulator`).
 - Lesson notices include a brief title from the stored rule (`✔ lesson project:1020 Avoid Verbose Output`) ([#171](https://github.com/jose-compu/trek/issues/171)).
 - `jailbreak-from-tool-output` is narrow by default (ignores read/edit/write and quoted fixture text); a flag asks to mute for the session ([#170](https://github.com/jose-compu/trek/issues/170)).
+- Several TUI sessions can run at once: API mode does not load MiniLM/ONNX; `llama-server` probes a free port from 18080 ([#175](https://github.com/jose-compu/trek/issues/175)).
 
 ## [0.16.1] - 2026-10-31
 

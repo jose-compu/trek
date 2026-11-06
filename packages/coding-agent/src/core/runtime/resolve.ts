@@ -78,7 +78,7 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 	const roles: Partial<Record<RuntimeRole, RoleAssignment>> = {};
 	if (effectiveMode === "api") {
 		roles.frontier = frontierRole(frontier);
-		// Memory embed + rerank stay local even when chat is API-only.
+		// Registry still lists embed/rerank ids. API mode does not load MiniLM unless TREK_MEMORY_LOCAL=1.
 		roles.embedding = overlay(preset.roles.embedding, config.roles.embedding);
 		roles.reranker = overlay(preset.roles.reranker, config.roles.reranker);
 	} else {

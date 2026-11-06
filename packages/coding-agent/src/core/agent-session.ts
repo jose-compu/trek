@@ -2459,13 +2459,14 @@ export class AgentSession {
 
 	private memory(): MemoryManager {
 		if (!this._memory) {
+			const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
 			this._memory = new MemoryManager({
 				cwd: this._cwd,
 				sessionId: this.sessionManager.getSessionId(),
 				sessionDir: this.sessionManager.getSessionDir() || undefined,
 				getSettings: () => this.settingsManager.getMemorySettings(),
-				embedder: createEmbedder(),
-				reranker: createReranker(),
+				embedder: createEmbedder(process.env, { mode: resolved.effectiveMode }),
+				reranker: createReranker(process.env, { mode: resolved.effectiveMode }),
 			});
 		}
 		return this._memory;

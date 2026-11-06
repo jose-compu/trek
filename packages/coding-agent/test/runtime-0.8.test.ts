@@ -13,6 +13,7 @@ import {
 	benchmarkRuntime,
 	createDefaultLlamaProcessManager,
 	createPortAllocator,
+	createProbingPortAllocator,
 	defaultRuntimeConfig,
 	detectFrontier,
 	formatBenchmark,
@@ -228,6 +229,18 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(stopping.list()).toEqual([]);
 		expect(resolved.roles.workhorse?.thinking).toBe(false);
 		expect(resolved.roles.planning?.thinking).toBe(true);
+	});
+
+	it("probing allocator skips ports already taken on the machine", () => {
+		const taken = new Set([18080, 18081]);
+		const allocatePort = createProbingPortAllocator(18080, (port) => !taken.has(port));
+		expect(allocatePort()).toBe(18082);
+		expect(allocatePort()).toBe(18083);
+	});
+
+	it("probing allocator names the range when every port is taken", () => {
+		const allocatePort = createProbingPortAllocator(18080, () => false);
+		expect(() => allocatePort()).toThrow(/TREK_LLAMA_PORT_START/);
 	});
 
 	it("refuses a second Planning model id", () => {

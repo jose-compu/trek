@@ -68,6 +68,40 @@ export function createPortAllocator(start = 18080): () => number {
 	return () => next++;
 }
 
+/** True when this process can bind `port` on 127.0.0.1. */
+export function isTcpPortFree(port: number): boolean {
+	const script =
+		`const n=require("net");const s=n.createServer();s.unref();s.on("error",()=>process.exit(2));` +
+		`s.listen(${port},"127.0.0.1",()=>{s.close(()=>process.exit(0));});`;
+	const result = spawnSync(process.execPath, ["-e", script], {
+		timeout: 2000,
+		windowsHide: true,
+		encoding: "utf8",
+	});
+	return result.status === 0;
+}
+
+/**
+ * Skip ports already bound on this machine so a second TUI can start llama-server.
+ * `createPortAllocator` stays an in-process counter for tests.
+ */
+export function createProbingPortAllocator(
+	start = 18080,
+	isFree: (port: number) => boolean = isTcpPortFree,
+): () => number {
+	let next = start;
+	const last = start + 1024;
+	return () => {
+		while (next < last) {
+			const port = next++;
+			if (isFree(port)) return port;
+		}
+		throw new Error(
+			`No free llama-server port in ${start}-${last - 1}. Set TREK_LLAMA_PORT_START to an unused range.`,
+		);
+	};
+}
+
 function portStart(): number {
 	const raw = process.env.TREK_LLAMA_PORT_START;
 	const parsed = raw ? Number(raw) : 18080;
@@ -320,7 +354,7 @@ export function createDefaultLlamaProcessManager(): LlamaProcessManager {
 			}
 			return { pid: child.pid };
 		},
-		allocatePort: createPortAllocator(portStart()),
+		allocatePort: createProbingPortAllocator(portStart()),
 		binaryAvailable: () => {
 			const binary = process.env.TREK_LLAMA_SERVER;
 			const llama = typeof binary === "string" && binary.length > 0 && existsSync(binary);
