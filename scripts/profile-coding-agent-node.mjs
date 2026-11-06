@@ -38,6 +38,7 @@ Options:
   --no-offline           Do not force PI_OFFLINE=1 / PI_SKIP_VERSION_CHECK=1
   --skip-build           Reuse the current dist/cli.js without rebuilding first (Node only)
   --cpu-profile          Write CPU profiles for benchmark runs
+  --json                 Print a machine-readable JSON summary after the text report
   --help                 Show this help
 
 Notes:
@@ -83,6 +84,7 @@ function parseArgs(argv) {
 		agentDir: undefined,
 		isolatedAgentDir: false,
 		cpuProfile: false,
+		json: false,
 	};
 
 	for (let index = 0; index < argv.length; index++) {
@@ -110,6 +112,11 @@ function parseArgs(argv) {
 
 		if (arg === "--cpu-profile") {
 			options.cpuProfile = true;
+			continue;
+		}
+
+		if (arg === "--json") {
+			options.json = true;
 			continue;
 		}
 
@@ -609,6 +616,7 @@ async function main() {
 		for (const [label, summary] of timingSummaries.entries()) {
 			process.stdout.write(`METRIC ${toMetricName(label)}=${summary.median.toFixed(1)}\n`);
 		}
+		writeJsonSummary(options, runtime, elapsedSummary, timingSummaries, measuredRuns);
 		return;
 	}
 
@@ -630,6 +638,37 @@ async function main() {
 	for (const [label, summary] of timingSummaries.entries()) {
 		process.stdout.write(`METRIC ${toMetricName(label)}=${summary.median.toFixed(1)}\n`);
 	}
+	writeJsonSummary(options, runtime, elapsedSummary, timingSummaries, measuredRuns);
+}
+
+function writeJsonSummary(options, runtime, elapsedSummary, timingSummaries, measuredRuns) {
+	if (!options.json) {
+		return;
+	}
+	const phases = {};
+	for (const [label, summary] of timingSummaries.entries()) {
+		phases[toMetricName(label)] = {
+			min: Number(summary.min.toFixed(1)),
+			median: Number(summary.median.toFixed(1)),
+			avg: Number(summary.avg.toFixed(1)),
+			max: Number(summary.max.toFixed(1)),
+		};
+	}
+	const payload = {
+		kind: "trek-profile",
+		version: 1,
+		runtime,
+		mode: options.mode,
+		runs: measuredRuns.length,
+		startup_time_ms: {
+			min: Number(elapsedSummary.min.toFixed(1)),
+			median: Number(elapsedSummary.median.toFixed(1)),
+			avg: Number(elapsedSummary.avg.toFixed(1)),
+			max: Number(elapsedSummary.max.toFixed(1)),
+		},
+		phases,
+	};
+	process.stdout.write(`${JSON.stringify(payload)}\n`);
 }
 
 main().catch((error) => {

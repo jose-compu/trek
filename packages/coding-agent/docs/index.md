@@ -82,3 +82,4 @@ For the full first-run flow, see [Quickstart](quickstart.md).
 ## Development
 
 - [Development](development.md) - local setup, project structure, and debugging.
+- [Performance](performance.md) - 0.17 baselines (`profile:tui`, `profile:rpc`, `profile:e2e`).
