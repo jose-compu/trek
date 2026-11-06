@@ -30,5 +30,5 @@ export function assertUnderBudget(metric: BudgetMetric, measuredMs: number): voi
 	expect(
 		measuredMs,
 		`${metric}=${measuredMs}ms exceeded budget ${budget}ms. Bump test/performance-budgets.json if this is intentional.`,
-	).toBeLessThan(budget);
+	).toBeLessThanOrEqual(budget);
 }

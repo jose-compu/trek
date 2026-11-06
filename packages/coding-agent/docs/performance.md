@@ -20,7 +20,7 @@ npm run profile:rpc -- --isolated-agent-dir --json --skip-build
 
 ## Baselines (#113) and budgets (#112)
 
-Record numbers before cutting latency (#109–#111). The CI gate is `test/performance-budgets.json` (`budget_ms`). A slower time fails `npm test` until that file is changed on purpose.
+Record numbers before cutting latency (#109–#111). The CI gate is `test/performance-budgets.json` (`budgets_ms`). A slower time fails `npm test` until that file is changed on purpose.
 
 ```bash
 cd packages/coding-agent && npx vitest --run test/performance-budgets.test.ts test/performance-baselines.test.ts test/session-manager/jsonl-write-path.test.ts --reporter=verbose
