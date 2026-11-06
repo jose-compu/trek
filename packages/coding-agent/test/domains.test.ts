@@ -304,7 +304,7 @@ describe("domains 0.12.0", () => {
 			},
 			theme,
 		);
-		expect(painted).toContain("{success}workflow");
+		expect(painted).toContain("{success}◆ workflow");
 		expect(painted).toContain("{success}finance");
 		expect(painted).toContain("{mdLink}control-break");
 		expect(painted).toContain("{syntaxKeyword}account");
