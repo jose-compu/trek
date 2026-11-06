@@ -63,11 +63,18 @@ Default cards are 1–4 lines (`ctrl+o` expands). Compact start has no persisten
 
 Several `trek` TUI processes may run on one machine.
 
-- **API mode** does not start `llama-server` and does not load MiniLM / ONNX. Recall stays empty until `TREK_MEMORY_LOCAL=1` (and weights already on disk, unless `TREK_MEMORY_DOWNLOAD=1`).
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `TREK_NO_LOCAL_LLM` | unset | `1` keeps chat on the API model (`PI_NO_LOCAL_LLM` still accepted) |
+| `TREK_MEMORY_LOCAL` | off in API | `1` loads MiniLM/ONNX in API mode; `0` skips it in local/hybrid |
+| `TREK_MEMORY_DOWNLOAD` | off | `1` may download MiniLM; otherwise `local_files_only` |
+| `TREK_LLAMA_PORT_START` | `18080` | First port to probe for `llama-server` |
+
+- **API mode** does not start `llama-server` and does not load MiniLM / ONNX. Recall stays empty until `TREK_MEMORY_LOCAL=1`.
 - **local / hybrid** MiniLM uses `local_files_only` unless `TREK_MEMORY_DOWNLOAD=1`.
-- Each process probes `18080` upward for a free `llama-server` port. Override the start with `TREK_LLAMA_PORT_START`.
+- Each process probes upward from `TREK_LLAMA_PORT_START` for a free `llama-server` port.
 
 ```bash
 export TREK_NO_LOCAL_LLM=1
-trek --provider xai --model grok-4.6
+trek --provider xai --model grok-4.20-0309-reasoning
 ```

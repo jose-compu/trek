@@ -15,7 +15,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 - Cold-start, reflective-loop, and session JSONL write-path cuts ([#109](https://github.com/jose-compu/trek/issues/109)–[#111](https://github.com/jose-compu/trek/issues/111)).
 - Bash detaches a still-running command after 8s (or a listen/bind line). `block_until_ms: 0` waits. Lesson notices carry a brief title. Jailbreak-from-tool-output is narrow by default ([#170](https://github.com/jose-compu/trek/issues/170), [#171](https://github.com/jose-compu/trek/issues/171)).
-- Several TUI sessions can run at once. API mode does not load MiniLM. `llama-server` probes a free port ([#175](https://github.com/jose-compu/trek/issues/175)).
+- Several TUI sessions can run at once. API mode does not load MiniLM. `llama-server` probes a free port ([#175](https://github.com/jose-compu/trek/issues/175)). `TREK_MEMORY_LOCAL`, `TREK_MEMORY_DOWNLOAD`, and `TREK_LLAMA_PORT_START` are documented.
 
 ## [0.16.1] - 2026-10-31
 

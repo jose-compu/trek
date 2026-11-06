@@ -58,7 +58,11 @@ Never use `__dirname` directly for package assets.
 ./test.sh                         # Run non-LLM tests (no API keys needed)
 npm test                          # Run all tests
 npm test -- test/specific.test.ts # Run specific test
+npm run profile:rpc -- --isolated-agent-dir --json --skip-build
+npm run profile:e2e
 ```
+
+`profile:tui` needs a TTY. Budgets live in `packages/coding-agent/test/performance-budgets.json`. See [Performance](performance.md).
 
 ## Project Structure
 

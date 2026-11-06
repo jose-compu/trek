@@ -8,6 +8,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 - Performance baselines: `profile:tui` / `profile:rpc` `--json`, and `npm run profile:e2e` for a faux-provider first prompt and reflective-loop wall clock ([#113](https://github.com/jose-compu/trek/issues/113)).
 - Performance docs: profile JSON shape, budgets, compact console, concurrent sessions ([#114](https://github.com/jose-compu/trek/issues/114)).
+- Operator env: `TREK_MEMORY_LOCAL`, `TREK_MEMORY_DOWNLOAD`, `TREK_LLAMA_PORT_START` (usage, settings, performance).
 
 ### Changed
 
