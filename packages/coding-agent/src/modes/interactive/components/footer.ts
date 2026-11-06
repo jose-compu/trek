@@ -1,10 +1,12 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type { AssistantMessage } from "@trek/ai";
 import { type Component, truncateToWidth, visibleWidth } from "@trek/tui";
+import { VERSION } from "../../../config.ts";
 import type { AgentSession } from "../../../core/agent-session.ts";
 import { estimateTokens } from "../../../core/compaction/compaction.ts";
 import type { ReadonlyFooterDataProvider } from "../../../core/footer-data-provider.ts";
 import { theme } from "../theme/theme.ts";
+import { formatFooterProductTag } from "./prompt-chrome.ts";
 
 /**
  * Sanitize text for display in a single-line status.
@@ -73,10 +75,12 @@ export class FooterComponent implements Component {
 	private session: AgentSession;
 	private footerData: ReadonlyFooterDataProvider;
 	private liveAssistant: AssistantMessage | undefined;
+	private version: string;
 
-	constructor(session: AgentSession, footerData: ReadonlyFooterDataProvider) {
+	constructor(session: AgentSession, footerData: ReadonlyFooterDataProvider, version: string = VERSION) {
 		this.session = session;
 		this.footerData = footerData;
+		this.version = version;
 	}
 
 	setSession(session: AgentSession): void {
@@ -158,7 +162,7 @@ export class FooterComponent implements Component {
 		const mark = (text: string) => theme.fg("accent", text);
 
 		const cwd = formatCwdForFooter(this.session.sessionManager.getCwd(), process.env.HOME || process.env.USERPROFILE);
-		let pwd = dim(cwd);
+		let pwd = `${dim(cwd)}${quiet(formatFooterProductTag(this.version))}`;
 
 		// Add git branch if available
 		const branch = this.footerData.getGitBranch();

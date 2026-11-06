@@ -64,6 +64,15 @@ function normalizeRenderedOutput(container: Container, width = 220): string {
 		.trim();
 }
 
+function compactExtensionListing(fakeThis: any, extensions: ExtensionFixture[]): string {
+	const labels = fakeThis
+		.getCompactExtensionLabels(extensions)
+		.map((label: string) => label.trim())
+		.filter((label: string) => label.length > 0)
+		.sort((a: string, b: string) => a.localeCompare(b));
+	return `[Extensions]\n  ${labels.join(", ")}`;
+}
+
 type ExtensionFixture = {
 	path: string;
 	sourceInfo?: SourceInfo;
@@ -120,12 +129,16 @@ describe("InteractiveMode.setToolsExpanded", () => {
 	test("applies expansion state to the active header and chat entries", () => {
 		const header = { setExpanded: vi.fn() };
 		const chatChild = { setExpanded: vi.fn() };
+		const asciiBanner = { setExpanded: vi.fn() };
 		const fakeThis: any = {
 			toolOutputExpanded: false,
 			customHeader: undefined,
 			builtInHeader: header,
+			headerContainer: { children: [header] },
 			chatContainer: { children: [chatChild] },
+			asciiBanner,
 			ui: { requestRender: vi.fn() },
+			updateEditorPromptLabel: vi.fn(),
 		};
 
 		(InteractiveMode as any).prototype.setToolsExpanded.call(fakeThis, true);
@@ -133,7 +146,55 @@ describe("InteractiveMode.setToolsExpanded", () => {
 		expect(fakeThis.toolOutputExpanded).toBe(true);
 		expect(header.setExpanded).toHaveBeenCalledWith(true);
 		expect(chatChild.setExpanded).toHaveBeenCalledWith(true);
+		expect(asciiBanner.setExpanded).toHaveBeenCalledWith(true);
+		expect(fakeThis.updateEditorPromptLabel).toHaveBeenCalledTimes(1);
 		expect(fakeThis.ui.requestRender).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("InteractiveMode.updateEditorPromptLabel", () => {
+	beforeAll(() => {
+		initTheme("dark");
+	});
+
+	function stripAnsi(value: string): string {
+		return value.replace(/\u001b\[[0-9;]*m/g, "");
+	}
+
+	test("prompt border is the id only", () => {
+		const setBorderLabel = vi.fn();
+		const editor = { setBorderLabel };
+		const fakeThis: any = {
+			sessionManager: { getNextPromptNumber: () => 1 },
+			toolOutputExpanded: false,
+			options: { verbose: false },
+			version: "0.17.0",
+			defaultEditor: editor,
+			editor,
+			getStartupExpansionState: () => (InteractiveMode as any).prototype.getStartupExpansionState.call(fakeThis),
+		};
+
+		(InteractiveMode as any).prototype.updateEditorPromptLabel.call(fakeThis);
+
+		expect(stripAnsi(setBorderLabel.mock.calls[0][0])).toBe("[#1]");
+	});
+
+	test("expanded keeps the prompt id only", () => {
+		const setBorderLabel = vi.fn();
+		const editor = { setBorderLabel };
+		const fakeThis: any = {
+			sessionManager: { getNextPromptNumber: () => 1 },
+			toolOutputExpanded: true,
+			options: { verbose: false },
+			version: "0.17.0",
+			defaultEditor: editor,
+			editor,
+			getStartupExpansionState: () => (InteractiveMode as any).prototype.getStartupExpansionState.call(fakeThis),
+		};
+
+		(InteractiveMode as any).prototype.updateEditorPromptLabel.call(fakeThis);
+
+		expect(stripAnsi(setBorderLabel.mock.calls[0][0])).toBe("[#1]");
 	});
 });
 
@@ -516,7 +577,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		];
 	}
 
-	test("shows a compact resource listing by default", () => {
+	test("hides resource listing in compact startup", () => {
 		const fakeThis = createShowLoadedResourcesThis({
 			quietStartup: false,
 			skills: [{ filePath: "/tmp/skill/SKILL.md", name: "commit" }],
@@ -527,9 +588,9 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		const output = renderAll(fakeThis.chatContainer);
-		expect(output).toContain("[Skills]");
-		expect(output).toContain("commit");
-		expect(output).not.toContain("resource-list");
+		expect(output).not.toContain("[Skills]");
+		expect(output).not.toContain("commit");
+		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toBe("");
 	});
 
 	test("shows full resource listing when expanded", () => {
@@ -568,19 +629,14 @@ describe("InteractiveMode.showLoadedResources", () => {
 	});
 
 	test("abbreviates extensions in compact listing", () => {
+		const extensions = [{ path: "/tmp/extensions/answer.ts" }, { path: "/tmp/extensions/btw.ts" }];
 		const fakeThis = createShowLoadedResourcesThis({
 			quietStartup: false,
-			extensions: [{ path: "/tmp/extensions/answer.ts" }, { path: "/tmp/extensions/btw.ts" }],
+			extensions,
 		});
 
-		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
-			force: false,
-		});
-
-		const output = renderAll(fakeThis.chatContainer);
-		expect(output).toContain("[Extensions]");
-		expect(output).toContain("answer.ts, btw.ts");
-		expect(output).not.toContain("extensions/answer.ts");
+		expect(compactExtensionListing(fakeThis, extensions)).toContain("answer.ts, btw.ts");
+		expect(compactExtensionListing(fakeThis, extensions)).not.toContain("extensions/answer.ts");
 	});
 
 	test("captures mixed extension layouts in compact output", () => {
@@ -590,13 +646,10 @@ describe("InteractiveMode.showLoadedResources", () => {
 			useRealScopeGroups: true,
 		});
 
-		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
-			force: false,
-		});
-
-		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+		expect(compactExtensionListing(fakeThis, createExtensionFixtures())).toMatchInlineSnapshot(`
 "[Extensions]
-  @scope/pi-scoped, answer.ts, cli-extension.ts, HazAT/pi-interactive-subagents, HazAT/pi-interactive-subagents:subagents, local-index, pi-markdown-preview, user-index"`);
+  @scope/pi-scoped, answer.ts, cli-extension.ts, HazAT/pi-interactive-subagents, HazAT/pi-interactive-subagents:subagents, local-index, pi-markdown-preview, user-index"
+`);
 	});
 
 	test("adds more parent folders until local extension labels are unique", () => {
@@ -636,13 +689,10 @@ describe("InteractiveMode.showLoadedResources", () => {
 			useRealScopeGroups: true,
 		});
 
-		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
-			force: false,
-		});
-
-		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+		expect(compactExtensionListing(fakeThis, extensions)).toMatchInlineSnapshot(`
 "[Extensions]
-  alpha/one, beta/one, gamma/one"`);
+  alpha/one, beta/one, gamma/one"
+`);
 	});
 
 	test("strips index.ts from local extension label, showing parent dir", () => {
@@ -664,13 +714,10 @@ describe("InteractiveMode.showLoadedResources", () => {
 			useRealScopeGroups: true,
 		});
 
-		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
-			force: false,
-		});
-
-		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+		expect(compactExtensionListing(fakeThis, extensions)).toMatchInlineSnapshot(`
 "[Extensions]
-  plan-mode"`);
+  plan-mode"
+`);
 	});
 
 	test("strips index.js from local extension label, showing parent dir", () => {
@@ -692,13 +739,10 @@ describe("InteractiveMode.showLoadedResources", () => {
 			useRealScopeGroups: true,
 		});
 
-		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
-			force: false,
-		});
-
-		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+		expect(compactExtensionListing(fakeThis, extensions)).toMatchInlineSnapshot(`
 "[Extensions]
-  plan-mode"`);
+  plan-mode"
+`);
 	});
 
 	test("mixed single-file and subdirectory index.ts extensions strip index.ts", () => {
@@ -729,13 +773,10 @@ describe("InteractiveMode.showLoadedResources", () => {
 			useRealScopeGroups: true,
 		});
 
-		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
-			force: false,
-		});
-
-		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+		expect(compactExtensionListing(fakeThis, extensions)).toMatchInlineSnapshot(`
 "[Extensions]
-  plan-mode, webfetch.ts"`);
+  plan-mode, webfetch.ts"
+`);
 	});
 
 	test("multiple index.ts with unique parent dirs need no disambiguation", () => {
@@ -766,13 +807,10 @@ describe("InteractiveMode.showLoadedResources", () => {
 			useRealScopeGroups: true,
 		});
 
-		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
-			force: false,
-		});
-
-		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+		expect(compactExtensionListing(fakeThis, extensions)).toMatchInlineSnapshot(`
 "[Extensions]
-  bar, foo"`);
+  bar, foo"
+`);
 	});
 
 	test("multiple index.ts with same parent dir name disambiguated with grandparent", () => {
@@ -803,13 +841,10 @@ describe("InteractiveMode.showLoadedResources", () => {
 			useRealScopeGroups: true,
 		});
 
-		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
-			force: false,
-		});
-
-		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+		expect(compactExtensionListing(fakeThis, extensions)).toMatchInlineSnapshot(`
 "[Extensions]
-  alpha/tools, beta/tools"`);
+  alpha/tools, beta/tools"
+`);
 	});
 
 	test("non-index file in subdirectory stays as filename", () => {
@@ -831,13 +866,10 @@ describe("InteractiveMode.showLoadedResources", () => {
 			useRealScopeGroups: true,
 		});
 
-		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
-			force: false,
-		});
-
-		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+		expect(compactExtensionListing(fakeThis, extensions)).toMatchInlineSnapshot(`
 "[Extensions]
-  main.ts"`);
+  main.ts"
+`);
 	});
 
 	test("package extensions still strip index.ts correctly (regression guard)", () => {
@@ -862,13 +894,10 @@ describe("InteractiveMode.showLoadedResources", () => {
 			useRealScopeGroups: true,
 		});
 
-		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
-			force: false,
-		});
-
-		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+		expect(compactExtensionListing(fakeThis, extensions)).toMatchInlineSnapshot(`
 "[Extensions]
-  pi-markdown-preview"`);
+  pi-markdown-preview"
+`);
 	});
 	test("captures mixed extension layouts in expanded output", () => {
 		const fakeThis = createShowLoadedResourcesThis({
@@ -897,29 +926,31 @@ describe("InteractiveMode.showLoadedResources", () => {
   user
     /tmp/agent/extensions/user-index
   path
-    /tmp/temp/cli-extension.ts"`);
+    /tmp/temp/cli-extension.ts"
+`);
 	});
 
-	test("shows context paths relative to cwd while preserving full external paths", () => {
+	test("formats context paths relative to cwd while preserving full external paths", () => {
 		const home = homedir();
 		const cwd = path.join(home, "Development", "pi-mono");
+		const contextFiles = [
+			{ path: path.join(home, ".trek", "agent", "AGENTS.md") },
+			{ path: path.join(cwd, "AGENTS.md") },
+		];
 		const fakeThis = createShowLoadedResourcesThis({
 			quietStartup: false,
 			cwd,
-			contextFiles: [
-				{ path: path.join(home, ".trek", "agent", "AGENTS.md") },
-				{ path: path.join(cwd, "AGENTS.md") },
-			],
+			contextFiles,
 		});
+
+		const compact = contextFiles.map((file) => fakeThis.formatContextPath(file.path)).join(", ");
+		expect(compact.replace(/\\/g, "/")).toBe("~/.trek/agent/AGENTS.md, AGENTS.md");
+		expect(compact.replace(/\\/g, "/")).not.toContain(`${cwd.replace(/\\/g, "/")}/AGENTS.md`);
 
 		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
 			force: false,
 		});
-
-		const output = renderAll(fakeThis.chatContainer).replace(/\\/g, "/");
-		expect(output).toContain("[Context]");
-		expect(output).toContain("~/.trek/agent/AGENTS.md, AGENTS.md");
-		expect(output).not.toContain(`${cwd.replace(/\\/g, "/")}/AGENTS.md`);
+		expect(renderAll(fakeThis.chatContainer)).not.toContain("[Context]");
 	});
 
 	test("shows full context paths when expanded", () => {

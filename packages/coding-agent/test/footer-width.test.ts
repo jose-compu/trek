@@ -98,12 +98,13 @@ describe("FooterComponent width handling", () => {
 	it("keeps all lines within width for wide session names", () => {
 		const width = 93;
 		const session = createSession({ sessionName: "한글".repeat(30) });
-		const footer = new FooterComponent(session, createFooterData(1));
+		const footer = new FooterComponent(session, createFooterData(1), "0.16.1");
 
 		const lines = footer.render(width);
 		for (const line of lines) {
 			expect(visibleWidth(line)).toBeLessThanOrEqual(width);
 		}
+		expect(lines[0]?.replace(/\u001b\[[0-9;]*m/g, "")).toContain("/tmp/project:trek-agent@0.16.1");
 	});
 
 	it("keeps stats line within width for wide model and provider names", () => {

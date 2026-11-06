@@ -485,7 +485,7 @@ Pi is aggressively extensible so it doesn't have to dictate your workflow. Featu
 
 **No built-in to-dos.** They confuse models. Use a TODO.md file, or build your own with [extensions](#extensions).
 
-**No background bash.** Use tmux. Full observability, direct interaction.
+**No job-control bash.** Server-like commands (`python -m http.server`, vite, `npm start`) return after they start and keep running. Use tmux for a full interactive shell.
 
 Read the [blog post](https://mariozechner.at/posts/2025-11-30-trek-coding-agent/) for the full rationale.
 

@@ -118,6 +118,7 @@ import { formatKeyText, keyDisplayText, keyHint, keyText, rawKeyHint } from "./c
 import { LoginDialogComponent } from "./components/login-dialog.ts";
 import { ModelSelectorComponent } from "./components/model-selector.ts";
 import { type AuthSelectorProvider, OAuthSelectorComponent } from "./components/oauth-selector.ts";
+import { formatPromptBorderChrome } from "./components/prompt-chrome.ts";
 import { ScopedModelsSelectorComponent } from "./components/scoped-models-selector.ts";
 import { SessionSelectorComponent } from "./components/session-selector.ts";
 import { SettingsSelectorComponent } from "./components/settings-selector.ts";
@@ -156,6 +157,27 @@ interface Expandable {
 
 function isExpandable(obj: unknown): obj is Expandable {
 	return typeof obj === "object" && obj !== null && "setExpanded" in obj && typeof obj.setExpanded === "function";
+}
+
+/** Blank line only while expanded, so compact startup stays banner-only. */
+class ExpandableSpacer implements Component, Expandable {
+	private expanded: boolean;
+
+	constructor(expanded = false) {
+		this.expanded = expanded;
+	}
+
+	setExpanded(expanded: boolean): void {
+		this.expanded = expanded;
+	}
+
+	invalidate(): void {
+		// Stateless.
+	}
+
+	render(_width: number): string[] {
+		return this.expanded ? [""] : [];
+	}
 }
 
 class ExpandableText extends Text implements Expandable {
@@ -427,10 +449,10 @@ export class InteractiveMode {
 		this.editorContainer = new Container();
 		this.editorContainer.addChild(this.editor as Component);
 		this.footerDataProvider = new FooterDataProvider(this.sessionManager.getCwd());
-		this.footer = new FooterComponent(this.session, this.footerDataProvider);
+		this.footer = new FooterComponent(this.session, this.footerDataProvider, this.version);
 		this.footer.setAutoCompactEnabled(this.session.autoCompactionEnabled);
 		this.shortcutBar = new ShortcutBarComponent(() => this.shortcutBarVisibility);
-		this.asciiBanner = new AsciiBannerComponent();
+		this.asciiBanner = new AsciiBannerComponent(false);
 
 		// Load hide thinking block setting
 		this.hideThinkingBlock = this.settingsManager.getHideThinkingBlock();
@@ -712,34 +734,23 @@ export class InteractiveMode {
 				hint("app.clipboard.pasteImage", "to paste image"),
 				rawKeyHint("drop files", "to attach"),
 			].join("\n");
-			const compactInstructions = [
-				hint("app.interrupt", "interrupt"),
-				rawKeyHint(`${keyText("app.clear")}/${keyText("app.exit")}`, "clear/exit"),
-				rawKeyHint("/", "commands"),
-				rawKeyHint("!", "bash"),
-				hint("app.tools.expand", "more"),
-			].join(theme.fg("muted", " · "));
-			const compactOnboarding = theme.fg(
-				"dim",
-				`Press ${keyText("app.tools.expand")} to show full startup help and loaded resources.`,
-			);
 			const appLabel = APP_TITLE.charAt(0).toUpperCase() + APP_TITLE.slice(1);
 			const onboarding = theme.fg(
 				"dim",
 				`${appLabel} can explain its own features and look up its docs. Ask it how to use or extend ${appLabel}.`,
 			);
 			this.builtInHeader = new ExpandableText(
-				() => `${logo}\n${compactInstructions}\n${compactOnboarding}\n\n${onboarding}`,
+				() => "",
 				() => `${logo}\n${expandedInstructions}\n\n${onboarding}`,
 				this.getStartupExpansionState(),
 				1,
 				0,
 			);
 
-			// Setup UI layout
-			this.headerContainer.addChild(new Spacer(1));
+			const headerExpanded = this.getStartupExpansionState();
+			this.headerContainer.addChild(new ExpandableSpacer(headerExpanded));
 			this.headerContainer.addChild(this.builtInHeader);
-			this.headerContainer.addChild(new Spacer(1));
+			this.headerContainer.addChild(new ExpandableSpacer(headerExpanded));
 		} else {
 			// Minimal header when silenced
 			this.builtInHeader = new Text("", 0, 0);
@@ -751,6 +762,7 @@ export class InteractiveMode {
 		this.ui.addChild(this.statusContainer);
 		this.renderWidgets(); // Initialize with default spacer
 		this.ui.addChild(this.widgetContainerAbove);
+		this.asciiBanner.setExpanded(this.getStartupExpansionState());
 		this.ui.addChild(this.asciiBanner);
 		this.ui.addChild(this.editorContainer);
 		this.ui.addChild(this.shortcutBar);
@@ -849,21 +861,29 @@ export class InteractiveMode {
 
 		// Process initial messages
 		if (initialMessage) {
+			this.showSubmittedPrompt(initialMessage);
+			this.showWorkingNow();
 			try {
 				await this.session.prompt(initialMessage, { images: initialImages });
 			} catch (error: unknown) {
 				const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 				this.showError(errorMessage);
+			} finally {
+				if (!this.session.isStreaming) this.stopWorkingLoader();
 			}
 		}
 
 		if (initialMessages) {
 			for (const message of initialMessages) {
+				this.showSubmittedPrompt(message);
+				this.showWorkingNow();
 				try {
 					await this.session.prompt(message);
 				} catch (error: unknown) {
 					const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 					this.showError(errorMessage);
+				} finally {
+					if (!this.session.isStreaming) this.stopWorkingLoader();
 				}
 			}
 		}
@@ -1028,7 +1048,7 @@ export class InteractiveMode {
 		return result;
 	}
 
-	private formatContextPath(p: string): string {
+	formatContextPath(p: string): string {
 		const cwd = path.resolve(this.sessionManager.getCwd());
 		const absolutePath = path.isAbsolute(p) ? path.resolve(p) : path.resolve(cwd, p);
 		const relativePath = getCwdRelativePath(absolutePath, cwd);
@@ -1154,7 +1174,7 @@ export class InteractiveMode {
 		return segments.join("/");
 	}
 
-	private getCompactExtensionLabels(extensions: Array<{ path: string; sourceInfo?: SourceInfo }>): string[] {
+	getCompactExtensionLabels(extensions: Array<{ path: string; sourceInfo?: SourceInfo }>): string[] {
 		const nonPackageExtensions = extensions
 			.map((extension) => {
 				const segments = this.getCompactDisplayPathSegments(extension.path);
@@ -1387,28 +1407,16 @@ export class InteractiveMode {
 		}
 
 		const sectionHeader = (name: string, color: ThemeColor = "mdHeading") => theme.fg(color, `[${name}]`);
-		const formatCompactList = (items: string[], options?: { sort?: boolean }): string => {
-			const labels = items.map((item) => item.trim()).filter((item) => item.length > 0);
-			if (options?.sort !== false) {
-				labels.sort((a, b) => a.localeCompare(b));
-			}
-			return theme.fg("dim", `  ${labels.join(", ")}`);
-		};
-		const addLoadedSection = (
-			name: string,
-			collapsedBody: string,
-			expandedBody = collapsedBody,
-			color: ThemeColor = "mdHeading",
-		): void => {
+		const addLoadedSection = (name: string, expandedBody: string, color: ThemeColor = "mdHeading"): void => {
 			const section = new ExpandableText(
-				() => `${sectionHeader(name, color)}\n${collapsedBody}`,
+				() => "",
 				() => `${sectionHeader(name, color)}\n${expandedBody}`,
 				this.getStartupExpansionState(),
 				0,
 				0,
 			);
 			this.chatContainer.addChild(section);
-			this.chatContainer.addChild(new Spacer(1));
+			this.chatContainer.addChild(new ExpandableSpacer(this.getStartupExpansionState()));
 		};
 
 		const skillsResult = this.session.resourceLoader.getSkills();
@@ -1445,15 +1453,11 @@ export class InteractiveMode {
 		if (showListing) {
 			const contextFiles = this.session.resourceLoader.getAgentsFiles().agentsFiles;
 			if (contextFiles.length > 0) {
-				this.chatContainer.addChild(new Spacer(1));
+				this.chatContainer.addChild(new ExpandableSpacer(this.getStartupExpansionState()));
 				const contextList = contextFiles
 					.map((f) => theme.fg("dim", `  ${this.formatDisplayPath(f.path)}`))
 					.join("\n");
-				const contextCompactList = formatCompactList(
-					contextFiles.map((contextFile) => this.formatContextPath(contextFile.path)),
-					{ sort: false },
-				);
-				addLoadedSection("Context", contextCompactList, contextList);
+				addLoadedSection("Context", contextList);
 			}
 
 			const skills = skillsResult.skills;
@@ -1465,8 +1469,7 @@ export class InteractiveMode {
 					formatPath: (item) => this.formatDisplayPath(item.path),
 					formatPackagePath: (item) => this.getShortPath(item.path, item.sourceInfo),
 				});
-				const skillCompactList = formatCompactList(skills.map((skill) => skill.name));
-				addLoadedSection("Skills", skillCompactList, skillList);
+				addLoadedSection("Skills", skillList);
 			}
 
 			const templates = this.session.promptTemplates;
@@ -1485,8 +1488,7 @@ export class InteractiveMode {
 						return template ? `/${template.name}` : this.formatDisplayPath(item.path);
 					},
 				});
-				const promptCompactList = formatCompactList(templates.map((template) => `/${template.name}`));
-				addLoadedSection("Prompts", promptCompactList, templateList);
+				addLoadedSection("Prompts", templateList);
 			}
 
 			if (extensions.length > 0) {
@@ -1496,8 +1498,7 @@ export class InteractiveMode {
 					formatPackagePath: (item) =>
 						this.formatExtensionDisplayPath(this.getShortPath(item.path, item.sourceInfo)),
 				});
-				const extensionCompactList = formatCompactList(this.getCompactExtensionLabels(extensions));
-				addLoadedSection("Extensions", extensionCompactList, extList, "mdHeading");
+				addLoadedSection("Extensions", extList);
 			}
 
 			// Show loaded themes (excluding built-in)
@@ -1514,13 +1515,7 @@ export class InteractiveMode {
 					formatPath: (item) => this.formatDisplayPath(item.path),
 					formatPackagePath: (item) => this.getShortPath(item.path, item.sourceInfo),
 				});
-				const themeCompactList = formatCompactList(
-					customThemes.map(
-						(loadedTheme) =>
-							loadedTheme.name ?? this.getCompactPathLabel(loadedTheme.sourcePath!, loadedTheme.sourceInfo),
-					),
-				);
-				addLoadedSection("Themes", themeCompactList, themeList);
+				addLoadedSection("Themes", themeList);
 			}
 		}
 
@@ -3887,7 +3882,8 @@ export class InteractiveMode {
 	/** Show the next monotonic prompt id ([#N]) on the input editor top border. */
 	private updateEditorPromptLabel(): void {
 		const promptId = this.sessionManager.getNextPromptNumber();
-		const label = theme.fg("customMessageLabel", `\x1b[1m[#${promptId}]\x1b[22m`);
+		const chrome = formatPromptBorderChrome(promptId);
+		const label = theme.fg("customMessageLabel", `\x1b[1m${chrome}\x1b[22m`);
 		this.defaultEditor.setBorderLabel(label);
 		if (this.editor !== this.defaultEditor && "setBorderLabel" in this.editor) {
 			(this.editor as CustomEditor).setBorderLabel(label);
@@ -3934,11 +3930,18 @@ export class InteractiveMode {
 		if (isExpandable(activeHeader)) {
 			activeHeader.setExpanded(expanded);
 		}
+		for (const child of this.headerContainer.children) {
+			if (isExpandable(child)) {
+				child.setExpanded(expanded);
+			}
+		}
 		for (const child of this.chatContainer.children) {
 			if (isExpandable(child)) {
 				child.setExpanded(expanded);
 			}
 		}
+		this.asciiBanner.setExpanded(expanded);
+		this.updateEditorPromptLabel();
 		this.ui.requestRender();
 	}
 

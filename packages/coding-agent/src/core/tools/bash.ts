@@ -16,6 +16,7 @@ import {
 	untrackDetachedChildPid,
 } from "../../utils/shell.ts";
 import type { ToolDefinition, ToolRenderResultOptions } from "../extensions/types.ts";
+import { formatBackgroundedBash, isServerReadyOutput, resolveBlockUntilMs } from "./bash-background.ts";
 import { bashRecipeSuggestion } from "./bash-recipes.ts";
 import { OutputAccumulator } from "./output-accumulator.ts";
 import { getTextOutput, invalidArgText, str } from "./render-utils.ts";
@@ -24,7 +25,13 @@ import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, type TruncationResult
 
 const bashSchema = Type.Object({
 	command: Type.String({ description: "Bash command to execute" }),
-	timeout: Type.Optional(Type.Number({ description: "Timeout in seconds (optional, no default timeout)" })),
+	timeout: Type.Optional(Type.Number({ description: "Timeout in seconds. Kills the process. Optional, no default." })),
+	block_until_ms: Type.Optional(
+		Type.Number({
+			description:
+				"Wait this many milliseconds then leave the process running and return. 0 waits for exit. Server-like commands (python -m http.server, vite, npm start, …) default to 8000. Unlike timeout, the process is not killed.",
+		}),
+	),
 });
 
 export type BashToolInput = Static<typeof bashSchema>;
@@ -32,6 +39,8 @@ export type BashToolInput = Static<typeof bashSchema>;
 export interface BashToolDetails {
 	truncation?: TruncationResult;
 	fullOutputPath?: string;
+	backgrounded?: boolean;
+	pid?: number;
 }
 
 /**
@@ -53,9 +62,10 @@ export interface BashOperations {
 			onData: (data: Buffer) => void;
 			signal?: AbortSignal;
 			timeout?: number;
+			blockUntilMs?: number;
 			env?: NodeJS.ProcessEnv;
 		},
-	) => Promise<{ exitCode: number | null }>;
+	) => Promise<{ exitCode: number | null; backgrounded?: boolean; pid?: number }>;
 }
 
 /**
@@ -64,9 +74,39 @@ export interface BashOperations {
  * This is useful for extensions that intercept user_bash and still want pi's
  * standard local shell behavior while wrapping or rewriting commands.
  */
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => {
+		setTimeout(resolve, ms);
+	});
+}
+
+async function waitForExitOrBackground(
+	exitPromise: Promise<{ kind: "exit"; exitCode: number | null }>,
+	blockUntilMs: number,
+	isReady: () => boolean,
+): Promise<{ kind: "exit"; exitCode: number | null } | { kind: "block" }> {
+	const deadline = Date.now() + blockUntilMs;
+	while (true) {
+		if (isReady()) {
+			return { kind: "block" };
+		}
+		const remaining = deadline - Date.now();
+		if (remaining <= 0) {
+			return { kind: "block" };
+		}
+		const result = await Promise.race([
+			exitPromise,
+			sleep(Math.min(200, remaining)).then(() => ({ kind: "poll" as const })),
+		]);
+		if (result.kind === "exit") {
+			return result;
+		}
+	}
+}
+
 export function createLocalBashOperations(options?: { shellPath?: string }): BashOperations {
 	return {
-		exec: async (command, cwd, { onData, signal, timeout, env }) => {
+		exec: async (command, cwd, { onData, signal, timeout, blockUntilMs, env }) => {
 			const { shell, args } = getShellConfig(options?.shellPath);
 			try {
 				await fsAccess(cwd, constants.F_OK);
@@ -86,6 +126,7 @@ export function createLocalBashOperations(options?: { shellPath?: string }): Bas
 			});
 			if (child.pid) trackDetachedChildPid(child.pid);
 			let timedOut = false;
+			let backgrounded = false;
 			let timeoutHandle: NodeJS.Timeout | undefined;
 			const onAbort = () => {
 				if (child.pid) killProcessTree(child.pid);
@@ -99,26 +140,52 @@ export function createLocalBashOperations(options?: { shellPath?: string }): Bas
 						if (child.pid) killProcessTree(child.pid);
 					}, timeout * 1000);
 				}
+				let ready = false;
+				const onChunk = (data: Buffer): void => {
+					onData(data);
+					if (!ready && isServerReadyOutput(data.toString("utf8"))) {
+						ready = true;
+					}
+				};
 				// Stream stdout and stderr.
-				child.stdout?.on("data", onData);
-				child.stderr?.on("data", onData);
+				child.stdout?.on("data", onChunk);
+				child.stderr?.on("data", onChunk);
 				// Handle abort signal by killing the entire process tree.
 				if (signal) {
 					if (signal.aborted) onAbort();
 					else signal.addEventListener("abort", onAbort, { once: true });
 				}
-				// Handle shell spawn errors and wait for the process to terminate without hanging
-				// on inherited stdio handles held by detached descendants.
-				const exitCode = await waitForChildProcess(child);
+				const exitPromise = waitForChildProcess(child).then((exitCode) => ({
+					kind: "exit" as const,
+					exitCode,
+				}));
+				void exitPromise.catch(() => {});
+				let settled: { kind: "exit"; exitCode: number | null };
+				if (blockUntilMs !== undefined && blockUntilMs > 0) {
+					const blocked = await waitForExitOrBackground(exitPromise, blockUntilMs, () => ready);
+					if (blocked.kind === "block") {
+						backgrounded = true;
+						const drain = (): void => {};
+						child.stdout?.removeListener("data", onChunk);
+						child.stderr?.removeListener("data", onChunk);
+						child.stdout?.on("data", drain);
+						child.stderr?.on("data", drain);
+						child.unref();
+						return { exitCode: null, backgrounded: true, pid: child.pid };
+					}
+					settled = blocked;
+				} else {
+					settled = await exitPromise;
+				}
 				if (signal?.aborted) {
 					throw new Error("aborted");
 				}
 				if (timedOut) {
 					throw new Error(`timeout:${timeout}`);
 				}
-				return { exitCode };
+				return { exitCode: settled.exitCode, pid: child.pid };
 			} finally {
-				if (child.pid) untrackDetachedChildPid(child.pid);
+				if (!backgrounded && child.pid) untrackDetachedChildPid(child.pid);
 				if (timeoutHandle) clearTimeout(timeoutHandle);
 				if (signal) signal.removeEventListener("abort", onAbort);
 			}
@@ -324,12 +391,12 @@ export function createBashToolDefinition(
 		name: "bash",
 		label: "bash",
 		reversibilityTier: "gated",
-		description: `Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds. Recipes: ${bashRecipeSuggestion()}.`,
+		description: `Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). If truncated, full output is saved to a temp file. A still-running command returns after 8s and keeps running (so http.server does not block the turn); it also returns as soon as it prints a listen/bind line. timeout kills the process. block_until_ms: 0 waits for exit. Recipes: ${bashRecipeSuggestion()}.`,
 		promptSnippet: "Execute bash commands (ls, grep, find, etc.)",
 		parameters: bashSchema,
 		async execute(
 			_toolCallId,
-			{ command, timeout }: { command: string; timeout?: number },
+			{ command, timeout, block_until_ms }: { command: string; timeout?: number; block_until_ms?: number },
 			signal?: AbortSignal,
 			onUpdate?,
 			_ctx?,
@@ -428,14 +495,19 @@ export function createBashToolDefinition(
 
 			try {
 				let exitCode: number | null;
+				let backgrounded = false;
+				let backgroundPid: number | undefined;
 				try {
 					const result = await ops.exec(spawnContext.command, spawnContext.cwd, {
 						onData: handleData,
 						signal,
 						timeout,
+						blockUntilMs: resolveBlockUntilMs(command, block_until_ms),
 						env: spawnContext.env,
 					});
 					exitCode = result.exitCode;
+					backgrounded = result.backgrounded === true;
+					backgroundPid = result.pid;
 				} catch (err) {
 					const snapshot = await finishOutput();
 					const { text } = formatOutput(snapshot, "");
@@ -451,6 +523,17 @@ export function createBashToolDefinition(
 
 				const snapshot = await finishOutput();
 				const { text: outputText, details } = formatOutput(snapshot);
+				if (backgrounded && backgroundPid !== undefined) {
+					return {
+						content: [
+							{
+								type: "text",
+								text: formatBackgroundedBash(backgroundPid, outputText === "(no output)" ? "" : outputText),
+							},
+						],
+						details: { ...details, backgrounded: true, pid: backgroundPid },
+					};
+				}
 				if (exitCode !== 0 && exitCode !== null) {
 					const diagnostics = compilerDiagnosticLines(outputText);
 					const lead = diagnostics.length > 0 ? `${diagnostics.join("\n")}\n\n` : "";
