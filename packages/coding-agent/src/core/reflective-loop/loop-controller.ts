@@ -63,6 +63,7 @@ export class ReflectiveLoopController {
 	private subtaskStack = new SubtaskStack();
 	private sessionManager: SessionManager;
 	private previousTask = "";
+	private cycleSeq: number | undefined;
 
 	constructor(sessionManager: SessionManager) {
 		this.sessionManager = sessionManager;
@@ -97,9 +98,15 @@ export class ReflectiveLoopController {
 		return reflection;
 	}
 
+	private nextCycleNumber(): number {
+		this.cycleSeq ??= getReflectiveCycleCount(this.sessionManager);
+		this.cycleSeq += 1;
+		return this.cycleSeq;
+	}
+
 	async runPromptCycle(options: RunPromptCycleOptions): Promise<ReflectiveCycleTrace> {
 		this.effortRegulator.beginPrompt(EFFORT_COST_BUDGET);
-		const cycleNumber = getReflectiveCycleCount(this.sessionManager) + 1;
+		const cycleNumber = this.nextCycleNumber();
 		const cycleId = createCycleId(cycleNumber);
 		const startedAt = nowIso();
 		const phaseTimestamps: Partial<Record<ReflectivePhase, TracePhaseTimestamps>> = {};
