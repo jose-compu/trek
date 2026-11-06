@@ -13,6 +13,15 @@ describe("compactCardLines", () => {
 	test("does not pad when content is shorter than the viewport", () => {
 		expect(compactCardLines(["bash  echo hi", "hi"])).toEqual(["bash  echo hi", "hi"]);
 	});
+
+	test("error cards keep the first 3 content lines", () => {
+		expect(compactCardLines(["edit  file.ts", "Could not find", "old text", "in file", "retry"], 3, "head")).toEqual([
+			"edit  file.ts",
+			"Could not find",
+			"old text",
+			"in file",
+		]);
+	});
 });
 
 describe("compactViewportLines", () => {

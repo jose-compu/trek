@@ -11,10 +11,15 @@ export function visibleCardText(line: string): string {
 
 /**
  * Collapse a rendered card to 1–4 lines: the first visible line (type + cmd)
- * plus the last `viewport` content lines. Empty viewport → header only.
- * Leading and trailing blank lines are dropped so unused space is not reserved.
+ * plus up to `viewport` content lines. Empty viewport → header only.
+ * Success cards use a tail viewport (streaming output moves up).
+ * Error cards use a head viewport so the failure lead is visible.
  */
-export function compactCardLines(lines: readonly string[], viewport = COMPACT_VIEWPORT_LINES): string[] {
+export function compactCardLines(
+	lines: readonly string[],
+	viewport = COMPACT_VIEWPORT_LINES,
+	mode: "tail" | "head" = "tail",
+): string[] {
 	let start = 0;
 	let end = lines.length;
 	while (start < end && visibleCardText(lines[start] ?? "") === "") {
@@ -38,7 +43,7 @@ export function compactCardLines(lines: readonly string[], viewport = COMPACT_VI
 	if (rest.length <= viewport) {
 		return [header, ...rest];
 	}
-	return [header, ...rest.slice(-viewport)];
+	return [header, ...(mode === "head" ? rest.slice(0, viewport) : rest.slice(-viewport))];
 }
 
 /** Last `viewport` non-empty lines of a thinking / output blob. Empty → []. */

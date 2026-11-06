@@ -258,7 +258,8 @@ export class ToolExecutionComponent extends Container {
 		}
 
 		if (!this.expanded) {
-			return compactCardLines(lines);
+			const mode = !this.result || this.result.isError ? "head" : "tail";
+			return compactCardLines(lines, undefined, mode);
 		}
 		return lines;
 	}
