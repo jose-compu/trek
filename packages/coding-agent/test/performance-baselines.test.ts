@@ -6,9 +6,8 @@
 import { performance } from "node:perf_hooks";
 import { fauxAssistantMessage } from "@trek/ai";
 import { afterEach, describe, expect, it } from "vitest";
+import { assertUnderBudget } from "./performance-budgets.ts";
 import { createHarness, type Harness } from "./suite/harness.ts";
-
-const CEILING_MS = 30_000;
 
 async function timeMs(fn: () => Promise<void>): Promise<number> {
 	const started = performance.now();
@@ -30,20 +29,19 @@ describe("0.17 performance baselines (faux provider)", () => {
 		first.setResponses([fauxAssistantMessage("ok")]);
 		const firstPromptMs = await timeMs(() => first.session.prompt("hello"));
 		expect(firstPromptMs).toBeGreaterThan(0);
-		expect(firstPromptMs).toBeLessThan(CEILING_MS);
+		assertUnderBudget("first_prompt_ms", firstPromptMs);
 
 		const looped = await createHarness({ enableReflectiveLoop: true });
 		harnesses.push(looped);
 		looped.setResponses([fauxAssistantMessage("ok")]);
 		const reflectiveLoopMs = await timeMs(() => looped.session.prompt("hello"));
 		expect(reflectiveLoopMs).toBeGreaterThan(0);
-		expect(reflectiveLoopMs).toBeLessThan(CEILING_MS);
+		assertUnderBudget("reflective_loop_ms", reflectiveLoopMs);
 
 		const payload = {
 			kind: "trek-e2e-wall-clock",
 			version: 1,
 			provider: "faux",
-			ceiling_ms: CEILING_MS,
 			first_prompt_ms: Number(firstPromptMs.toFixed(1)),
 			reflective_loop_ms: Number(reflectiveLoopMs.toFixed(1)),
 		};

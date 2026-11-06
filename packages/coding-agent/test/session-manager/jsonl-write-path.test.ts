@@ -14,6 +14,7 @@ import {
 	persistCycleBoundary,
 	REFLECTIVE_CYCLE_CUSTOM_TYPE,
 } from "../../src/core/trace/index.ts";
+import { assertUnderBudget } from "../performance-budgets.ts";
 import { assistantMsg, userMsg } from "../utilities.ts";
 
 function parseLines(path: string): Record<string, unknown>[] {
@@ -127,7 +128,7 @@ describe("SessionManager JSONL write path", () => {
 		}
 		const jsonlAppendMs = Number((performance.now() - started).toFixed(1));
 		expect(jsonlAppendMs).toBeGreaterThanOrEqual(0);
-		expect(jsonlAppendMs).toBeLessThan(5_000);
+		assertUnderBudget("jsonl_append_400_ms", jsonlAppendMs);
 		const file = session.getSessionFile()!;
 		expect(parseLines(file).filter((row) => row.customType === "bench")).toHaveLength(400);
 		process.stdout.write(`METRIC jsonl_append_400_ms=${jsonlAppendMs}\n`);

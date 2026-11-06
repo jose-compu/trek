@@ -18,15 +18,15 @@ npm run profile:rpc -- --isolated-agent-dir --json --skip-build
 
 `profile:tui` must run from an interactive terminal.
 
-## Baselines (#113)
+## Baselines (#113) and budgets (#112)
 
-Record numbers before cutting latency (#109–#111). Refreshing a baseline is an explicit commit. The automated 2× budget gate is [#112](https://github.com/jose-compu/trek/issues/112).
-
-Run the e2e fixture:
+Record numbers before cutting latency (#109–#111). The CI gate is `test/performance-budgets.json` (`budget_ms`). A slower time fails `npm test` until that file is changed on purpose.
 
 ```bash
-cd packages/coding-agent && npx vitest --run test/performance-baselines.test.ts --reporter=verbose
+cd packages/coding-agent && npx vitest --run test/performance-budgets.test.ts test/performance-baselines.test.ts test/session-manager/jsonl-write-path.test.ts --reporter=verbose
 ```
+
+To accept a slower machine or a real regression: raise the metric in `performance-budgets.json`, note why in the PR, keep `recorded_ms` as the last local snapshot.
 
 ## Modules
 
