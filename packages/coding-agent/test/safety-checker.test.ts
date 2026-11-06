@@ -73,7 +73,11 @@ describe("SafetyChecker", () => {
 	test("read-before-write: editing an existing unread file is rejected", async () => {
 		const verdict = await checker.checkToolCall(
 			descriptor("edit", { path: "src/app.ts" }),
-			createEnv({ fileExists: async () => true, hasReadFile: () => false }),
+			createEnv({
+				enforceReadBeforeWrite: true,
+				fileExists: async () => true,
+				hasReadFile: () => false,
+			}),
 		);
 		expect(verdict.allowed).toBe(false);
 		expect(verdict.law).toBe(1);
@@ -83,7 +87,11 @@ describe("SafetyChecker", () => {
 	test("read-before-write: editing an existing read file is allowed", async () => {
 		const verdict = await checker.checkToolCall(
 			descriptor("edit", { path: "src/app.ts" }),
-			createEnv({ fileExists: async () => true, hasReadFile: (p) => p === "/repo/src/app.ts" }),
+			createEnv({
+				enforceReadBeforeWrite: true,
+				fileExists: async () => true,
+				hasReadFile: (p) => p === "/repo/src/app.ts",
+			}),
 		);
 		expect(verdict.allowed).toBe(true);
 	});
@@ -91,7 +99,7 @@ describe("SafetyChecker", () => {
 	test("read-before-write: writing a brand-new file is allowed (nothing to clobber)", async () => {
 		const verdict = await checker.checkToolCall(
 			descriptor("write", { path: "src/new.ts", content: "export const x = 1;" }),
-			createEnv({ fileExists: async () => false }),
+			createEnv({ enforceReadBeforeWrite: true, fileExists: async () => false }),
 		);
 		expect(verdict.allowed).toBe(true);
 	});
@@ -99,10 +107,26 @@ describe("SafetyChecker", () => {
 	test("read-before-write: overwriting an existing unread file is rejected", async () => {
 		const verdict = await checker.checkToolCall(
 			descriptor("write", { path: "src/app.ts", content: "clobber" }),
-			createEnv({ fileExists: async () => true, hasReadFile: () => false }),
+			createEnv({
+				enforceReadBeforeWrite: true,
+				fileExists: async () => true,
+				hasReadFile: () => false,
+			}),
 		);
 		expect(verdict.allowed).toBe(false);
 		expect(verdict.law).toBe(1);
+	});
+
+	test("read-before-write: Tooling/Decision skip the unread-file block", async () => {
+		const verdict = await checker.checkToolCall(
+			descriptor("edit", { path: "src/app.ts" }),
+			createEnv({
+				enforceReadBeforeWrite: false,
+				fileExists: async () => true,
+				hasReadFile: () => false,
+			}),
+		);
+		expect(verdict.allowed).toBe(true);
 	});
 
 	test("forbidden-tier tool is never auto-run", async () => {

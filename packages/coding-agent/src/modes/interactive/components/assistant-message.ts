@@ -1,4 +1,5 @@
 import type { AssistantMessage } from "@trek/ai";
+import { isContextOverflow } from "@trek/ai";
 import { Container, Markdown, type MarkdownTheme, Spacer, Text } from "@trek/tui";
 import { honestyDisplay, stripHonestyFooter } from "../../../core/honesty/index.ts";
 import { getMarkdownTheme, theme } from "../theme/theme.ts";
@@ -191,6 +192,10 @@ export class AssistantMessageComponent extends Container {
 				}
 				this.contentContainer.addChild(new Text(theme.fg("error", abortMessage), 1, 0));
 			} else if (message.stopReason === "error") {
+				// Context-size failures stay quiet (ladder may climb on first prompt).
+				if (isContextOverflow(message)) {
+					return;
+				}
 				const errorMsg = message.errorMessage || "Unknown error";
 				this.contentContainer.addChild(new Spacer(1));
 				this.contentContainer.addChild(new Text(theme.fg("error", `Error: ${errorMsg}`), 1, 0));

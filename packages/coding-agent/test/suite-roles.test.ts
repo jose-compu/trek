@@ -4,7 +4,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { defaultRuntimeConfig, resolveRuntime, withHierarchy } from "../src/core/runtime/index.ts";
+import {
+	DEFAULT_DECISION_MODEL_ID,
+	defaultRuntimeConfig,
+	resolveRuntime,
+	withHierarchy,
+} from "../src/core/runtime/index.ts";
 import { liftLocalToolText } from "../src/core/runtime/local-work.ts";
 import { selectSessionRole, selectThinkRole, sessionRoleForModel } from "../src/core/runtime/select-role.ts";
 import type { SuiteId } from "../src/core/runtime/types.ts";
@@ -16,6 +21,15 @@ function resolved(suite: SuiteId) {
 }
 
 describe("local suite roles", () => {
+	it("reuses LFM d1 Decision on every suite (non-LFM has no native Decision)", () => {
+		for (const suite of SUITES) {
+			const runtime = resolved(suite);
+			expect(runtime.roles.decision?.id, suite).toBe(DEFAULT_DECISION_MODEL_ID);
+			expect(runtime.roles.decision?.source, suite).toBe("local");
+			expect(runtime.roles.decision?.thinking, suite).toBe(false);
+		}
+	});
+
 	it("turns a JSON tool call in the reply text into a tool call", () => {
 		const lifted = liftLocalToolText({
 			stopReason: "stop",

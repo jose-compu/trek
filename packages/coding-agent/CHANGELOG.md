@@ -4,6 +4,23 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-10-31
+
+### Added
+
+- Decision Index runs before Tooling: idle parks on Decision (d1); sentiment / yes-no and other structured turns can **solve** at Decision (`· decision · solve · …`) without binding Tooling ([#166](https://github.com/jose-compu/trek/issues/166), [#158](https://github.com/jose-compu/trek/issues/158)).
+- Creative Decision JSON packs (`sentiment-pulse`, `tweet-weather`, `yes-no-coin`, `label-jar`, …) plus a default `route-ladder` compass ([#166](https://github.com/jose-compu/trek/issues/166)).
+- When no canned pack fits, Tooling invents a Decision template, Trek validates it, then applies it (Liquid API or lexical fill) ([#167](https://github.com/jose-compu/trek/issues/167)).
+- Bidirectional ladder: escalate and descalate (`{"descalate":…}`, soft hand-off, user `descalate` / `go back to decision`); floor sticks on the same topic ([#163](https://github.com/jose-compu/trek/issues/163)).
+- Topic/task reset (`detectTopicReset`, `{"new_topic":true}`) drops sticky elevation back to Decision ([#164](https://github.com/jose-compu/trek/issues/164)).
+- Malformed tool arguments (schema validation, e.g. `write` without `path`) escalate on the first failure ([#165](https://github.com/jose-compu/trek/issues/165)).
+- Shared LFM Decision (`LiquidAI/d1-omni-600M`) across suites; Law 1 read-before-write skips Decision and Tooling.
+
+### Changed
+
+- New topic no longer always flashes Decision → Tooling; the Decision Index chooses solve vs escalate.
+- `/new` inherits parent hierarchy config and re-activates the local Decision floor.
+
 ## [0.16.0] - 2026-10-31
 
 ### Added

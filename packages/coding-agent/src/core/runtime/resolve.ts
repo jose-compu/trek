@@ -151,7 +151,7 @@ export function formatRuntimeStatus(resolved: ResolvedRuntime): string {
 		`huggingFaceToken: ${resolved.requiresHuggingFaceToken ? "required for local weights" : "not required"}`,
 		`rerank: ${resolved.rerank ? "on" : "off"}`,
 	];
-	const order: RuntimeRole[] = ["tooling", "workhorse", "planning", "embedding", "reranker", "frontier"];
+	const order: RuntimeRole[] = ["decision", "tooling", "workhorse", "planning", "embedding", "reranker", "frontier"];
 	for (const name of order) {
 		const active = resolved.roles[name];
 		const preset = resolved.presetRoles[name];

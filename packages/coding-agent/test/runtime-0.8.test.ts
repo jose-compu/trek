@@ -281,17 +281,21 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(mistral.roles.tooling?.id).toBe("Qwen3.5-0.8B");
 		expect(mistral.roles.workhorse?.id).toBe("Ministral-3-3B-Instruct-2512");
 		expect(mistral.roles.planning?.id).toBe("Ministral-3-8B-Reasoning-2512");
+		expect(mistral.roles.decision?.id).toBe("LiquidAI/d1-omni-600M");
 		expect(mistral.rerank).toBe(true);
 		expect(qwen.roles.workhorse?.id).toBe("Qwen3.5-4B");
 		expect(qwen.roles.workhorse?.thinking).toBe(false);
 		expect(qwen.roles.planning?.thinking).toBe(true);
+		expect(qwen.roles.decision?.id).toBe("LiquidAI/d1-omni-600M");
 		expect(lfm.roles.embedding?.id).toBe("LFM2-ColBERT-350M");
 		expect(lfm.roles.reranker?.id).toBe("cross-encoder/ms-marco-MiniLM-L-6-v2");
+		expect(lfm.roles.decision?.id).toBe("LiquidAI/d1-omni-600M");
 		expect(lfm.rerank).toBe(true);
 		expect(lfm.roles.planning?.thinking).toBe(true);
 		expect(pro.roles.workhorse?.id).toBe("Devstral-Small-2507");
 		expect(pro.roles.workhorse?.thinking).toBe(false);
 		expect(pro.roles.planning?.id).toBe("Ministral-3-8B-Reasoning-2512");
+		expect(pro.roles.decision?.id).toBe("LiquidAI/d1-omni-600M");
 	});
 
 	it("points a local chat model at llama-server", () => {

@@ -172,8 +172,7 @@ describe("AgentSession auto-compaction queue resume", () => {
 		expect(events).toContainEqual({
 			type: "compaction_end",
 			reason: "overflow",
-			errorMessage:
-				"Context overflow recovery failed after one compact-and-retry attempt. Try reducing context or switching to a larger-context model.",
+			errorMessage: "context full",
 		});
 	});
 

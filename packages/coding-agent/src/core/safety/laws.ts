@@ -46,7 +46,8 @@ export function checkLaw0(descriptor: ToolCallDescriptor): string | undefined {
  * Law 1: protect the user, their codebase, and production systems.
  * - Destructive shell commands require explicit confirmation.
  * - Forbidden-tier tools are never auto-run.
- * - Read-before-write: do not overwrite/edit an existing file the agent has not read this session.
+ * - Read-before-write (Workhorse / Planning / Frontier only): do not overwrite/edit an
+ *   existing file the agent has not read this session. Tooling and Decision skip this.
  */
 export async function checkLaw1(descriptor: ToolCallDescriptor, env: SafetyEnv): Promise<string | undefined> {
 	const command = getCommand(descriptor);
@@ -56,6 +57,11 @@ export async function checkLaw1(descriptor: ToolCallDescriptor, env: SafetyEnv):
 
 	if (descriptor.tier === "forbidden") {
 		return `Tool "${descriptor.toolName}" is forbidden by default (Law 1) and requires operator co-sign.`;
+	}
+
+	// Decision / Tooling may edit without a prior read; stronger ladder tiers must not.
+	if (env.enforceReadBeforeWrite === false) {
+		return undefined;
 	}
 
 	const filePath = getFilePath(descriptor);

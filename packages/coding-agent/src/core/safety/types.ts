@@ -36,6 +36,11 @@ export interface SafetyEnv {
 	halted: boolean;
 	/** Destructive operations have been explicitly confirmed for this session. */
 	requireDestructiveConfirm: boolean;
+	/**
+	 * When true (default), Law 1 read-before-write applies.
+	 * Tooling / Decision skip this; Workhorse / Planning / Frontier enforce it.
+	 */
+	enforceReadBeforeWrite?: boolean;
 	/** Whether a file (absolute path) has been read during this session. */
 	hasReadFile(absPath: string): boolean;
 	/** Whether a file currently exists on disk. */

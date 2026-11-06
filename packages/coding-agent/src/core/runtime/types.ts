@@ -9,10 +9,18 @@ export type HierarchyMode = (typeof HIERARCHY_MODES)[number];
 export const SUITE_IDS = ["mistral", "mistral-pro", "qwen", "lfm"] as const;
 export type SuiteId = (typeof SUITE_IDS)[number];
 
-export const RUNTIME_ROLES = ["tooling", "workhorse", "planning", "frontier", "embedding", "reranker"] as const;
+export const RUNTIME_ROLES = [
+	"decision",
+	"tooling",
+	"workhorse",
+	"planning",
+	"frontier",
+	"embedding",
+	"reranker",
+] as const;
 export type RuntimeRole = (typeof RUNTIME_ROLES)[number];
 
-/** Roles that may own a llama-server process. Frontier never does. */
+/** Roles that may own a llama-server process. Decision and Frontier never do. */
 export const LOCAL_SERVER_ROLES = ["tooling", "workhorse", "planning", "embedding", "reranker"] as const;
 export type LocalServerRole = (typeof LOCAL_SERVER_ROLES)[number];
 

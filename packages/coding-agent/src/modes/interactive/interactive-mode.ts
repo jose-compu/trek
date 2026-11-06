@@ -343,6 +343,8 @@ export class InteractiveMode {
 	// Auto-compaction state
 	private autoCompactionLoader: Loader | undefined = undefined;
 	private autoCompactionEscapeHandler?: () => void;
+	/** Global Escape listener while compacting (works even if editor is not focused). */
+	private compactionInputUnsub?: () => void;
 
 	// Auto-retry state
 	private retryLoader: Loader | undefined = undefined;
@@ -3051,6 +3053,13 @@ export class InteractiveMode {
 			case "hierarchy_escalate":
 				// Discreet one-line card — no spacer, dim only.
 				this.chatContainer.addChild(new Text(theme.fg("dim", event.text), 0, 0));
+				this.footer.invalidate();
+				this.ui.requestRender();
+				break;
+
+			case "hierarchy_model":
+				// Footer switches to the active ladder role/model (Tooling → … → Frontier).
+				this.footer.invalidate();
 				this.ui.requestRender();
 				break;
 
@@ -3222,15 +3231,26 @@ export class InteractiveMode {
 				}
 				// Keep editor active; submissions are queued during compaction.
 				this.autoCompactionEscapeHandler = this.defaultEditor.onEscape;
-				this.defaultEditor.onEscape = () => {
+				const cancelCompaction = () => {
 					this.session.abortCompaction();
 				};
+				this.defaultEditor.onEscape = cancelCompaction;
+				if (this.editor !== this.defaultEditor && "onEscape" in this.editor) {
+					(this.editor as CustomEditor).onEscape = cancelCompaction;
+				}
+				// Global Escape: cancel even when focus is not on the editor.
+				this.compactionInputUnsub?.();
+				this.compactionInputUnsub = this.ui.addInputListener((data) => {
+					if (this.keybindings.matches(data, "app.interrupt")) {
+						cancelCompaction();
+						return { consume: true };
+					}
+					return undefined;
+				});
 				this.statusContainer.clear();
 				const cancelHint = `(${keyText("app.interrupt")} to cancel)`;
 				const label =
-					event.reason === "manual"
-						? `Compacting context... ${cancelHint}`
-						: `${event.reason === "overflow" ? "Context overflow detected, " : ""}Auto-compacting... ${cancelHint}`;
+					event.reason === "manual" ? `Compacting context... ${cancelHint}` : `Auto-compacting... ${cancelHint}`;
 				this.autoCompactionLoader = new Loader(
 					this.ui,
 					(spinner) => theme.fg("accent", spinner),
@@ -3246,8 +3266,13 @@ export class InteractiveMode {
 				if (this.settingsManager.getShowTerminalProgress()) {
 					this.ui.terminal.setProgress(false);
 				}
+				this.compactionInputUnsub?.();
+				this.compactionInputUnsub = undefined;
 				if (this.autoCompactionEscapeHandler) {
 					this.defaultEditor.onEscape = this.autoCompactionEscapeHandler;
+					if (this.editor !== this.defaultEditor && "onEscape" in this.editor) {
+						(this.editor as CustomEditor).onEscape = () => this.defaultEditor.onEscape?.();
+					}
 					this.autoCompactionEscapeHandler = undefined;
 				}
 				if (this.autoCompactionLoader) {
@@ -3275,6 +3300,9 @@ export class InteractiveMode {
 				} else if (event.errorMessage) {
 					if (event.reason === "manual") {
 						this.showError(event.errorMessage);
+					} else if (event.reason === "overflow") {
+						// Keep context-size recovery quiet; avoid dumping provider text.
+						this.showStatus("context full");
 					} else {
 						this.chatContainer.addChild(new Spacer(1));
 						this.chatContainer.addChild(new Text(theme.fg("error", event.errorMessage), 1, 0));

@@ -17,19 +17,58 @@ export {
 	smallContextPrompt,
 } from "./context-budget.ts";
 export {
+	applyDecisionQuestions,
+	type DecisionIndexResult,
+	type DecisionOutcome,
+	formatDecisionSolveCard,
+	type InventDecisionTemplateFn,
+	liquidSystemOne,
+	runDecisionIndex,
+} from "./decision-index.ts";
+export {
+	buildDecisionRequest,
+	DECISION_PROMPT_TEMPLATES,
+	type DecisionChoiceQuestion,
+	type DecisionNoulQuestion,
+	type DecisionPromptTemplate,
+	type DecisionQuestion,
+	type DecisionQuestionType,
+	type DecisionScoreQuestion,
+	decisionTemplateInventPrompt,
+	extractJsonObject,
+	formatDecisionTemplateExample,
+	type InventedDecisionTemplate,
+	needsInventedTemplate,
+	parseInventedDecisionTemplate,
+	ROUTE_LADDER_TEMPLATE,
+	type SelectedDecisionTemplate,
+	selectDecisionTemplate,
+} from "./decision-templates.ts";
+export {
+	type DescalateAsk,
+	type DescalateSignal,
+	type DescalateTarget,
 	ESCALATION_LADDER,
 	type EscalateAsk,
 	type EscalateSignal,
 	type EscalateTier,
 	escalateComplexity,
+	formatDescalateCard,
 	formatEscalateCard,
+	type HierarchyRole,
 	isHigherLadderRole,
 	isLadderRole,
+	isLowerLadderRole,
+	isToolArgumentValidationError,
 	type LadderRole,
 	ladderIndex,
 	nextLadderRole,
+	parseDescalateAsk,
+	parseDescalateSignal,
 	parseEscalateAsk,
 	parseEscalateSignal,
+	prevLadderRole,
+	resolveDescalateTarget,
 	resolveEscalateTarget,
 	roleAvailable,
 	startLadderRole,
@@ -61,6 +100,14 @@ export {
 	preferMlx,
 	useMlx,
 } from "./mlx-backend.ts";
+export {
+	detectTopicReset,
+	isNewTopic,
+	parseNewTopicSignal,
+	stripNewTopicSignal,
+	type TopicReset,
+	type TopicResetReason,
+} from "./new-topic.ts";
 export {
 	formatPerformance,
 	HIERARCHY_PROBES,
@@ -142,7 +189,7 @@ export {
 	type TraceSpanEvent,
 	tokensBeforeTool,
 } from "./short-trace.ts";
-export { SUITE_PRESETS, type SuitePreset, suitePreset } from "./suites.ts";
+export { DEFAULT_DECISION_MODEL_ID, SUITE_PRESETS, type SuitePreset, suitePreset } from "./suites.ts";
 export {
 	assertPublicModelId,
 	DEFAULT_LMSTUDIO_BASE_URL,

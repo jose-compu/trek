@@ -207,9 +207,15 @@ import {
 	applyPlanBlock,
 	contextBudget,
 	createDefaultLlamaProcessManager,
+	decisionTemplateInventPrompt,
+	detectTopicReset,
 	extractPlanBody,
 	fitCompactionSettings,
+	formatDecisionSolveCard,
+	formatDescalateCard,
 	formatEscalateCard,
+	type HierarchyRole,
+	isToolArgumentValidationError,
 	type LadderRole,
 	type LlamaProcessManager,
 	LMSTUDIO_PROVIDER,
@@ -220,13 +226,18 @@ import {
 	loadRuntimeConfig,
 	localLlamaChatModel,
 	NO_PROMOTION_MODEL,
+	nextLadderRole,
+	parseDescalateSignal,
 	parseEscalateSignal,
+	parseNewTopicSignal,
 	planningBriefPrompt,
 	planningReplanEnabled,
 	planningReplanPrompt,
+	prevLadderRole,
 	promotionRole,
 	type ResolvedRuntime,
 	resolveRuntime,
+	runDecisionIndex,
 	SMALL_CONTEXT_TOOLS,
 	selectSessionRole,
 	selectThinkRole,
@@ -235,6 +246,7 @@ import {
 	smallContextPrompt,
 	startLadderRole,
 	stripEscalateSignal,
+	stripNewTopicSignal,
 	toolResultSnippet,
 } from "./runtime/index.ts";
 import {
@@ -336,7 +348,9 @@ export type AgentSessionEvent =
 	| { type: "anti_pattern"; text: string }
 	| { type: "lesson_stored"; text: string }
 	/** Discreet one-line ladder climb (Tooling → … → Frontier). */
-	| { type: "hierarchy_escalate"; text: string; from: string; to: string };
+	| { type: "hierarchy_escalate"; text: string; from: string; to: string }
+	/** Active hierarchy role / model for the footer (decision → frontier). */
+	| { type: "hierarchy_model"; role: string; provider: string; modelId: string };
 
 /** Listener function for agent session events */
 export type AgentSessionEventListener = (event: AgentSessionEvent) => void;
@@ -866,8 +880,14 @@ export class AgentSession {
 
 			if (isError) {
 				this._toolErrorStreak += 1;
-				if (this._toolErrorStreak >= 2 && !this._pendingElevate) {
-					await this._climbLadder(`tool ${toolCall.name} failed twice`);
+				const errText = toolResultSnippet(result);
+				if (!this._pendingElevate) {
+					if (isToolArgumentValidationError(errText)) {
+						// Missing/malformed args (e.g. write without path) → climb now.
+						await this._climbLadder(`malformed ${toolCall.name} args`);
+					} else if (this._toolErrorStreak >= 2) {
+						await this._climbLadder(`tool ${toolCall.name} failed twice`);
+					}
 				}
 			} else {
 				this._toolErrorStreak = 0;
@@ -1480,9 +1500,13 @@ export class AgentSession {
 				reason: `Diagnostic mode: ${toolName} is blocked (mutating tools are not allowed).`,
 			};
 		}
+		const role = this.hierarchyRole;
 		const env: SafetyEnv = {
 			halted: this._halted,
 			requireDestructiveConfirm: this._allowDestructiveOps,
+			// Read-before-write for Workhorse / Planning / Frontier (and non-hierarchy).
+			// Decision and Tooling may write without a prior read this session.
+			enforceReadBeforeWrite: role !== "decision" && role !== "tooling",
 			hasReadFile: (absPath: string) => this._readFiles.has(absPath),
 			fileExists: async (absPath: string) => existsSync(absPath),
 			resolvePath: (filePath: string) => resolveToCwd(filePath, this._cwd),
@@ -2188,6 +2212,20 @@ export class AgentSession {
 		return this.agent.state.model;
 	}
 
+	/** Active hierarchy role when local/hybrid is bound (decision → frontier). */
+	get hierarchyRole(): HierarchyRole | undefined {
+		return this._hierarchyDisplayRole ?? this._ladderRole ?? this._lastHierarchyRole;
+	}
+
+	/** Model id shown in the footer for the active hierarchy role (e.g. d1 while parked on Decision). */
+	get hierarchyModelId(): string | undefined {
+		return this._hierarchyModelId;
+	}
+
+	get hierarchyModelProvider(): string | undefined {
+		return this._hierarchyModelProvider;
+	}
+
 	/** Current thinking level */
 	get thinkingLevel(): ThinkingLevel {
 		return this.agent.state.thinkingLevel;
@@ -2687,8 +2725,15 @@ export class AgentSession {
 	private _apiSessionModel?: Model<any>;
 	/** Last chat role on the ladder (Tooling → Workhorse → Planning → Frontier). */
 	private _lastHierarchyRole?: LadderRole;
-	/** Active ladder floor for this prompt. Starts at Tooling. */
+	/** Active ladder floor for this prompt. Starts at Tooling after Decision. */
 	private _ladderRole?: LadderRole;
+	/** Footer role including Decision floor (not always a chat/llama role). */
+	private _hierarchyDisplayRole?: HierarchyRole;
+	/** Footer model id for the active hierarchy role (may differ from chat `model`). */
+	private _hierarchyModelId?: string;
+	private _hierarchyModelProvider?: string;
+	/** Idle on Decision until the first prompt routes to Tooling. */
+	private _parkedOnDecision = false;
 	/** Tools since the last Planning brief; drives optional mid-turn replan. */
 	private _toolsSincePlan = 0;
 	/** True when this turn attached a Planning brief (replan is allowed). */
@@ -2706,9 +2751,13 @@ export class AgentSession {
 		return this._llama;
 	}
 
-	/** Start the local work-horse before the first prompt when the hierarchy is local. */
+	/**
+	 * Start local hierarchy parked on Decision (d1) in the footer.
+	 * Warms Tooling llama-server quietly; footer stays on Decision until a prompt routes.
+	 */
 	async activateLocalModel(): Promise<void> {
-		await this._bindLocalCompletion("");
+		const parked = this._parkOnDecisionFloor();
+		await this._bindLocalCompletion("", { keepDecisionDisplay: parked });
 	}
 
 	/**
@@ -2716,7 +2765,7 @@ export class AgentSession {
 	 * The saved API model is restored for an API role and is not written back over settings.
 	 * PI_NO_LOCAL_LLM=1 keeps the session model, so the CI suite does not spawn llama.cpp.
 	 */
-	private async _bindLocalCompletion(text: string): Promise<void> {
+	private async _bindLocalCompletion(text: string, options?: { keepDecisionDisplay?: boolean }): Promise<void> {
 		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
 			return;
 		}
@@ -2743,6 +2792,10 @@ export class AgentSession {
 		this._lastHierarchyRole = selection.role;
 		if (selection.source === "api") {
 			this._restoreApiSessionModel();
+			const api = this.model;
+			if (api && !(options?.keepDecisionDisplay && this._parkedOnDecision)) {
+				this._emitHierarchyModel(selection.role, api.provider, api.id);
+			}
 			return;
 		}
 		this._rememberApiSessionModel();
@@ -2761,7 +2814,199 @@ export class AgentSession {
 			this.sessionManager.appendModelChange(registered.provider, registered.id);
 			await this._emitModelSelect(registered, previous, "set");
 		}
+		if (options?.keepDecisionDisplay && this._parkedOnDecision) {
+			// Chat model is Tooling (warm), footer stays on Decision until a prompt routes.
+			return;
+		}
+		this._parkedOnDecision = false;
+		this._emitHierarchyModel(selection.role, registered.provider, registered.id);
 		void think;
+	}
+
+	private _emitHierarchyModel(role: HierarchyRole, provider: string, modelId: string): void {
+		this._hierarchyDisplayRole = role;
+		this._hierarchyModelProvider = provider;
+		this._hierarchyModelId = modelId;
+		this._emit({ type: "hierarchy_model", role, provider, modelId });
+	}
+
+	/** Idle floor: footer shows Decision / d1. Returns true when parked. */
+	private _parkOnDecisionFloor(): boolean {
+		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			return false;
+		}
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const resolved = resolveRuntime(config);
+		if (resolved.effectiveMode === "api") {
+			return false;
+		}
+		const decision = resolved.roles.decision;
+		if (!decision) {
+			return false;
+		}
+		this._lastHierarchyRole = undefined;
+		this._ladderRole = undefined;
+		this._parkedOnDecision = true;
+		this._emitHierarchyModel("decision", decision.provider ?? decision.source, decision.id);
+		return true;
+	}
+
+	/**
+	 * New topic/task: drop sticky elevation back to Decision (footer shows d1).
+	 * Does not route to Tooling — {@link _runDecisionGate} decides solve vs escalate.
+	 */
+	private _resetLadderForNewTopic(label = "new topic"): void {
+		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			this._lastHierarchyRole = undefined;
+			this._ladderRole = undefined;
+			this._hierarchyDisplayRole = undefined;
+			this._hierarchyModelId = undefined;
+			this._hierarchyModelProvider = undefined;
+			this._parkedOnDecision = false;
+			return;
+		}
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const resolved = resolveRuntime(config);
+		if (resolved.effectiveMode === "api") {
+			this._lastHierarchyRole = undefined;
+			this._ladderRole = undefined;
+			this._hierarchyDisplayRole = undefined;
+			this._hierarchyModelId = undefined;
+			this._hierarchyModelProvider = undefined;
+			this._parkedOnDecision = false;
+			return;
+		}
+		const from: HierarchyRole | undefined = this._hierarchyDisplayRole ?? this._ladderRole ?? this._lastHierarchyRole;
+		this._lastHierarchyRole = undefined;
+		this._ladderRole = undefined;
+		this._planningBriefActive = false;
+		this._toolsSincePlan = 0;
+		const decision = resolved.roles.decision;
+		if (decision) {
+			if (from && from !== "decision") {
+				this._emit({
+					type: "hierarchy_escalate",
+					text: formatDescalateCard(from, "decision", label),
+					from,
+					to: "decision",
+				});
+			}
+			this._parkOnDecisionFloor();
+		} else {
+			const floor = startLadderRole(resolved);
+			if (from && from !== floor) {
+				this._emit({
+					type: "hierarchy_escalate",
+					text: formatDescalateCard(from, floor, label),
+					from,
+					to: floor,
+				});
+			}
+			this._parkedOnDecision = false;
+			this._ladderRole = floor;
+		}
+	}
+
+	/**
+	 * Decision Index: solve at d1 when possible; otherwise escalate to Tooling+.
+	 * Returns true when the turn was answered at Decision (caller must skip the agent loop).
+	 */
+	private async _runDecisionGate(text: string): Promise<boolean> {
+		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			return false;
+		}
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const resolved = resolveRuntime(config);
+		if (resolved.effectiveMode === "api" || !resolved.roles.decision) {
+			return false;
+		}
+		const decision = resolved.roles.decision;
+		const index = await runDecisionIndex({
+			text,
+			resolved,
+			inventTemplate: async (userText) => {
+				const tooling = resolved.roles.tooling;
+				if (!tooling || tooling.source === "api") {
+					return undefined;
+				}
+				this._emit({
+					type: "hierarchy_escalate",
+					text: "· decision · invent · tooling drafting template",
+					from: "decision",
+					to: "tooling",
+				});
+				try {
+					const model = this._localRoleModel("tooling", tooling.id, resolved);
+					return await this._sideCallDecisionInvent(model, decisionTemplateInventPrompt(userText));
+				} catch (error) {
+					debugLog("runtime", "decision template invent failed", {
+						error: error instanceof Error ? error.message : String(error),
+					});
+					return undefined;
+				}
+			},
+		});
+		if (index.outcome === "solve" && index.answer) {
+			this._parkOnDecisionFloor();
+			this._emit({
+				type: "hierarchy_escalate",
+				text: formatDecisionSolveCard(index.why),
+				from: "decision",
+				to: "decision",
+			});
+			this._recordLocalTurn(text, index.answer, decision.id);
+			debugLog("runtime", "decision index solve", {
+				why: index.why,
+				source: index.source,
+				confidence: index.confidence,
+				templateId: index.templateId,
+			});
+			return true;
+		}
+		const floor = index.route ?? startLadderRole(resolved);
+		this._parkedOnDecision = false;
+		this._ladderRole = floor;
+		this._lastHierarchyRole = floor;
+		this._emit({
+			type: "hierarchy_escalate",
+			text: formatEscalateCard("decision", floor, index.why),
+			from: "decision",
+			to: floor,
+		});
+		if (decision) {
+			// Footer will move to the chat role on bind; keep Decision visible until then.
+			this._emitHierarchyModel("decision", decision.provider ?? decision.source, decision.id);
+		}
+		debugLog("runtime", "decision index escalate", {
+			to: floor,
+			why: index.why,
+			source: index.source,
+			templateId: index.templateId,
+		});
+		return false;
+	}
+
+	/** Park Decision as the lowest floor (idle or mid-turn topic reset). */
+	private async _dropToDecision(why: string): Promise<boolean> {
+		const from: HierarchyRole | undefined = this._hierarchyDisplayRole ?? this._ladderRole ?? this._lastHierarchyRole;
+		if (from && from !== "decision") {
+			this._emit({
+				type: "hierarchy_escalate",
+				text: formatDescalateCard(from, "decision", why),
+				from,
+				to: "decision",
+			});
+		}
+		this._lastHierarchyRole = undefined;
+		this._ladderRole = undefined;
+		this._pendingElevate = undefined;
+		this._planningBriefActive = false;
+		this._toolErrorStreak = 0;
+		const parked = this._parkOnDecisionFloor();
+		if (parked) {
+			await this._bindLocalCompletion("", { keepDecisionDisplay: true });
+		}
+		return parked;
 	}
 
 	private async _attachPlanningBrief(text: string): Promise<void> {
@@ -2836,12 +3081,176 @@ export class AgentSession {
 		if (!signal) {
 			return undefined;
 		}
+		this._parkedOnDecision = false;
 		this._emitEscalateCard(from, signal.tier, signal.why);
 		this._pendingElevate = { tier: signal.tier, why: signal.why };
 		this._ladderRole = signal.tier;
 		this._lastHierarchyRole = signal.tier;
 		this._toolErrorStreak = 0;
 		return signal.tier;
+	}
+
+	/** Drop one step (or to a named lower tier / Decision) and show a discreet card. */
+	private async _dropLadder(
+		why: string,
+		requested?: LadderRole | "next" | "decision",
+	): Promise<LadderRole | "decision" | undefined> {
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const resolved = resolveRuntime(config);
+		const from = this._ladderRole ?? this._lastHierarchyRole ?? startLadderRole(resolved);
+		if (requested === "decision") {
+			const parked = await this._dropToDecision(why);
+			return parked ? "decision" : undefined;
+		}
+		if (!prevLadderRole(from, resolved)) {
+			return undefined;
+		}
+		const signalText =
+			requested && requested !== "next"
+				? `{"descalate":"${requested}","why":${JSON.stringify(why)}}`
+				: `{"descalate":"next","why":${JSON.stringify(why)}}`;
+		const signal = parseDescalateSignal(signalText, from, resolved);
+		if (!signal) {
+			return undefined;
+		}
+		if (signal.tier === "decision") {
+			const parked = await this._dropToDecision(signal.why);
+			return parked ? "decision" : undefined;
+		}
+		this._parkedOnDecision = false;
+		this._emit({
+			type: "hierarchy_escalate",
+			text: formatDescalateCard(from, signal.tier, signal.why),
+			from,
+			to: signal.tier,
+		});
+		this._pendingElevate = undefined;
+		this._ladderRole = signal.tier;
+		this._lastHierarchyRole = signal.tier;
+		this._toolErrorStreak = 0;
+		if (signal.tier !== "planning" && signal.tier !== "frontier") {
+			this._planningBriefActive = false;
+		}
+		return signal.tier;
+	}
+
+	/**
+	 * User asked to drop (e.g. "descalate", "use tooling"). Same-topic stickiness yields.
+	 * "go back to decision" parks the Decision floor (same as a new topic idle).
+	 * Returns true when the floor moved.
+	 */
+	private async _maybeUserDescalate(text: string): Promise<boolean> {
+		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			return false;
+		}
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const resolved = resolveRuntime(config);
+		if (resolved.effectiveMode === "api") {
+			return false;
+		}
+		const trimmed = text.trim();
+		if (parseNewTopicSignal(trimmed) || /^(?:go back to decision|\/decision|\/new-topic)\b/i.test(trimmed)) {
+			const parked = await this._dropToDecision(parseNewTopicSignal(trimmed)?.why ?? "user requested");
+			debugLog("runtime", "ladder parked on decision by user", { parked });
+			return parked;
+		}
+		const from = this._ladderRole ?? this._lastHierarchyRole;
+		if (!from) {
+			return false;
+		}
+		const signal = parseDescalateSignal(text, from, resolved);
+		if (!signal?.explicit) {
+			return false;
+		}
+		const dropped = await this._dropLadder(signal.why, signal.tier);
+		if (!dropped) {
+			return false;
+		}
+		if (dropped !== "decision") {
+			await this._bindLocalCompletion(text);
+		}
+		this._pendingElevate = undefined;
+		debugLog("runtime", "ladder descaled on user request", { from, to: dropped });
+		return true;
+	}
+
+	/** User turns currently in the agent context (for first-prompt overflow policy). */
+	private _userPromptCountInContext(): number {
+		return this.agent.state.messages.filter((m) => m.role === "user").length;
+	}
+
+	/** Climb after a repetitive-stream abort so the next tier retries the same user turn. */
+	private async _maybeEscalateRepetitiveLoop(message: AssistantMessage): Promise<boolean> {
+		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			return false;
+		}
+		const err = message.errorMessage || "";
+		if (message.stopReason !== "error" || !/repetitive thinking loop/i.test(err)) {
+			return false;
+		}
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const resolved = resolveRuntime(config);
+		if (resolved.effectiveMode === "api") {
+			return false;
+		}
+		const from = this._ladderRole ?? this._lastHierarchyRole ?? startLadderRole(resolved);
+		if (!nextLadderRole(from, resolved)) {
+			return false;
+		}
+		const messages = this.agent.state.messages;
+		if (messages.length > 0 && messages[messages.length - 1].role === "assistant") {
+			this.agent.state.messages = messages.slice(0, -1);
+		}
+		const climbed = await this._climbLadder("repetitive output");
+		if (!climbed) {
+			return false;
+		}
+		await this._bindLocalCompletion(this._lastPromptTask);
+		this._pendingElevate = undefined;
+		debugLog("runtime", "ladder elevated on repetitive stream", { from, to: climbed });
+		return true;
+	}
+
+	/**
+	 * On the first user prompt only, a context-size error means this ladder tier is too small.
+	 * Climb discreetly and retry. Do not escalate when context fills after two or more prompts.
+	 */
+	private async _maybeEscalateFirstPromptOverflow(message: AssistantMessage): Promise<boolean> {
+		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			return false;
+		}
+		const contextWindow = this.model?.contextWindow ?? 0;
+		if (!isContextOverflow(message, contextWindow)) {
+			return false;
+		}
+		if (this._userPromptCountInContext() !== 1) {
+			return false;
+		}
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const resolved = resolveRuntime(config);
+		if (resolved.effectiveMode === "api") {
+			return false;
+		}
+		const from = this._ladderRole ?? this._lastHierarchyRole ?? startLadderRole(resolved);
+		if (!nextLadderRole(from, resolved)) {
+			return false;
+		}
+		const messages = this.agent.state.messages;
+		if (messages.length > 0 && messages[messages.length - 1].role === "assistant") {
+			this.agent.state.messages = messages.slice(0, -1);
+		}
+		const climbed = await this._climbLadder("context");
+		if (!climbed) {
+			return false;
+		}
+		await this._bindLocalCompletion(this._lastPromptTask);
+		this._pendingElevate = undefined;
+		this._overflowRecoveryAttempted = false;
+		debugLog("runtime", "ladder elevated on first-prompt context overflow", {
+			from,
+			to: climbed,
+		});
+		return true;
 	}
 
 	private _emitEscalateCard(from: LadderRole, to: LadderRole, why?: string): void {
@@ -2861,13 +3270,61 @@ export class AgentSession {
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
 		const from = this._ladderRole ?? this._lastHierarchyRole ?? startLadderRole(resolved);
+		const topicSignal = parseNewTopicSignal(text);
+		if (topicSignal) {
+			const cleanedTopic = stripNewTopicSignal(stripEscalateSignal(text));
+			if (cleanedTopic !== text.trim()) {
+				const nextContent = message.content.map((part) =>
+					part.type === "text" && typeof part.text === "string"
+						? { ...part, text: stripNewTopicSignal(stripEscalateSignal(part.text)) }
+						: part,
+				);
+				this._replaceMessageInPlace(message, { ...message, content: nextContent } as AgentMessage);
+			}
+			// Model saw a topic switch: clear sticky task and park Decision.
+			this._previousTask = "";
+			await this._dropToDecision(topicSignal.why);
+			debugLog("runtime", "ladder new topic from model", { from, why: topicSignal.why });
+			return;
+		}
+		const down = parseDescalateSignal(text, from, resolved);
+		if (down) {
+			const cleanedDown = stripEscalateSignal(text);
+			if (cleanedDown !== text.trim()) {
+				const nextContent = message.content.map((part) =>
+					part.type === "text" && typeof part.text === "string"
+						? { ...part, text: stripEscalateSignal(part.text) }
+						: part,
+				);
+				this._replaceMessageInPlace(message, { ...message, content: nextContent } as AgentMessage);
+			}
+			const dropped = await this._dropLadder(down.why, down.tier);
+			if (!dropped) {
+				return;
+			}
+			if (dropped === "decision") {
+				this._previousTask = "";
+			} else {
+				await this._bindLocalCompletion(this._lastPromptTask || text);
+			}
+			this._pendingElevate = undefined;
+			debugLog("runtime", "ladder descaled", {
+				from,
+				to: dropped,
+				why: down.why,
+				explicit: down.explicit,
+			});
+			return;
+		}
 		const signal = parseEscalateSignal(text, from, resolved);
 		if (!signal) {
 			return;
 		}
+		this._parkedOnDecision = false;
 		this._emitEscalateCard(from, signal.tier, signal.why);
 		this._pendingElevate = { tier: signal.tier, why: signal.why };
 		this._ladderRole = signal.tier;
+		this._lastHierarchyRole = signal.tier;
 		const cleaned = stripEscalateSignal(text);
 		if (cleaned !== text.trim()) {
 			const nextContent = message.content.map((part) =>
@@ -3073,6 +3530,31 @@ export class AgentSession {
 				headers: auth.headers,
 				maxTokens: 512,
 				temperature: 0,
+				signal: AbortSignal.timeout(AgentSession.SIDE_CALL_TIMEOUT_MS),
+			},
+		);
+		const text = reply.content
+			.filter((part): part is TextContent => part.type === "text")
+			.map((part) => part.text)
+			.join("\n");
+		return stripHonestyFooter(text).trim();
+	}
+
+	/** Tooling drafts a Decision Index JSON pack (noul/choice/score). */
+	private async _sideCallDecisionInvent(model: Model<any>, prompt: string): Promise<string> {
+		const auth = await this._getCompactionRequestAuth(model);
+		const reply = await completeSimple(
+			model,
+			{
+				systemPrompt:
+					"You invent Liquid d1 Decision Index packs for Trek. Reply with one JSON object only. No markdown fences unless required. No tools.",
+				messages: [{ role: "user", content: [{ type: "text", text: prompt }], timestamp: Date.now() }],
+			},
+			{
+				apiKey: auth.apiKey,
+				headers: auth.headers,
+				maxTokens: 900,
+				temperature: 0.4,
 				signal: AbortSignal.timeout(AgentSession.SIDE_CALL_TIMEOUT_MS),
 			},
 		);
@@ -3708,6 +4190,17 @@ export class AgentSession {
 			this._retryAttempt = 0;
 		}
 
+		// First prompt only: context already too big for this tier → discreet ladder climb.
+		// Later prompts fill the window gradually; those stay on compact/retry, not escalate.
+		if (await this._maybeEscalateFirstPromptOverflow(msg)) {
+			return true;
+		}
+
+		// Tiny local models sometimes babble fake wrap-ups forever; climb and retry once.
+		if (await this._maybeEscalateRepetitiveLoop(msg)) {
+			return true;
+		}
+
 		if (await this._checkCompaction(msg)) {
 			return true;
 		}
@@ -3832,6 +4325,31 @@ export class AgentSession {
 				throw new Error(formatNoModelSelectedMessage());
 			}
 
+			// Topic/task reset before any bind so sticky Planning/Frontier cannot stick.
+			const previousTask = this._previousTask;
+			const topicReset = detectTopicReset(previousTask, expandedText);
+			expandedText = stripNewTopicSignal(expandedText);
+			this._previousTask = expandedText;
+			this._toolsSincePlan = 0;
+			this._planningBriefActive = false;
+			this._toolErrorStreak = 0;
+			this._pendingElevate = undefined;
+			const runDecision = topicReset.reset || this._parkedOnDecision || !this._lastHierarchyRole;
+			if (topicReset.reset) {
+				this._resetLadderForNewTopic(topicReset.label ?? "new topic");
+			} else if (!runDecision && this._lastHierarchyRole) {
+				this._ladderRole = this._lastHierarchyRole;
+			} else if (!runDecision) {
+				this._ladderRole = undefined;
+			}
+			if (runDecision) {
+				const solved = await this._runDecisionGate(expandedText);
+				if (solved) {
+					preflightResult?.(true);
+					return;
+				}
+			}
+
 			await this._bindLocalCompletion(expandedText);
 			this._assertStrictAuditModel();
 
@@ -3916,12 +4434,6 @@ export class AgentSession {
 				this.agent.state.systemPrompt = this._baseSystemPrompt;
 			}
 			this._turnSelection = this._selectTurn(expandedText);
-			this._previousTask = expandedText;
-			this._toolsSincePlan = 0;
-			this._planningBriefActive = false;
-			this._toolErrorStreak = 0;
-			this._ladderRole = undefined;
-			this._pendingElevate = undefined;
 			await this._learnFromCorrection(expandedText);
 			await this._injectMemory(expandedText);
 			this._appendDomainSkills(this._turnSelection);
@@ -3932,6 +4444,8 @@ export class AgentSession {
 					this.model.maxTokens = budget.outputTokens;
 				}
 			}
+			// Explicit user descalate yields sticky floor before brief/bind.
+			await this._maybeUserDescalate(expandedText);
 			await this._attachPlanningBrief(expandedText);
 			await this._bindLocalCompletion(expandedText);
 		} catch (error) {
@@ -4682,8 +5196,7 @@ export class AgentSession {
 					result: undefined,
 					aborted: false,
 					willRetry: false,
-					errorMessage:
-						"Context overflow recovery failed after one compact-and-retry attempt. Try reducing context or switching to a larger-context model.",
+					errorMessage: "context full",
 				});
 				return false;
 			}
@@ -4733,10 +5246,26 @@ export class AgentSession {
 	private async _runAutoCompaction(reason: "overflow" | "threshold", willRetry: boolean): Promise<boolean> {
 		const settings = this._fittedCompactionSettings();
 
-		this._emit({ type: "compaction_start", reason });
+		// AbortController must exist before compaction_start so Escape can cancel immediately.
 		this._autoCompactionAbortController = new AbortController();
+		const signal = this._autoCompactionAbortController.signal;
+		this._emit({ type: "compaction_start", reason });
+
+		const emitAborted = (): false => {
+			this._emit({
+				type: "compaction_end",
+				reason,
+				result: undefined,
+				aborted: true,
+				willRetry: false,
+			});
+			return false;
+		};
 
 		try {
+			if (signal.aborted) {
+				return emitAborted();
+			}
 			if (!this.model) {
 				this._emit({
 					type: "compaction_end",
@@ -4752,6 +5281,9 @@ export class AgentSession {
 			let headers: Record<string, string> | undefined;
 			if (this.agent.streamFn === streamSimple) {
 				const authResult = await this._modelRegistry.getApiKeyAndHeaders(this.model);
+				if (signal.aborted) {
+					return emitAborted();
+				}
 				if (!authResult.ok || !authResult.apiKey) {
 					this._emit({
 						type: "compaction_end",
@@ -4766,6 +5298,9 @@ export class AgentSession {
 				headers = authResult.headers;
 			} else {
 				({ apiKey, headers } = await this._getCompactionRequestAuth(this.model));
+				if (signal.aborted) {
+					return emitAborted();
+				}
 			}
 
 			const pathEntries = this.sessionManager.getBranch();
@@ -4786,24 +5321,20 @@ export class AgentSession {
 			let fromExtension = false;
 
 			await this._captureHandoff();
+			if (signal.aborted) {
+				return emitAborted();
+			}
 			if (this._extensionRunner.hasHandlers("session_before_compact")) {
 				const extensionResult = (await this._extensionRunner.emit({
 					type: "session_before_compact",
 					preparation,
 					branchEntries: pathEntries,
 					customInstructions: undefined,
-					signal: this._autoCompactionAbortController.signal,
+					signal,
 				})) as SessionBeforeCompactResult | undefined;
 
-				if (extensionResult?.cancel) {
-					this._emit({
-						type: "compaction_end",
-						reason,
-						result: undefined,
-						aborted: true,
-						willRetry: false,
-					});
-					return false;
+				if (signal.aborted || extensionResult?.cancel) {
+					return emitAborted();
 				}
 
 				if (extensionResult?.compaction) {
@@ -4831,7 +5362,7 @@ export class AgentSession {
 					apiKey,
 					headers,
 					undefined,
-					this._autoCompactionAbortController.signal,
+					signal,
 					this.thinkingLevel,
 					this.agent.streamFn,
 				);
@@ -4841,15 +5372,8 @@ export class AgentSession {
 				details = compactResult.details;
 			}
 
-			if (this._autoCompactionAbortController.signal.aborted) {
-				this._emit({
-					type: "compaction_end",
-					reason,
-					result: undefined,
-					aborted: true,
-					willRetry: false,
-				});
-				return false;
+			if (signal.aborted) {
+				return emitAborted();
 			}
 
 			summary = this._annotateCompaction(summary);
@@ -4897,15 +5421,19 @@ export class AgentSession {
 			return this.agent.hasQueuedMessages();
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : "compaction failed";
+			const aborted =
+				signal.aborted ||
+				(error instanceof Error && (error.name === "AbortError" || /aborted|cancelled/i.test(error.message)));
 			this._emit({
 				type: "compaction_end",
 				reason,
 				result: undefined,
-				aborted: false,
+				aborted,
 				willRetry: false,
-				errorMessage:
-					reason === "overflow"
-						? `Context overflow recovery failed: ${errorMessage}`
+				errorMessage: aborted
+					? undefined
+					: reason === "overflow"
+						? "context full"
 						: `Auto-compaction failed: ${errorMessage}`,
 			});
 			return false;
