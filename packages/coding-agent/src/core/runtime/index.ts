@@ -125,6 +125,13 @@ export {
 	parseLayerSubtaskResult,
 	SAFE_LAYER_DECISION,
 } from "./layer-decision.ts";
+export {
+	type LayerExecuteResult,
+	type LayerNodeReply,
+	layerWaves,
+	type RunLayerWorkflowInput,
+	runLayerWorkflow,
+} from "./layer-execute.ts";
 export { localLlamaChatModel } from "./local-llama-model.ts";
 export {
 	LMSTUDIO_PROVIDER,
