@@ -28,18 +28,18 @@ describe("Mistral local suite", () => {
 		expect(toolDialect("Qwen3.5-0.8B")).toBe("qwen");
 	});
 
-	it("starts Act on Tooling for a build and a small fix", () => {
+	it("starts Act on Workhorse for a build and a small fix", () => {
 		const mistral = resolved("mistral");
 		expect(selectSessionRole({ text: "build a web chess in /tmp/blah", resolved: mistral })).toMatchObject({
-			role: "tooling",
-			modelId: "Qwen3.5-0.8B",
+			role: "workhorse",
+			modelId: "Ministral-3-3B-Instruct-2512",
 		});
 		expect(selectSessionRole({ text: "fix the typo", resolved: mistral })).toMatchObject({
-			role: "tooling",
-			modelId: "Qwen3.5-0.8B",
+			role: "workhorse",
+			modelId: "Ministral-3-3B-Instruct-2512",
 		});
 		expect(selectSessionRole({ text: "build the site", resolved: resolved("mistral-pro") }).modelId).toBe(
-			"Qwen3.5-0.8B",
+			"Devstral-Small-2507",
 		);
 	});
 

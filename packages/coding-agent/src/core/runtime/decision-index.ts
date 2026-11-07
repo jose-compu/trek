@@ -1,7 +1,7 @@
 /**
- * Decision Index (LFM d1 contract): before Tooling binds, classify the turn.
+ * Decision Index (LFM d1 contract): before Workhorse binds, classify the turn.
  * - solve — answer at Decision (no chat tokens from d1; structured reply here)
- * - escalate — bind Tooling (or a higher ladder floor when requested)
+ * - escalate — bind Workhorse (never Tooling; Tooling is a later delegate)
  *
  * Prefer Liquid Decision API when LIQUID_API_KEY is set. Otherwise use a
  * local heuristic index so trivial classify/sentiment/yes-no work stays on
@@ -18,7 +18,7 @@ import {
 	selectDecisionTemplate,
 } from "./decision-templates.ts";
 import type { LadderRole } from "./escalate.ts";
-import { roleAvailable, startLadderRole } from "./escalate.ts";
+import { asClimbRole, roleAvailable, startLadderRole } from "./escalate.ts";
 import type { ResolvedRuntime } from "./resolve.ts";
 
 export type DecisionOutcome = "solve" | "escalate";
@@ -328,7 +328,7 @@ async function tryInventedPath(
 			if (choice === "tooling" || choice === "workhorse" || choice === "planning" || choice === "frontier") {
 				return {
 					outcome: "escalate",
-					route: choice,
+					route: asClimbRole(choice, resolved),
 					why: `${invented.id} → ${choice}`,
 					source: "tooling-invent",
 					templateId: invented.id,
@@ -453,7 +453,7 @@ async function tryLiquidTemplate(
 		if (choice === "tooling" || choice === "workhorse" || choice === "planning" || choice === "frontier") {
 			return {
 				outcome: "escalate",
-				route: choice,
+				route: asClimbRole(choice, resolved),
 				why: `${request.templateId} → ${choice}`,
 				confidence: routeAnswer?.confidence,
 				source: "liquid-api",

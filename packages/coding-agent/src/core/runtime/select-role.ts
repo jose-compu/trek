@@ -1,13 +1,13 @@
 /**
- * Session routing. Ladder: Tooling → Workhorse → Planning → Frontier.
- * Act starts on Tooling. Elevate / fail climbs. api mode is a single session model.
+ * Session routing. Ladder: Workhorse ⇄ Planning ⇄ Frontier.
+ * Act starts on Workhorse. Tooling is a runner via delegate. api mode is one session model.
  */
 
 import { routeComponent } from "./component-router.ts";
 import type { LadderRole } from "./escalate.ts";
 import { escalateComplexity, startLadderRole } from "./escalate.ts";
 import type { ResolvedRuntime } from "./resolve.ts";
-import type { RoleSource, RouteComponent } from "./types.ts";
+import type { RoleSource, RouteComponent, RouteRole } from "./types.ts";
 
 export const FRONTIER_COMPLEXITY_THRESHOLD = 0.7;
 
@@ -76,7 +76,7 @@ export function classifyTask(text: string): TaskClass {
 }
 
 export interface RoleSelection {
-	role: LadderRole;
+	role: RouteRole;
 	source: RoleSource;
 	modelId: string;
 	provider?: string;
@@ -115,7 +115,7 @@ export function selectThinkRole(input: {
 	} else if (input.previousRole === "planning" && (input.text ?? "").trim().length > 0 && kind !== "mechanical") {
 		kind = kind === "deep" ? "deep" : "plan";
 	}
-	// Brief only for plan/deep (or elevated planning/frontier). Act stays on Tooling until escalate.
+	// Brief only for plan/deep (or elevated planning/frontier). Act stays on Workhorse until escalate.
 	if (kind === "mechanical" || kind === "act") {
 		return undefined;
 	}
@@ -137,7 +137,7 @@ export function selectSessionRole(input: {
 	complexity?: number;
 	retries?: number;
 	previousRole?: RoleSelection["role"];
-	/** Current ladder floor (starts tooling; climbs on elevate/fail). */
+	/** Current ladder floor (starts workhorse; climbs on elevate/fail). */
 	elevateTo?: LadderRole;
 	ladderRole?: LadderRole;
 	overrides?: Parameters<typeof routeComponent>[0]["overrides"];
@@ -177,7 +177,7 @@ export function selectSessionRole(input: {
 	}
 
 	if (kind === "plan" || floor === "planning") {
-		// Planning may act after elevation; otherwise Tooling/Workhorse still executes.
+		// Planning may act after elevation; otherwise Workhorse still executes.
 		return routeComponent({
 			component: floor === "planning" ? "intend" : "toolIntent",
 			resolved,

@@ -1,7 +1,7 @@
 /**
  * Local suite presets (PROMPT §6, §20, issue #91).
  * Applied only when hierarchy.mode is local or hybrid.
- * Ladder: Decision → Tooling → Workhorse → Planning (+ Frontier in hybrid).
+ * Climb: Decision → Workhorse → Planning (+ Frontier consult). Tooling is a runner.
  *
  * Decision is always Liquid d1 (LFM family). Mistral / Qwen / mistral-pro have no
  * suite-native Decision model, so they reuse the same LFM `d1-omni-600M` weights.

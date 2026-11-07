@@ -8,6 +8,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ### Added
 
+- Climb is Workhorse ⇄ Planning ⇄ Frontier; Tooling is a runner, not a rung ([#193](https://github.com/jose-compu/trek/issues/193)).
 - Typed `LayerDecision` + faux layering harness ([#191](https://github.com/jose-compu/trek/issues/191)).
 - Fourteen bundled `layer-*` Archon workflows; `/workflows` lists them ([#192](https://github.com/jose-compu/trek/issues/192)).
 - Layering config: `single` / `auto` / `manual`, `/hierarchy auto|single`, `trek models set-layering` ([#190](https://github.com/jose-compu/trek/issues/190)).

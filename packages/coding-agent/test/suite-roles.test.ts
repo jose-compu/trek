@@ -89,7 +89,7 @@ describe("local suite roles", () => {
 	});
 
 	for (const suite of SUITES) {
-		it(`${suite}: a build thinks on Planning and acts from Tooling upward`, () => {
+		it(`${suite}: a build thinks on Planning and acts from Workhorse upward`, () => {
 			const runtime = resolved(suite);
 			const planning = runtime.roles.planning;
 			const workhorse = runtime.roles.workhorse;
@@ -107,15 +107,15 @@ describe("local suite roles", () => {
 			]) {
 				const act = selectSessionRole({ text, resolved: runtime });
 				const think = selectThinkRole({ text, resolved: runtime });
-				expect(act.role, text).toBe("tooling");
-				expect(act.modelId, text).toBe(tooling?.id);
+				expect(act.role, text).toBe("workhorse");
+				expect(act.modelId, text).toBe(workhorse?.id);
 				expect(think?.role, text).toBe("planning");
 				expect(think?.modelId, text).toBe(planning?.id);
 			}
 
 			const typo = selectSessionRole({ text: "fix the typo in the title", resolved: runtime });
-			expect(typo.role).toBe("tooling");
-			expect(typo.modelId).toBe(tooling?.id);
+			expect(typo.role).toBe("workhorse");
+			expect(typo.modelId).toBe(workhorse?.id);
 			expect(selectThinkRole({ text: "fix the typo in the title", resolved: runtime })).toBeUndefined();
 
 			const follow = selectSessionRole({
@@ -123,7 +123,7 @@ describe("local suite roles", () => {
 				resolved: runtime,
 				previousRole: "planning",
 			});
-			expect(follow.role).toBe("tooling");
+			expect(follow.role).toBe("workhorse");
 			expect(selectThinkRole({ text: "add castling", resolved: runtime, previousRole: "planning" })?.role).toBe(
 				"planning",
 			);
@@ -133,10 +133,10 @@ describe("local suite roles", () => {
 				resolved: runtime,
 				previousRole: "planning",
 			});
-			expect(drop.role).toBe("tooling");
-			expect(drop.modelId).toBe(tooling?.id);
+			expect(drop.role).toBe("workhorse");
+			expect(drop.modelId).toBe(workhorse?.id);
 
-			expect(selectSessionRole({ text: "", resolved: runtime }).role).toBe("tooling");
+			expect(selectSessionRole({ text: "", resolved: runtime }).role).toBe("workhorse");
 			expect(sessionRoleForModel(runtime, { provider: "local", name: planning?.id, id: planning?.id })).toBe(
 				"planning",
 			);

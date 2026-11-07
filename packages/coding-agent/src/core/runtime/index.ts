@@ -45,6 +45,8 @@ export {
 	selectDecisionTemplate,
 } from "./decision-templates.ts";
 export {
+	asClimbRole,
+	type DelegateAsk,
 	type DescalateAsk,
 	type DescalateSignal,
 	type DescalateTarget,
@@ -56,6 +58,7 @@ export {
 	formatDescalateCard,
 	formatEscalateCard,
 	frontierBound,
+	frontierConsultRole,
 	type HierarchyRole,
 	isHigherLadderRole,
 	isLadderRole,
@@ -64,6 +67,7 @@ export {
 	type LadderRole,
 	ladderIndex,
 	nextLadderRole,
+	parseDelegateAsk,
 	parseDescalateAsk,
 	parseDescalateSignal,
 	parseEscalateAsk,
@@ -76,6 +80,7 @@ export {
 	stripEscalateSignal,
 } from "./escalate.ts";
 export {
+	climbHandoffBrief,
 	constrainDecisionRoute,
 	DECISION_ROUTE_TARGETS,
 	type DecisionRouteTarget,

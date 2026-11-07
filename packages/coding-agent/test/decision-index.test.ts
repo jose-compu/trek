@@ -48,7 +48,7 @@ describe("decision index", () => {
 			resolved,
 		});
 		expect(result.outcome).toBe("escalate");
-		expect(result.route).toBe("tooling");
+		expect(result.route).toBe("workhorse");
 	});
 
 	it("escalates open chat that is not a structured decision", async () => {
@@ -58,7 +58,7 @@ describe("decision index", () => {
 			resolved,
 		});
 		expect(result.outcome).toBe("escalate");
-		expect(result.route).toBe("tooling");
+		expect(result.route).toBe("workhorse");
 	});
 
 	it("asks Tooling to invent a template when no canned pack fits", async () => {

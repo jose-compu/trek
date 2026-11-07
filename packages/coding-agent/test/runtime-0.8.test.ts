@@ -339,17 +339,17 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(model.compat?.supportsReasoningEffort).toBe(false);
 	});
 
-	it("routes Act from Tooling upward and deep work to Frontier through routeComponent", () => {
+	it("routes Act from Workhorse upward and deep work to Frontier through routeComponent", () => {
 		const local = resolveRuntime(localConfig(), { frontier: null });
 		const hybrid = resolveRuntime(localConfig(), { frontier: { provider: "anthropic", modelId: "frontier" } });
-		expect(selectSessionRole({ text: "fix the typo", resolved: local }).role).toBe("tooling");
+		expect(selectSessionRole({ text: "fix the typo", resolved: local }).role).toBe("workhorse");
 		expect(selectSessionRole({ text: "fix the typo", resolved: local }).thinking).toBe(false);
 		expect(selectSessionRole({ text: "build a web chess in /tmp/blah", resolved: local })).toMatchObject({
-			role: "tooling",
-			reason: /toolIntent uses tooling/,
+			role: "workhorse",
+			reason: /toolIntent uses workhorse/,
 		});
 		expect(selectSessionRole({ text: "plan the login page", resolved: local })).toMatchObject({
-			role: "tooling",
+			role: "workhorse",
 			source: "local",
 		});
 		expect(selectSessionRole({ text: "debug the hard bug", resolved: local }).role).toBe("planning");

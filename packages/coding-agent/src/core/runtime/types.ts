@@ -43,7 +43,7 @@ export const LOCAL_SERVER_ROLES = [
 ] as const;
 export type LocalServerRole = (typeof LOCAL_SERVER_ROLES)[number];
 
-/** Chat processes a local session may start. Ladder: tooling → workhorse → planning. */
+/** Chat processes a local session may start. Climb: workhorse → planning. Tooling is a runner. */
 export const SESSION_LOCAL_ROLES = ["tooling", "workhorse", "planning"] as const;
 export type SessionLocalRole = (typeof SESSION_LOCAL_ROLES)[number];
 

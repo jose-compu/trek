@@ -199,6 +199,18 @@ export function needsHandoffBrief(action: LayerAction): boolean {
 	return action === "escalate" || action === "descalate" || action === "delegate";
 }
 
+/** Code-triggered climb: five-field brief from the why line. */
+export function climbHandoffBrief(why: string, goal = "continue the task"): HandoffBrief {
+	const reason = why.trim() || "climb";
+	return {
+		goal: clip(goal, REASON_MAX),
+		constraints: "do not repeat failed attempts",
+		tried: clip(reason, REASON_MAX),
+		evidence: clipList([reason]),
+		openQuestion: clip(reason, REASON_MAX),
+	};
+}
+
 export function layerDecisionTextFromEnvelope(dialect: LayeringDialect, envelope: unknown): string {
 	if (dialect === "scripts") {
 		return JSON.stringify({
