@@ -228,7 +228,7 @@ import {
 	startLadderRole,
 	stripEscalateSignal,
 } from "./runtime/escalate.ts";
-import { climbHandoffBrief, type HandoffBrief, LAYER_JOIN, parseLayerSubtaskResult } from "./runtime/layer-decision.ts";
+import { climbHandoffBrief, type HandoffBrief, tryLayerSubtaskResult } from "./runtime/layer-decision.ts";
 import { runLayerWorkflow } from "./runtime/layer-execute.ts";
 import { localLlamaChatModel } from "./runtime/local-llama-model.ts";
 import { LMSTUDIO_PROVIDER, LOCAL_LLAMA_PROVIDER, lmStudioChatModel } from "./runtime/local-model.ts";
@@ -4038,26 +4038,37 @@ export class AgentSession {
 		const kimiSwarm = process.env.TREK_KIMI_SWARM === "1";
 		if (workflow.name.startsWith("layer-") && config.hierarchy.layering !== "single" && !kimiSwarm) {
 			const outputs = new Map<string, string>();
+			let promptGate: Promise<void> = Promise.resolve();
 			const executed = await runLayerWorkflow({
 				workflow,
 				layering: config.hierarchy.layering,
 				seed: this._reproducibility.seed,
 				kimiSwarm,
 				runNode: async (node) => {
-					const output = await runArchonNode(workflow, node, archonOptions, outputs);
-					outputs.set(node.id, output);
-					if (output.includes(LAYER_JOIN)) {
-						const parsed = parseLayerSubtaskResult(output);
-						return {
-							id: node.id,
-							output: parsed.output || output,
-							evidence: parsed.evidence,
-							status: parsed.status,
-							...(parsed.winner ? { winner: parsed.winner } : {}),
-							...(parsed.handoff ? { handoff: parsed.handoff } : {}),
-						};
+					const previous = promptGate;
+					let release: () => void = () => {};
+					promptGate = new Promise<void>((resolve) => {
+						release = resolve;
+					});
+					await previous;
+					try {
+						const output = await runArchonNode(workflow, node, archonOptions, outputs);
+						outputs.set(node.id, output);
+						const parsed = tryLayerSubtaskResult(output);
+						if (parsed) {
+							return {
+								id: node.id,
+								output: parsed.output || output,
+								evidence: parsed.evidence,
+								status: parsed.status,
+								...(parsed.winner ? { winner: parsed.winner } : {}),
+								...(parsed.handoff ? { handoff: parsed.handoff } : {}),
+							};
+						}
+						return { id: node.id, output, status: "ok" as const };
+					} finally {
+						release();
 					}
-					return { id: node.id, output, status: "ok" as const };
 				},
 			});
 			results = [...outputs.entries()].map(([id, output]) => ({ id, output }));

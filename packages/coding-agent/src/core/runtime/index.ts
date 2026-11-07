@@ -124,6 +124,7 @@ export {
 	parseLayerDecision,
 	parseLayerSubtaskResult,
 	SAFE_LAYER_DECISION,
+	tryLayerSubtaskResult,
 } from "./layer-decision.ts";
 export {
 	type LayerExecuteResult,
