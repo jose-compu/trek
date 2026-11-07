@@ -3912,9 +3912,11 @@ export class AgentSession {
 		return withLessonIds(summary, ids);
 	}
 
-	private async _learnFromTurn(turnStart: number): Promise<void> {
+	private async _learnFromTurn(turnStart: number, extraFailures: string[] = []): Promise<void> {
 		if (!lessonsEnabled() || !this.memoryActive()) return;
-		const failures = turnFailures(this.agent.state.messages.slice(turnStart));
+		const failures = [...turnFailures(this.agent.state.messages.slice(turnStart)), ...extraFailures].filter(
+			(line) => line.trim().length > 0,
+		);
 		if (failures.length === 0) return;
 		await this._writeLesson(
 			{
@@ -4011,7 +4013,7 @@ export class AgentSession {
 				reply: stripHonestyFooter(this._lastAssistantText()),
 				correction: text,
 			},
-			this._layerLessonDomain(task, domain, { correction: text, failures }),
+			this._layerLessonDomain(task, domain, { correction: text }),
 		);
 	}
 
@@ -4273,7 +4275,9 @@ export class AgentSession {
 				if (executed.result.status === "halt") {
 					this._workflowCheck = executed.result.output;
 					this._emit({ type: "workflow_check", text: this._workflowCheck });
-					await this._learnFromTurn(learned ? (layerStart ?? turnStart) : turnStart);
+					await this._learnFromTurn(learned ? (layerStart ?? turnStart) : turnStart, [
+						executed.result.output || "layer workflow halt",
+					]);
 					return;
 				}
 			}
