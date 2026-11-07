@@ -6,6 +6,19 @@ export {
 	formatBenchmark,
 	writeBenchmarkJson,
 } from "./benchmark.ts";
+export {
+	type AutoMappedRole,
+	type AutoMapResult,
+	applyAutoLayering,
+	CATALOG_KINDS,
+	CATALOG_TAGS,
+	type CatalogFixture,
+	type CatalogKind,
+	type CatalogModel,
+	type CatalogTag,
+	loadCatalogFixture,
+	mapCatalogToRoles,
+} from "./catalog-map.ts";
 export { type ComponentRouteInput, routeComponent } from "./component-router.ts";
 export {
 	type CompactionFitSettings,
@@ -189,6 +202,7 @@ export {
 	loadRuntimeConfig,
 	projectModelsYamlPath,
 	readRuntimeConfigFile,
+	syncProjectAutoMap,
 	syncProjectLayering,
 	syncProjectRole,
 	withClearedRole,

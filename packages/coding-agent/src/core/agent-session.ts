@@ -2842,10 +2842,32 @@ export class AgentSession {
 		});
 		this._lastHierarchyRole = asClimbRole(selection.role, resolved);
 		if (selection.source === "api") {
+			const mapped = resolved.roles.workhorse
+				? this._apiRoleModel(selection.provider ?? resolved.roles[selection.role]?.provider, selection.modelId)
+				: undefined;
+			if (mapped) {
+				const previous = this.model;
+				this.agent.state.model = mapped;
+				if (!selection.thinking) {
+					this.agent.state.thinkingLevel = "off";
+				} else if (selection.thinking && this.agent.state.thinkingLevel === "off") {
+					this.agent.state.thinkingLevel = "medium";
+				}
+				if (!modelsAreEqual(previous, mapped)) {
+					this.sessionManager.appendModelChange(mapped.provider, mapped.id);
+					await this._emitModelSelect(mapped, previous, "set");
+				}
+				if (!(options?.keepDecisionDisplay && this._parkedOnDecision)) {
+					this._emitHierarchyModel(selection.role, mapped.provider, mapped.id);
+				}
+				return;
+			}
 			this._restoreApiSessionModel();
 			const api = this.model;
 			if (api && !(options?.keepDecisionDisplay && this._parkedOnDecision)) {
-				this._emitHierarchyModel(selection.role, api.provider, api.id);
+				const shown =
+					sessionRoleForModel(resolved, api) ?? (resolved.roles.workhorse ? "frontier" : selection.role);
+				this._emitHierarchyModel(shown, api.provider, api.id);
 			}
 			return;
 		}
@@ -2888,7 +2910,7 @@ export class AgentSession {
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
-		if (resolved.effectiveMode === "api") {
+		if (resolved.effectiveMode === "api" && !resolved.roles.workhorse) {
 			return false;
 		}
 		const decision = resolved.roles.decision;
@@ -2918,7 +2940,7 @@ export class AgentSession {
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
-		if (resolved.effectiveMode === "api") {
+		if (resolved.effectiveMode === "api" && !resolved.roles.workhorse) {
 			this._lastHierarchyRole = undefined;
 			this._ladderRole = undefined;
 			this._hierarchyDisplayRole = undefined;
@@ -3109,6 +3131,10 @@ export class AgentSession {
 		resolved: ResolvedRuntime,
 	): Model<any> | undefined {
 		if (think.source === "api") {
+			const mapped = this._apiRoleModel(resolved.roles[think.role]?.provider, think.modelId);
+			if (mapped) {
+				return mapped;
+			}
 			this._rememberApiSessionModel();
 			return this._apiSessionModel ?? this.model;
 		}
@@ -3196,7 +3222,7 @@ export class AgentSession {
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
-		if (resolved.effectiveMode === "api") {
+		if (resolved.effectiveMode === "api" && !resolved.roles.workhorse) {
 			return false;
 		}
 		const trimmed = text.trim();
@@ -3241,7 +3267,7 @@ export class AgentSession {
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
-		if (resolved.effectiveMode === "api") {
+		if (resolved.effectiveMode === "api" && !resolved.roles.workhorse) {
 			return false;
 		}
 		const from = this._ladderRole ?? this._lastHierarchyRole ?? startLadderRole(resolved);
@@ -3279,7 +3305,7 @@ export class AgentSession {
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
-		if (resolved.effectiveMode === "api") {
+		if (resolved.effectiveMode === "api" && !resolved.roles.workhorse) {
 			return false;
 		}
 		const from = this._ladderRole ?? this._lastHierarchyRole ?? startLadderRole(resolved);
@@ -3882,6 +3908,17 @@ export class AgentSession {
 		if (this._apiThinkingLevel) {
 			this.agent.state.thinkingLevel = this._apiThinkingLevel;
 		}
+	}
+
+	private _apiRoleModel(provider: string | undefined, modelId: string): Model<any> | undefined {
+		const from = provider ?? this.model?.provider;
+		if (!from || from === LOCAL_LLAMA_PROVIDER || from === LMSTUDIO_PROVIDER || from === "faux") {
+			return undefined;
+		}
+		if (this.model?.provider === from && this.model.id === modelId) {
+			return this.model;
+		}
+		return this._modelRegistry.find(from, modelId);
 	}
 
 	private _runtimeAuditFields(prior: readonly { role: string; content?: unknown }[]): {

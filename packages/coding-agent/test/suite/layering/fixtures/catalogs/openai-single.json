@@ -1,0 +1,6 @@
+{
+	"provider": "openai",
+	"models": [
+		{ "id": "gpt-6.1-terra", "provider": "openai", "tags": ["default"], "kind": "chat", "thinking": true }
+	]
+}

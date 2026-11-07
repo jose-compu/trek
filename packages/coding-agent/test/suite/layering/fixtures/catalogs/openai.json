@@ -1,0 +1,9 @@
+{
+	"provider": "openai",
+	"models": [
+		{ "id": "gpt-6-luna", "provider": "openai", "tags": ["cheap"], "kind": "chat", "inputPrice": 0.1 },
+		{ "id": "gpt-6.1-terra", "provider": "openai", "tags": ["default"], "kind": "chat", "thinking": true, "inputPrice": 1 },
+		{ "id": "gpt-6.1-sol", "provider": "openai", "tags": ["thinking", "coding"], "kind": "chat", "thinking": true, "inputPrice": 2 },
+		{ "id": "gpt-6-astra", "provider": "openai", "tags": ["frontier"], "kind": "chat", "thinking": true, "inputPrice": 10 }
+	]
+}

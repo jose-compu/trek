@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runHierarchyCommand } from "../src/core/hierarchy-command.ts";
 import { globalModelsYamlPath, loadRuntimeConfig, projectModelsYamlPath } from "../src/core/runtime/registry.ts";
@@ -99,6 +100,47 @@ describe("/hierarchy", () => {
 		expect(loadRuntimeConfig({ agentDir, cwd }).hierarchy.layering).toBe("auto");
 		runHierarchyCommand(agentDir, cwd, "mode local");
 		expect(resolveRuntime(loadRuntimeConfig({ agentDir, cwd }), { frontier: null }).roles.planning).toBeUndefined();
+	});
+
+	it("auto --catalog maps slots; single then auto re-applies", () => {
+		const { agentDir, cwd } = isolated();
+		const catalog = join(dirname(fileURLToPath(import.meta.url)), "suite/layering/fixtures/catalogs/openai.json");
+		const written = runHierarchyCommand(agentDir, cwd, `auto --catalog ${catalog}`);
+		expect(written).toContain("layering auto");
+		expect(written).toContain("workhorse api gpt-6.1-terra");
+		expect(written).toContain("planning api gpt-6.1-sol");
+		expect(written).toContain("verifier unset");
+		const loaded = loadRuntimeConfig({ agentDir, cwd });
+		expect(loaded.roles.frontier?.id).toBe("gpt-6-astra");
+		expect(loaded.roles.verifier).toBeUndefined();
+		runHierarchyCommand(agentDir, cwd, "single");
+		expect(loadRuntimeConfig({ agentDir, cwd }).roles.planning).toBeUndefined();
+		runHierarchyCommand(agentDir, cwd, `auto --catalog ${catalog}`);
+		expect(loadRuntimeConfig({ agentDir, cwd }).roles.planning?.id).toBe("gpt-6.1-sol");
+	});
+
+	it("auto --catalog overwrites stale project role pins", () => {
+		const { agentDir, cwd } = isolated();
+		mkdirSync(dirname(projectModelsYamlPath(cwd)), { recursive: true });
+		writeFileSync(
+			projectModelsYamlPath(cwd),
+			[
+				"hierarchy:",
+				"  layering: manual",
+				"roles:",
+				"  planning:",
+				"    source: local",
+				"    id: Qwen3.5-9B",
+				"    thinking: deep",
+				"",
+			].join("\n"),
+		);
+		const catalog = join(dirname(fileURLToPath(import.meta.url)), "suite/layering/fixtures/catalogs/openai.json");
+		runHierarchyCommand(agentDir, cwd, `auto --catalog ${catalog}`);
+		const loaded = loadRuntimeConfig({ agentDir, cwd });
+		expect(loaded.hierarchy.layering).toBe("auto");
+		expect(loaded.roles.planning?.id).toBe("gpt-6.1-sol");
+		expect(loaded.roles.workhorse?.id).toBe("gpt-6.1-terra");
 	});
 
 	it("patches project layering so a project YAML cannot keep manual after single", () => {

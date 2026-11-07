@@ -1,0 +1,8 @@
+{
+	"provider": "qwen",
+	"models": [
+		{ "id": "Qwen3.5-4B", "provider": "qwen", "kind": "decision", "source": "local", "thinking": false },
+		{ "id": "Qwen3.5-9B", "provider": "qwen", "tags": ["cheap"], "kind": "chat", "source": "local", "inputPrice": 0 },
+		{ "id": "Qwen3.8-27B", "provider": "qwen", "tags": ["default"], "kind": "chat", "source": "local", "thinking": true, "inputPrice": 0 }
+	]
+}

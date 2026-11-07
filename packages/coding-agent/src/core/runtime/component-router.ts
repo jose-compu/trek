@@ -98,7 +98,7 @@ function resolveAvailable(role: RouteRole, resolved: ResolvedRuntime): RouteRole
 }
 
 function escalationTarget(resolved: ResolvedRuntime): RouteRole {
-	if (frontierBound(resolved) || resolved.effectiveMode === "api") {
+	if (frontierBound(resolved) || (resolved.effectiveMode === "api" && !resolved.roles.workhorse)) {
 		return "frontier";
 	}
 	return "planning";
@@ -124,7 +124,7 @@ function nextTier(role: RouteRole, resolved: ResolvedRuntime): RouteRole {
 }
 
 function assign(resolved: ResolvedRuntime, role: RouteRole, reason: string): RoleSelection {
-	if (resolved.effectiveMode === "api") {
+	if (resolved.effectiveMode === "api" && !resolved.roles.workhorse) {
 		const frontier = resolved.roles.frontier;
 		if (!frontier) {
 			throw new Error("API mode has no frontier model.");
