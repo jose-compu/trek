@@ -4201,6 +4201,7 @@ export class AgentSession {
 		if (workflow && !callable) {
 			learned = true;
 		}
+		let layerStart: number | undefined;
 		const archonOptions = {
 			cwd: this._cwd,
 			userMessage: this._lastPromptTask,
@@ -4234,6 +4235,7 @@ export class AgentSession {
 				results = await runArchonWorkflow(workflow, archonOptions);
 			}
 			if (layerWorkflow && config.hierarchy.layering !== "single" && !kimiSwarm) {
+				layerStart = this.agent.state.messages.length;
 				const outputs = new Map<string, string>();
 				let promptGate: Promise<void> = Promise.resolve();
 				const executed = await runLayerWorkflow({
@@ -4271,9 +4273,7 @@ export class AgentSession {
 				if (executed.result.status === "halt") {
 					this._workflowCheck = executed.result.output;
 					this._emit({ type: "workflow_check", text: this._workflowCheck });
-					if (!learned) {
-						await this._learnFromTurn(turnStart);
-					}
+					await this._learnFromTurn(learned ? (layerStart ?? turnStart) : turnStart);
 					return;
 				}
 			}
@@ -4291,7 +4291,9 @@ export class AgentSession {
 					)
 				: [];
 			this._noteAntiPatterns(turnStart);
-			if (!learned) {
+			if (layerStart !== undefined) {
+				await this._learnFromTurn(learned ? layerStart : turnStart);
+			} else if (!learned) {
 				await this._learnFromTurn(turnStart);
 			}
 			this._workflowCheck = findings.length > 0 ? formatWorkflowCheck(findings) : undefined;

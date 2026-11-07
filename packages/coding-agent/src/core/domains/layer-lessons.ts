@@ -41,7 +41,7 @@ export function detectMetaLessonTrigger(input: {
 	if (input.verifierDenied || /\bverifier reject/.test(hay)) {
 		return "verifier_reject";
 	}
-	if (/\b(runner miss|missed grep)\b/.test(hay)) {
+	if (/\brunner miss\b/.test(hay) || (input.layerWorkflow === "layer-tool-runners" && /\bmissed grep\b/.test(hay))) {
 		return "runner_miss";
 	}
 	const needless = /\bover.?escalate\b/.test(hay) || /\b(needless climb|should have stayed on workhorse)\b/.test(hay);

@@ -118,6 +118,7 @@ describe("layer lessons", () => {
 				budgetStopped: true,
 			}),
 		).toBe("budget_stop");
+		expect(detectMetaLessonTrigger({ task: "missed grep on the symbol" })).toBeUndefined();
 		expect(detectMetaLessonTrigger({ task: "missed grep on the symbol", layerWorkflow: "layer-tool-runners" })).toBe(
 			"runner_miss",
 		);
