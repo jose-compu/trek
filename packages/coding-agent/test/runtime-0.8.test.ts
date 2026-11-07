@@ -468,9 +468,11 @@ describe("trek models CLI (#89)", () => {
 		stdio.restore();
 		const text = stdio.logs.join("\n");
 		expect(text).toContain("hierarchy.mode: local");
+		expect(text).toContain("hierarchy.layering: single");
 		expect(text).toContain("suite: qwen");
 		expect(text).toContain("thinking off");
-		expect(text).toContain("Qwen3.5-9B");
+		expect(text).toContain("Qwen3.5-4B");
+		expect(text).not.toContain("Qwen3.5-9B");
 	});
 });
 

@@ -27,6 +27,7 @@ import {
 	syncProjectLayering,
 	syncProjectRole,
 	weightFileExists,
+	withClearedRole,
 	withHierarchy,
 	withRoleOverride,
 	writeBenchmarkJson,
@@ -39,7 +40,7 @@ function printHelp(): void {
 	console.log(`${APP_NAME} models set-suite mistral|mistral-pro|qwen|lfm`);
 	console.log(`${APP_NAME} models set-layering auto|single|manual`);
 	console.log(
-		`${APP_NAME} models set-role <role> --id <id> [--source local|api|lmstudio] [--thinking off|brief|deep|on]`,
+		`${APP_NAME} models set-role <role> --id <id> [--source local|api|lmstudio] [--thinking off|brief|deep|on] | --clear`,
 	);
 	console.log(`${APP_NAME} models set-lmstudio --id <id> | --tooling <id> --workhorse <id> --planning <id>`);
 	console.log(`${APP_NAME} models benchmark`);
@@ -171,15 +172,25 @@ function setRole(rest: string[]): boolean {
 	if (!roleName || !isRuntimeRole(roleName)) {
 		console.error(
 			chalk.red(
-				"Usage: trek models set-role <decision|tooling|workhorse|planning|frontier|verifier|embedding|reranker> --id <id>",
+				"Usage: trek models set-role <decision|tooling|workhorse|planning|frontier|verifier|embedding|reranker> --id <id> | --clear",
 			),
 		);
 		process.exitCode = 1;
 		return true;
 	}
+	if (rest.includes("--clear")) {
+		const current = loadGlobal();
+		if (process.exitCode) {
+			return true;
+		}
+		writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), withClearedRole(current, roleName));
+		syncProjectRole(process.cwd(), roleName, undefined);
+		printStatus();
+		return true;
+	}
 	const id = flagValue(rest, "--id");
 	if (!id) {
-		console.error(chalk.red("set-role requires --id."));
+		console.error(chalk.red("set-role requires --id or --clear."));
 		process.exitCode = 1;
 		return true;
 	}

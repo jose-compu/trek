@@ -188,14 +188,11 @@ export function formatRuntimeStatus(resolved: ResolvedRuntime): string {
 	];
 	for (const name of order) {
 		const active = resolved.roles[name];
-		const preset = resolved.presetRoles[name];
-		const shown = active ?? preset;
-		if (!shown) {
+		if (!active) {
 			continue;
 		}
-		const state = active ? "active" : "inactive";
-		const provider = shown.provider ? ` provider ${shown.provider}` : "";
-		lines.push(`${name} ${shown.source} ${shown.id}${provider} thinking ${shown.thinking} ${state}`);
+		const provider = active.provider ? ` provider ${active.provider}` : "";
+		lines.push(`${name} ${active.source} ${active.id}${provider} thinking ${active.thinking} active`);
 	}
 	return lines.join("\n");
 }
