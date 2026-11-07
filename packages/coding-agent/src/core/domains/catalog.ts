@@ -48,8 +48,14 @@ export function bundledDomainsRoot(): string {
 
 const LAYER_FILE = /^layer-[a-z0-9-]+\.yaml$/;
 
+const layerWorkflowCache = new Map<string, ArchonWorkflow[]>();
+
 /** Bundled 0.18 layering DAGs under domains/meta/. Not extra domains. */
 export function loadLayerWorkflows(bundledRoot = bundledDomainsRoot()): ArchonWorkflow[] {
+	const hit = layerWorkflowCache.get(bundledRoot);
+	if (hit) {
+		return hit;
+	}
 	const dir = join(bundledRoot, "meta");
 	let names: string[] = [];
 	try {
@@ -59,7 +65,9 @@ export function loadLayerWorkflows(bundledRoot = bundledDomainsRoot()): ArchonWo
 	} catch {
 		return [];
 	}
-	return names.map((name) => loadArchonFile(join(dir, name)));
+	const workflows = names.map((name) => loadArchonFile(join(dir, name)));
+	layerWorkflowCache.set(bundledRoot, workflows);
+	return workflows;
 }
 
 export function findLayerWorkflow(name: string, bundledRoot = bundledDomainsRoot()): ArchonWorkflow | undefined {
