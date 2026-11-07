@@ -12,6 +12,7 @@ import {
 	actingLessonRole,
 	detectMetaLessonTrigger,
 	META_LAYER_TRIGGERS,
+	retagRecallForRole,
 	tagRecallForRole,
 } from "../../../src/core/domains/layer-lessons.ts";
 import { acceptTypedLesson, lessonAllowed, lessonPatternFor } from "../../../src/core/domains/lesson-pattern.ts";
@@ -71,10 +72,55 @@ describe("layer lessons", () => {
 				action: "escalate",
 			}),
 		).toBe("over_escalate");
+		expect(detectMetaLessonTrigger({ task: "Fix a typo.", action: "escalate" })).toBe("over_escalate");
+		expect(
+			detectMetaLessonTrigger({
+				task: "Fix a typo.",
+				correction: "Wrong. Should have stayed on Workhorse.",
+			}),
+		).toBe("over_escalate");
 		expect(detectMetaLessonTrigger({ task: "over-think a one-line rename", thinking: "deep" })).toBe("over_think");
+		expect(detectMetaLessonTrigger({ task: "one-line rename", thinking: "deep" })).toBe("over_think");
 		expect(tagRecallForRole("<memory>\nRule: x\n</memory>", "planning")).toContain('role="planning"');
+		expect(retagRecallForRole('<memory role="workhorse">\nRule: x\n</memory>', "planning")).toContain(
+			'role="planning"',
+		);
 		expect(actingLessonRole("planning")).toBe("planning");
 		expect(actingLessonRole("decision")).toBe("workhorse");
+	});
+
+	it("does not treat a layer workflow name as a meta lesson by itself", () => {
+		expect(
+			detectMetaLessonTrigger({
+				task: "Examine the reconciliation break.",
+				layerWorkflow: "layer-verify",
+			}),
+		).toBeUndefined();
+		expect(
+			detectMetaLessonTrigger({
+				task: "Examine the reconciliation break.",
+				layerWorkflow: "layer-budget-stop",
+			}),
+		).toBeUndefined();
+		expect(
+			detectMetaLessonTrigger({ task: "Search the logs.", layerWorkflow: "layer-tool-runners" }),
+		).toBeUndefined();
+		expect(
+			detectMetaLessonTrigger({
+				task: "Examine the reconciliation break.",
+				layerWorkflow: "layer-verify",
+				verifierDenied: true,
+			}),
+		).toBe("verifier_reject");
+		expect(
+			detectMetaLessonTrigger({
+				task: "Examine the reconciliation break.",
+				budgetStopped: true,
+			}),
+		).toBe("budget_stop");
+		expect(detectMetaLessonTrigger({ task: "missed grep on the symbol", layerWorkflow: "layer-tool-runners" })).toBe(
+			"runner_miss",
+		);
 	});
 
 	it("does not recall a finance lesson on a robotics turn; Meta and Security still apply", () => {
@@ -149,6 +195,38 @@ describe("layered session lessons", () => {
 			domain: "meta",
 			category: "over_escalate",
 		});
+	});
+
+	it("writes meta over_escalate from a correction about a needless climb", async () => {
+		const created = await createHarness({ enableLessons: true });
+		harnesses.push(created);
+		project(created);
+		const metaLesson = {
+			trigger: "needless climb",
+			mistake: "escalated a typo",
+			rule: "Stay on Workhorse for a one-line rename.",
+			category: "over_escalate",
+			area: "agent_config",
+			severity: "medium",
+		};
+		created.setResponses(
+			Array.from({ length: 16 }, () => (context: Context) => {
+				const side = context.systemPrompt?.includes("Trek learning step") ?? false;
+				const prompt = firstUserText(context);
+				if (side && (prompt.startsWith("Write one lesson") || prompt.startsWith("Repair this lesson"))) {
+					return fauxAssistantMessage(JSON.stringify(metaLesson));
+				}
+				if (side && prompt.startsWith("Choose the stored lessons")) return fauxAssistantMessage('{"ids": []}');
+				const last = context.messages[context.messages.length - 1];
+				if (last?.role === "toolResult") return fauxAssistantMessage("failed");
+				return fauxAssistantMessage("The rename is done.");
+			}),
+		);
+		await created.session.prompt("Fix a typo.");
+		await created.session.prompt("Wrong. Should have stayed on Workhorse.");
+		expect(listLessonRecords(created.tempDir)).toEqual(
+			expect.arrayContaining([expect.objectContaining({ domain: "meta", category: "over_escalate" })]),
+		);
 	});
 
 	it("offers L1 only after confirm, including after layer-cooldown", async () => {

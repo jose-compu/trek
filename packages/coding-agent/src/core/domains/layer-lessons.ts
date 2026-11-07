@@ -23,26 +23,32 @@ export function isLessonLayerRole(value: string): value is LessonLayerRole {
 
 export function detectMetaLessonTrigger(input: {
 	task: string;
+	correction?: string;
 	layerWorkflow?: string;
 	thinking?: string;
 	action?: string;
+	failures?: readonly string[];
+	verifierDenied?: boolean;
+	budgetStopped?: boolean;
 }): MetaLayerTrigger | undefined {
-	const hay = input.task.toLowerCase();
-	if (input.layerWorkflow === "layer-budget-stop" || /\bbudget stop\b/.test(hay)) {
+	const hay = [input.task, input.correction, ...(input.failures ?? [])]
+		.filter((part) => typeof part === "string" && part.length > 0)
+		.join("\n")
+		.toLowerCase();
+	if (input.budgetStopped || /\bbudget[_ ]stop\b/.test(hay) || /\bcircuit breaker\b/.test(hay)) {
 		return "budget_stop";
 	}
-	if (input.layerWorkflow === "layer-verify" || /\bverifier reject/.test(hay)) {
+	if (input.verifierDenied || /\bverifier reject/.test(hay)) {
 		return "verifier_reject";
 	}
-	if (input.layerWorkflow === "layer-tool-runners" && /\b(runner miss|missed grep)\b/.test(hay)) {
+	if (/\b(runner miss|missed grep)\b/.test(hay)) {
 		return "runner_miss";
 	}
-	if (input.action === "escalate" || input.layerWorkflow === "layer-escalate" || /\bescalate\b/.test(hay)) {
-		if (/\b(typo|rename|one.line|should have stayed on workhorse)\b/.test(hay)) {
-			return "over_escalate";
-		}
+	if (/\bover.?escalate\b/.test(hay) || /\b(needless climb|should have stayed on workhorse)\b/.test(hay)) {
+		return "over_escalate";
 	}
-	if (/\bover.?escalate\b/.test(hay)) {
+	const climbed = input.action === "escalate" || input.layerWorkflow === "layer-escalate" || /\bescalate\b/.test(hay);
+	if (climbed && /\b(typo|rename|one.line|trivial)\b/.test(hay)) {
 		return "over_escalate";
 	}
 	if (input.thinking === "deep" && /\b(one.line|typo|trivial)\b/.test(hay)) {
@@ -51,7 +57,10 @@ export function detectMetaLessonTrigger(input: {
 	if (/\bover.?think\b/.test(hay)) {
 		return "over_think";
 	}
-	if (/\bmisroute\b/.test(hay)) {
+	if (
+		/\bmisroute\b/.test(hay) ||
+		(input.action === "route" && /\b(wrong layer|should have (been|stayed|gone))\b/.test(hay))
+	) {
 		return "misroute";
 	}
 	return undefined;
@@ -59,10 +68,18 @@ export function detectMetaLessonTrigger(input: {
 
 /** Recall injects into the role about to act, not only the session preamble. */
 export function tagRecallForRole(block: string, role: LessonLayerRole): string {
-	if (!block.includes("<memory>")) {
+	if (!block.includes("<memory")) {
 		return `<memory role="${role}">\n${block}\n</memory>`;
 	}
-	return block.replace("<memory>", `<memory role="${role}">`);
+	return retagRecallForRole(block, role);
+}
+
+/** Retarget an already-injected memory block when Archon or a climb changes the acting role. */
+export function retagRecallForRole(prompt: string, role: LessonLayerRole): string {
+	if (!prompt.includes("<memory")) {
+		return prompt;
+	}
+	return prompt.replace(/<memory(?:\s+role="[^"]*")?>/g, `<memory role="${role}">`);
 }
 
 export function actingLessonRole(role: string | undefined): LessonLayerRole {

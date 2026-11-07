@@ -39,6 +39,7 @@ export {
 	type LessonLayerRole,
 	META_LAYER_TRIGGERS,
 	type MetaLayerTrigger,
+	retagRecallForRole,
 	tagRecallForRole,
 } from "./layer-lessons.ts";
 export {

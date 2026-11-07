@@ -92,6 +92,7 @@ import {
 	readDomainSkills,
 	repairLessonPrompt,
 	restoreDomainWorkflow,
+	retagRecallForRole,
 	runArchonNode,
 	runArchonWorkflow,
 	runDomainSessionCommand,
@@ -1577,6 +1578,7 @@ export class AgentSession {
 			const grant = consumeVerifierGrant(this._verifierDecision);
 			this._verifierDecision = grant.remaining;
 			if (!grant.allowed) {
+				this._verifierDeniedThisTurn = true;
 				return { allowed: false, reason: verifierBlockReason(grant.remaining) };
 			}
 		}
@@ -2867,6 +2869,9 @@ export class AgentSession {
 	private _thinkingPin?: RoleThinking;
 	private _decisionThinking?: RoleThinking;
 	private _verifierDecision?: LayerDecision;
+	/** Last trek:layer_route action this prompt (climb/route). */
+	private _turnLayerAction?: string;
+	private _verifierDeniedThisTurn = false;
 	/** Idle on Decision until the first prompt routes to Workhorse. */
 	private _parkedOnDecision = false;
 	/** Tools since the last Planning brief; drives optional mid-turn replan. */
@@ -2986,6 +2991,7 @@ export class AgentSession {
 		this._hierarchyDisplayRole = role;
 		this._hierarchyModelProvider = provider;
 		this._hierarchyModelId = modelId;
+		this._retagLessonRecall(role);
 		this._emit({ type: "hierarchy_model", role, provider, modelId });
 	}
 
@@ -3249,6 +3255,7 @@ export class AgentSession {
 		this._pendingElevate = { tier: signal.tier, why: signal.why, handoff: climbHandoffBrief(signal.why) };
 		this._ladderRole = signal.tier;
 		this._lastHierarchyRole = signal.tier;
+		this._retagLessonRecall(signal.tier);
 		this._toolErrorStreak = 0;
 		return signal.tier;
 	}
@@ -3421,6 +3428,7 @@ export class AgentSession {
 	}
 
 	private _emitEscalateCard(from: LadderRole, to: LadderRole, why?: string): void {
+		this._turnLayerAction = "escalate";
 		this._emit({
 			type: "hierarchy_escalate",
 			text: formatEscalateCard(from, to, why),
@@ -3906,11 +3914,6 @@ export class AgentSession {
 		if (!lessonsEnabled() || !this.memoryActive()) return;
 		const failures = turnFailures(this.agent.state.messages.slice(turnStart));
 		if (failures.length === 0) return;
-		const meta = detectMetaLessonTrigger({
-			task: this._lastPromptTask,
-			layerWorkflow: this._turnSelection.layer_workflow,
-			thinking: this._decisionThinking,
-		});
 		await this._writeLesson(
 			{
 				kind: "error",
@@ -3918,8 +3921,34 @@ export class AgentSession {
 				failures,
 				reply: stripHonestyFooter(this._lastAssistantText()),
 			},
-			meta ? "meta" : this._turnSelection.domain,
+			this._layerLessonDomain(this._lastPromptTask, this._turnSelection.domain, { failures }),
 		);
+	}
+
+	private _layerLessonDomain(
+		task: string,
+		fallback: string,
+		extra?: { correction?: string; failures?: string[] },
+	): string {
+		const meta = detectMetaLessonTrigger({
+			task,
+			correction: extra?.correction,
+			failures: extra?.failures,
+			layerWorkflow: this._turnSelection.layer_workflow,
+			thinking: this._decisionThinking ?? this._thinkingPin,
+			action: this._turnLayerAction,
+			verifierDenied: this._verifierDeniedThisTurn,
+			budgetStopped: this._effort.stopReason()?.includes("spent budget") === true,
+		});
+		return meta ? "meta" : fallback;
+	}
+
+	private _retagLessonRecall(role?: string): void {
+		const prompt = this.agent.state.systemPrompt;
+		if (!prompt?.includes("<memory")) {
+			return;
+		}
+		this.agent.state.systemPrompt = retagRecallForRole(prompt, actingLessonRole(role ?? this.hierarchyRole));
 	}
 
 	/** Workhorse writes lessons (D9), including after a Planning/Frontier success. */
@@ -3970,15 +3999,16 @@ export class AgentSession {
 		} catch {
 			domain = "none";
 		}
+		const failures = turnFailures(messages.slice(lastUser));
 		await this._writeLesson(
 			{
 				kind: "correction",
 				task,
-				failures: turnFailures(messages.slice(lastUser)),
+				failures,
 				reply: stripHonestyFooter(this._lastAssistantText()),
 				correction: text,
 			},
-			domain,
+			this._layerLessonDomain(task, domain, { correction: text, failures }),
 		);
 	}
 
@@ -4164,6 +4194,10 @@ export class AgentSession {
 		const currentRole = hierarchy && isArchonNodeRole(hierarchy) ? hierarchy : "workhorse";
 		const previousDisplay = this._hierarchyDisplayRole;
 		const previousLadder = this._ladderRole;
+		let learned = false;
+		if (workflow && !callable) {
+			learned = true;
+		}
 		const archonOptions = {
 			cwd: this._cwd,
 			userMessage: this._lastPromptTask,
@@ -4179,6 +4213,7 @@ export class AgentSession {
 				if (role === "workhorse" || role === "planning") {
 					this._ladderRole = role;
 				}
+				this._retagLessonRecall(role);
 			},
 			runPrompt: async (prompt: string, node: ArchonNode) => {
 				this.setActiveToolsByName(node.allowedTools ?? []);
@@ -4233,6 +4268,9 @@ export class AgentSession {
 				if (executed.result.status === "halt") {
 					this._workflowCheck = executed.result.output;
 					this._emit({ type: "workflow_check", text: this._workflowCheck });
+					if (!learned) {
+						await this._learnFromTurn(turnStart);
+					}
 					return;
 				}
 			}
@@ -4250,6 +4288,9 @@ export class AgentSession {
 					)
 				: [];
 			this._noteAntiPatterns(turnStart);
+			if (!learned) {
+				await this._learnFromTurn(turnStart);
+			}
 			this._workflowCheck = findings.length > 0 ? formatWorkflowCheck(findings) : undefined;
 			if (!this._workflowCheck) return;
 			const message = this._findLastAssistantMessage();
@@ -4718,6 +4759,8 @@ export class AgentSession {
 			({ promptId } = this._assignPromptNumber(expandedText));
 			this._lastPromptTask = expandedText;
 			this._decisionThinking = undefined;
+			this._turnLayerAction = undefined;
+			this._verifierDeniedThisTurn = false;
 			setSessionThinkingPin(this.sessionManager.getSessionId(), this._thinkingPin);
 
 			// Emit before_agent_start extension event
