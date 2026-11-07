@@ -173,4 +173,39 @@ describe("layer execute", () => {
 		expect(executed.result.output).toBe("budget");
 		expect(executed.result.join).toBe(LAYER_JOIN);
 	});
+
+	it("finishes a parallel wave on halt, then skips later waves", async () => {
+		const ran: string[] = [];
+		const executed = await runLayerWorkflow({
+			workflow: load("layer-tool-runners"),
+			layering: "auto",
+			seed: 9,
+			runNode: async (node) => {
+				ran.push(node.id);
+				return {
+					id: node.id,
+					output: node.id,
+					status: node.id === "logs" ? "halt" : "ok",
+				};
+			},
+		});
+		expect(ran.sort()).toEqual(["fetch", "logs", "search", "summarize"]);
+		expect(executed.result.status).toBe("halt");
+		expect(executed.result.evidence).toContain("seed 9");
+	});
+
+	it("keeps hypotheses winner output but marks partial if a prior node failed", async () => {
+		const executed = await runLayerWorkflow({
+			workflow: load("layer-hypotheses"),
+			layering: "auto",
+			seed: 10,
+			runNode: replies({
+				gather: { status: "fail", output: "no logs" },
+				pick: { output: "theory B", winner: "theory-b" },
+			}),
+		});
+		expect(executed.result.winner).toBe("theory-b");
+		expect(executed.result.output).toBe("theory B");
+		expect(executed.result.status).toBe("partial");
+	});
 });

@@ -88,14 +88,15 @@ export async function runLayerWorkflow(input: RunLayerWorkflowInput): Promise<La
 		});
 		schedulerUsed = schedulerUsed || batch.schedulerUsed;
 		for (const reply of batch.values) {
-			replies.push(reply);
-			if (reply.status === "halt") {
-				return {
-					result: joinResult(input.workflow.name, input.seed, replies),
-					schedulerUsed,
-					seed: input.seed,
-				};
-			}
+			replies.push({ ...reply, status: reply.status ?? "ok" });
+		}
+		// Halt joins after this CPA wave. Later waves do not start.
+		if (replies.some((reply) => reply.status === "halt")) {
+			return {
+				result: joinResult(input.workflow.name, input.seed, replies),
+				schedulerUsed,
+				seed: input.seed,
+			};
 		}
 		if (input.workflow.name === "layer-consult" && wave.some((node) => node.id === "exit")) {
 			break;
@@ -158,8 +159,8 @@ function joinResult(workflow: string, seed: number, replies: LayerNodeReply[]): 
 						(reply) => reply.id === "named-steps" || reply.id === "workhorse-act" || reply.id === "handoff-brief",
 					)
 				: replies;
-	const failed = selected.filter((reply) => reply.status === "fail").length;
-	const status: LayerSubtaskStatus = failed === 0 ? "ok" : failed === selected.length ? "fail" : "partial";
+	const failed = replies.filter((reply) => reply.status === "fail").length;
+	const status: LayerSubtaskStatus = failed === 0 ? "ok" : failed === replies.length ? "fail" : "partial";
 	const output =
 		workflow === "layer-hypotheses" && winnerReply
 			? winnerReply.output
