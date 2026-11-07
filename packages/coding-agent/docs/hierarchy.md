@@ -12,6 +12,20 @@ Trek can run one API chat model, or a local / hybrid **ladder** of roles. Each t
 
 Configure with `trek models set-mode …`, `~/.trek/models.yaml`, project `.trek/models.yaml`, or `/hierarchy` (0.16).
 
+## Layering (0.18)
+
+`hierarchy.layering` is independent of `mode`. Factory default is **single**: one chat model on Workhorse. Extra roles (Tooling, Planning, Frontier, verifier) stay unbound until you opt in.
+
+| Value | Behavior |
+| --- | --- |
+| `single` | One Workhorse. `/hierarchy single` and `trek models set-layering single` clear extra roles. |
+| `auto` | `/hierarchy auto` stores the flag. Catalog map of slots lands in a follow-up. |
+| `manual` | Any `/hierarchy role` or `trek models set-role` write. |
+
+Role `thinking` is `off`, `brief`, or `deep`. YAML `true`/`on` still means deep; `false`/`off` means off. Frontier and verifier may use `source: local` or `lmstudio`. The 0.16 climb (Tooling on the ladder) is unchanged until the controller rewrite.
+
+`/hierarchy role <role> --clear` unbinds one extra role.
+
 ## Ladder
 
 ```
@@ -90,21 +104,22 @@ See the [Roadmap model suite table](../../../../ROADMAP.md#5-model-suite-referen
 hierarchy:
   mode: hybrid
   suite: mistral   # or qwen / lfm / mistral-pro — Decision stays d1
+  layering: single
 roles:
   decision:
     source: local
     id: LiquidAI/d1-omni-600M
-    thinking: false
+    thinking: off
   tooling:
     source: local
     id: Qwen3.5-0.8B
-    thinking: false
+    thinking: off
 ```
 
 ## Related commands
 
-- `trek models list|set-mode|set-suite|set-role|set-lmstudio|benchmark`
-- `/hierarchy` — in-session mode / suite / role picker (0.16)
+- `trek models list|set-mode|set-suite|set-layering|set-role|set-lmstudio|benchmark`
+- `/hierarchy` — in-session layering / mode / suite / role picker (0.16, layering in 0.18)
 
 ## Related tests
 

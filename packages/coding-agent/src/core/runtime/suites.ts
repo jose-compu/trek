@@ -7,7 +7,7 @@
  * suite-native Decision model, so they reuse the same LFM `d1-omni-600M` weights.
  */
 
-import type { RoleAssignment, SuiteId } from "./types.ts";
+import type { RoleAssignment, RoleThinking, SuiteId } from "./types.ts";
 
 export interface SuitePreset {
 	id: SuiteId;
@@ -24,7 +24,7 @@ export interface SuitePreset {
 	};
 }
 
-function local(id: string, thinking: boolean, repo?: string): RoleAssignment {
+function local(id: string, thinking: RoleThinking, repo?: string): RoleAssignment {
 	return {
 		source: "local",
 		id,
@@ -37,15 +37,15 @@ function local(id: string, thinking: boolean, repo?: string): RoleAssignment {
 export const DEFAULT_DECISION_MODEL_ID = "LiquidAI/d1-omni-600M";
 
 /** Default Decision Index assignment across suites (open weights; classify-only). */
-const DECISION = local(DEFAULT_DECISION_MODEL_ID, false, DEFAULT_DECISION_MODEL_ID);
+const DECISION = local(DEFAULT_DECISION_MODEL_ID, "off", DEFAULT_DECISION_MODEL_ID);
 
 const mistralRoles = {
 	decision: DECISION,
-	tooling: local("Qwen3.5-0.8B", false),
-	embedding: local("sentence-transformers/all-MiniLM-L6-v2", false),
-	reranker: local("cross-encoder/ms-marco-MiniLM-L-6-v2", false),
-	workhorse: local("Ministral-3-3B-Instruct-2512", false),
-	planning: local("Ministral-3-8B-Reasoning-2512", true),
+	tooling: local("Qwen3.5-0.8B", "off"),
+	embedding: local("sentence-transformers/all-MiniLM-L6-v2", "off"),
+	reranker: local("cross-encoder/ms-marco-MiniLM-L-6-v2", "off"),
+	workhorse: local("Ministral-3-3B-Instruct-2512", "off"),
+	planning: local("Ministral-3-8B-Reasoning-2512", "deep"),
 };
 
 export const SUITE_PRESETS: Record<SuiteId, SuitePreset> = {
@@ -59,7 +59,7 @@ export const SUITE_PRESETS: Record<SuiteId, SuitePreset> = {
 		rerank: true,
 		roles: {
 			...mistralRoles,
-			workhorse: local("Devstral-Small-2507", false),
+			workhorse: local("Devstral-Small-2507", "off"),
 		},
 	},
 	qwen: {
@@ -67,11 +67,11 @@ export const SUITE_PRESETS: Record<SuiteId, SuitePreset> = {
 		rerank: true,
 		roles: {
 			decision: DECISION,
-			tooling: local("Qwen3.5-0.8B", false),
-			embedding: local("Qwen3-Embedding-0.6B", false),
-			reranker: local("Qwen3-Reranker-0.6B", false),
-			workhorse: local("Qwen3.5-4B", false),
-			planning: local("Qwen3.5-9B", true),
+			tooling: local("Qwen3.5-0.8B", "off"),
+			embedding: local("Qwen3-Embedding-0.6B", "off"),
+			reranker: local("Qwen3-Reranker-0.6B", "off"),
+			workhorse: local("Qwen3.5-4B", "off"),
+			planning: local("Qwen3.5-9B", "deep"),
 		},
 	},
 	lfm: {
@@ -79,12 +79,12 @@ export const SUITE_PRESETS: Record<SuiteId, SuitePreset> = {
 		rerank: true,
 		roles: {
 			decision: DECISION,
-			tooling: local("LFM2.5-350M", false),
-			embedding: local("LFM2-ColBERT-350M", false),
+			tooling: local("LFM2.5-350M", "off"),
+			embedding: local("LFM2-ColBERT-350M", "off"),
 			/** ColBERT has no sibling CE; MiniLM is the default second-pass scorer. */
-			reranker: local("cross-encoder/ms-marco-MiniLM-L-6-v2", false),
-			workhorse: local("LFM2.5-1.2B-Instruct", false),
-			planning: local("LFM2.5-8B-A1B", true),
+			reranker: local("cross-encoder/ms-marco-MiniLM-L-6-v2", "off"),
+			workhorse: local("LFM2.5-1.2B-Instruct", "off"),
+			planning: local("LFM2.5-8B-A1B", "deep"),
 		},
 	},
 };

@@ -13,11 +13,14 @@ import {
 	defaultRuntimeConfig,
 	type HierarchySettings,
 	isHierarchyMode,
+	isLayeringMode,
 	isRoleSource,
 	isRouteComponent,
 	isRouteRole,
 	isRuntimeRole,
 	isSuiteId,
+	LAYERING_EXTRA_ROLES,
+	parseRoleThinking,
 	type RoleAssignment,
 	type RoleSource,
 	type RouteComponent,
@@ -146,6 +149,12 @@ function parseHierarchy(value: unknown, path: string, current: HierarchySettings
 		}
 		next.quant = record.quant;
 	}
+	if (record.layering !== undefined) {
+		if (typeof record.layering !== "string" || !isLayeringMode(record.layering)) {
+			throw new Error(`${path}: hierarchy.layering must be single, auto, or manual.`);
+		}
+		next.layering = record.layering;
+	}
 	return next;
 }
 
@@ -175,13 +184,14 @@ function parseRole(value: unknown, label: string): RoleAssignment {
 		throw new Error(`${label}: id must be a string.`);
 	}
 	assertPublicModelId(record.id);
-	if (typeof record.thinking !== "boolean") {
-		throw new Error(`${label}: thinking must be true or false.`);
+	const thinking = parseRoleThinking(record.thinking);
+	if (thinking === undefined) {
+		throw new Error(`${label}: thinking must be off, brief, deep, or a YAML boolean.`);
 	}
 	const role: RoleAssignment = {
 		source: record.source as RoleSource,
 		id: record.id,
-		thinking: record.thinking,
+		thinking,
 	};
 	if (record.provider !== undefined) {
 		if (typeof record.provider !== "string" || !record.provider.trim()) {
@@ -208,21 +218,43 @@ function parseRole(value: unknown, label: string): RoleAssignment {
 
 export function withHierarchy(
 	config: RuntimeConfig,
-	patch: Partial<Pick<HierarchySettings, "mode" | "suite" | "quant">>,
+	patch: Partial<Pick<HierarchySettings, "mode" | "suite" | "quant" | "layering">>,
 ): RuntimeConfig {
 	return {
 		hierarchy: { ...config.hierarchy, ...patch },
 		roles: config.roles,
+		...(config.routing ? { routing: config.routing } : {}),
 	};
 }
 
 export function withRoleOverride(config: RuntimeConfig, role: RuntimeRole, assignment: RoleAssignment): RuntimeConfig {
-	if (role === "frontier" && assignment.source === "local") {
-		throw new Error("Frontier stays on the API.");
-	}
 	assertPublicModelId(assignment.id);
 	return {
-		hierarchy: config.hierarchy,
+		hierarchy: { ...config.hierarchy, layering: "manual" },
 		roles: { ...config.roles, [role]: assignment },
+		...(config.routing ? { routing: config.routing } : {}),
+	};
+}
+
+/** Beginner stack: one chat model on Workhorse. Extra roles alias it at resolve time. */
+export function flattenToSingle(config: RuntimeConfig): RuntimeConfig {
+	const roles = { ...config.roles };
+	for (const role of LAYERING_EXTRA_ROLES) {
+		delete roles[role];
+	}
+	return {
+		hierarchy: { ...config.hierarchy, layering: "single" },
+		roles,
+		...(config.routing ? { routing: config.routing } : {}),
+	};
+}
+
+export function withClearedRole(config: RuntimeConfig, role: RuntimeRole): RuntimeConfig {
+	const roles = { ...config.roles };
+	delete roles[role];
+	return {
+		hierarchy: { ...config.hierarchy, layering: "manual" },
+		roles,
+		...(config.routing ? { routing: config.routing } : {}),
 	};
 }

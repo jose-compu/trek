@@ -146,7 +146,7 @@ describe("LM Studio roles", () => {
 		const config = withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "mistral" });
 		const lm = {
 			source: "lmstudio" as const,
-			thinking: false,
+			thinking: "off" as const,
 			baseUrl: DEFAULT_LMSTUDIO_BASE_URL,
 		};
 		const one = withRoleOverride(config, "tooling", { ...lm, id: "tool-0.8b" });
@@ -154,7 +154,7 @@ describe("LM Studio roles", () => {
 		const three = withRoleOverride(two, "planning", {
 			...lm,
 			id: "lfm2.5-1.2b-thinking-mlx",
-			thinking: true,
+			thinking: "deep",
 		});
 		const resolved = resolveRuntime(three, { frontier: null });
 		expect(resolved.roles.tooling?.source).toBe("lmstudio");

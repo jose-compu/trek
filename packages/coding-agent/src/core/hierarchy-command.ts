@@ -5,19 +5,40 @@
 
 import { getAgentDir } from "../config.ts";
 import {
+	DEFAULT_LMSTUDIO_BASE_URL,
+	defaultRoleThinking,
+	flattenToSingle,
 	globalModelsYamlPath,
 	isHierarchyMode,
+	isLayeringMode,
 	isRuntimeRole,
 	isSuiteId,
 	loadRuntimeConfig,
+	parseRoleThinking,
 	type RoleAssignment,
+	type RoleSource,
 	type RuntimeRole,
 	readRuntimeConfigFile,
 	resolveRuntime,
+	withClearedRole,
 	withHierarchy,
 	withRoleOverride,
 	writeRuntimeConfigFile,
 } from "./runtime/index.ts";
+
+const ROLE_ORDER: RuntimeRole[] = [
+	"decision",
+	"tooling",
+	"workhorse",
+	"planning",
+	"frontier",
+	"verifier",
+	"embedding",
+	"reranker",
+];
+
+const USAGE =
+	"Usage: /hierarchy | /hierarchy auto | /hierarchy single | /hierarchy mode <mode> | /hierarchy suite <suite> | /hierarchy role <role> --id <id> [--source api|local|lmstudio] [--thinking off|brief|deep|on] | /hierarchy role <role> --clear";
 
 export function runHierarchyCommand(agentDir: string, cwd: string, arg: string): string {
 	const path = globalModelsYamlPath(agentDir);
@@ -30,6 +51,9 @@ export function runHierarchyCommand(agentDir: string, cwd: string, arg: string):
 	}
 	const [kind, ...rest] = parts;
 	try {
+		if (kind === "auto" || kind === "single" || kind === "manual") {
+			return setLayering(path, agentDir, cwd, kind);
+		}
 		if (kind === "mode") {
 			const mode = rest[0];
 			if (!mode || !isHierarchyMode(mode)) {
@@ -37,7 +61,7 @@ export function runHierarchyCommand(agentDir: string, cwd: string, arg: string):
 			}
 			const current = readRuntimeConfigFile(path);
 			writeRuntimeConfigFile(path, withHierarchy(current, { mode }));
-			return `${status(agentDir, cwd, path)}\nThe next session reads this file. This session does not start llama.cpp.`;
+			return nextSession(status(agentDir, cwd, path));
 		}
 		if (kind === "suite") {
 			const suite = rest[0];
@@ -46,7 +70,7 @@ export function runHierarchyCommand(agentDir: string, cwd: string, arg: string):
 			}
 			const current = readRuntimeConfigFile(path);
 			writeRuntimeConfigFile(path, withHierarchy(current, { suite }));
-			return `${status(agentDir, cwd, path)}\nThe next session reads this file. This session does not start llama.cpp.`;
+			return nextSession(status(agentDir, cwd, path));
 		}
 		if (kind === "role") {
 			return setRole(path, agentDir, cwd, rest);
@@ -54,57 +78,85 @@ export function runHierarchyCommand(agentDir: string, cwd: string, arg: string):
 	} catch (error) {
 		return error instanceof Error ? error.message : String(error);
 	}
-	return "Usage: /hierarchy | /hierarchy mode <mode> | /hierarchy suite <suite> | /hierarchy role <role> --id <id> [--source local|api] [--thinking on|off]";
+	return USAGE;
 }
 
 export function hierarchyAgentDir(): string {
 	return getAgentDir();
 }
 
+function setLayering(path: string, agentDir: string, cwd: string, mode: "auto" | "single" | "manual"): string {
+	if (!isLayeringMode(mode)) {
+		return "Usage: /hierarchy auto|single|manual";
+	}
+	const current = readRuntimeConfigFile(path);
+	const next = mode === "single" ? flattenToSingle(current) : withHierarchy(current, { layering: mode });
+	writeRuntimeConfigFile(path, next);
+	return nextSession(status(agentDir, cwd, path));
+}
+
 function setRole(path: string, agentDir: string, cwd: string, rest: string[]): string {
 	const roleName = rest[0];
 	if (!roleName || !isRuntimeRole(roleName)) {
-		return "Usage: /hierarchy role <decision|tooling|workhorse|planning|frontier|embedding|reranker> --id <id>";
+		return "Usage: /hierarchy role <decision|tooling|workhorse|planning|frontier|verifier|embedding|reranker> --id <id>";
+	}
+	if (rest.includes("--clear")) {
+		const current = readRuntimeConfigFile(path);
+		writeRuntimeConfigFile(path, withClearedRole(current, roleName as RuntimeRole));
+		return nextSession(status(agentDir, cwd, path));
 	}
 	const id = flagValue(rest, "--id");
 	if (!id) {
-		return "role requires --id.";
+		return "role requires --id (or --clear).";
 	}
 	const sourceFlag = flagValue(rest, "--source");
-	if (sourceFlag !== undefined && sourceFlag !== "api" && sourceFlag !== "local") {
-		return "role --source must be local or api.";
+	if (sourceFlag !== undefined && sourceFlag !== "api" && sourceFlag !== "local" && sourceFlag !== "lmstudio") {
+		return "role --source must be api, local, or lmstudio.";
 	}
-	const source =
-		sourceFlag === "api" || sourceFlag === "local" ? sourceFlag : roleName === "frontier" ? "api" : "local";
-	if (roleName === "frontier" && source === "local") {
-		return "Frontier stays on the API.";
-	}
+	const source: RoleSource =
+		sourceFlag === "api" || sourceFlag === "local" || sourceFlag === "lmstudio"
+			? sourceFlag
+			: roleName === "frontier" || roleName === "verifier"
+				? "api"
+				: "local";
 	const thinkingFlag = flagValue(rest, "--thinking");
-	let thinking = roleName === "planning" || roleName === "frontier";
-	if (roleName === "decision") {
-		thinking = false;
-	}
+	let thinking = defaultRoleThinking(roleName as RuntimeRole);
 	if (thinkingFlag !== undefined) {
-		if (thinkingFlag !== "on" && thinkingFlag !== "off") {
-			return "role --thinking must be on or off.";
+		const parsed = parseRoleThinking(thinkingFlag);
+		if (parsed === undefined) {
+			return "role --thinking must be off, brief, deep, or on.";
 		}
-		thinking = thinkingFlag === "on";
+		thinking = parsed;
 	}
 	const assignment: RoleAssignment = { source, id, thinking };
+	if (source === "lmstudio") {
+		assignment.baseUrl = flagValue(rest, "--base-url") ?? DEFAULT_LMSTUDIO_BASE_URL;
+	}
 	const current = readRuntimeConfigFile(path);
 	writeRuntimeConfigFile(path, withRoleOverride(current, roleName as RuntimeRole, assignment));
-	return `${status(agentDir, cwd, path)}\nThe next session reads this file. This session does not start llama.cpp.`;
+	return nextSession(status(agentDir, cwd, path));
 }
 
 function status(agentDir: string, cwd: string, path: string): string {
 	const config = loadRuntimeConfig({ agentDir, cwd });
 	const resolved = resolveRuntime(config);
-	const lines = [`mode ${config.hierarchy.mode}`, `suite ${config.hierarchy.suite}`, `file ${path}`];
-	for (const role of ["decision", "tooling", "workhorse", "planning", "frontier", "embedding", "reranker"] as const) {
-		const assignment = resolved.roles[role] ?? config.roles[role];
-		lines.push(assignment ? `${role} ${assignment.source} ${assignment.id}` : `${role} unset`);
+	const lines = [
+		`layering ${config.hierarchy.layering}`,
+		`mode ${config.hierarchy.mode}`,
+		`suite ${config.hierarchy.suite}`,
+		`file ${path}`,
+	];
+	for (const role of ROLE_ORDER) {
+		const assignment = config.roles[role] ?? resolved.roles[role];
+		lines.push(
+			assignment ? `${role} ${assignment.source} ${assignment.id} thinking ${assignment.thinking}` : `${role} unset`,
+		);
 	}
 	return lines.join("\n");
+}
+
+function nextSession(body: string): string {
+	return `${body}\nThe next session reads this file. This session does not start llama.cpp.`;
 }
 
 function flagValue(args: string[], name: string): string | undefined {

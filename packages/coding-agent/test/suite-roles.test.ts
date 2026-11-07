@@ -26,7 +26,7 @@ describe("local suite roles", () => {
 			const runtime = resolved(suite);
 			expect(runtime.roles.decision?.id, suite).toBe(DEFAULT_DECISION_MODEL_ID);
 			expect(runtime.roles.decision?.source, suite).toBe("local");
-			expect(runtime.roles.decision?.thinking, suite).toBe(false);
+			expect(runtime.roles.decision?.thinking, suite).toBe("off");
 		}
 	});
 

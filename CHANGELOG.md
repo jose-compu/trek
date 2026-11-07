@@ -6,6 +6,10 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Added
+
+- Layering config: `single` / `auto` / `manual`, `/hierarchy auto|single`, `trek models set-layering` ([#190](https://github.com/jose-compu/trek/issues/190)).
+
 ## [0.17.0] - 2026-11-07
 
 ### Added

@@ -7,7 +7,7 @@ import { nextLadderRole, startLadderRole } from "./escalate.ts";
 import type { ResolvedRuntime } from "./resolve.ts";
 import type { RoleSelection } from "./select-role.ts";
 import { FRONTIER_COMPLEXITY_THRESHOLD } from "./select-role.ts";
-import type { RouteComponent, RouteRole } from "./types.ts";
+import { type RouteComponent, type RouteRole, roleThinkingEnabled } from "./types.ts";
 
 const COMPONENT_ROLE: Record<RouteComponent, RouteRole> = {
 	worldModel: "planning",
@@ -139,7 +139,7 @@ function assign(resolved: ResolvedRuntime, role: RouteRole, reason: string): Rol
 			source: frontier.source,
 			modelId: frontier.id,
 			...(frontier.provider ? { provider: frontier.provider } : {}),
-			thinking: frontier.thinking,
+			thinking: roleThinkingEnabled(frontier.thinking),
 			reason: `api mode records the session model as frontier (${reason})`,
 		};
 	}
@@ -154,7 +154,7 @@ function assign(resolved: ResolvedRuntime, role: RouteRole, reason: string): Rol
 		source: assignment.source,
 		modelId: assignment.id,
 		...(assignment.provider ? { provider: assignment.provider } : {}),
-		thinking: assignment.thinking,
+		thinking: roleThinkingEnabled(assignment.thinking),
 		reason: used === role ? reason : `${reason}; ${role} unavailable, using ${used}`,
 	};
 }
