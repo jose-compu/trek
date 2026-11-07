@@ -8,7 +8,7 @@ import { findLayerWorkflow, loadLayerWorkflows } from "./catalog.ts";
 import type { DomainSelection } from "./select.ts";
 
 const LAYER_HINTS: Record<string, string[]> = {
-	"layer-escalate": ["escalate", "climb", "handoff", "planning"],
+	"layer-escalate": ["escalate", "climb", "handoff"],
 	"layer-tool-runners": ["grep", "search", "logs", "fetch"],
 	"layer-scripts": ["format json", "rename the symbol", "sed"],
 	"layer-route": ["route to scripts", "scripts or workhorse"],

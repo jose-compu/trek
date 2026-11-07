@@ -158,6 +158,30 @@ nodes:
 		expect(runDomainSessionCommand(cwd, "domains", "")).not.toContain("layer-escalate");
 	});
 
+	it("does not treat incidental planning wording as escalate", () => {
+		expect(selectLayerWorkflow("auto", "help me planning the refactor of the adapter")).toBe("none");
+	});
+
+	it("skips layer-scripts command nodes without a chat model", async () => {
+		const workflow = parseArchonWorkflow(`
+name: layer-scripts
+description: Mechanical format. No chat model.
+nodes:
+  - id: command
+    command: format
+  - id: bash
+    bash: echo layer-scripts
+    depends_on: [command]
+`);
+		const executed = await runArchonScheduled(workflow, {
+			cwd: mkdtempSync(join(tmpdir(), "trek-compose-scripts-")),
+			seed: 3,
+			skipUncallable: true,
+		});
+		expect(executed.results[0]?.output).toMatch(/skipped; no model/);
+		expect(executed.results[1]?.output).toBe("layer-scripts");
+	});
+
 	it("loads the defect-fix + layer-escalate fixture pack", () => {
 		const pack = loadLayeringCase("openai", "workhorse", "defect-fix-escalate");
 		expect(pack.prompt).toMatch(/lint error/);

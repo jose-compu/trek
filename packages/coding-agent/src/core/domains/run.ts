@@ -41,6 +41,8 @@ export interface RunArchonOptions {
 	currentRole?: ArchonNodeRole;
 	/** Called before each prompt node so the session can bind that role. */
 	onNodeRole?: (role: ArchonNodeRole | undefined, node: ArchonNode) => void;
+	/** Layer-* command/script/loop nodes skip instead of failing the turn. */
+	skipUncallable?: boolean;
 }
 
 export interface RunArchonScheduled {
@@ -145,12 +147,21 @@ export async function runArchonNode(
 		return String(stdout).trim();
 	}
 	if (node.kind === "command") {
+		if (options.skipUncallable) {
+			return `command ${node.body} skipped; no model`;
+		}
 		throw new Error(`command node ${node.id} names a command file. This release calls prompt and bash nodes.`);
 	}
 	if (node.kind === "script") {
+		if (options.skipUncallable) {
+			return `script ${node.id} skipped; no model`;
+		}
 		throw new Error(
 			`script node ${node.id} is not called in this release. This release calls prompt and bash nodes.`,
 		);
+	}
+	if (options.skipUncallable) {
+		return `loop ${node.id} skipped; no model`;
 	}
 	throw new Error(
 		`loop node ${node.id} repeats until ${node.loop?.until ?? "COMPLETE"}. This release calls prompt and bash nodes.`,
