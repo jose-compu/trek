@@ -15,6 +15,7 @@ import {
 	isRuntimeRole,
 	isSuiteId,
 	loadRuntimeConfig,
+	mixVendorVerifierError,
 	parseRoleThinking,
 	type RoleAssignment,
 	type RoleSource,
@@ -152,10 +153,18 @@ function setRole(path: string, agentDir: string, cwd: string, rest: string[]): s
 		thinking = parsed;
 	}
 	const assignment: RoleAssignment = { source, id, thinking };
+	const provider = flagValue(rest, "--provider");
+	if (provider) {
+		assignment.provider = provider;
+	}
 	if (source === "lmstudio") {
 		assignment.baseUrl = flagValue(rest, "--base-url") ?? DEFAULT_LMSTUDIO_BASE_URL;
 	}
 	const current = readRuntimeConfigFile(path);
+	const mixVendor = mixVendorVerifierError({ ...current.roles, [roleName]: assignment });
+	if (mixVendor) {
+		return mixVendor;
+	}
 	writeRuntimeConfigFile(path, withRoleOverride(current, roleName as RuntimeRole, assignment));
 	syncProjectRole(cwd, roleName as RuntimeRole, assignment);
 	return nextSession(status(agentDir, cwd, path));

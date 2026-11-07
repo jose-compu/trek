@@ -49,9 +49,6 @@ export function modelsDir(dir = process.env.TREK_MODELS_DIR): string {
 }
 
 export function missingLocalWeights(resolved: ResolvedRuntime, dir = modelsDir()): MissingWeight[] {
-	if (resolved.effectiveMode === "api") {
-		return [];
-	}
 	const missing: MissingWeight[] = [];
 	for (const role of LOCAL_SERVER_ROLES) {
 		const assignment = resolved.roles[role];

@@ -12,6 +12,7 @@ import { parseArchonWorkflow } from "../../../src/core/domains/archon.ts";
 import { loadCatalogFixture, mapCatalogToRoles } from "../../../src/core/runtime/catalog-map.ts";
 import {
 	benchmarkLayering,
+	consumeVerifierGrant,
 	createPortAllocator,
 	defaultRuntimeConfig,
 	formatLayerRoute,
@@ -20,8 +21,11 @@ import {
 	LlamaProcessManager,
 	layerDecisionTextFromEnvelope,
 	layerRouteTrace,
+	missingLocalWeights,
 	mixVendorVerifier,
+	mixVendorVerifierError,
 	parseLayerDecision,
+	pendingVerifierDecision,
 	resolveRuntime,
 	runLayerWorkflow,
 	sessionLocalRoles,
@@ -67,6 +71,19 @@ describe("mix-source", () => {
 		expect(manager.ensure("tooling", resolved).pid).toBe(7);
 		expect(() => manager.ensure("planning", resolved)).toThrow(/api mode does not start llama-server/);
 	});
+
+	it("offers GGUF download for a local role in an api session", () => {
+		let config = withHierarchy(defaultRuntimeConfig(), { mode: "api", layering: "manual" });
+		config = withRoleOverride(config, "tooling", {
+			source: "local",
+			id: "Qwen3.5-0.8B",
+			thinking: "off",
+		});
+		const resolved = resolveRuntime(config, { frontier: null });
+		const dir = mkdtempSync(join(tmpdir(), "trek-mix-weights-"));
+		expect(missingLocalWeights(resolved, dir).map((item) => item.role)).toEqual(["tooling"]);
+		rmSync(dir, { recursive: true, force: true });
+	});
 });
 
 describe("mix-vendor verifier", () => {
@@ -103,6 +120,50 @@ describe("mix-vendor verifier", () => {
 				evidence: ["diff"],
 			}),
 		).toBe(true);
+	});
+
+	it("rejects a same-provider verifier and unbinds it at resolve", () => {
+		let config = withHierarchy(defaultRuntimeConfig(), { mode: "api", layering: "manual" });
+		config = withRoleOverride(config, "workhorse", {
+			source: "api",
+			id: "gpt-6.1-terra",
+			provider: "openai",
+			thinking: "brief",
+		});
+		config = withRoleOverride(config, "verifier", {
+			source: "api",
+			id: "gpt-6.1-sol",
+			provider: "openai",
+			thinking: "off",
+		});
+		expect(mixVendorVerifierError(config.roles)).toMatch(/different provider/);
+		const resolved = resolveRuntime(config, { frontier: null });
+		expect(resolved.roles.verifier).toBeUndefined();
+		expect(mixVendorVerifier(resolved.roles)).toBe(false);
+	});
+
+	it("consumes a high verify grant after one gated tool", () => {
+		const grant = {
+			action: "verify" as const,
+			target: "verifier" as const,
+			confidence: "high" as const,
+			reason: "ok",
+			evidence: ["diff"],
+		};
+		const first = consumeVerifierGrant(grant);
+		expect(first.allowed).toBe(true);
+		expect(first.remaining).toBeUndefined();
+		expect(consumeVerifierGrant(first.remaining).allowed).toBe(false);
+		expect(
+			pendingVerifierDecision(grant, {
+				action: "continue",
+				target: "workhorse",
+				confidence: "high",
+				reason: "go",
+				evidence: [],
+			}),
+		).toBeUndefined();
+		expect(pendingVerifierDecision(undefined, grant)).toEqual(grant);
 	});
 });
 

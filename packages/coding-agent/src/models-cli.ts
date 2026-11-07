@@ -21,6 +21,7 @@ import {
 	isRuntimeRole,
 	isSuiteId,
 	loadRuntimeConfig,
+	mixVendorVerifierError,
 	parseRoleThinking,
 	type RoleAssignment,
 	type RoleSource,
@@ -259,6 +260,12 @@ function setRole(rest: string[]): boolean {
 	try {
 		const current = loadGlobal();
 		if (process.exitCode) {
+			return true;
+		}
+		const mixVendor = mixVendorVerifierError({ ...current.roles, [roleName]: assignment });
+		if (mixVendor) {
+			console.error(chalk.red(mixVendor));
+			process.exitCode = 1;
 			return true;
 		}
 		writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), withRoleOverride(current, roleName, assignment));

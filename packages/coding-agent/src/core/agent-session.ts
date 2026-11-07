@@ -237,7 +237,13 @@ import {
 } from "./runtime/layer-decision.ts";
 import { runLayerWorkflow } from "./runtime/layer-execute.ts";
 import { LAYER_ROUTE_CUSTOM_TYPE, layerRouteTrace } from "./runtime/layer-telemetry.ts";
-import { toolNeedsVerifier, verifierAllows, verifierBlockReason, verifierBound } from "./runtime/layer-verifier.ts";
+import {
+	consumeVerifierGrant,
+	pendingVerifierDecision,
+	toolNeedsVerifier,
+	verifierBlockReason,
+	verifierBound,
+} from "./runtime/layer-verifier.ts";
 import { localLlamaChatModel } from "./runtime/local-llama-model.ts";
 import { LMSTUDIO_PROVIDER, LOCAL_LLAMA_PROVIDER, lmStudioChatModel } from "./runtime/local-model.ts";
 import { LOCAL_SUITE_WORK_SECTION } from "./runtime/local-work.ts";
@@ -1558,8 +1564,10 @@ export class AgentSession {
 		}
 		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
 		if (toolNeedsVerifier(toolName, (args ?? {}) as Record<string, unknown>, verifierBound(resolved.roles))) {
-			if (!verifierAllows(this._verifierDecision)) {
-				return { allowed: false, reason: verifierBlockReason(this._verifierDecision) };
+			const grant = consumeVerifierGrant(this._verifierDecision);
+			this._verifierDecision = grant.remaining;
+			if (!grant.allowed) {
+				return { allowed: false, reason: verifierBlockReason(grant.remaining) };
 			}
 		}
 		return verdict;
@@ -3419,9 +3427,7 @@ export class AgentSession {
 			.join("\n");
 		const decision = tryParseLayerDecision(text);
 		this._decisionThinking = decision?.thinking;
-		if (decision?.action === "verify") {
-			this._verifierDecision = decision;
-		}
+		this._verifierDecision = pendingVerifierDecision(this._verifierDecision, decision);
 		if (decision?.thinking === "brief") {
 			this._honorThinkingPin();
 		}

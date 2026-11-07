@@ -151,8 +151,11 @@ export {
 	type LayerRouteTrace,
 	layerRouteTrace,
 	mixVendorVerifier,
+	mixVendorVerifierError,
 } from "./layer-telemetry.ts";
 export {
+	consumeVerifierGrant,
+	pendingVerifierDecision,
 	toolNeedsVerifier,
 	verifierAllows,
 	verifierBlockReason,

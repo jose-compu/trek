@@ -93,7 +93,7 @@ export interface MissingMlxWeight {
 }
 
 export function missingMlxWeights(resolved: ResolvedRuntime, env: NodeJS.ProcessEnv = process.env): MissingMlxWeight[] {
-	if (!preferMlx(env) || resolved.effectiveMode === "api") {
+	if (!preferMlx(env)) {
 		return [];
 	}
 	const missing: MissingMlxWeight[] = [];

@@ -3,6 +3,7 @@
  * local promotes to hybrid when a Frontier API key is present (issue #87, #90).
  */
 
+import { mixVendorVerifierError } from "./layer-telemetry.ts";
 import { suitePreset } from "./suites.ts";
 import type { HierarchyMode, RoleAssignment, RuntimeConfig, RuntimeRole } from "./types.ts";
 import { isLayeringExtraRole, SESSION_LOCAL_ROLES, type SessionLocalRole } from "./types.ts";
@@ -125,6 +126,10 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 			continue;
 		}
 		roles[name] = overlay(roles[name], assignment);
+	}
+
+	if (mixVendorVerifierError(roles)) {
+		delete roles.verifier;
 	}
 
 	return {

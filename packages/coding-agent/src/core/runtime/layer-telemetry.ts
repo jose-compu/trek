@@ -67,6 +67,18 @@ export function mixVendorVerifier(roles: Partial<Record<RuntimeRole, RoleAssignm
 	return writer.provider !== verifier.provider;
 }
 
+export function mixVendorVerifierError(roles: Partial<Record<RuntimeRole, RoleAssignment>>): string | undefined {
+	const writer = roles.workhorse;
+	const verifier = roles.verifier;
+	if (!writer || !verifier || !writer.provider || !verifier.provider) {
+		return undefined;
+	}
+	if (writer.provider === verifier.provider) {
+		return "Verifier must use a different provider than Workhorse.";
+	}
+	return undefined;
+}
+
 export function isLayerRouteEntry(entry: { type?: string; customType?: string }): boolean {
 	return entry.type === "custom" && entry.customType === LAYER_ROUTE_CUSTOM_TYPE;
 }

@@ -32,3 +32,25 @@ export function verifierBlockReason(decision: LayerDecision | undefined): string
 	}
 	return "Verifier on: typed verdict required before deploy/delete/external send.";
 }
+
+/** One high-confidence verify covers the next gated tool only. */
+export function consumeVerifierGrant(decision: LayerDecision | undefined): {
+	allowed: boolean;
+	remaining?: LayerDecision;
+} {
+	if (!verifierAllows(decision)) {
+		return { allowed: false, remaining: decision };
+	}
+	return { allowed: true };
+}
+
+/** A later non-verify LayerDecision invalidates a pending grant. */
+export function pendingVerifierDecision(
+	current: LayerDecision | undefined,
+	incoming: LayerDecision | undefined,
+): LayerDecision | undefined {
+	if (!incoming) {
+		return current;
+	}
+	return incoming.action === "verify" ? incoming : undefined;
+}
