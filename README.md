@@ -28,6 +28,42 @@ Pi compatibility is preserved: community packages from [pi.dev/packages](https:/
 
 **Version:** 0.18.0 — see [CHANGELOG.md](./CHANGELOG.md). Full plan: [ROADMAP.md](../ROADMAP.md). GitHub release only.
 
+## Quick start
+
+GitHub release only (not npm). Download the archive for your machine from [v0.18.0](https://github.com/jose-compu/trek/releases/tag/v0.18.0):
+
+| OS | Archive |
+|---|---|
+| macOS Apple silicon | `trek-darwin-arm64.tar.gz` |
+| macOS Intel | `trek-darwin-x64.tar.gz` |
+| Linux x64 | `trek-linux-x64.tar.gz` |
+| Linux ARM64 | `trek-linux-arm64.tar.gz` |
+| Windows x64 | `trek-windows-x64.zip` |
+| Windows ARM64 | `trek-windows-arm64.zip` |
+
+macOS / Linux (swap the archive name for your machine):
+
+```bash
+curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/latest/download/trek-darwin-arm64.tar.gz
+tar -xzf trek.tar.gz
+export PATH="$PWD/trek:$PATH"
+cd /path/to/your/project
+trek
+```
+
+The archive unpacks to a `trek/` folder. The binary is `trek/trek`. Keep that folder together (themes, domains, and native helpers sit beside the binary). Config and sessions live under `~/.trek/agent/`.
+
+Windows: unzip `trek-windows-x64.zip` and run `trek.exe` from that folder.
+
+From this repo:
+
+```bash
+cd trek
+npm install
+npm run build
+npx trek --help
+```
+
 ## Status
 
 **0.18.0 Layering** is current on GitHub. npm stays **0.16.1**. Factory `layering: single` (one Workhorse). `/hierarchy auto` maps Tooling / Workhorse / Planning / Frontier from a catalog. Climb is Workhorse ⇄ Planning ⇄ Frontier; Tooling is a runner, not a rung. `/thinking briefly`. A domain DAG and a `layer-*` DAG may run on the same turn. Lessons stay domain-typed. **0.17.0** compact cards (`ctrl+o`), faster startup and JSONL, CI budgets, several TUI sessions at once. **0.16.1** parks on Decision (d1) and may solve structured turns there (or invent a Decision pack via Tooling). Footer chords work in Terminal.app. Bash recipes and `trek models benchmark` ship. **0.15.1** stopped a fix/push/unblock prompt from starting the engineering review. **0.15.0** types a lesson by its domain and recalls it only there. `/patterns` edits the pattern. `/crystallize` writes a domain skill only after you confirm. A workflow node calls a tool only when that node allows it. **0.14.1** shows the honesty line, a stored lesson, and Working... as soon as there is something to report. Shortcut keys, the branch, and the model name use a quiet accent. **0.14.0** runs up to four branches at once. A failed turn stores a lesson. `/crystallize` writes a skill only after you confirm. **0.13.1** `/domains` turns a domain on or off for the next prompt. A workflow reply that skips a node, or adds a fact that is not in the turn, is marked on that turn. **0.13.0** added operator modes. `--operator-mode` chooses supervised, delegated, checkpoint, diagnostic, or ask. Ask answers and may read. It does not write. The laws stay in force. A selected Archon workflow is called one node at a time. An ambiguous prompt asks one question. On Telegram, a guest may talk and cannot run tools. **0.12.0** draws a green workflow call. Domain commands are in [Domains](#domains). **0.11.0** memory is documented in [Memory](#memory). **0.10.0** runs independent reads, and edits of different files, together. `trek processes` prints the seeded tree. `--effort loose` multiplies the effort stops by 10, and `--effort off` does not stop the turn for effort. **0.9.1** hides an edit that already matches the file. **0.9.0** routes each component, keeps same-file edits from colliding, and stops a prompt that repeats a failed command or a no-op edit. **0.8.1** updated production dependencies flagged by `npm audit`. **0.8.0** made remote API the default and kept llama.cpp opt-in. **0.7.0 Audit** shipped the session seed (default `42`), `default` / `strict_audit` modes, per-step `trek:audit_step` records, and honest warnings when a provider cannot honor seed. Bit-exact replay is not claimed on closed APIs or on GPU llama.cpp. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
@@ -222,17 +258,6 @@ Token may also come from `TREK_TELEGRAM_BOT_TOKEN`. Startup refuses an empty all
 - **Groups:** reply only on `/command` or `@bot` mention; per-chat (and forum topic) session. Unlisted senders never run tools.
 - **Safety:** `/stop` HALTs at the next tool boundary; gated/destructive ops need `/confirm` in that session. Full traces are omitted in groups (use a DM or `trek trace show`).
 - **Media:** photos/documents stage under `cwd/.trek/telegram/inbox/` and attach as image/file context. Stickers and voice get a short unsupported ack. Long replies split or send as a file.
-
-## Quick start
-
-```bash
-cd trek
-npm install
-npm run build
-npx trek --help
-```
-
-Config and sessions live under `~/.trek/agent/` by default.
 
 ## Pi Coding Agent plugins
 
