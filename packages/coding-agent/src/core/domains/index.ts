@@ -32,6 +32,16 @@ export {
 	toolingWorkflowView,
 } from "./layer-compose.ts";
 export {
+	actingLessonRole,
+	detectMetaLessonTrigger,
+	isLessonLayerRole,
+	LESSON_LAYER_ROLES,
+	type LessonLayerRole,
+	META_LAYER_TRIGGERS,
+	type MetaLayerTrigger,
+	tagRecallForRole,
+} from "./layer-lessons.ts";
+export {
 	acceptTypedLesson,
 	clearLessonPatternCache,
 	formatLessonPattern,

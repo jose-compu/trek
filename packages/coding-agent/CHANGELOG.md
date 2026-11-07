@@ -6,6 +6,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ### Added
 
+- Domain lessons stay typed when roles climb. Workhorse writes. Meta triggers `misroute|over_escalate|over_think|runner_miss|verifier_reject|budget_stop`. Recall injects into the acting role. L1 still needs confirm ([#189](https://github.com/jose-compu/trek/issues/189)).
 - Domain DAG and `layer-*` compose on the same turn. Trace `workflow` and `layer_workflow`. Optional Archon node `role:`. `layering: single` stays 0.12 ([#188](https://github.com/jose-compu/trek/issues/188)).
 - Mix-source: per-role `source` wins over `hierarchy.mode`. Mix-vendor verifier must be a different provider than Workhorse. Route/escalate JSONL (`trek:layer_route`) includes `source`. Remaining D26 fixture packs. `trek models benchmark --layering` writes `trek-layering-benchmark.json` from fixture traces (not a CI gate) ([#198](https://github.com/jose-compu/trek/issues/198)).
 - `/thinking briefly|deep|off` pins short-think. Compact **thinking briefly** card (1–2 lines). `LayerDecision.thinking: brief` wins. `/thinking deep` restores the 0.17 card and skips the #108 floor. The 128-token floor remains otherwise ([#197](https://github.com/jose-compu/trek/issues/197)).

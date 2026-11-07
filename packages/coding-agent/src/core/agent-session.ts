@@ -69,11 +69,13 @@ import {
 	type ArchonNodeRole,
 	type ArchonWorkflow,
 	acceptTypedLesson,
+	actingLessonRole,
 	attachLayerWorkflow,
 	checkWorkflowNodes,
 	completeDomainCommand,
 	completePatternCommand as completePatternArguments,
 	type DomainSelection,
+	detectMetaLessonTrigger,
 	runPatternCommand as executePatternCommand,
 	findLayerWorkflow,
 	formatWorkflowCheck,
@@ -95,6 +97,7 @@ import {
 	runDomainSessionCommand,
 	saveDomainWorkflow,
 	selectDomain,
+	tagRecallForRole,
 	toolingWorkflowView,
 	tryWorkflowYaml,
 	unwrapWorkflowYaml,
@@ -2606,7 +2609,8 @@ export class AgentSession {
 				this._lessonScope(),
 			);
 			if (!block.text) return;
-			this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n${block.text}`;
+			const tagged = tagRecallForRole(block.text, actingLessonRole(this.hierarchyRole));
+			this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n${tagged}`;
 			this._lastRetrievedLessonIds = block.lessonIds;
 		} catch {
 			this._lastRetrievedLessonIds = [];
@@ -3758,6 +3762,7 @@ export class AgentSession {
 			const lesson = await this._draftLesson(evidence, pattern);
 			if (!lesson) return;
 			lesson.source_turn = evidence.task.slice(0, 80);
+			lesson.layer_role = actingLessonRole(this.hierarchyRole);
 			if (lessonIsBlocked(lesson, pattern)) {
 				this.sessionManager.appendCustomEntry("trek:lesson_dropped", {
 					reason: "redacted",
@@ -3800,13 +3805,14 @@ export class AgentSession {
 		evidence: LessonEvidence,
 		pattern: ReturnType<typeof lessonPatternFor>,
 	): Promise<Lesson | undefined> {
-		if (!this.model) return undefined;
-		const first = await this._sideCall(this.model, lessonPrompt(evidence, pattern));
+		const writer = this._lessonWriterModel();
+		if (!writer) return undefined;
+		const first = await this._sideCall(writer, lessonPrompt(evidence, pattern));
 		if (!pattern) return parseLesson(first);
 		const accepted = acceptTypedLesson(first, pattern);
 		if (accepted.lesson) return accepted.lesson;
 		const repaired = acceptTypedLesson(
-			await this._sideCall(this.model, repairLessonPrompt(pattern, accepted.reason ?? "invalid")),
+			await this._sideCall(writer, repairLessonPrompt(pattern, accepted.reason ?? "invalid")),
 			pattern,
 		);
 		if (!repaired.lesson) {
@@ -3900,6 +3906,11 @@ export class AgentSession {
 		if (!lessonsEnabled() || !this.memoryActive()) return;
 		const failures = turnFailures(this.agent.state.messages.slice(turnStart));
 		if (failures.length === 0) return;
+		const meta = detectMetaLessonTrigger({
+			task: this._lastPromptTask,
+			layerWorkflow: this._turnSelection.layer_workflow,
+			thinking: this._decisionThinking,
+		});
 		await this._writeLesson(
 			{
 				kind: "error",
@@ -3907,8 +3918,31 @@ export class AgentSession {
 				failures,
 				reply: stripHonestyFooter(this._lastAssistantText()),
 			},
-			this._turnSelection.domain,
+			meta ? "meta" : this._turnSelection.domain,
 		);
+	}
+
+	/** Workhorse writes lessons (D9), including after a Planning/Frontier success. */
+	private _lessonWriterModel(): Model<any> | undefined {
+		if (!this.model) {
+			return undefined;
+		}
+		if (this.model.provider === "faux" || process.env.PI_NO_LOCAL_LLM === "1") {
+			return this.model;
+		}
+		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const workhorse = resolved.roles.workhorse;
+		if (!workhorse || workhorse.source === "api") {
+			return this.model;
+		}
+		try {
+			if (workhorse.source === "lmstudio") {
+				return this._lmStudioRoleModel(workhorse.id, workhorse.baseUrl);
+			}
+			return this._localRoleModel("workhorse", workhorse.id, resolved);
+		} catch {
+			return this.model;
+		}
 	}
 
 	private async _learnFromCorrection(text: string): Promise<void> {
@@ -4715,7 +4749,6 @@ export class AgentSession {
 			}
 			this._turnSelection = this._selectTurn(expandedText);
 			await this._learnFromCorrection(expandedText);
-			await this._injectMemory(expandedText);
 			this._appendDomainSkills(this._turnSelection);
 			if (this._usesSmallContext()) {
 				this.setActiveToolsByName([...SMALL_CONTEXT_TOOLS]);
@@ -4728,6 +4761,7 @@ export class AgentSession {
 			await this._maybeUserDescalate(expandedText);
 			await this._attachPlanningBrief(expandedText);
 			await this._bindLocalCompletion(expandedText);
+			await this._injectMemory(expandedText);
 		} catch (error) {
 			preflightResult?.(false);
 			throw error;

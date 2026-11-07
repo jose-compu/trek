@@ -6,6 +6,12 @@ categories:
   - hook_failure
   - context_bloat
   - instruction_ambiguity
+  - misroute
+  - over_escalate
+  - over_think
+  - runner_miss
+  - verifier_reject
+  - budget_stop
 areas:
   - agent_config
   - skill_authoring

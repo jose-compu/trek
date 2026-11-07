@@ -23,6 +23,8 @@ export interface Lesson {
 	status?: LessonStatus;
 	recurrence_key?: string;
 	source_turn?: string;
+	/** Role that was active when the lesson was written. */
+	layer_role?: string;
 }
 
 export interface LessonEvidence {
@@ -153,6 +155,7 @@ export function formatLesson(lesson: Lesson): string {
 	if (lesson.mistake) parts.push(`Mistake: ${lesson.mistake}`);
 	if (lesson.category) parts.push(`Category: ${lesson.category}`);
 	if (lesson.area) parts.push(`Area: ${lesson.area}`);
+	if (lesson.layer_role) parts.push(`Layer: ${lesson.layer_role}`);
 	return parts.join("\n");
 }
 
