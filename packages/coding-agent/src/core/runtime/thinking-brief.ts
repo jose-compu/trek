@@ -4,7 +4,9 @@
  */
 
 import type { ThinkingLevel } from "@trek/agent-core";
-import type { RoleThinking } from "./types.ts";
+import { parseRoleThinking, type RoleThinking } from "./types.ts";
+
+export const THINKING_PIN_CUSTOM_TYPE = "trek:thinking_pin";
 
 export const THINKING_COMMAND_USAGE = "Usage: /thinking briefly|deep|off";
 
@@ -94,6 +96,27 @@ export function sessionThinkingPin(sessionId: string | undefined): RoleThinking 
 		return undefined;
 	}
 	return sessionPins.get(sessionId);
+}
+
+export function thinkingPinFromBranch(
+	entries: readonly { type?: string; customType?: string; data?: unknown }[],
+): RoleThinking | undefined {
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i];
+		if (entry?.type !== "custom" || entry.customType !== THINKING_PIN_CUSTOM_TYPE) {
+			continue;
+		}
+		const data = entry.data;
+		if (!data || typeof data !== "object") {
+			return undefined;
+		}
+		const pin = (data as { pin?: unknown }).pin;
+		if (pin === null || pin === undefined) {
+			return undefined;
+		}
+		return parseRoleThinking(pin);
+	}
+	return undefined;
 }
 
 /** `/thinking deep` restores the 0.17 card and skips the #108 128-token floor. */

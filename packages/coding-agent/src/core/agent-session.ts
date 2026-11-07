@@ -259,7 +259,12 @@ import {
 	selectThinkRole,
 	sessionRoleForModel,
 } from "./runtime/select-role.ts";
-import { setSessionThinkingPin, thinkingLevelForPin } from "./runtime/thinking-brief.ts";
+import {
+	setSessionThinkingPin,
+	THINKING_PIN_CUSTOM_TYPE,
+	thinkingLevelForPin,
+	thinkingPinFromBranch,
+} from "./runtime/thinking-brief.ts";
 import type { RoleThinking } from "./runtime/types.ts";
 import {
 	type AntiPattern,
@@ -715,6 +720,11 @@ export class AgentSession {
 			this._effort = this._reflectiveLoop.effort;
 		}
 		this.setEffort(this.settingsManager.getEffort());
+		const restoredPin = thinkingPinFromBranch(this.sessionManager.getBranch());
+		if (restoredPin) {
+			this._thinkingPin = restoredPin;
+			setSessionThinkingPin(this.sessionManager.getSessionId(), restoredPin);
+		}
 		for (const pattern of this.settingsManager.getMutedAntiPatterns()) {
 			if (
 				pattern === "goal-drift" ||
@@ -2297,16 +2307,20 @@ export class AgentSession {
 	}
 
 	setThinkingPin(pin: RoleThinking | undefined): void {
+		const changed = pin !== this._thinkingPin;
 		this._thinkingPin = pin;
-		setSessionThinkingPin(this.sessionManager.getSessionId(), pin);
+		if (changed) {
+			this.sessionManager.appendCustomEntry(THINKING_PIN_CUSTOM_TYPE, { pin: pin ?? null });
+		}
 		this._honorThinkingPin();
 	}
 
 	private _honorThinkingPin(): void {
-		if (!this._thinkingPin) {
-			return;
+		const mapped = this._decisionThinking === "brief" ? "brief" : this._thinkingPin;
+		setSessionThinkingPin(this.sessionManager.getSessionId(), mapped);
+		if (mapped) {
+			this.setThinkingLevel(thinkingLevelForPin(mapped));
 		}
-		this.setThinkingLevel(thinkingLevelForPin(this._thinkingPin));
 	}
 
 	/** Whether agent is currently streaming a response */
@@ -2811,8 +2825,9 @@ export class AgentSession {
 	/** Footer model id for the active hierarchy role (may differ from chat `model`). */
 	private _hierarchyModelId?: string;
 	private _hierarchyModelProvider?: string;
-	/** `/thinking briefly|deep|off` pin. LayerDecision.thinking brief wins. */
+	/** `/thinking briefly|deep|off` pin. LayerDecision.thinking brief wins for the next span. */
 	private _thinkingPin?: RoleThinking;
+	private _decisionThinking?: RoleThinking;
 	/** Idle on Decision until the first prompt routes to Workhorse. */
 	private _parkedOnDecision = false;
 	/** Tools since the last Planning brief; drives optional mid-turn replan. */
@@ -3377,8 +3392,9 @@ export class AgentSession {
 			.map((part) => part.text)
 			.join("\n");
 		const decision = tryParseLayerDecision(text);
+		this._decisionThinking = decision?.thinking;
 		if (decision?.thinking === "brief") {
-			this.setThinkingPin("brief");
+			this._honorThinkingPin();
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
@@ -4589,6 +4605,8 @@ export class AgentSession {
 			this._ensureReproducibilityTrace();
 			({ promptId } = this._assignPromptNumber(expandedText));
 			this._lastPromptTask = expandedText;
+			this._decisionThinking = undefined;
+			setSessionThinkingPin(this.sessionManager.getSessionId(), this._thinkingPin);
 
 			// Emit before_agent_start extension event
 			const result = await this._extensionRunner.emitBeforeAgentStart(

@@ -268,9 +268,11 @@ export {
 	setSessionThinkingPin,
 	skipShortTraceCap,
 	THINKING_COMMAND_USAGE,
+	THINKING_PIN_CUSTOM_TYPE,
 	thinkingCardTitle,
 	thinkingCardViewport,
 	thinkingLevelForPin,
+	thinkingPinFromBranch,
 } from "./thinking-brief.ts";
 export {
 	assertPublicModelId,

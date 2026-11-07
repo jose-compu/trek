@@ -17,9 +17,11 @@ import {
 	effectiveThinkingPin,
 	parseThinkingCommand,
 	runThinkingCommand,
+	THINKING_PIN_CUSTOM_TYPE,
 	thinkingCardTitle,
 	thinkingCardViewport,
 	thinkingLevelForPin,
+	thinkingPinFromBranch,
 } from "../../../src/core/runtime/thinking-brief.ts";
 import { loadLayeringCase } from "./load-fixture.ts";
 
@@ -88,5 +90,15 @@ describe("/thinking briefly", () => {
 		expect(decision).toMatchObject(pack.expect);
 		expect(thinkingCardTitle(decision.thinking)).toBe("thinking briefly");
 		expect(tokensBeforeTool(apiShortTraceFixture())).toBeLessThanOrEqual(128);
+	});
+
+	it("restores the last trek:thinking_pin custom entry from the session branch", () => {
+		expect(
+			thinkingPinFromBranch([
+				{ type: "custom", customType: THINKING_PIN_CUSTOM_TYPE, data: { pin: "brief" } },
+				{ type: "custom", customType: THINKING_PIN_CUSTOM_TYPE, data: { pin: "deep" } },
+			]),
+		).toBe("deep");
+		expect(thinkingPinFromBranch([{ type: "message" }])).toBeUndefined();
 	});
 });

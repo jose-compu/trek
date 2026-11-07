@@ -3514,7 +3514,6 @@ export class InteractiveMode {
 					this.getMarkdownThemeWithSettings(),
 					this.hiddenThinkingLabel,
 					this.toolOutputExpanded,
-					this.session.thinkingPin === "brief",
 				);
 				this.chatContainer.addChild(assistantComponent);
 				break;
@@ -4082,8 +4081,11 @@ export class InteractiveMode {
 	}
 
 	showThinkingCommand(arg: string): void {
-		const result = runThinkingCommand(this.session.thinkingPin, arg);
-		this.session.setThinkingPin(result.pin);
+		const before = this.session.thinkingPin;
+		const result = runThinkingCommand(before, arg);
+		if (arg.trim() && result.pin !== before) {
+			this.session.setThinkingPin(result.pin);
+		}
 		this.streamingComponent?.setThinkingBrief(this.session.thinkingPin === "brief");
 		this.footer.invalidate();
 		this.chatContainer.addChild(new Spacer(1));
