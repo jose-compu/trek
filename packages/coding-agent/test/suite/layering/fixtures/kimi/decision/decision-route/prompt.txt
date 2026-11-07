@@ -1,0 +1,1 @@
+Should we format package.json with the repo prettier recipe?

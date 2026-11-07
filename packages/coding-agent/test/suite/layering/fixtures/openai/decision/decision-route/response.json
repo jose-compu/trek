@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"action\":\"continue\",\"target\":\"script\",\"thinking\":\"off\",\"confidence\":\"high\",\"reason\":\"format is a recipe\",\"evidence\":[\"prettier\"]}"
+			}
+		}
+	]
+}
