@@ -2,6 +2,8 @@
  * Planning brief + optional mid-turn replan when Workhorse elevates or a tool fails.
  */
 
+import type { HandoffBrief } from "./layer-decision.ts";
+
 export const PLANNING_REPLAN_EVERY = 3;
 
 export function planningReplanEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -34,11 +36,12 @@ export function shouldReplanAfterTool(input: {
 	return false;
 }
 
-export function planningBriefPrompt(task: string, why?: string): string {
+export function planningBriefPrompt(task: string, why?: string, handoff?: HandoffBrief): string {
 	const lines = [
 		"Reply with a short plan only.",
 		'JSON: {"goal":"...","files":["..."],"order":["..."],"next":"read|write|edit|bash ...","stop":"..."}',
 		"Do not call tools. Do not write file contents.",
+		"Do not repeat a failed command from the handoff as the first act.",
 		"",
 		"Task:",
 		task,
@@ -46,6 +49,7 @@ export function planningBriefPrompt(task: string, why?: string): string {
 	if (why?.trim()) {
 		lines.push("", "Elevation reason:", why.trim());
 	}
+	appendHandoff(lines, handoff);
 	return lines.join("\n");
 }
 
@@ -56,6 +60,7 @@ export function planningReplanPrompt(input: {
 	resultSnippet: string;
 	isError: boolean;
 	why?: string;
+	handoff?: HandoffBrief;
 }): string {
 	const status = input.isError ? "failed" : "ok";
 	const lines = [
@@ -75,7 +80,23 @@ export function planningReplanPrompt(input: {
 	if (input.why?.trim()) {
 		lines.push("", "Elevation reason:", input.why.trim());
 	}
+	appendHandoff(lines, input.handoff);
 	return lines.join("\n");
+}
+
+function appendHandoff(lines: string[], handoff?: HandoffBrief): void {
+	if (!handoff) {
+		return;
+	}
+	lines.push(
+		"",
+		"Handoff brief:",
+		`goal: ${handoff.goal}`,
+		`constraints: ${handoff.constraints}`,
+		`tried: ${handoff.tried}`,
+		`evidence: ${handoff.evidence.join("; ") || "(none)"}`,
+		`open question: ${handoff.openQuestion}`,
+	);
 }
 
 export function extractPlanBody(systemPrompt: string): string {

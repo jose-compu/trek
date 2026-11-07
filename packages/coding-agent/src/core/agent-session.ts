@@ -3083,7 +3083,7 @@ export class AgentSession {
 			return;
 		}
 		try {
-			const brief = await this._sideCall(model, planningBriefPrompt(text, elevate?.why));
+			const brief = await this._sideCall(model, planningBriefPrompt(text, elevate?.why, elevate?.handoff));
 			const trimmed = brief.trim();
 			if (!trimmed) {
 				return;
@@ -3451,6 +3451,7 @@ export class AgentSession {
 					resultSnippet: toolResultSnippet(result),
 					isError,
 					why: elevate?.why,
+					handoff: elevate?.handoff,
 				}),
 			);
 			const trimmed = brief.trim();

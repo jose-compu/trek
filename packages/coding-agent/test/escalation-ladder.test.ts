@@ -18,6 +18,7 @@ import {
 	parseDescalateSignal,
 	parseEscalateAsk,
 	parseEscalateSignal,
+	planningBriefPrompt,
 	prevLadderRole,
 	resolveDescalateTarget,
 	resolveEscalateTarget,
@@ -246,5 +247,9 @@ Received arguments:
 			evidence: [],
 		});
 		expect(parseEscalateAsk(empty)).toBeUndefined();
+		const prompt = planningBriefPrompt("fix the login", "two failed fixes", climbHandoffBrief("two failed fixes"));
+		expect(prompt).toMatch(/Handoff brief:/);
+		expect(prompt).toMatch(/tried: two failed fixes/);
+		expect(prompt).toMatch(/Do not repeat a failed command/);
 	});
 });
