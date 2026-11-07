@@ -49,7 +49,7 @@ export {
 	workflowFactRefusal,
 } from "./parameters.ts";
 export { completePatternCommand, runPatternCommand } from "./pattern-command.ts";
-export { runArchonWorkflow, type WorkflowNodeResult } from "./run.ts";
+export { runArchonNode, runArchonWorkflow, type WorkflowNodeResult } from "./run.ts";
 export {
 	type DomainSelection,
 	formatSelection,

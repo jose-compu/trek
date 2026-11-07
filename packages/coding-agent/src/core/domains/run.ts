@@ -37,14 +37,14 @@ export async function runArchonWorkflow(
 	const outputs = new Map<string, string>();
 	const results: WorkflowNodeResult[] = [];
 	for (const node of orderNodes(workflow)) {
-		const output = await callNode(workflow, node, options, outputs);
+		const output = await runArchonNode(workflow, node, options, outputs);
 		outputs.set(node.id, output);
 		results.push({ id: node.id, output });
 	}
 	return results;
 }
 
-async function callNode(
+export async function runArchonNode(
 	workflow: ArchonWorkflow,
 	node: ArchonNode,
 	options: RunArchonOptions,

@@ -153,6 +153,10 @@ export function parseHandoffBrief(value: unknown): HandoffBrief | undefined {
 	};
 }
 
+export function tryLayerSubtaskResult(text: string): LayerSubtaskResult | undefined {
+	return trySubtask(text);
+}
+
 export function parseLayerSubtaskResult(text: string, retry?: () => string | undefined): LayerSubtaskResult {
 	const first = trySubtask(text);
 	if (first) {

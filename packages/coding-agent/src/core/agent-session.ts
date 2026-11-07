@@ -65,6 +65,7 @@ import {
 } from "./compaction/index.ts";
 import { DEFAULT_THINKING_LEVEL } from "./defaults.ts";
 import {
+	type ArchonNode,
 	type ArchonWorkflow,
 	acceptTypedLesson,
 	checkWorkflowNodes,
@@ -84,6 +85,7 @@ import {
 	readDomainSkills,
 	repairLessonPrompt,
 	restoreDomainWorkflow,
+	runArchonNode,
 	runArchonWorkflow,
 	runDomainSessionCommand,
 	saveDomainWorkflow,
@@ -226,7 +228,8 @@ import {
 	startLadderRole,
 	stripEscalateSignal,
 } from "./runtime/escalate.ts";
-import { climbHandoffBrief, type HandoffBrief } from "./runtime/layer-decision.ts";
+import { climbHandoffBrief, type HandoffBrief, tryLayerSubtaskResult } from "./runtime/layer-decision.ts";
+import { runLayerWorkflow } from "./runtime/layer-execute.ts";
 import { localLlamaChatModel } from "./runtime/local-llama-model.ts";
 import { LMSTUDIO_PROVIDER, LOCAL_LLAMA_PROVIDER, lmStudioChatModel } from "./runtime/local-model.ts";
 import { LOCAL_SUITE_WORK_SECTION } from "./runtime/local-work.ts";
@@ -4016,11 +4019,11 @@ export class AgentSession {
 		}
 		const previousTools = this.getActiveToolNames();
 		const turnStart = this.agent.state.messages.length;
-		const results = await runArchonWorkflow(workflow, {
+		const archonOptions = {
 			cwd: this._cwd,
 			userMessage: this._lastPromptTask,
 			facts,
-			runPrompt: async (prompt, node) => {
+			runPrompt: async (prompt: string, node: ArchonNode) => {
 				this.setActiveToolsByName(node.allowedTools ?? []);
 				try {
 					await this.agent.prompt(prompt);
@@ -4029,7 +4032,57 @@ export class AgentSession {
 				}
 				return stripHonestyFooter(this._lastAssistantText()).trim();
 			},
-		});
+		};
+		let results: Array<{ id: string; output: string }>;
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const kimiSwarm = process.env.TREK_KIMI_SWARM === "1";
+		if (workflow.name.startsWith("layer-") && config.hierarchy.layering !== "single" && !kimiSwarm) {
+			const outputs = new Map<string, string>();
+			let promptGate: Promise<void> = Promise.resolve();
+			const executed = await runLayerWorkflow({
+				workflow,
+				layering: config.hierarchy.layering,
+				seed: this._reproducibility.seed,
+				kimiSwarm,
+				runNode: async (node) => {
+					const previous = promptGate;
+					let release: () => void = () => {};
+					promptGate = new Promise<void>((resolve) => {
+						release = resolve;
+					});
+					await previous;
+					try {
+						const output = await runArchonNode(workflow, node, archonOptions, outputs);
+						outputs.set(node.id, output);
+						const parsed = tryLayerSubtaskResult(output);
+						if (parsed) {
+							return {
+								id: node.id,
+								output: parsed.output || output,
+								evidence: parsed.evidence,
+								status: parsed.status,
+								...(parsed.winner ? { winner: parsed.winner } : {}),
+								...(parsed.handoff ? { handoff: parsed.handoff } : {}),
+							};
+						}
+						return { id: node.id, output, status: "ok" as const };
+					} finally {
+						release();
+					}
+				},
+			});
+			results = [...outputs.entries()].map(([id, output]) => ({ id, output }));
+			if (results.length === 0) {
+				results = [{ id: executed.result.workflow, output: executed.result.output }];
+			}
+			if (executed.result.status === "halt") {
+				this._workflowCheck = executed.result.output;
+				this._emit({ type: "workflow_check", text: executed.result.output });
+				return;
+			}
+		} else {
+			results = await runArchonWorkflow(workflow, archonOptions);
+		}
 		const findings = checkWorkflowNodes(
 			this._lastPromptTask,
 			workflow.nodes.map((node) => ({

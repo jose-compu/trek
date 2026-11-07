@@ -6,6 +6,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ### Added
 
+- Layer-* Archon workflows execute through cpa-agents. Join is one `layer_join`. `layering: single` and Kimi Swarm skip CPA ([#195](https://github.com/jose-compu/trek/issues/195), [#196](https://github.com/jose-compu/trek/issues/196)).
 - `/hierarchy auto --catalog <file>` and `trek models set-layering auto --catalog <file>` fill slots from a tagged catalog. Heuristic uses tags/thinking/price, not compiled SKU names. One chat model stays `single`. Verifier and Decision stay unbound. Layered `api` climbs the mapped SKUs instead of collapsing to Frontier ([#194](https://github.com/jose-compu/trek/issues/194)).
 - Climb is Workhorse ⇄ Planning ⇄ Frontier. Decision routes Scripts or Workhorse. Tooling is a delegate runner, not a rung. Unbound Frontier aliases Planning. Handoff brief on code-triggered climbs ([#193](https://github.com/jose-compu/trek/issues/193)).
 - Typed `LayerDecision`, handoff brief, and `LayerSubtaskResult`. Vendor-safe JSON Schema (no `minLength`/`maxItems`). Bad JSON retries once then a safe Workhorse continue. Faux harness under `test/suite/layering/` ([#191](https://github.com/jose-compu/trek/issues/191)).
