@@ -2865,7 +2865,8 @@ export class AgentSession {
 			this._restoreApiSessionModel();
 			const api = this.model;
 			if (api && !(options?.keepDecisionDisplay && this._parkedOnDecision)) {
-				const shown = sessionRoleForModel(resolved, api) ?? selection.role;
+				const shown =
+					sessionRoleForModel(resolved, api) ?? (resolved.roles.workhorse ? "frontier" : selection.role);
 				this._emitHierarchyModel(shown, api.provider, api.id);
 			}
 			return;

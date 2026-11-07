@@ -86,6 +86,13 @@ describe("catalog auto-map", () => {
 		expect("decision" in mapped.roles).toBe(false);
 	});
 
+	it("auto without a catalog keeps factory api Frontier", () => {
+		const config = withHierarchy(defaultRuntimeConfig(), { layering: "auto" });
+		const resolved = resolveRuntime(config, { frontier: { provider: "xai", modelId: "grok-4" } });
+		expect(resolved.roles.frontier?.id).toBe("grok-4");
+		expect(resolved.roles.workhorse).toBeUndefined();
+	});
+
 	it("writes auto roles into config and resolve skips suite extras", () => {
 		const config = applyAutoLayering(defaultRuntimeConfig(), load("openai"));
 		expect(config.hierarchy.layering).toBe("auto");

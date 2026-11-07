@@ -107,9 +107,10 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 	}
 
 	if (config.hierarchy.layering === "auto") {
+		const catalogBound = Boolean(config.roles.workhorse);
 		for (const name of ["tooling", "workhorse", "planning", "frontier"] as const) {
 			if (skipExtraRole(config, name)) {
-				if (name !== "workhorse") {
+				if (catalogBound && name !== "workhorse") {
 					delete roles[name];
 				}
 				continue;
