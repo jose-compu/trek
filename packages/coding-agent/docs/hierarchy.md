@@ -10,7 +10,7 @@ Trek can run one API chat model, or a local / hybrid **ladder** of roles. Each t
 | `local` | Decision → Tooling → Workhorse → Planning. No Frontier. |
 | `hybrid` | Same as local, plus Frontier (API) at the top. |
 
-Configure with `trek models set-mode …`, `~/.trek/models.yaml`, project `.trek/models.yaml`, or `/hierarchy` (0.16).
+Configure with `trek models set-mode …`, `~/.trek/models.yaml`, project `.trek/models.yaml`, or `/hierarchy` (0.16). Pre-0.18 files with `mode: local` or `hybrid` and no `layering` key load as `manual` so the suite ladder stays intact.
 
 ## Layering (0.18)
 

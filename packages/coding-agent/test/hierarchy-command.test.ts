@@ -153,6 +153,17 @@ describe("/hierarchy", () => {
 		expect(resolveRuntime(afterClear, { frontier: null }).roles.planning).toBeUndefined();
 	});
 
+	it("treats pre-0.18 local YAML without layering as manual", () => {
+		const { agentDir, cwd } = isolated();
+		const path = globalModelsYamlPath(agentDir);
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, ["hierarchy:", "  mode: local", "  suite: mistral", "roles: {}", ""].join("\n"));
+		const loaded = loadRuntimeConfig({ agentDir, cwd });
+		expect(loaded.hierarchy.layering).toBe("manual");
+		expect(resolveRuntime(loaded, { frontier: null }).roles.planning).toBeDefined();
+		expect(resolveRuntime(loaded, { frontier: null }).roles.tooling).toBeDefined();
+	});
+
 	it("reads legacy YAML thinking booleans", () => {
 		const { agentDir, cwd } = isolated();
 		const path = globalModelsYamlPath(agentDir);

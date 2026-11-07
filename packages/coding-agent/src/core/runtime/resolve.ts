@@ -5,7 +5,7 @@
 
 import { suitePreset } from "./suites.ts";
 import type { HierarchyMode, RoleAssignment, RuntimeConfig, RuntimeRole } from "./types.ts";
-import { isLayeringExtraRole, SESSION_LOCAL_ROLES, type SessionLocalRole } from "./types.ts";
+import { isLayeringExtraRole, LOCAL_SERVER_ROLES, SESSION_LOCAL_ROLES, type SessionLocalRole } from "./types.ts";
 
 export interface FrontierHint {
 	provider: string;
@@ -61,7 +61,7 @@ function sessionNeedsLocalWeights(mode: HierarchyMode, roles: Partial<Record<Run
 	if (mode === "api") {
 		return false;
 	}
-	return SESSION_LOCAL_ROLES.some((role) => roles[role]?.source === "local");
+	return LOCAL_SERVER_ROLES.some((role) => roles[role]?.source === "local");
 }
 
 export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOptions = {}): ResolvedRuntime {

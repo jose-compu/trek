@@ -155,6 +155,8 @@ function parseHierarchy(value: unknown, path: string, current: HierarchySettings
 			throw new Error(`${path}: hierarchy.layering must be single, auto, or manual.`);
 		}
 		next.layering = record.layering;
+	} else if (next.mode === "local" || next.mode === "hybrid") {
+		next.layering = "manual";
 	}
 	if (record.unbound !== undefined) {
 		if (!Array.isArray(record.unbound)) {
