@@ -5,15 +5,20 @@
 
 import { describe, expect, it } from "vitest";
 import {
+	asClimbRole,
+	climbHandoffBrief,
 	defaultRuntimeConfig,
 	formatDescalateCard,
 	formatEscalateCard,
+	frontierConsultRole,
 	isToolArgumentValidationError,
 	nextLadderRole,
+	parseDelegateAsk,
 	parseDescalateAsk,
 	parseDescalateSignal,
 	parseEscalateAsk,
 	parseEscalateSignal,
+	planningBriefPrompt,
 	prevLadderRole,
 	resolveDescalateTarget,
 	resolveEscalateTarget,
@@ -45,14 +50,13 @@ function hybridResolved() {
 }
 
 describe("escalation ladder", () => {
-	it("starts on Tooling and climbs Tooling → Workhorse → Planning (local)", () => {
+	it("starts on Workhorse and climbs Workhorse → Planning (local)", () => {
 		const resolved = localResolved();
-		expect(startLadderRole(resolved)).toBe("tooling");
-		expect(nextLadderRole("tooling", resolved)).toBe("workhorse");
+		expect(startLadderRole(resolved)).toBe("workhorse");
 		expect(nextLadderRole("workhorse", resolved)).toBe("planning");
 		expect(nextLadderRole("planning", resolved)).toBeUndefined();
-		expect(formatEscalateCard("tooling", "workhorse", "need stronger act")).toBe(
-			"↑ tooling → workhorse · need stronger act",
+		expect(formatEscalateCard("workhorse", "planning", "need stronger act")).toBe(
+			"↑ workhorse → planning · need stronger act",
 		);
 	});
 
@@ -94,23 +98,22 @@ describe("escalation ladder", () => {
 			why: "stuck",
 			explicit: true,
 		});
-		expect(parseEscalateSignal('{"escalate":"planning","why":"design"}', "tooling", resolved)?.tier).toBe("planning");
+		expect(parseEscalateSignal('{"escalate":"planning","why":"design"}', "workhorse", resolved)?.tier).toBe(
+			"planning",
+		);
 		const pretty = '```json\n{\n  "escalate": "next",\n  "why": "needs plan"\n}\n```';
 		expect(parseEscalateAsk(pretty)?.requested).toBe("next");
-		expect(parseEscalateSignal(pretty, "tooling", resolved)?.tier).toBe("workhorse");
-		// Tiny Tooling models sometimes omit the opening brace.
-		expect(parseEscalateAsk('escalate":"workhorse"')?.requested).toBe("workhorse");
-		expect(parseEscalateSignal('escalate":"workhorse"', "tooling", resolved)?.tier).toBe("workhorse");
-		// Same-or-lower named tier still climbs one step.
-		expect(resolveEscalateTarget("workhorse", "tooling", resolved)).toBe("planning");
+		expect(parseEscalateSignal(pretty, "workhorse", resolved)?.tier).toBe("planning");
+		expect(parseEscalateAsk('escalate":"planning"')?.requested).toBe("planning");
+		expect(parseEscalateSignal('escalate":"planning"', "workhorse", resolved)?.tier).toBe("planning");
 		expect(resolveEscalateTarget("workhorse", "workhorse", resolved)).toBe("planning");
 		expect(stripEscalateSignal('done\n{"escalate":"next","why":"x"}\nmore')).toBe("done\n\nmore");
 	});
 
 	it("soft stuck phrases ask for the next tier", () => {
 		const resolved = localResolved();
-		const soft = parseEscalateSignal("I am stuck deciding the architecture", "tooling", resolved);
-		expect(soft).toMatchObject({ tier: "workhorse", explicit: false });
+		const soft = parseEscalateSignal("I am stuck deciding the architecture", "workhorse", resolved);
+		expect(soft).toMatchObject({ tier: "planning", explicit: false });
 	});
 
 	it("in-tier answers do not escalate", () => {
@@ -129,13 +132,13 @@ describe("escalation ladder", () => {
 		];
 		for (const text of answers) {
 			expect(parseEscalateAsk(text), text).toBeUndefined();
-			expect(parseEscalateSignal(text, "tooling", resolved), text).toBeUndefined();
+			expect(parseEscalateSignal(text, "workhorse", resolved), text).toBeUndefined();
 		}
 	});
 
 	it("session bind climbs when elevateTo is set; think only at planning+", () => {
 		const resolved = localResolved();
-		expect(selectSessionRole({ text: "list files", resolved }).role).toBe("tooling");
+		expect(selectSessionRole({ text: "list files", resolved }).role).toBe("workhorse");
 		expect(selectSessionRole({ text: "list files", resolved, elevateTo: "workhorse" }).role).toBe("workhorse");
 		expect(selectSessionRole({ text: "list files", resolved, elevateTo: "planning" }).role).toBe("planning");
 		expect(selectThinkRole({ text: "list files", resolved })).toBeUndefined();
@@ -143,22 +146,15 @@ describe("escalation ladder", () => {
 		expect(selectThinkRole({ text: "list files", resolved, elevateTo: "planning" })?.role).toBe("planning");
 	});
 
-	it("simulates a Tooling failure then explicit Planning ask for a hard decision", () => {
+	it("simulates Workhorse stuck then Planning consult of Frontier", () => {
 		const hybrid = hybridResolved();
 		let floor = startLadderRole(hybrid);
-		expect(floor).toBe("tooling");
+		expect(floor).toBe("workhorse");
 
-		// Two tool failures → next
-		const afterFail = resolveEscalateTarget(floor, "next", hybrid);
-		expect(afterFail).toBe("workhorse");
-		floor = afterFail!;
-
-		// Workhorse still stuck on architecture → planning
 		const afterStuck = parseEscalateSignal("I am stuck on the architecture", floor, hybrid);
 		expect(afterStuck?.tier).toBe("planning");
 		floor = afterStuck!.tier;
 
-		// Planning asks for Frontier on a deep bug
 		const toFrontier = parseEscalateSignal(
 			'{"escalate":"frontier","why":"distributed consensus tradeoffs"}',
 			floor,
@@ -184,9 +180,10 @@ Received arguments:
 	it("drops Planning → Workhorse on descalate and refuses escalate demotion", () => {
 		const resolved = localResolved();
 		expect(prevLadderRole("planning", resolved)).toBe("workhorse");
-		expect(prevLadderRole("tooling", resolved)).toBeUndefined();
+		expect(prevLadderRole("workhorse", resolved)).toBeUndefined();
 		expect(resolveDescalateTarget("planning", "workhorse", resolved)).toBe("workhorse");
 		expect(resolveDescalateTarget("planning", "next", resolved)).toBe("workhorse");
+		expect(resolveDescalateTarget("workhorse", "next", resolved)).toBe("decision");
 		expect(parseDescalateAsk('{"descalate":"workhorse","why":"simple typo"}')).toEqual({
 			requested: "workhorse",
 			why: "simple typo",
@@ -195,12 +192,64 @@ Received arguments:
 		expect(parseDescalateSignal('{"descalate":"next","why":"easy edit"}', "planning", resolved)?.tier).toBe(
 			"workhorse",
 		);
-		expect(parseDescalateSignal("hand off to tooling", "planning", resolved)?.tier).toBe("tooling");
-		expect(parseDescalateSignal("descalate to tooling", "planning", resolved)?.tier).toBe("tooling");
-		// Escalate JSON still cannot demote (weak model protection).
-		expect(resolveEscalateTarget("workhorse", "tooling", resolved)).toBe("planning");
-		expect(parseEscalateAsk('{"descalate":"tooling","why":"x"}')).toBeUndefined();
+		expect(parseDescalateSignal("hand off to tooling", "planning", resolved)).toBeUndefined();
+		expect(parseEscalateAsk('{"descalate":"workhorse","why":"x"}')).toBeUndefined();
 		expect(stripEscalateSignal('done\n{"descalate":"next","why":"x"}\nmore')).toBe("done\n\nmore");
 		expect(formatDescalateCard("planning", "workhorse", "simple typo")).toBe("↓ planning → workhorse · simple typo");
+	});
+
+	it("does not climb to Tooling; delegate+tooling is a runner", () => {
+		const resolved = localResolved();
+		expect(parseEscalateAsk('{"escalate":"tooling","why":"search"}')).toBeUndefined();
+		expect(parseEscalateSignal('{"escalate":"tooling","why":"search"}', "workhorse", resolved)).toBeUndefined();
+		expect(asClimbRole("tooling", resolved)).toBe("workhorse");
+		expect(parseDelegateAsk('{"action":"delegate","target":"tooling","reason":"grep the log"}')).toEqual({
+			target: "tooling",
+			why: "grep the log",
+			explicit: true,
+		});
+		expect(parseDelegateAsk("hand off to tooling")?.target).toBe("tooling");
+		expect(parseEscalateAsk("hand off to tooling")).toBeUndefined();
+	});
+
+	it("aliases Frontier consult to Planning when no third id is bound", () => {
+		const local = localResolved();
+		expect(frontierConsultRole(local)).toEqual({ role: "planning", aliased: true });
+		expect(resolveEscalateTarget("workhorse", "frontier", local)).toBe("planning");
+		expect(parseEscalateSignal('{"escalate":"frontier","why":"consult"}', "workhorse", local)).toMatchObject({
+			tier: "planning",
+			aliased: true,
+		});
+		expect(resolveEscalateTarget("planning", "frontier", local)).toBeUndefined();
+	});
+
+	it("parses LayerDecision escalate with evidence and builds a handoff brief", () => {
+		const resolved = localResolved();
+		const text = JSON.stringify({
+			action: "escalate",
+			target: "planning",
+			confidence: "high",
+			reason: "two failed fixes",
+			evidence: ["write missing path", "second retry failed"],
+		});
+		expect(parseEscalateSignal(text, "workhorse", resolved)?.tier).toBe("planning");
+		expect(climbHandoffBrief("two failed fixes")).toMatchObject({
+			goal: "continue the task",
+			tried: "two failed fixes",
+			evidence: ["two failed fixes"],
+			openQuestion: "two failed fixes",
+		});
+		const empty = JSON.stringify({
+			action: "escalate",
+			target: "planning",
+			confidence: "low",
+			reason: "guess",
+			evidence: [],
+		});
+		expect(parseEscalateAsk(empty)).toBeUndefined();
+		const prompt = planningBriefPrompt("fix the login", "two failed fixes", climbHandoffBrief("two failed fixes"));
+		expect(prompt).toMatch(/Handoff brief:/);
+		expect(prompt).toMatch(/tried: two failed fixes/);
+		expect(prompt).toMatch(/Do not repeat a failed command/);
 	});
 });

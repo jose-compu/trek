@@ -244,7 +244,7 @@ class LiveRoleServer {
 }
 
 function ladderAtOrAbove(got: LadderRole, min: LadderRole): boolean {
-	const order: LadderRole[] = ["tooling", "workhorse", "planning", "frontier"];
+	const order: LadderRole[] = ["workhorse", "planning", "frontier"];
 	return order.indexOf(got) >= order.indexOf(min);
 }
 
@@ -256,14 +256,14 @@ describe.skipIf(!live)("local models escalate when stuck (matrix)", () => {
 		await Promise.all(servers.map((server) => server.stop()));
 	});
 
-	it("mistral suite still starts on Tooling until Decision lands", () => {
+	it("mistral suite starts the climb on Workhorse", () => {
 		const resolved = resolveRuntime(
 			withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "mistral" }),
 			{
 				frontier: null,
 			},
 		);
-		expect(startLadderRole(resolved)).toBe("tooling");
+		expect(startLadderRole(resolved)).toBe("workhorse");
 	});
 
 	for (const suite of SUITES) {
@@ -290,7 +290,7 @@ describe.skipIf(!live)("local models escalate when stuck (matrix)", () => {
 			);
 			const modelId = local.roles[role]?.id;
 			const available = Boolean(modelId && fits(modelId));
-			const floor = role as LadderRole;
+			const floor: LadderRole = role === "tooling" ? "workhorse" : role;
 			const next = resolveEscalateTarget(floor, "next", hybrid);
 
 			it.skipIf(!available)(
@@ -331,7 +331,7 @@ describe.skipIf(!live)("local models escalate when stuck (matrix)", () => {
 						}
 
 						// Demotion refuse is pure policy; assert once per battery.
-						expect(resolveEscalateTarget("workhorse", "tooling", hybrid)).toBe("planning");
+						expect(resolveEscalateTarget("workhorse", "workhorse", hybrid)).toBe("planning");
 					} finally {
 						await server.stop();
 					}
@@ -392,7 +392,7 @@ describe.skipIf(!live)("local models escalate when stuck (matrix)", () => {
 		try {
 			const t1 = await tooling.complete(HARD_DECISION);
 			console.log(`chain tooling:\n${t1.slice(0, 300)}`);
-			expect(parseEscalateSignal(t1, "tooling", hybrid)?.tier).toBe("workhorse");
+			expect(parseEscalateSignal(t1, "workhorse", hybrid)?.tier).toBe("planning");
 
 			await workhorse.start();
 			const t2 = await workhorse.complete(HARD_DECISION);
@@ -412,7 +412,7 @@ describe.skipIf(!live)("local models escalate when stuck (matrix)", () => {
 			},
 		);
 		const fenced = '```json\n{"escalate":"next","why":"needs plan"}\n```';
-		expect(parseEscalateSignal(fenced, "tooling", hybrid)?.tier).toBe("workhorse");
+		expect(parseEscalateSignal(fenced, "workhorse", hybrid)?.tier).toBe("planning");
 		expect(parseEscalateAsk(fenced)?.explicit).toBe(true);
 	});
 });

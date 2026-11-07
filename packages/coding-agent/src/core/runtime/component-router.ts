@@ -1,6 +1,6 @@
 /**
  * Per-component model assignment (0.9.0).
- * Ladder: Tooling → Workhorse → Planning → Frontier.
+ * Ladder: Workhorse → Planning → Frontier. Tooling is opt-in via a YAML pin or delegate.
  */
 
 import { frontierBound, nextLadderRole, startLadderRole } from "./escalate.ts";
@@ -11,13 +11,13 @@ import { type RouteComponent, type RouteRole, roleThinkingEnabled } from "./type
 
 const COMPONENT_ROLE: Record<RouteComponent, RouteRole> = {
 	worldModel: "planning",
-	toolIntent: "tooling",
-	mechanical: "tooling",
+	toolIntent: "workhorse",
+	mechanical: "workhorse",
 	intend: "planning",
 };
 
-/** Smaller chat models first. A retry or escalate moves up. */
-const TIER: RouteRole[] = ["tooling", "workhorse", "planning", "frontier"];
+/** Climb order. Tooling is not a rung; a YAML pin may still name it. */
+const TIER: RouteRole[] = ["workhorse", "planning", "frontier"];
 
 export interface ComponentRouteInput {
 	component: RouteComponent;
@@ -52,7 +52,7 @@ export function routeComponent(input: ComponentRouteInput): RoleSelection {
 		return assign(input.resolved, after, `${input.component} failed ${retries} times; next tier after ${base}`);
 	}
 	if (lowBudget || input.component === "mechanical") {
-		const role = input.minRole ?? (input.component === "mechanical" ? "tooling" : "workhorse");
+		const role = input.minRole ?? "workhorse";
 		const used = floorRole(role, input.minRole, input.resolved);
 		return assign(input.resolved, used, workhorseReason(input.component, lowBudget, used));
 	}
@@ -64,13 +64,23 @@ function floorRole(base: RouteRole, minRole: RouteRole | undefined, resolved: Re
 	if (!minRole) {
 		return resolveAvailable(base, resolved);
 	}
-	const baseIndex = TIER.indexOf(base);
+	if (minRole === "tooling") {
+		return resolveAvailable("tooling", resolved);
+	}
+	const climbBase = base === "tooling" ? "workhorse" : base;
+	const baseIndex = TIER.indexOf(climbBase);
 	const minIndex = TIER.indexOf(minRole);
-	const pick = minIndex > baseIndex ? minRole : base;
+	const pick = minIndex > baseIndex ? minRole : climbBase;
 	return resolveAvailable(pick, resolved);
 }
 
 function resolveAvailable(role: RouteRole, resolved: ResolvedRuntime): RouteRole {
+	if (role === "tooling") {
+		if (resolved.roles.tooling) {
+			return "tooling";
+		}
+		return startLadderRole(resolved);
+	}
 	if (role === "frontier") {
 		if (frontierBound(resolved)) {
 			return "frontier";
@@ -80,7 +90,7 @@ function resolveAvailable(role: RouteRole, resolved: ResolvedRuntime): RouteRole
 	if (resolved.roles[role]) {
 		return role;
 	}
-	const next = nextLadderRole(role === "tooling" ? "tooling" : role, resolved);
+	const next = nextLadderRole(role, resolved);
 	if (next) {
 		return next;
 	}
@@ -106,23 +116,11 @@ function workhorseReason(component: RouteComponent, lowBudget: boolean, role: Ro
 }
 
 function nextTier(role: RouteRole, resolved: ResolvedRuntime): RouteRole {
-	const index = TIER.indexOf(role);
-	for (let cursor = index + 1; cursor < TIER.length; cursor++) {
-		const candidate = TIER[cursor];
-		if (!candidate) {
-			continue;
-		}
-		if (candidate === "frontier") {
-			if (frontierBound(resolved)) {
-				return "frontier";
-			}
-			continue;
-		}
-		if (resolved.roles[candidate]) {
-			return candidate;
-		}
+	if (role === "tooling") {
+		return nextLadderRole("workhorse", resolved) ?? startLadderRole(resolved);
 	}
-	return role;
+	const next = nextLadderRole(role, resolved);
+	return next ?? role;
 }
 
 function assign(resolved: ResolvedRuntime, role: RouteRole, reason: string): RoleSelection {

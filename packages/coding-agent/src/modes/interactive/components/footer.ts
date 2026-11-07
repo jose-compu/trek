@@ -207,7 +207,7 @@ export class FooterComponent implements Component {
 		let statsLeft = statsParts.join(" ");
 
 		// Active model on the right. In hierarchy mode, include the ladder role so
-		// Decision → Tooling → … → Frontier switches are visible in the footer.
+		// Decision → Workhorse → … → Frontier switches are visible in the footer.
 		// Prefer hierarchyModelId so Decision (d1) shows even while Tooling is warmed.
 		const hierarchyRole = this.session.hierarchyRole;
 		const modelName = this.session.hierarchyModelId || state.model?.id || "no-model";

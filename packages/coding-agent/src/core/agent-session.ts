@@ -213,6 +213,7 @@ import {
 import { formatDecisionSolveCard, runDecisionIndex } from "./runtime/decision-index.ts";
 import { decisionTemplateInventPrompt } from "./runtime/decision-templates.ts";
 import {
+	asClimbRole,
 	formatDescalateCard,
 	formatEscalateCard,
 	type HierarchyRole,
@@ -225,6 +226,7 @@ import {
 	startLadderRole,
 	stripEscalateSignal,
 } from "./runtime/escalate.ts";
+import { climbHandoffBrief, type HandoffBrief } from "./runtime/layer-decision.ts";
 import { localLlamaChatModel } from "./runtime/local-llama-model.ts";
 import { LMSTUDIO_PROVIDER, LOCAL_LLAMA_PROVIDER, lmStudioChatModel } from "./runtime/local-model.ts";
 import { LOCAL_SUITE_WORK_SECTION } from "./runtime/local-work.ts";
@@ -242,7 +244,13 @@ import { createDefaultLlamaProcessManager, type LlamaProcessManager } from "./ru
 import { NO_PROMOTION_MODEL, promotionRole } from "./runtime/promotion-model.ts";
 import { loadRuntimeConfig } from "./runtime/registry.ts";
 import { type ResolvedRuntime, resolveRuntime } from "./runtime/resolve.ts";
-import { latestUserPrompt, selectSessionRole, selectThinkRole, sessionRoleForModel } from "./runtime/select-role.ts";
+import {
+	latestUserPrompt,
+	type RoleSelection,
+	selectSessionRole,
+	selectThinkRole,
+	sessionRoleForModel,
+} from "./runtime/select-role.ts";
 import {
 	type AntiPattern,
 	applyTone,
@@ -2766,23 +2774,23 @@ export class AgentSession {
 	private _llama?: LlamaProcessManager;
 	/** Session model before a local role took the chat call. Not written to settings. */
 	private _apiSessionModel?: Model<any>;
-	/** Last chat role on the ladder (Tooling → Workhorse → Planning → Frontier). */
+	/** Last chat role on the ladder (Workhorse ⇄ Planning ⇄ Frontier). */
 	private _lastHierarchyRole?: LadderRole;
-	/** Active ladder floor for this prompt. Starts at Tooling after Decision. */
+	/** Active ladder floor for this prompt. Starts at Workhorse after Decision. */
 	private _ladderRole?: LadderRole;
 	/** Footer role including Decision floor (not always a chat/llama role). */
 	private _hierarchyDisplayRole?: HierarchyRole;
 	/** Footer model id for the active hierarchy role (may differ from chat `model`). */
 	private _hierarchyModelId?: string;
 	private _hierarchyModelProvider?: string;
-	/** Idle on Decision until the first prompt routes to Tooling. */
+	/** Idle on Decision until the first prompt routes to Workhorse. */
 	private _parkedOnDecision = false;
 	/** Tools since the last Planning brief; drives optional mid-turn replan. */
 	private _toolsSincePlan = 0;
 	/** True when this turn attached a Planning brief (replan is allowed). */
 	private _planningBriefActive = false;
 	/** Pending climb; consumed by the next brief / bind. */
-	private _pendingElevate?: { tier: LadderRole; why: string };
+	private _pendingElevate?: { tier: LadderRole; why: string; handoff?: HandoffBrief };
 	/** Consecutive tool errors in this prompt; two failures climb one ladder step. */
 	private _toolErrorStreak = 0;
 	private _apiThinkingLevel?: ThinkingLevel;
@@ -2796,7 +2804,7 @@ export class AgentSession {
 
 	/**
 	 * Start local hierarchy parked on Decision (d1) in the footer.
-	 * Warms Tooling llama-server quietly; footer stays on Decision until a prompt routes.
+	 * Warms Workhorse llama-server quietly; footer stays on Decision until a prompt routes.
 	 */
 	async activateLocalModel(): Promise<void> {
 		const parked = this._parkOnDecisionFloor();
@@ -2832,7 +2840,7 @@ export class AgentSession {
 			elevateTo: this._pendingElevate?.tier,
 			overrides: config.routing?.components,
 		});
-		this._lastHierarchyRole = selection.role;
+		this._lastHierarchyRole = asClimbRole(selection.role, resolved);
 		if (selection.source === "api") {
 			this._restoreApiSessionModel();
 			const api = this.model;
@@ -3075,7 +3083,7 @@ export class AgentSession {
 			return;
 		}
 		try {
-			const brief = await this._sideCall(model, planningBriefPrompt(text, elevate?.why));
+			const brief = await this._sideCall(model, planningBriefPrompt(text, elevate?.why, elevate?.handoff));
 			const trimmed = brief.trim();
 			if (!trimmed) {
 				return;
@@ -3097,7 +3105,7 @@ export class AgentSession {
 	}
 
 	private _thinkSideModel(
-		think: { role: LadderRole; source: string; modelId: string },
+		think: { role: RoleSelection["role"]; source: string; modelId: string },
 		resolved: ResolvedRuntime,
 	): Model<any> | undefined {
 		if (think.source === "api") {
@@ -3107,7 +3115,7 @@ export class AgentSession {
 		if (think.source === "lmstudio") {
 			return this._lmStudioRoleModel(think.modelId, resolved.roles[think.role]?.baseUrl);
 		}
-		const role = think.role === "frontier" ? "planning" : think.role;
+		const role = think.role === "frontier" ? "planning" : think.role === "tooling" ? "workhorse" : think.role;
 		return this._localRoleModel(role, think.modelId, resolved);
 	}
 
@@ -3115,7 +3123,7 @@ export class AgentSession {
 	private async _climbLadder(why: string, requested?: LadderRole | "next"): Promise<LadderRole | undefined> {
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
-		const from = this._ladderRole ?? this._lastHierarchyRole ?? startLadderRole(resolved);
+		const from = asClimbRole(this._ladderRole ?? this._lastHierarchyRole, resolved);
 		const signalText =
 			requested && requested !== "next"
 				? `{"escalate":"${requested}","why":${JSON.stringify(why)}}`
@@ -3126,7 +3134,7 @@ export class AgentSession {
 		}
 		this._parkedOnDecision = false;
 		this._emitEscalateCard(from, signal.tier, signal.why);
-		this._pendingElevate = { tier: signal.tier, why: signal.why };
+		this._pendingElevate = { tier: signal.tier, why: signal.why, handoff: climbHandoffBrief(signal.why) };
 		this._ladderRole = signal.tier;
 		this._lastHierarchyRole = signal.tier;
 		this._toolErrorStreak = 0;
@@ -3140,7 +3148,7 @@ export class AgentSession {
 	): Promise<LadderRole | "decision" | undefined> {
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
-		const from = this._ladderRole ?? this._lastHierarchyRole ?? startLadderRole(resolved);
+		const from = asClimbRole(this._ladderRole ?? this._lastHierarchyRole, resolved);
 		if (requested === "decision") {
 			const parked = await this._dropToDecision(why);
 			return parked ? "decision" : undefined;
@@ -3443,6 +3451,7 @@ export class AgentSession {
 					resultSnippet: toolResultSnippet(result),
 					isError,
 					why: elevate?.why,
+					handoff: elevate?.handoff,
 				}),
 			);
 			const trimmed = brief.trim();
@@ -3458,7 +3467,7 @@ export class AgentSession {
 			this._planningBriefActive = true;
 			this._toolsSincePlan = 0;
 			this._pendingElevate = undefined;
-			this._lastHierarchyRole = think.role;
+			this._lastHierarchyRole = asClimbRole(think.role, resolved);
 		} catch (error) {
 			debugLog("runtime", "planning replan skipped", {
 				role: think.role,

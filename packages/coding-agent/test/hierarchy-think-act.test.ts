@@ -44,12 +44,12 @@ describe("think versus act", () => {
 		expect(classifyTask("list the files").kind).toBe("act");
 	});
 
-	it("uses routeComponent so Act starts on tooling and Intend is planning", () => {
+	it("uses routeComponent so Act starts on workhorse and Intend is planning", () => {
 		const resolved = localResolved();
 		const act = routeComponent({ component: "toolIntent", resolved, complexity: 0.4, depth: 1 });
 		const think = routeComponent({ component: "intend", resolved, complexity: 0.4, depth: 0 });
-		expect(act.role).toBe("tooling");
-		expect(act.reason).toMatch(/toolIntent uses tooling/);
+		expect(act.role).toBe("workhorse");
+		expect(act.reason).toMatch(/toolIntent uses workhorse/);
 		expect(think.role).toBe("planning");
 		expect(think.reason).toMatch(/intend uses planning/);
 		expect(selectSessionRole({ text: "build a web chess", resolved }).reason).toBe(act.reason);
@@ -111,12 +111,12 @@ describe("think versus act", () => {
 				frontier: { provider: "xai", modelId: "grok-4" },
 			},
 		);
-		expect(parseEscalateSignal('{"escalate":"next","why":"need tools"}', "tooling", local)).toEqual({
-			tier: "workhorse",
+		expect(parseEscalateSignal('{"escalate":"next","why":"need tools"}', "workhorse", local)).toEqual({
+			tier: "planning",
 			why: "need tools",
 			explicit: true,
 		});
-		expect(parseEscalateSignal('{"escalate":"planning","why":"ambiguous design"}', "tooling", local)).toEqual({
+		expect(parseEscalateSignal('{"escalate":"planning","why":"ambiguous design"}', "workhorse", local)).toEqual({
 			tier: "planning",
 			why: "ambiguous design",
 			explicit: true,
@@ -124,8 +124,8 @@ describe("think versus act", () => {
 		expect(parseEscalateSignal('{"escalate":"frontier","why":"hard bug"}', "planning", hybrid)?.tier).toBe(
 			"frontier",
 		);
-		expect(parseEscalateSignal("I am stuck on the architecture", "tooling", local)?.tier).toBe("workhorse");
-		expect(parseEscalateSignal("I am stuck on the architecture", "tooling", local)?.explicit).toBe(false);
+		expect(parseEscalateSignal("I am stuck on the architecture", "workhorse", local)?.tier).toBe("planning");
+		expect(parseEscalateSignal("I am stuck on the architecture", "workhorse", local)?.explicit).toBe(false);
 		expect(stripEscalateSignal('ok\n{"escalate":"planning","why":"x"}\n')).toBe("ok");
 		expect(shouldReplanAfterTool({ toolsSincePlan: 1, isError: false, planActive: true })).toBe(false);
 		expect(shouldReplanAfterTool({ toolsSincePlan: 1, isError: false, elevated: true })).toBe(true);

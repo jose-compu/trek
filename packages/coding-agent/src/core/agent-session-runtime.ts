@@ -259,7 +259,7 @@ export class AgentSessionRuntime {
 		this.session.setScopedModels(snapshot.scopedModels);
 		this.session.setAutoCompactionEnabled(snapshot.autoCompactionEnabled);
 
-		// Local/hybrid: re-bind the ladder (Decision → Tooling…) like the parent startup.
+		// Local/hybrid: re-bind the ladder (Decision → Workhorse…) like the parent startup.
 		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this.cwd }));
 		if (resolved.effectiveMode !== "api" && process.env.PI_NO_LOCAL_LLM !== "1") {
 			await this.session.activateLocalModel();

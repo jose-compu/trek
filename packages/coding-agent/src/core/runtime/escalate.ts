@@ -1,21 +1,23 @@
 /**
- * Escalation ladder: Tooling → Workhorse → Planning → Frontier.
+ * Escalation ladder: Workhorse ⇄ Planning ⇄ Frontier.
+ * Tooling is a supporting runner (delegate), not a rung.
  * Climb on escalate/stuck/failures; drop on descalate or new topic (→ Decision).
  */
 
+import { parseLayerDecision } from "./layer-decision.ts";
 import type { ResolvedRuntime } from "./resolve.ts";
 
-export const ESCALATION_LADDER = ["tooling", "workhorse", "planning", "frontier"] as const;
+export const ESCALATION_LADDER = ["workhorse", "planning", "frontier"] as const;
 export type LadderRole = (typeof ESCALATION_LADDER)[number];
 
-/** Ladder plus Decision floor (d1; not a chat/llama role). */
-export type HierarchyRole = "decision" | LadderRole;
+/** Display floor: Decision, the climb, or Tooling when a runner is bound. */
+export type HierarchyRole = "decision" | "tooling" | LadderRole;
 
 /** @deprecated Prefer LadderRole. */
 export type EscalateTier = LadderRole;
 
 export interface EscalateAsk {
-	/** Named tier or relative next step. */
+	/** Named tier or relative next step. Tooling is not a climb target. */
 	requested: LadderRole | "next";
 	why: string;
 	explicit: boolean;
@@ -26,6 +28,8 @@ export interface EscalateSignal {
 	tier: LadderRole;
 	why: string;
 	explicit: boolean;
+	/** True when Frontier was requested but Planning+deep is the consult. */
+	aliased?: boolean;
 }
 
 /** Explicit drop toward a lower chat role, or Decision (lowest / new-topic floor). */
@@ -42,35 +46,46 @@ export interface DescalateSignal {
 	explicit: boolean;
 }
 
-/** Pretty-printed or single-line escalate objects. */
+/** Workhorse/Planning delegate a runner job; the climb floor does not move. */
+export interface DelegateAsk {
+	target: "tooling";
+	why: string;
+	explicit: boolean;
+}
+
+/** Pretty-printed or single-line escalate objects. Tooling is not a valid climb. */
 const ESCALATE_JSON =
-	/\{\s*"escalate"\s*:\s*"(next|tooling|workhorse|planning|frontier)"\s*(?:,\s*"why"\s*:\s*"((?:\\.|[^"\\])*)")?\s*\}/is;
+	/\{\s*"escalate"\s*:\s*"(next|workhorse|planning|frontier)"\s*(?:,\s*"why"\s*:\s*"((?:\\.|[^"\\])*)")?\s*\}/is;
 
 /**
- * Tiny Tooling models sometimes drop the opening brace:
- * escalate":"workhorse"  or  "escalate":"next"
+ * Weak models sometimes drop the opening brace:
+ * escalate":"planning"  or  "escalate":"next"
  * Negative lookbehind avoids matching inside "descalate".
  */
 const ESCALATE_LOOSE =
-	/(?<![a-z])"?escalate"?\s*:\s*"(next|tooling|workhorse|planning|frontier)"(?:\s*,\s*"why"\s*:\s*"((?:\\.|[^"\\])*)")?/i;
+	/(?<![a-z])"?escalate"?\s*:\s*"(next|workhorse|planning|frontier)"(?:\s*,\s*"why"\s*:\s*"((?:\\.|[^"\\])*)")?/i;
 
 const DESCALATE_JSON =
-	/\{\s*"descalate"\s*:\s*"(next|tooling|workhorse|planning|decision)"\s*(?:,\s*"why"\s*:\s*"((?:\\.|[^"\\])*)")?\s*\}/is;
+	/\{\s*"descalate"\s*:\s*"(next|workhorse|planning|decision)"\s*(?:,\s*"why"\s*:\s*"((?:\\.|[^"\\])*)")?\s*\}/is;
 
 const DESCALATE_LOOSE =
-	/"?descalate"?\s*:\s*"(next|tooling|workhorse|planning|decision)"(?:\s*,\s*"why"\s*:\s*"((?:\\.|[^"\\])*)")?/i;
+	/"?descalate"?\s*:\s*"(next|workhorse|planning|decision)"(?:\s*,\s*"why"\s*:\s*"((?:\\.|[^"\\])*)")?/i;
+
+const DELEGATE_JSON = /\{\s*"(?:delegate|action)"\s*:\s*"(?:delegate|tooling)"[\s\S]{0,200}?"target"\s*:\s*"tooling"/is;
+
+const DELEGATE_LOOSE = /\b(?:delegate|hand off) to tooling\b|"target"\s*:\s*"tooling"/i;
 
 // Soft stuck only — do NOT match "Escalate to tooling? No." (tiny models refuse and babble).
 const STUCK =
 	/\b(i(?:'m| am) (?:stuck|unsure|confused)|need (?:a )?(?:plan|help|guidance|stronger model)|too (?:hard|complex|ambiguous)|cannot (?:decide|design|architect)|escalation needed|please escalate|ask (?:planning|workhorse|frontier)|hand off to (?:planning|frontier|workhorse))\b/i;
 
-/** Soft drop — Planning/Frontier handing simple remaining work down. */
+/** Soft drop — Planning/Frontier handing simple remaining work down. Not a Tooling bind. */
 const SIMPLE_AGAIN =
-	/\b(this is (?:simple|easy|trivial)|simple (?:edit|fix|typo|rename)|hand off to (?:tooling|workhorse)|descalat(?:e|ion)(?:\s+needed)?|please descalate|too (?:much|heavy|strong) (?:a )?model|overkill|drop (?:to|down)|go back to (?:tooling|workhorse|decision)|new topic(?:\s+now)?|user switched (?:task|topic))\b/i;
+	/\b(this is (?:simple|easy|trivial)|simple (?:edit|fix|typo|rename)|hand off to workhorse|descalat(?:e|ion)(?:\s+needed)?|please descalate|too (?:much|heavy|strong) (?:a )?model|overkill|drop (?:to|down)|go back to (?:workhorse|decision)|new topic(?:\s+now)?|user switched (?:task|topic))\b/i;
 
-/** User asks to drop a tier (or to a named lower role). */
+/** User asks to drop a tier (or to a named lower role). "use tooling" is a runner, not a drop. */
 const USER_DESCALATE =
-	/^(?:\/descalate\b|descalate(?:\s+to\s+(?:tooling|workhorse|planning|decision))?|use (?:the )?(?:tooling|workhorse)(?:\s+model)?|go back to (?:tooling|workhorse|decision)|simpler model|↓\s*(?:tooling|workhorse|planning|decision)?)\b/i;
+	/^(?:\/descalate\b|descalate(?:\s+to\s+(?:workhorse|planning|decision))?|use (?:the )?workhorse(?:\s+model)?|go back to (?:workhorse|decision)|simpler model|↓\s*(?:workhorse|planning|decision)?)\b/i;
 
 export type DescalateTarget = LadderRole | "next" | "decision";
 
@@ -90,6 +105,17 @@ export function isLowerLadderRole(current: LadderRole, candidate: LadderRole): b
 	return ladderIndex(candidate) < ladderIndex(current);
 }
 
+/** Map a display/session role onto the climb. Tooling and Decision are not rungs. */
+export function asClimbRole(role: HierarchyRole | undefined, resolved: ResolvedRuntime): LadderRole {
+	if (role === "planning" || role === "frontier" || role === "workhorse") {
+		if (role === "frontier" && !frontierBound(resolved)) {
+			return roleAvailable(resolved, "planning") ? "planning" : startLadderRole(resolved);
+		}
+		return role;
+	}
+	return startLadderRole(resolved);
+}
+
 export function frontierBound(resolved: ResolvedRuntime): boolean {
 	const assignment = resolved.roles.frontier;
 	if (!assignment) {
@@ -101,6 +127,17 @@ export function frontierBound(resolved: ResolvedRuntime): boolean {
 	return resolved.effectiveMode !== "local";
 }
 
+/** Frontier consult, or Planning when no third id is bound. */
+export function frontierConsultRole(resolved: ResolvedRuntime): { role: LadderRole; aliased: boolean } {
+	if (frontierBound(resolved)) {
+		return { role: "frontier", aliased: false };
+	}
+	if (roleAvailable(resolved, "planning")) {
+		return { role: "planning", aliased: true };
+	}
+	return { role: startLadderRole(resolved), aliased: true };
+}
+
 export function roleAvailable(resolved: ResolvedRuntime, role: LadderRole): boolean {
 	if (role === "frontier") {
 		return frontierBound(resolved);
@@ -108,7 +145,7 @@ export function roleAvailable(resolved: ResolvedRuntime, role: LadderRole): bool
 	return Boolean(resolved.roles[role]);
 }
 
-/** Lowest assigned chat role. Local/hybrid start on Tooling when present. */
+/** Lowest assigned climb role. Local/hybrid start on Workhorse. */
 export function startLadderRole(resolved: ResolvedRuntime): LadderRole {
 	if (resolved.effectiveMode === "api") {
 		return "frontier";
@@ -132,11 +169,17 @@ export function nextLadderRole(current: LadderRole, resolved: ResolvedRuntime): 
 		if (roleAvailable(resolved, candidate)) {
 			return candidate;
 		}
+		if (candidate === "frontier") {
+			const consult = frontierConsultRole(resolved);
+			if (consult.aliased && consult.role !== current && roleAvailable(resolved, consult.role)) {
+				return consult.role;
+			}
+		}
 	}
 	return undefined;
 }
 
-/** Next weaker chat role that exists, or undefined at Tooling. */
+/** Next weaker climb role that exists, or undefined at Workhorse. */
 export function prevLadderRole(current: LadderRole, resolved: ResolvedRuntime): LadderRole | undefined {
 	for (let i = ladderIndex(current) - 1; i >= 0; i--) {
 		const candidate = ESCALATION_LADDER[i]!;
@@ -150,7 +193,8 @@ export function prevLadderRole(current: LadderRole, resolved: ResolvedRuntime): 
 /**
  * Named tiers only move up; "next" climbs one step.
  * Same-or-lower named escalate still climbs one step so a weak model cannot demote via escalate.
- * Use descalate to move down.
+ * `frontier` with no bound Frontier aliases Planning.
+ * Use descalate to move down. Tooling is never a climb target.
  */
 export function resolveEscalateTarget(
 	current: LadderRole,
@@ -158,6 +202,16 @@ export function resolveEscalateTarget(
 	resolved: ResolvedRuntime,
 ): LadderRole | undefined {
 	if (requested === "next") {
+		return nextLadderRole(current, resolved);
+	}
+	if (requested === "frontier") {
+		const consult = frontierConsultRole(resolved);
+		if (consult.role === current) {
+			return undefined;
+		}
+		if (isHigherLadderRole(current, consult.role) && roleAvailable(resolved, consult.role)) {
+			return consult.role;
+		}
 		return nextLadderRole(current, resolved);
 	}
 	if (isHigherLadderRole(current, requested) && roleAvailable(resolved, requested)) {
@@ -168,7 +222,7 @@ export function resolveEscalateTarget(
 
 /**
  * Named descalate only moves down; "next" drops one step; "decision" is the floor.
- * Same-or-higher named chat targets drop one step when a lower role exists.
+ * From Workhorse, next is Decision. Tooling is not a drop target.
  */
 export function resolveDescalateTarget(
 	current: LadderRole,
@@ -179,12 +233,31 @@ export function resolveDescalateTarget(
 		return "decision";
 	}
 	if (requested === "next") {
-		return prevLadderRole(current, resolved);
+		return prevLadderRole(current, resolved) ?? "decision";
 	}
 	if (isLowerLadderRole(current, requested) && roleAvailable(resolved, requested)) {
 		return requested;
 	}
-	return prevLadderRole(current, resolved);
+	return prevLadderRole(current, resolved) ?? "decision";
+}
+
+export function parseDelegateAsk(text: string): DelegateAsk | undefined {
+	const trimmed = text.trim();
+	if (!trimmed) {
+		return undefined;
+	}
+	if (/"action"\s*:\s*"delegate"/i.test(trimmed) && /"target"\s*:\s*"tooling"/i.test(trimmed)) {
+		const why = trimmed.match(/"reason"\s*:\s*"((?:\\.|[^"\\])*)"/i)?.[1];
+		return {
+			target: "tooling",
+			why: (why ?? "runner job").replace(/\\"/g, '"').trim() || "runner job",
+			explicit: true,
+		};
+	}
+	if (DELEGATE_JSON.test(trimmed) || DELEGATE_LOOSE.test(trimmed)) {
+		return { target: "tooling", why: "delegate to tooling", explicit: /delegate/i.test(trimmed) };
+	}
+	return undefined;
 }
 
 export function parseEscalateAsk(text: string): EscalateAsk | undefined {
@@ -192,9 +265,12 @@ export function parseEscalateAsk(text: string): EscalateAsk | undefined {
 	if (!trimmed) {
 		return undefined;
 	}
-	// Prefer descalate JSON when both appear — do not also climb.
-	if (trimmed.match(DESCALATE_JSON) || trimmed.match(DESCALATE_LOOSE)) {
+	if (parseDescalateAsk(trimmed) || parseDelegateAsk(trimmed)) {
 		return undefined;
+	}
+	const layered = layerEscalateAsk(trimmed);
+	if (layered) {
+		return layered;
 	}
 	const match = trimmed.match(ESCALATE_JSON) ?? trimmed.match(ESCALATE_LOOSE);
 	if (match) {
@@ -220,15 +296,18 @@ export function parseDescalateAsk(text: string): DescalateAsk | undefined {
 		if (raw === "decision") {
 			return { requested: "decision", why, explicit: true };
 		}
-		return { requested: raw as LadderRole | "next", why, explicit: true };
+		if (raw === "next" || isLadderRole(raw)) {
+			return { requested: raw, why, explicit: true };
+		}
+		return undefined;
 	}
 	if (USER_DESCALATE.test(trimmed)) {
 		if (/\bdecision\b/i.test(trimmed)) {
 			return { requested: "decision", why: "user requested descalation", explicit: true };
 		}
-		const named = trimmed.match(/\b(tooling|workhorse|planning)\b/i)?.[1]?.toLowerCase();
+		const named = trimmed.match(/\b(workhorse|planning)\b/i)?.[1]?.toLowerCase();
 		return {
-			requested: named && isLadderRole(named) && named !== "frontier" ? named : "next",
+			requested: named && isLadderRole(named) ? named : "next",
 			why: "user requested descalation",
 			explicit: true,
 		};
@@ -237,7 +316,7 @@ export function parseDescalateAsk(text: string): DescalateAsk | undefined {
 		if (/\bdecision\b|new topic|switched (?:task|topic)/i.test(trimmed)) {
 			return { requested: "decision", why: "model reported topic reset", explicit: false };
 		}
-		const named = trimmed.match(/\b(tooling|workhorse)\b/i)?.[1]?.toLowerCase();
+		const named = trimmed.match(/\bworkhorse\b/i)?.[0]?.toLowerCase();
 		return {
 			requested: named && isLadderRole(named) ? named : "next",
 			why: "model reported simpler remaining work",
@@ -261,7 +340,8 @@ export function parseEscalateSignal(
 	if (!tier) {
 		return undefined;
 	}
-	return { tier, why: ask.why, explicit: ask.explicit };
+	const aliased = ask.requested === "frontier" && tier !== "frontier";
+	return { tier, why: ask.why, explicit: ask.explicit, ...(aliased ? { aliased: true } : {}) };
 }
 
 /** Parse and resolve a drop against the current ladder position. */
@@ -319,10 +399,8 @@ export function escalateComplexity(tier: LadderRole): number {
 			return 0.85;
 		case "planning":
 			return 0.55;
-		case "workhorse":
-			return 0.35;
 		default:
-			return 0.15;
+			return 0.35;
 	}
 }
 
@@ -336,4 +414,22 @@ export function formatEscalateCard(from: HierarchyRole, to: HierarchyRole, why?:
 export function formatDescalateCard(from: HierarchyRole, to: HierarchyRole, why?: string): string {
 	const reason = why?.trim() ? ` · ${why.trim().slice(0, 48)}` : "";
 	return `↓ ${from} → ${to}${reason}`;
+}
+
+function layerEscalateAsk(text: string): EscalateAsk | undefined {
+	if (!/"action"\s*:\s*"escalate"/i.test(text)) {
+		return undefined;
+	}
+	const decision = parseLayerDecision(text);
+	if (decision.action !== "escalate") {
+		return undefined;
+	}
+	const target = decision.target;
+	if (target === "tooling" || target === "script" || target === "verifier" || target === "workhorse") {
+		return undefined;
+	}
+	if (target === "planning" || target === "frontier") {
+		return { requested: target, why: decision.reason, explicit: true };
+	}
+	return { requested: "next", why: decision.reason, explicit: true };
 }
