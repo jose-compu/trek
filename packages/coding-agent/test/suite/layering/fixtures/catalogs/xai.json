@@ -1,0 +1,9 @@
+{
+	"provider": "xai",
+	"models": [
+		{ "id": "grok-4.1-fast", "provider": "xai", "tags": ["cheap"], "kind": "chat", "inputPrice": 0.2 },
+		{ "id": "grok-4.3", "provider": "xai", "tags": ["default", "mid"], "kind": "chat", "thinking": true, "inputPrice": 1.25 },
+		{ "id": "grok-4.5", "provider": "xai", "tags": ["coding", "reasoning"], "kind": "chat", "thinking": true, "inputPrice": 3 },
+		{ "id": "grok-4.20-multi-agent", "provider": "xai", "tags": ["frontier", "multi-agent"], "kind": "chat", "thinking": true, "inputPrice": 8 }
+	]
+}

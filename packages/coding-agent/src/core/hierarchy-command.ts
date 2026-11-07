@@ -4,6 +4,7 @@
  */
 
 import { getAgentDir } from "../config.ts";
+import { applyAutoLayering, loadCatalogFixture } from "./runtime/catalog-map.ts";
 import {
 	DEFAULT_LMSTUDIO_BASE_URL,
 	defaultRoleThinking,
@@ -55,7 +56,7 @@ export function runHierarchyCommand(agentDir: string, cwd: string, arg: string):
 	const [kind, ...rest] = parts;
 	try {
 		if (kind === "auto" || kind === "single" || kind === "manual") {
-			return setLayering(path, agentDir, cwd, kind);
+			return setLayering(path, agentDir, cwd, kind, rest);
 		}
 		if (kind === "mode") {
 			const mode = rest[0];
@@ -88,14 +89,26 @@ export function hierarchyAgentDir(): string {
 	return getAgentDir();
 }
 
-function setLayering(path: string, agentDir: string, cwd: string, mode: "auto" | "single" | "manual"): string {
+function setLayering(
+	path: string,
+	agentDir: string,
+	cwd: string,
+	mode: "auto" | "single" | "manual",
+	rest: string[] = [],
+): string {
 	if (!isLayeringMode(mode)) {
-		return "Usage: /hierarchy auto|single|manual";
+		return "Usage: /hierarchy auto|single|manual [--catalog <file>]";
 	}
 	const current = readRuntimeConfigFile(path);
-	const next = mode === "single" ? flattenToSingle(current) : withHierarchy(current, { layering: mode });
+	let next = mode === "single" ? flattenToSingle(current) : withHierarchy(current, { layering: mode });
+	if (mode === "auto") {
+		const catalogPath = flagValue(rest, "--catalog");
+		if (catalogPath) {
+			next = applyAutoLayering(current, loadCatalogFixture(catalogPath));
+		}
+	}
 	writeRuntimeConfigFile(path, next);
-	syncProjectLayering(cwd, mode, mode === "single");
+	syncProjectLayering(cwd, next.hierarchy.layering, next.hierarchy.layering === "single");
 	return nextSession(status(agentDir, cwd, path));
 }
 

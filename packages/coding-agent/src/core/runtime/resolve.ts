@@ -106,6 +106,18 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 		}
 	}
 
+	if (config.hierarchy.layering === "auto") {
+		for (const name of ["tooling", "workhorse", "planning", "frontier"] as const) {
+			if (skipExtraRole(config, name)) {
+				continue;
+			}
+			const assigned = overlay(roles[name], config.roles[name]);
+			if (assigned) {
+				roles[name] = assigned;
+			}
+		}
+	}
+
 	return {
 		mode: config.hierarchy.mode,
 		effectiveMode,

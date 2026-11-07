@@ -1,0 +1,6 @@
+{
+	"provider": "liquid",
+	"models": [
+		{ "id": "d1.1", "provider": "liquid", "kind": "decision", "thinking": false }
+	]
+}

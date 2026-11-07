@@ -1,0 +1,7 @@
+{
+	"provider": "zai",
+	"models": [
+		{ "id": "glm-5.3-flash", "provider": "zai", "tags": ["cheap", "default"], "kind": "chat", "inputPrice": 0.15 },
+		{ "id": "glm-5.3", "provider": "zai", "tags": ["thinking"], "kind": "chat", "thinking": true, "inputPrice": 1.4 }
+	]
+}

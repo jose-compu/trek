@@ -1,0 +1,7 @@
+{
+	"provider": "moonshot",
+	"models": [
+		{ "id": "kimi-k2.7-code", "provider": "moonshot", "tags": ["default"], "kind": "chat", "thinking": true, "inputPrice": 1 },
+		{ "id": "kimi-k3", "provider": "moonshot", "tags": ["thinking", "frontier"], "kind": "chat", "thinking": true, "inputPrice": 5 }
+	]
+}

@@ -5,6 +5,7 @@
 import { join } from "node:path";
 import chalk from "chalk";
 import { APP_NAME, getAgentDir } from "./config.ts";
+import { applyAutoLayering, loadCatalogFixture } from "./core/runtime/catalog-map.ts";
 import {
 	benchmarkRuntime,
 	DEFAULT_LMSTUDIO_BASE_URL,
@@ -38,7 +39,7 @@ function printHelp(): void {
 	console.log(`${APP_NAME} models list`);
 	console.log(`${APP_NAME} models set-mode api|local|hybrid`);
 	console.log(`${APP_NAME} models set-suite mistral|mistral-pro|qwen|lfm`);
-	console.log(`${APP_NAME} models set-layering auto|single|manual`);
+	console.log(`${APP_NAME} models set-layering auto|single|manual [--catalog <file>]`);
 	console.log(
 		`${APP_NAME} models set-role <role> --id <id> [--source local|api|lmstudio] [--thinking off|brief|deep|on] | --clear`,
 	);
@@ -144,9 +145,15 @@ function setLayering(rest: string[]): boolean {
 	if (process.exitCode) {
 		return true;
 	}
-	const next = mode === "single" ? flattenToSingle(current) : withHierarchy(current, { layering: mode });
+	let next = mode === "single" ? flattenToSingle(current) : withHierarchy(current, { layering: mode });
+	if (mode === "auto") {
+		const catalogPath = flagValue(rest, "--catalog");
+		if (catalogPath) {
+			next = applyAutoLayering(current, loadCatalogFixture(catalogPath));
+		}
+	}
 	writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), next);
-	syncProjectLayering(process.cwd(), mode, mode === "single");
+	syncProjectLayering(process.cwd(), next.hierarchy.layering, next.hierarchy.layering === "single");
 	printStatus();
 	return true;
 }

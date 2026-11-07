@@ -1,0 +1,8 @@
+{
+	"provider": "anthropic",
+	"models": [
+		{ "id": "claude-haiku-4-5", "provider": "anthropic", "tags": ["cheap"], "kind": "chat", "inputPrice": 0.25 },
+		{ "id": "claude-sonnet-4-5", "provider": "anthropic", "tags": ["default"], "kind": "chat", "thinking": true, "inputPrice": 3 },
+		{ "id": "claude-opus-4-5", "provider": "anthropic", "tags": ["thinking"], "kind": "chat", "thinking": true, "inputPrice": 15 }
+	]
+}
