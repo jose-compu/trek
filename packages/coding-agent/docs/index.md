@@ -57,7 +57,7 @@ For the full first-run flow, see [Quickstart](quickstart.md).
 - [Themes](themes.md) - built-in and custom terminal themes.
 - [Pi packages](packages.md) - bundle and share extensions, skills, prompts, and themes.
 - [Custom models](models.md) - add model entries for supported provider APIs.
-- [Hierarchy](hierarchy.md) - Decision → Workhorse ⇄ Planning ⇄ Frontier; Tooling is a runner.
+- [Hierarchy](hierarchy.md) - 0.18 layering (`single` / `auto` / `manual`). Climb is Workhorse ⇄ Planning ⇄ Frontier; Tooling is a runner.
 - [Custom providers](custom-provider.md) - implement custom APIs and OAuth flows.
 
 ## Programmatic usage

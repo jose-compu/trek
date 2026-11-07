@@ -4,6 +4,8 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-07
+
 ### Added
 
 - Domain lessons stay typed when roles climb. Workhorse writes. Meta triggers `misroute|over_escalate|over_think|runner_miss|verifier_reject|budget_stop`. Recall injects into the acting role. L1 still needs confirm ([#189](https://github.com/jose-compu/trek/issues/189)).
