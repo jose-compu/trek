@@ -3,7 +3,7 @@
  * Same store as `trek domains enable|disable`. The command does not run a workflow.
  */
 
-import { disableDomain, enableDomain, loadDomainCatalog } from "./catalog.ts";
+import { disableDomain, enableDomain, findLayerWorkflow, loadDomainCatalog, loadLayerWorkflows } from "./catalog.ts";
 
 const HELP = "Detection still chooses the workflow. This command only changes which domains are candidates.";
 
@@ -30,7 +30,9 @@ export function runDomainSessionCommand(cwd: string, name: "domains" | "workflow
 			disableDomain(cwd, parts[1]);
 			return formatDomainList(cwd);
 		}
-		if (sub === "" || sub === "list") return formatDomainList(cwd);
+		if (sub === "" || sub === "list") {
+			return name === "workflows" ? formatWorkflowList(cwd) : formatDomainList(cwd);
+		}
 		return usage(name);
 	} catch (error) {
 		return error instanceof Error ? error.message : String(error);
@@ -45,6 +47,13 @@ export function formatDomainList(cwd: string): string {
 		return [domain.id, state, domain.workflowName];
 	});
 	return `${renderTextTable(["domain", "state", "workflow"], rows)}\n${HELP}`;
+}
+
+export function formatWorkflowList(cwd: string): string {
+	const domains = formatDomainList(cwd);
+	const layers = loadLayerWorkflows().map((workflow) => [workflow.name, String(workflow.nodes.length)]);
+	const table = renderTextTable(["layer", "nodes"], layers);
+	return `${domains}\nlayer workflows\n${table}`;
 }
 
 function renderTextTable(headers: string[], rows: string[][], maxWidths?: number[]): string {
@@ -89,6 +98,14 @@ function wrapCell(text: string, width: number): string[] {
 
 function showWorkflow(cwd: string, id: string | undefined): string {
 	requireId(id, "/workflows show <id>");
+	const layer = findLayerWorkflow(id);
+	if (layer) {
+		const rows = layer.nodes.map((node) => {
+			const after = node.dependsOn.length > 0 ? `after ${node.dependsOn.join(", ")}. ` : "";
+			return [node.id, `${after}${oneLine(node.body)}`];
+		});
+		return `${layer.name}\n${oneLine(layer.description)}\n\n${renderTextTable(["node", "step"], rows, [16, 48])}`;
+	}
 	const domain = loadDomainCatalog(cwd).domains.find((item) => item.id === id);
 	if (!domain) throw new Error(`unknown domain ${id}`);
 	const rows = domain.workflow.nodes.map((node) => {
@@ -116,9 +133,17 @@ export function completeDomainCommand(
 				.map((item) => ({ value: item, label: item, description: item === "show" ? "domain id" : "the table" }));
 		}
 		if (sub !== "show") return [];
-		return catalog.domains
+		const domains = catalog.domains
 			.filter((domain) => domain.id.startsWith(partial))
 			.map((domain) => ({ value: `show ${domain.id}`, label: domain.id, description: domain.workflowName }));
+		const layers = loadLayerWorkflows()
+			.filter((workflow) => workflow.name.startsWith(partial))
+			.map((workflow) => ({
+				value: `show ${workflow.name}`,
+				label: workflow.name,
+				description: "layer",
+			}));
+		return [...domains, ...layers];
 	}
 	if (!sub || (rest.length === 0 && !text.endsWith(" "))) {
 		return ["list", "enable", "disable"]

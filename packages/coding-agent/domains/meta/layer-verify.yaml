@@ -1,0 +1,11 @@
+name: layer-verify
+description: |
+  Verifier reads the diff and emits a verdict. Off until bound.
+nodes:
+  - id: read-diff
+    prompt: |
+      Read the pending diff. Do not rewrite it.
+  - id: verdict
+    prompt: |
+      Emit a LayerDecision verify verdict.
+    depends_on: [read-diff]

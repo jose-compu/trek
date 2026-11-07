@@ -1,0 +1,7 @@
+name: layer-think-brief
+description: |
+  Forced thinking briefly. One short span, then the next tool. #108 128-token floor.
+nodes:
+  - id: observe-next-tool
+    prompt: |
+      Think briefly, then call the next tool. Do not write a monologue.

@@ -7,7 +7,9 @@ export {
 	disableDomain,
 	enableDomain,
 	enabledDomains,
+	findLayerWorkflow,
 	loadDomainCatalog,
+	loadLayerWorkflows,
 	restoreDomainWorkflow,
 	type SavedWorkflow,
 	saveDomainWorkflow,
@@ -57,7 +59,12 @@ export {
 	selectDomain,
 	turnNeedsTools,
 } from "./select.ts";
-export { completeDomainCommand, formatDomainList, runDomainSessionCommand } from "./session-command.ts";
+export {
+	completeDomainCommand,
+	formatDomainList,
+	formatWorkflowList,
+	runDomainSessionCommand,
+} from "./session-command.ts";
 export {
 	parseWorkflowEdit,
 	tryWorkflowYaml,

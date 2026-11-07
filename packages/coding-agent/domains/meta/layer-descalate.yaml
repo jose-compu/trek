@@ -1,0 +1,15 @@
+name: layer-descalate
+description: |
+  Planning or Frontier hands named steps back to Workhorse.
+nodes:
+  - id: handoff-brief
+    prompt: |
+      Fill goal, constraints, what was tried, evidence, and the open question.
+  - id: named-steps
+    prompt: |
+      Name the remaining mechanical steps. No new architecture.
+    depends_on: [handoff-brief]
+  - id: workhorse-act
+    prompt: |
+      Hand the named steps to Workhorse.
+    depends_on: [named-steps]

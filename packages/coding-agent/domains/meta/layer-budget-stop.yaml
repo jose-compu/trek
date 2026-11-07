@@ -1,0 +1,11 @@
+name: layer-budget-stop
+description: |
+  Circuit breaker. Pin brief thinking, then escalate or ask_human. Never another silent loop.
+nodes:
+  - id: pin-brief
+    prompt: |
+      Pin thinking briefly for the next span.
+  - id: escalate
+    prompt: |
+      Escalate with evidence, or ask_human if evidence is empty.
+    depends_on: [pin-brief]

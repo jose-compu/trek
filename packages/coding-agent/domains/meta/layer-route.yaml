@@ -1,0 +1,15 @@
+name: layer-route
+description: |
+  Decision routes the turn to Scripts or Workhorse. Unsure goes to Workhorse. Never Tooling.
+nodes:
+  - id: classify
+    prompt: |
+      Classify this turn. Emit LayerDecision JSON. target must be script or workhorse.
+  - id: script
+    prompt: |
+      Route to Scripts. No chat model on the mechanical steps.
+    depends_on: [classify]
+  - id: workhorse
+    prompt: |
+      Route to Workhorse. Tooling is a later delegate, not this route.
+    depends_on: [classify]

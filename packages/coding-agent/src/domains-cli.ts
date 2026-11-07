@@ -5,12 +5,18 @@
 import { resolve } from "node:path";
 import chalk from "chalk";
 import { APP_NAME } from "./config.ts";
-import { addDomain, disableDomain, enableDomain, loadDomainCatalog } from "./core/domains/catalog.ts";
+import {
+	addDomain,
+	disableDomain,
+	enableDomain,
+	findLayerWorkflow,
+	loadDomainCatalog,
+} from "./core/domains/catalog.ts";
 import { formatLessonPattern, lessonPatternFor } from "./core/domains/lesson-pattern.ts";
 import { runPatternCommand } from "./core/domains/pattern-command.ts";
 import { runArchonWorkflow } from "./core/domains/run.ts";
 import { overrideSelection } from "./core/domains/select.ts";
-import { formatDomainList, runDomainSessionCommand } from "./core/domains/session-command.ts";
+import { formatDomainList, formatWorkflowList, runDomainSessionCommand } from "./core/domains/session-command.ts";
 import { dismissLesson, formatLessonsTable, loadLessonRecord } from "./core/reflective-loop/crystallize.ts";
 
 export async function handleDomainsCommand(args: string[]): Promise<boolean> {
@@ -82,7 +88,7 @@ export async function handleWorkflowsCommand(args: string[]): Promise<boolean> {
 				printWorkflowsHelp();
 				return true;
 			}
-			printDomains(cwd);
+			console.log(formatWorkflowList(cwd));
 			return true;
 		}
 		if (sub === "show") {
@@ -93,6 +99,9 @@ export async function handleWorkflowsCommand(args: string[]): Promise<boolean> {
 		}
 		if (sub === "run") {
 			requireId(args[2], "workflows run <id>");
+			if (findLayerWorkflow(args[2])) {
+				throw new Error(`${args[2]} is a layer workflow. Parse-only in 0.18 until the CPA runner ships.`);
+			}
 			const catalog = loadDomainCatalog(cwd);
 			const selection = overrideSelection(catalog, args[2]);
 			const domain = findDomain(cwd, args[2]);

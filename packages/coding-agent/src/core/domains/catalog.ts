@@ -7,7 +7,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { getPackageDir } from "../../config.ts";
-import { type ArchonWorkflow, parseArchonWorkflow } from "./archon.ts";
+import { type ArchonWorkflow, loadArchonFile, parseArchonWorkflow } from "./archon.ts";
 import { warmLessonPatterns } from "./lesson-pattern.ts";
 
 export interface DomainDefinition {
@@ -44,6 +44,34 @@ const ID_PATTERN = /^[a-z][a-z0-9-]{0,40}$/;
 
 export function bundledDomainsRoot(): string {
 	return join(getPackageDir(), "domains");
+}
+
+const LAYER_FILE = /^layer-[a-z0-9-]+\.yaml$/;
+
+const layerWorkflowCache = new Map<string, ArchonWorkflow[]>();
+
+/** Bundled 0.18 layering DAGs under domains/meta/. Not extra domains. */
+export function loadLayerWorkflows(bundledRoot = bundledDomainsRoot()): ArchonWorkflow[] {
+	const hit = layerWorkflowCache.get(bundledRoot);
+	if (hit) {
+		return hit;
+	}
+	const dir = join(bundledRoot, "meta");
+	let names: string[] = [];
+	try {
+		names = readdirSync(dir)
+			.filter((name) => LAYER_FILE.test(name))
+			.sort();
+	} catch {
+		return [];
+	}
+	const workflows = names.map((name) => loadArchonFile(join(dir, name)));
+	layerWorkflowCache.set(bundledRoot, workflows);
+	return workflows;
+}
+
+export function findLayerWorkflow(name: string, bundledRoot = bundledDomainsRoot()): ArchonWorkflow | undefined {
+	return loadLayerWorkflows(bundledRoot).find((workflow) => workflow.name === name);
 }
 
 export function loadDomainCatalog(cwd: string, bundledRoot = bundledDomainsRoot()): DomainCatalog {

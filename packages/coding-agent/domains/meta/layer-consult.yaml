@@ -1,0 +1,15 @@
+name: layer-consult
+description: |
+  Frontier (or Planning + deep) diagnoses, then exits. Not the main loop.
+nodes:
+  - id: handoff-brief
+    prompt: |
+      Fill goal, constraints, what was tried, evidence, and the open question.
+  - id: diagnose
+    prompt: |
+      Diagnose. Do not take over the session.
+    depends_on: [handoff-brief]
+  - id: exit
+    prompt: |
+      Return a consult result and exit. Do not stay on Frontier.
+    depends_on: [diagnose]

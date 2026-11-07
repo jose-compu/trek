@@ -224,7 +224,11 @@ describe("workflow gate", () => {
 		expect(harness.session.runDomainCommand("workflows", "show missing")).toMatch(/unknown domain missing/);
 		expect(harness.session.runDomainCommand("workflows", "enable finance")).toMatch(/does not run a workflow/);
 		expect(harness.session.runDomainCommand("domains", "nope")).toMatch(/usage: \/domains/);
-		expect(runDomainSessionCommand(cwd, "workflows", "")).toBe(runDomainSessionCommand(cwd, "domains", ""));
+		const workflows = runDomainSessionCommand(cwd, "workflows", "");
+		const domains = runDomainSessionCommand(cwd, "domains", "");
+		expect(workflows.startsWith(domains)).toBe(true);
+		expect(workflows).toContain("layer workflows");
+		expect(workflows).toContain("layer-route");
 		const shown = harness.session.runDomainCommand("workflows", "show engineering");
 		expect(shown).toContain("engineering  change-review");
 		expect(shown).toMatch(/│ state-constraint\s+│/);

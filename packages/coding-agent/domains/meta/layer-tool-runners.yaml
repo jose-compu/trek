@@ -1,0 +1,16 @@
+name: layer-tool-runners
+description: |
+  Workhorse or Planning delegates search, logs, fetch, and summarize to Tooling. Independent nodes run in parallel.
+nodes:
+  - id: search
+    prompt: |
+      Search the repo or logs. Read-only.
+  - id: logs
+    prompt: |
+      Fetch recent logs for the failing path.
+  - id: fetch
+    prompt: |
+      Fetch a URL or file the Workhorse named.
+  - id: summarize
+    prompt: |
+      Summarize long output for the parent role.

@@ -1,0 +1,15 @@
+name: layer-escalate
+description: |
+  Climb to Planning with a handoff brief, then a plan and the steps back.
+nodes:
+  - id: handoff-brief
+    prompt: |
+      Fill goal, constraints, what was tried, evidence, and the open question.
+  - id: plan
+    prompt: |
+      Write a short plan. Do not repeat failed steps.
+    depends_on: [handoff-brief]
+  - id: steps-back
+    prompt: |
+      Name the steps Workhorse should take after this climb.
+    depends_on: [plan]
