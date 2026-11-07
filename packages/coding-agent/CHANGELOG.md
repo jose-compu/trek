@@ -6,6 +6,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ### Added
 
+- `/thinking briefly|deep|off` pins short-think. Compact **thinking briefly** card (1–2 lines). `LayerDecision.thinking: brief` wins. `/thinking deep` restores the 0.17 card and skips the #108 floor. The 128-token floor remains otherwise ([#197](https://github.com/jose-compu/trek/issues/197)).
 - Layer-* Archon workflows execute through cpa-agents. Join is one `layer_join`. `layering: single` and Kimi Swarm skip CPA ([#195](https://github.com/jose-compu/trek/issues/195), [#196](https://github.com/jose-compu/trek/issues/196)).
 - `/hierarchy auto --catalog <file>` and `trek models set-layering auto --catalog <file>` fill slots from a tagged catalog. Heuristic uses tags/thinking/price, not compiled SKU names. One chat model stays `single`. Verifier and Decision stay unbound. Layered `api` climbs the mapped SKUs instead of collapsing to Frontier ([#194](https://github.com/jose-compu/trek/issues/194)).
 - Climb is Workhorse ⇄ Planning ⇄ Frontier. Decision routes Scripts or Workhorse. Tooling is a delegate runner, not a rung. Unbound Frontier aliases Planning. Handoff brief on code-triggered climbs ([#193](https://github.com/jose-compu/trek/issues/193)).
