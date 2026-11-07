@@ -6,6 +6,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ### Added
 
+- Typed `LayerDecision`, handoff brief, and `LayerSubtaskResult`. Vendor-safe JSON Schema (no `minLength`/`maxItems`). Bad JSON retries once then a safe Workhorse continue. Faux harness under `test/suite/layering/` ([#191](https://github.com/jose-compu/trek/issues/191)).
 - `hierarchy.layering`: `single` (factory default), `auto`, or `manual`. `/hierarchy auto|single` and `trek models set-layering`. Role thinking is `off|brief|deep`. Verifier role. Frontier may be local. Binding a role sets `manual`; `--clear` records `hierarchy.unbound` so the suite preset cannot refill that slot; `single` clears Tooling/Planning/Frontier/verifier ([#190](https://github.com/jose-compu/trek/issues/190)).
 
 ## [0.17.0] - 2026-11-07
