@@ -20,6 +20,7 @@ import {
 	type RuntimeRole,
 	readRuntimeConfigFile,
 	resolveRuntime,
+	skipExtraRole,
 	syncProjectLayering,
 	syncProjectRole,
 	withClearedRole,
@@ -40,7 +41,7 @@ const ROLE_ORDER: RuntimeRole[] = [
 ];
 
 const USAGE =
-	"Usage: /hierarchy | /hierarchy auto | /hierarchy single | /hierarchy mode <mode> | /hierarchy suite <suite> | /hierarchy role <role> --id <id> [--source api|local|lmstudio] [--thinking off|brief|deep|on] | /hierarchy role <role> --clear";
+	"Usage: /hierarchy | /hierarchy auto | /hierarchy single | /hierarchy manual | /hierarchy mode <mode> | /hierarchy suite <suite> | /hierarchy role <role> --id <id> [--source api|local|lmstudio] [--thinking off|brief|deep|on] | /hierarchy role <role> --clear";
 
 export function runHierarchyCommand(agentDir: string, cwd: string, arg: string): string {
 	const path = globalModelsYamlPath(agentDir);
@@ -152,7 +153,7 @@ function status(agentDir: string, cwd: string, path: string): string {
 		`file ${path}`,
 	];
 	for (const role of ROLE_ORDER) {
-		const assignment = config.roles[role] ?? resolved.roles[role];
+		const assignment = skipExtraRole(config, role) ? undefined : (config.roles[role] ?? resolved.roles[role]);
 		lines.push(
 			assignment ? `${role} ${assignment.source} ${assignment.id} thinking ${assignment.thinking}` : `${role} unset`,
 		);

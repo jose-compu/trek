@@ -168,6 +168,7 @@ export {
 	requiresHuggingFaceToken,
 	resolveRuntime,
 	sessionLocalRoles,
+	skipExtraRole,
 } from "./resolve.ts";
 export {
 	classifyTask,

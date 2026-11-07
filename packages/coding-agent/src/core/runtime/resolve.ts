@@ -126,7 +126,7 @@ export function sessionLocalRoles(resolved: ResolvedRuntime): SessionLocalRole[]
 	return SESSION_LOCAL_ROLES.filter((role) => resolved.roles[role]?.source === "local");
 }
 
-function skipExtraRole(config: RuntimeConfig, name: RuntimeRole): boolean {
+export function skipExtraRole(config: RuntimeConfig, name: RuntimeRole): boolean {
 	if (config.hierarchy.unbound?.includes(name)) {
 		return true;
 	}
