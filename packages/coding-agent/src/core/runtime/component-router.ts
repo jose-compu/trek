@@ -3,11 +3,11 @@
  * Ladder: Tooling → Workhorse → Planning → Frontier.
  */
 
-import { nextLadderRole, startLadderRole } from "./escalate.ts";
+import { frontierBound, nextLadderRole, startLadderRole } from "./escalate.ts";
 import type { ResolvedRuntime } from "./resolve.ts";
 import type { RoleSelection } from "./select-role.ts";
 import { FRONTIER_COMPLEXITY_THRESHOLD } from "./select-role.ts";
-import type { RouteComponent, RouteRole } from "./types.ts";
+import { type RouteComponent, type RouteRole, roleThinkingEnabled } from "./types.ts";
 
 const COMPONENT_ROLE: Record<RouteComponent, RouteRole> = {
 	worldModel: "planning",
@@ -72,7 +72,7 @@ function floorRole(base: RouteRole, minRole: RouteRole | undefined, resolved: Re
 
 function resolveAvailable(role: RouteRole, resolved: ResolvedRuntime): RouteRole {
 	if (role === "frontier") {
-		if (resolved.roles.frontier && resolved.effectiveMode !== "local") {
+		if (frontierBound(resolved)) {
 			return "frontier";
 		}
 		return resolveAvailable("planning", resolved);
@@ -88,10 +88,7 @@ function resolveAvailable(role: RouteRole, resolved: ResolvedRuntime): RouteRole
 }
 
 function escalationTarget(resolved: ResolvedRuntime): RouteRole {
-	if (resolved.effectiveMode === "hybrid" && resolved.roles.frontier) {
-		return "frontier";
-	}
-	if (resolved.effectiveMode === "api") {
+	if (frontierBound(resolved) || resolved.effectiveMode === "api") {
 		return "frontier";
 	}
 	return "planning";
@@ -116,7 +113,7 @@ function nextTier(role: RouteRole, resolved: ResolvedRuntime): RouteRole {
 			continue;
 		}
 		if (candidate === "frontier") {
-			if (resolved.roles.frontier && resolved.effectiveMode !== "local") {
+			if (frontierBound(resolved)) {
 				return "frontier";
 			}
 			continue;
@@ -139,7 +136,7 @@ function assign(resolved: ResolvedRuntime, role: RouteRole, reason: string): Rol
 			source: frontier.source,
 			modelId: frontier.id,
 			...(frontier.provider ? { provider: frontier.provider } : {}),
-			thinking: frontier.thinking,
+			thinking: roleThinkingEnabled(frontier.thinking),
 			reason: `api mode records the session model as frontier (${reason})`,
 		};
 	}
@@ -154,7 +151,7 @@ function assign(resolved: ResolvedRuntime, role: RouteRole, reason: string): Rol
 		source: assignment.source,
 		modelId: assignment.id,
 		...(assignment.provider ? { provider: assignment.provider } : {}),
-		thinking: assignment.thinking,
+		thinking: roleThinkingEnabled(assignment.thinking),
 		reason: used === role ? reason : `${reason}; ${role} unavailable, using ${used}`,
 	};
 }

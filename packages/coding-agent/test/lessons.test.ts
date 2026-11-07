@@ -92,6 +92,7 @@ function resolved(roles: ResolvedRuntime["roles"]): ResolvedRuntime {
 	return {
 		mode: "api",
 		effectiveMode: "api",
+		layering: "single",
 		suite: "mistral",
 		quant: "Q4_K_M",
 		rerank: true,
@@ -162,9 +163,9 @@ describe("lesson helpers", () => {
 	});
 
 	it("promotes with Frontier, else Planning, else nothing", () => {
-		const frontier = { source: "api" as const, id: "grok", provider: "xai", thinking: true };
-		const planning = { source: "local" as const, id: "Ministral-3-14B", thinking: true };
-		const workhorse = { source: "local" as const, id: "Ministral-3-3B", thinking: false };
+		const frontier = { source: "api" as const, id: "grok", provider: "xai", thinking: "deep" as const };
+		const planning = { source: "local" as const, id: "Ministral-3-14B", thinking: "deep" as const };
+		const workhorse = { source: "local" as const, id: "Ministral-3-3B", thinking: "off" as const };
 		expect(promotionRole(resolved({ frontier, planning, workhorse }))?.role).toBe("frontier");
 		expect(promotionRole(resolved({ planning, workhorse }))).toMatchObject({
 			role: "planning",

@@ -3547,8 +3547,18 @@ export class AgentSession {
 		if (pick.assignment.source === "api" || process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
 			return api ? { model: api, role: pick.role, reason: pick.reason } : undefined;
 		}
-		const role = pick.role === "frontier" ? "planning" : pick.role;
-		return { model: this._localRoleModel(role, pick.assignment.id, resolved), role: pick.role, reason: pick.reason };
+		if (pick.assignment.source === "lmstudio") {
+			return {
+				model: this._lmStudioRoleModel(pick.assignment.id, pick.assignment.baseUrl),
+				role: pick.role,
+				reason: pick.reason,
+			};
+		}
+		return {
+			model: this._localRoleModel(pick.role, pick.assignment.id, resolved),
+			role: pick.role,
+			reason: pick.reason,
+		};
 	}
 
 	/** Side calls must not block the TUI on a slow local server. */

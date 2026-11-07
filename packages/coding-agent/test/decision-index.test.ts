@@ -18,7 +18,7 @@ import {
 } from "../src/core/runtime/index.ts";
 
 function localResolved() {
-	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "lfm" }), {
+	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "lfm" }), {
 		frontier: null,
 	});
 }

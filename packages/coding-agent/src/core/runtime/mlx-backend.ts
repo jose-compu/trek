@@ -9,7 +9,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { LFM_CHAT_TEMPLATE } from "./lfm-chat-template.ts";
 import type { ResolvedRuntime } from "./resolve.ts";
-import { SESSION_LOCAL_ROLES } from "./types.ts";
+import { LOCAL_SERVER_ROLES } from "./types.ts";
 
 export const MLX_SOURCES: Record<string, { repo: string }> = {
 	"LFM2.5-350M": { repo: "LiquidAI/LFM2.5-350M-MLX-4bit" },
@@ -97,7 +97,7 @@ export function missingMlxWeights(resolved: ResolvedRuntime, env: NodeJS.Process
 		return [];
 	}
 	const missing: MissingMlxWeight[] = [];
-	for (const role of SESSION_LOCAL_ROLES) {
+	for (const role of LOCAL_SERVER_ROLES) {
 		const assignment = resolved.roles[role];
 		if (!assignment || assignment.source !== "local") {
 			continue;

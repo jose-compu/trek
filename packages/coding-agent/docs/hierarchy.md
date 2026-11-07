@@ -10,7 +10,25 @@ Trek can run one API chat model, or a local / hybrid **ladder** of roles. Each t
 | `local` | Decision → Tooling → Workhorse → Planning. No Frontier. |
 | `hybrid` | Same as local, plus Frontier (API) at the top. |
 
-Configure with `trek models set-mode …`, `~/.trek/models.yaml`, project `.trek/models.yaml`, or `/hierarchy` (0.16).
+Configure with `trek models set-mode …`, `~/.trek/models.yaml`, project `.trek/models.yaml`, or `/hierarchy` (0.16). Pre-0.18 files with `mode: local` or `hybrid` and no `layering` key load as `manual` so the suite ladder stays intact.
+
+## Layering (0.18)
+
+`hierarchy.layering` is independent of `mode`. Factory default is **single**: one chat model on Workhorse. Extra roles (Tooling, Planning, Frontier, verifier) stay unbound until you opt in.
+
+| Value | Behavior |
+| --- | --- |
+| `single` | One Workhorse. `/hierarchy single` and `trek models set-layering single` clear extra roles. |
+| `auto` | `/hierarchy auto` stores the flag. Resolve does not load suite extras until the catalog map lands. |
+| `manual` | Suite extras plus any `/hierarchy role` or `trek models set-role` write. `--clear` unbinds one role so the suite preset cannot fill it. |
+
+Role `thinking` is `off`, `brief`, or `deep`. YAML `true`/`on` still means deep; `false`/`off` means off. Frontier and verifier may use `source: local` or `lmstudio`. In `single`, local/hybrid resolve only Decision, Workhorse, embedding, and reranker — not Tooling, Planning, Frontier, or verifier. The escalate parser still lists Tooling as a rung until the controller rewrite.
+
+`/hierarchy` and `trek models set-layering` write `~/.trek/models.yaml`. If the project has `.trek/models.yaml`, they also patch `hierarchy.layering` there so the project file cannot keep an older value after a successful command. Role bind, `--clear`, and `set-lmstudio` likewise patch the project file and set `layering: manual`.
+
+`/hierarchy role <role> --clear` unbinds one extra role.
+
+Frontier `source: local` starts llama-server like Planning. `source: lmstudio` uses the LM Studio endpoint. API Frontier stays hybrid/api only.
 
 ## Ladder
 
@@ -23,7 +41,7 @@ Decision  →  Tooling  →  Workhorse  →  Planning  →  Frontier
 2. **Tooling** — Small generative model for mechanical tool calls (`read` / `bash` / simple edits). Law 1 read-before-write does **not** apply (fast mechanical edits).
 3. **Workhorse** — Default Act model for builds and multi-step tool work. Read-before-write enforced.
 4. **Planning** — Thinking / plan brief; may act after elevation. Read-before-write enforced.
-5. **Frontier** — Hybrid only. Deep debug, research, hard architecture. Read-before-write enforced.
+5. **Frontier** — Deep debug, research, hard architecture. Default is API (hybrid). `source: local` or `lmstudio` is allowed. Read-before-write enforced.
 
 **Policy:** new sessions and idle LFM/hybrid consoles park on **Decision** (footer shows d1). Generative work routes Decision → Tooling. After a climb, the floor **sticks** for the same topic until a new topic, an escalate, or a descalate.
 
@@ -90,21 +108,22 @@ See the [Roadmap model suite table](../../../../ROADMAP.md#5-model-suite-referen
 hierarchy:
   mode: hybrid
   suite: mistral   # or qwen / lfm / mistral-pro — Decision stays d1
+  layering: single
 roles:
   decision:
     source: local
     id: LiquidAI/d1-omni-600M
-    thinking: false
+    thinking: off
   tooling:
     source: local
     id: Qwen3.5-0.8B
-    thinking: false
+    thinking: off
 ```
 
 ## Related commands
 
-- `trek models list|set-mode|set-suite|set-role|set-lmstudio|benchmark`
-- `/hierarchy` — in-session mode / suite / role picker (0.16)
+- `trek models list|set-mode|set-suite|set-layering|set-role|set-lmstudio|benchmark`
+- `/hierarchy` — in-session layering / mode / suite / role picker (0.16, layering in 0.18)
 
 ## Related tests
 

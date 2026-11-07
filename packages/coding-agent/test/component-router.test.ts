@@ -19,9 +19,12 @@ import {
 } from "../src/core/runtime/index.ts";
 
 function localResolved() {
-	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "mistral" }), {
-		frontier: null,
-	});
+	return resolveRuntime(
+		withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "mistral" }),
+		{
+			frontier: null,
+		},
+	);
 }
 
 describe("component router", () => {
@@ -80,7 +83,7 @@ describe("component router", () => {
 		const dir = mkdtempSync(join(tmpdir(), "trek-route-"));
 		dirs.push(dir);
 		const path = join(dir, "models.yaml");
-		const config = withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "mistral" });
+		const config = withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "mistral" });
 		config.routing = { components: { worldModel: "workhorse" } };
 		writeRuntimeConfigFile(path, config);
 		const loaded = readRuntimeConfigFile(path);
@@ -106,9 +109,12 @@ describe("component router", () => {
 	});
 
 	it("escalates a heavy hybrid step to Frontier and a cheap step to Workhorse", () => {
-		const hybrid = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "mistral" }), {
-			frontier: { provider: "anthropic", modelId: "frontier" },
-		});
+		const hybrid = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "mistral" }),
+			{
+				frontier: { provider: "anthropic", modelId: "frontier" },
+			},
+		);
 		const regular = routeComponent({ component: "intend", resolved: hybrid, depth: 0, complexity: 0.2 });
 		expect(regular.role).toBe("planning");
 		expect(regular.reason).toMatch(/intend uses planning/);

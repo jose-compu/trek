@@ -28,9 +28,12 @@ import {
 import { handleModelsCommand } from "../src/models-cli.ts";
 
 function localResolved() {
-	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "mistral" }), {
-		frontier: null,
-	});
+	return resolveRuntime(
+		withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "mistral" }),
+		{
+			frontier: null,
+		},
+	);
 }
 
 describe("think versus act", () => {
@@ -54,9 +57,12 @@ describe("think versus act", () => {
 	});
 
 	it("sends deep work to Frontier when the API is available", () => {
-		const hybrid = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", suite: "mistral" }), {
-			frontier: { provider: "anthropic", modelId: "claude-sonnet" },
-		});
+		const hybrid = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", layering: "manual", suite: "mistral" }),
+			{
+				frontier: { provider: "anthropic", modelId: "claude-sonnet" },
+			},
+		);
 		const deep = selectSessionRole({ text: "debug the hard bug in login", resolved: hybrid });
 		expect(deep.role).toBe("frontier");
 		expect(deep.source).toBe("api");
@@ -81,9 +87,12 @@ describe("think versus act", () => {
 		const resolved = localResolved();
 		expect(selectThinkRole({ text: "list the files", resolved })).toBeUndefined();
 		expect(selectThinkRole({ text: "list the files", resolved, elevateTo: "planning" })?.role).toBe("planning");
-		const hybrid = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", suite: "mistral" }), {
-			frontier: { provider: "xai", modelId: "grok-4" },
-		});
+		const hybrid = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", layering: "manual", suite: "mistral" }),
+			{
+				frontier: { provider: "xai", modelId: "grok-4" },
+			},
+		);
 		expect(selectThinkRole({ text: "list the files", resolved: hybrid, elevateTo: "frontier" })?.role).toBe(
 			"frontier",
 		);
@@ -96,9 +105,12 @@ describe("think versus act", () => {
 
 	it("parses ladder escalate JSON and soft stuck phrases", () => {
 		const local = localResolved();
-		const hybrid = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", suite: "mistral" }), {
-			frontier: { provider: "xai", modelId: "grok-4" },
-		});
+		const hybrid = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", layering: "manual", suite: "mistral" }),
+			{
+				frontier: { provider: "xai", modelId: "grok-4" },
+			},
+		);
 		expect(parseEscalateSignal('{"escalate":"next","why":"need tools"}', "tooling", local)).toEqual({
 			tier: "workhorse",
 			why: "need tools",
@@ -143,10 +155,10 @@ describe("LM Studio roles", () => {
 		expect(single.baseUrl).toBe(DEFAULT_LMSTUDIO_BASE_URL);
 		expect(single.id).toBe("bonsai-27b");
 
-		const config = withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "mistral" });
+		const config = withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "mistral" });
 		const lm = {
 			source: "lmstudio" as const,
-			thinking: false,
+			thinking: "off" as const,
 			baseUrl: DEFAULT_LMSTUDIO_BASE_URL,
 		};
 		const one = withRoleOverride(config, "tooling", { ...lm, id: "tool-0.8b" });
@@ -154,7 +166,7 @@ describe("LM Studio roles", () => {
 		const three = withRoleOverride(two, "planning", {
 			...lm,
 			id: "lfm2.5-1.2b-thinking-mlx",
-			thinking: true,
+			thinking: "deep",
 		});
 		const resolved = resolveRuntime(three, { frontier: null });
 		expect(resolved.roles.tooling?.source).toBe("lmstudio");

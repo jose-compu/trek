@@ -23,18 +23,25 @@ import {
 	startLadderRole,
 	stripEscalateSignal,
 	withHierarchy,
+	withRoleOverride,
 } from "../src/core/runtime/index.ts";
 
 function localResolved() {
-	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "mistral" }), {
-		frontier: null,
-	});
+	return resolveRuntime(
+		withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "mistral" }),
+		{
+			frontier: null,
+		},
+	);
 }
 
 function hybridResolved() {
-	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", suite: "mistral" }), {
-		frontier: { provider: "xai", modelId: "grok-4" },
-	});
+	return resolveRuntime(
+		withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", layering: "manual", suite: "mistral" }),
+		{
+			frontier: { provider: "xai", modelId: "grok-4" },
+		},
+	);
 }
 
 describe("escalation ladder", () => {
@@ -56,6 +63,28 @@ describe("escalation ladder", () => {
 		expect(nextLadderRole("planning", hybrid)).toBe("frontier");
 		expect(resolveEscalateTarget("planning", "frontier", local)).toBeUndefined();
 		expect(resolveEscalateTarget("planning", "frontier", hybrid)).toBe("frontier");
+	});
+
+	it("starts on Workhorse when layering is single", () => {
+		const resolved = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "single", suite: "mistral" }),
+			{ frontier: null },
+		);
+		expect(startLadderRole(resolved)).toBe("workhorse");
+		expect(nextLadderRole("workhorse", resolved)).toBeUndefined();
+	});
+
+	it("climbs to a local Frontier assignment in local mode", () => {
+		const resolved = resolveRuntime(
+			withRoleOverride(
+				withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "mistral" }),
+				"frontier",
+				{ source: "local", id: "Ministral-3-8B-Reasoning-2512", thinking: "deep" },
+			),
+			{ frontier: null },
+		);
+		expect(nextLadderRole("planning", resolved)).toBe("frontier");
+		expect(resolveEscalateTarget("planning", "frontier", resolved)).toBe("frontier");
 	});
 
 	it("honors explicit escalate JSON and refuses demotion", () => {

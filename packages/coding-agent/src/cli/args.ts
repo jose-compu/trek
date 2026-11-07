@@ -351,6 +351,7 @@ ${chalk.bold("Commands:")}
   ${APP_NAME} models                    Show the 0.8.0 hierarchy (api by default)
   ${APP_NAME} models set-mode <mode>    api, local, or hybrid
   ${APP_NAME} models set-suite <suite>  mistral, mistral-pro, qwen, or lfm
+  ${APP_NAME} models set-layering <mode>  single, auto, or manual (factory: single)
   ${APP_NAME} models set-role <role>    Override one role (--id, --source, --thinking)
   ${APP_NAME} models set-lmstudio       One or two models already loaded in LM Studio
   ${APP_NAME} models benchmark          Tokens/s per local role; skips missing weights

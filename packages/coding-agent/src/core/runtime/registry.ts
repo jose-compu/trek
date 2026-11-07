@@ -13,11 +13,15 @@ import {
 	defaultRuntimeConfig,
 	type HierarchySettings,
 	isHierarchyMode,
+	isLayeringMode,
 	isRoleSource,
 	isRouteComponent,
 	isRouteRole,
 	isRuntimeRole,
 	isSuiteId,
+	LAYERING_EXTRA_ROLES,
+	type LayeringMode,
+	parseRoleThinking,
 	type RoleAssignment,
 	type RoleSource,
 	type RouteComponent,
@@ -146,6 +150,31 @@ function parseHierarchy(value: unknown, path: string, current: HierarchySettings
 		}
 		next.quant = record.quant;
 	}
+	if (record.layering !== undefined) {
+		if (typeof record.layering !== "string" || !isLayeringMode(record.layering)) {
+			throw new Error(`${path}: hierarchy.layering must be single, auto, or manual.`);
+		}
+		next.layering = record.layering;
+	} else if (next.mode === "local" || next.mode === "hybrid") {
+		next.layering = "manual";
+	}
+	if (record.unbound !== undefined) {
+		if (!Array.isArray(record.unbound)) {
+			throw new Error(`${path}: hierarchy.unbound must be a list of roles.`);
+		}
+		const unbound: RuntimeRole[] = [];
+		for (const item of record.unbound) {
+			if (typeof item !== "string" || !isRuntimeRole(item)) {
+				throw new Error(`${path}: hierarchy.unbound entries must be role names.`);
+			}
+			unbound.push(item);
+		}
+		if (unbound.length > 0) {
+			next.unbound = [...new Set(unbound)];
+		} else {
+			delete next.unbound;
+		}
+	}
 	return next;
 }
 
@@ -175,13 +204,14 @@ function parseRole(value: unknown, label: string): RoleAssignment {
 		throw new Error(`${label}: id must be a string.`);
 	}
 	assertPublicModelId(record.id);
-	if (typeof record.thinking !== "boolean") {
-		throw new Error(`${label}: thinking must be true or false.`);
+	const thinking = parseRoleThinking(record.thinking);
+	if (thinking === undefined) {
+		throw new Error(`${label}: thinking must be off, brief, deep, or a YAML boolean.`);
 	}
 	const role: RoleAssignment = {
 		source: record.source as RoleSource,
 		id: record.id,
-		thinking: record.thinking,
+		thinking,
 	};
 	if (record.provider !== undefined) {
 		if (typeof record.provider !== "string" || !record.provider.trim()) {
@@ -208,21 +238,150 @@ function parseRole(value: unknown, label: string): RoleAssignment {
 
 export function withHierarchy(
 	config: RuntimeConfig,
-	patch: Partial<Pick<HierarchySettings, "mode" | "suite" | "quant">>,
+	patch: Partial<Pick<HierarchySettings, "mode" | "suite" | "quant" | "layering">>,
 ): RuntimeConfig {
 	return {
 		hierarchy: { ...config.hierarchy, ...patch },
 		roles: config.roles,
+		...(config.routing ? { routing: config.routing } : {}),
 	};
 }
 
-export function withRoleOverride(config: RuntimeConfig, role: RuntimeRole, assignment: RoleAssignment): RuntimeConfig {
-	if (role === "frontier" && assignment.source === "local") {
-		throw new Error("Frontier stays on the API.");
+function hierarchyWithUnbound(hierarchy: HierarchySettings, unbound: RuntimeRole[]): HierarchySettings {
+	const next = { ...hierarchy };
+	const unique = [...new Set(unbound)];
+	if (unique.length > 0) {
+		next.unbound = unique;
+	} else {
+		delete next.unbound;
 	}
+	return next;
+}
+
+export function withRoleOverride(config: RuntimeConfig, role: RuntimeRole, assignment: RoleAssignment): RuntimeConfig {
 	assertPublicModelId(assignment.id);
+	const unbound = (config.hierarchy.unbound ?? []).filter((name) => name !== role);
 	return {
-		hierarchy: config.hierarchy,
+		hierarchy: hierarchyWithUnbound({ ...config.hierarchy, layering: "manual" }, unbound),
 		roles: { ...config.roles, [role]: assignment },
+		...(config.routing ? { routing: config.routing } : {}),
 	};
+}
+
+/** Beginner stack: one chat model on Workhorse. Extra roles alias it at resolve time. */
+export function flattenToSingle(config: RuntimeConfig): RuntimeConfig {
+	const roles = { ...config.roles };
+	for (const role of LAYERING_EXTRA_ROLES) {
+		delete roles[role];
+	}
+	const hierarchy = { ...config.hierarchy, layering: "single" as const };
+	delete hierarchy.unbound;
+	return {
+		hierarchy,
+		roles,
+		...(config.routing ? { routing: config.routing } : {}),
+	};
+}
+
+export function withClearedRole(config: RuntimeConfig, role: RuntimeRole): RuntimeConfig {
+	const roles = { ...config.roles };
+	delete roles[role];
+	return {
+		hierarchy: hierarchyWithUnbound({ ...config.hierarchy, layering: "manual" }, [
+			...(config.hierarchy.unbound ?? []),
+			role,
+		]),
+		roles,
+		...(config.routing ? { routing: config.routing } : {}),
+	};
+}
+
+function readProjectYaml(cwd: string): { path: string; record: Record<string, unknown> } | undefined {
+	const path = projectModelsYamlPath(cwd);
+	if (!existsSync(path)) {
+		return undefined;
+	}
+	let raw: unknown;
+	try {
+		raw = parse(readFileSync(path, "utf-8"));
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		throw new Error(`Cannot parse ${path}: ${message}`);
+	}
+	const record = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+	return { path, record };
+}
+
+function writeProjectYaml(path: string, record: Record<string, unknown>): void {
+	const body = stringify(record);
+	writeFileSync(path, body.endsWith("\n") ? body : `${body}\n`);
+}
+
+function projectRoles(record: Record<string, unknown>): Record<string, unknown> {
+	if (record.roles && typeof record.roles === "object" && !Array.isArray(record.roles)) {
+		return { ...(record.roles as Record<string, unknown>) };
+	}
+	return {};
+}
+
+function applyProjectLayering(record: Record<string, unknown>, layering: LayeringMode, clearExtras: boolean): void {
+	const hierarchy =
+		record.hierarchy && typeof record.hierarchy === "object" && !Array.isArray(record.hierarchy)
+			? { ...(record.hierarchy as Record<string, unknown>) }
+			: {};
+	hierarchy.layering = layering;
+	if (clearExtras) {
+		delete hierarchy.unbound;
+		const roles = projectRoles(record);
+		for (const role of LAYERING_EXTRA_ROLES) {
+			delete roles[role];
+		}
+		record.roles = roles;
+	}
+	record.hierarchy = hierarchy;
+}
+
+/** Keep project `.trek/models.yaml` from overriding a global layering write. */
+export function syncProjectLayering(cwd: string, layering: LayeringMode, clearExtras: boolean): void {
+	const loaded = readProjectYaml(cwd);
+	if (!loaded) {
+		return;
+	}
+	applyProjectLayering(loaded.record, layering, clearExtras);
+	writeProjectYaml(loaded.path, loaded.record);
+}
+
+/** Bind or clear one role in the project file, and set layering to manual. */
+export function syncProjectRole(cwd: string, role: RuntimeRole, assignment: RoleAssignment | undefined): void {
+	const loaded = readProjectYaml(cwd);
+	if (!loaded) {
+		return;
+	}
+	applyProjectLayering(loaded.record, "manual", false);
+	const roles = projectRoles(loaded.record);
+	const hierarchy = loaded.record.hierarchy as Record<string, unknown>;
+	const unbound = Array.isArray(hierarchy.unbound)
+		? hierarchy.unbound.filter((item): item is string => typeof item === "string" && item !== role)
+		: [];
+	if (assignment) {
+		roles[role] = {
+			source: assignment.source,
+			id: assignment.id,
+			thinking: assignment.thinking,
+			...(assignment.provider ? { provider: assignment.provider } : {}),
+			...(assignment.repo ? { repo: assignment.repo } : {}),
+			...(assignment.baseUrl ? { baseUrl: assignment.baseUrl } : {}),
+		};
+	} else {
+		delete roles[role];
+		unbound.push(role);
+	}
+	if (unbound.length > 0) {
+		hierarchy.unbound = [...new Set(unbound)];
+	} else {
+		delete hierarchy.unbound;
+	}
+	loaded.record.hierarchy = hierarchy;
+	loaded.record.roles = roles;
+	writeProjectYaml(loaded.path, loaded.record);
 }

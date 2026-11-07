@@ -8,19 +8,26 @@ import { APP_NAME, getAgentDir } from "./config.ts";
 import {
 	benchmarkRuntime,
 	DEFAULT_LMSTUDIO_BASE_URL,
+	defaultRoleThinking,
 	defaultRuntimeConfig,
+	flattenToSingle,
 	formatBenchmark,
 	formatRuntimeStatus,
 	globalModelsYamlPath,
 	isHierarchyMode,
+	isLayeringMode,
 	isRuntimeRole,
 	isSuiteId,
 	loadRuntimeConfig,
+	parseRoleThinking,
 	type RoleAssignment,
 	type RoleSource,
 	readRuntimeConfigFile,
 	resolveRuntime,
+	syncProjectLayering,
+	syncProjectRole,
 	weightFileExists,
+	withClearedRole,
 	withHierarchy,
 	withRoleOverride,
 	writeBenchmarkJson,
@@ -31,7 +38,10 @@ function printHelp(): void {
 	console.log(`${APP_NAME} models list`);
 	console.log(`${APP_NAME} models set-mode api|local|hybrid`);
 	console.log(`${APP_NAME} models set-suite mistral|mistral-pro|qwen|lfm`);
-	console.log(`${APP_NAME} models set-role <role> --id <id> [--source local|api|lmstudio] [--thinking on|off]`);
+	console.log(`${APP_NAME} models set-layering auto|single|manual`);
+	console.log(
+		`${APP_NAME} models set-role <role> --id <id> [--source local|api|lmstudio] [--thinking off|brief|deep|on] | --clear`,
+	);
 	console.log(`${APP_NAME} models set-lmstudio --id <id> | --tooling <id> --workhorse <id> --planning <id>`);
 	console.log(`${APP_NAME} models benchmark`);
 	console.log("  Role registry in ~/.trek/models.yaml. Project .trek/models.yaml overrides it.");
@@ -69,6 +79,9 @@ export async function handleModelsCommand(args: string[]): Promise<boolean> {
 	}
 	if (sub === "set-suite") {
 		return setSuite(rest.slice(1));
+	}
+	if (sub === "set-layering") {
+		return setLayering(rest.slice(1));
 	}
 	if (sub === "set-role") {
 		return setRole(rest.slice(1));
@@ -120,6 +133,24 @@ function setMode(rest: string[]): boolean {
 	return true;
 }
 
+function setLayering(rest: string[]): boolean {
+	const mode = rest[0];
+	if (!mode || !isLayeringMode(mode)) {
+		console.error(chalk.red("Usage: trek models set-layering auto|single|manual"));
+		process.exitCode = 1;
+		return true;
+	}
+	const current = loadGlobal();
+	if (process.exitCode) {
+		return true;
+	}
+	const next = mode === "single" ? flattenToSingle(current) : withHierarchy(current, { layering: mode });
+	writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), next);
+	syncProjectLayering(process.cwd(), mode, mode === "single");
+	printStatus();
+	return true;
+}
+
 function setSuite(rest: string[]): boolean {
 	const suite = rest[0];
 	if (!suite || !isSuiteId(suite)) {
@@ -140,14 +171,26 @@ function setRole(rest: string[]): boolean {
 	const roleName = rest[0];
 	if (!roleName || !isRuntimeRole(roleName)) {
 		console.error(
-			chalk.red("Usage: trek models set-role <tooling|workhorse|planning|frontier|embedding|reranker> --id <id>"),
+			chalk.red(
+				"Usage: trek models set-role <decision|tooling|workhorse|planning|frontier|verifier|embedding|reranker> --id <id> | --clear",
+			),
 		);
 		process.exitCode = 1;
 		return true;
 	}
+	if (rest.includes("--clear")) {
+		const current = loadGlobal();
+		if (process.exitCode) {
+			return true;
+		}
+		writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), withClearedRole(current, roleName));
+		syncProjectRole(process.cwd(), roleName, undefined);
+		printStatus();
+		return true;
+	}
 	const id = flagValue(rest, "--id");
 	if (!id) {
-		console.error(chalk.red("set-role requires --id."));
+		console.error(chalk.red("set-role requires --id or --clear."));
 		process.exitCode = 1;
 		return true;
 	}
@@ -155,7 +198,7 @@ function setRole(rest: string[]): boolean {
 	const source: RoleSource =
 		sourceFlag === "api" || sourceFlag === "local" || sourceFlag === "lmstudio"
 			? sourceFlag
-			: roleName === "frontier"
+			: roleName === "frontier" || roleName === "verifier"
 				? "api"
 				: "local";
 	if (sourceFlag !== undefined && sourceFlag !== "api" && sourceFlag !== "local" && sourceFlag !== "lmstudio") {
@@ -164,14 +207,15 @@ function setRole(rest: string[]): boolean {
 		return true;
 	}
 	const thinkingFlag = flagValue(rest, "--thinking");
-	let thinking = roleName === "planning" || roleName === "frontier";
+	let thinking = defaultRoleThinking(roleName);
 	if (thinkingFlag !== undefined) {
-		if (thinkingFlag !== "on" && thinkingFlag !== "off") {
-			console.error(chalk.red("set-role --thinking must be on or off."));
+		const parsed = parseRoleThinking(thinkingFlag);
+		if (parsed === undefined) {
+			console.error(chalk.red("set-role --thinking must be off, brief, deep, or on."));
 			process.exitCode = 1;
 			return true;
 		}
-		thinking = thinkingFlag === "on";
+		thinking = parsed;
 	}
 	const assignment: RoleAssignment = { source, id, thinking };
 	const provider = flagValue(rest, "--provider");
@@ -194,6 +238,7 @@ function setRole(rest: string[]): boolean {
 			return true;
 		}
 		writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), withRoleOverride(current, roleName, assignment));
+		syncProjectRole(process.cwd(), roleName, assignment);
 	} catch (error) {
 		console.error(chalk.red(error instanceof Error ? error.message : String(error)));
 		process.exitCode = 1;
@@ -224,22 +269,25 @@ function setLmStudio(rest: string[]): boolean {
 	next = withRoleOverride(next, "tooling", {
 		source: "lmstudio",
 		id: toolingId,
-		thinking: false,
+		thinking: "off",
 		baseUrl,
 	});
 	next = withRoleOverride(next, "workhorse", {
 		source: "lmstudio",
 		id: workhorseId,
-		thinking: false,
+		thinking: "off",
 		baseUrl,
 	});
 	next = withRoleOverride(next, "planning", {
 		source: "lmstudio",
 		id: planningId,
-		thinking: true,
+		thinking: "deep",
 		baseUrl,
 	});
 	writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), next);
+	syncProjectRole(process.cwd(), "tooling", next.roles.tooling);
+	syncProjectRole(process.cwd(), "workhorse", next.roles.workhorse);
+	syncProjectRole(process.cwd(), "planning", next.roles.planning);
 	printStatus();
 	return true;
 }

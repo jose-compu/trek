@@ -20,9 +20,12 @@ describe("missing model download", () => {
 	});
 
 	function localLfm() {
-		return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "lfm" }), {
-			frontier: null,
-		});
+		return resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "lfm" }),
+			{
+				frontier: null,
+			},
+		);
 	}
 
 	it("lists local chat weights that are not on disk", () => {

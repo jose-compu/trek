@@ -5,7 +5,7 @@
 
 import { suitePreset } from "./suites.ts";
 import type { HierarchyMode, RoleAssignment, RuntimeConfig, RuntimeRole } from "./types.ts";
-import { SESSION_LOCAL_ROLES, type SessionLocalRole } from "./types.ts";
+import { isLayeringExtraRole, SESSION_LOCAL_ROLES, type SessionLocalRole } from "./types.ts";
 
 export interface FrontierHint {
 	provider: string;
@@ -24,6 +24,7 @@ export interface ResolveRuntimeOptions {
 export interface ResolvedRuntime {
 	mode: HierarchyMode;
 	effectiveMode: HierarchyMode;
+	layering: RuntimeConfig["hierarchy"]["layering"];
 	suite: RuntimeConfig["hierarchy"]["suite"];
 	quant: string;
 	rerank: boolean;
@@ -60,7 +61,8 @@ function sessionNeedsLocalWeights(mode: HierarchyMode, roles: Partial<Record<Run
 	if (mode === "api") {
 		return false;
 	}
-	return SESSION_LOCAL_ROLES.some((role) => roles[role]?.source === "local");
+	const chatRoles = [...SESSION_LOCAL_ROLES, "frontier", "verifier"] as const;
+	return chatRoles.some((role) => roles[role]?.source === "local");
 }
 
 export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOptions = {}): ResolvedRuntime {
@@ -77,20 +79,29 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 
 	const roles: Partial<Record<RuntimeRole, RoleAssignment>> = {};
 	if (effectiveMode === "api") {
-		roles.frontier = frontierRole(frontier);
+		roles.frontier = overlay(frontierRole(frontier), config.roles.frontier);
+		if (config.roles.verifier) {
+			roles.verifier = config.roles.verifier;
+		}
 		// Registry still lists embed/rerank ids. API mode does not load MiniLM unless TREK_MEMORY_LOCAL=1.
 		roles.embedding = overlay(preset.roles.embedding, config.roles.embedding);
 		roles.reranker = overlay(preset.roles.reranker, config.roles.reranker);
 	} else {
 		for (const [name, assignment] of Object.entries(preset.roles) as [RuntimeRole, RoleAssignment][]) {
+			if (skipExtraRole(config, name)) {
+				continue;
+			}
 			roles[name] = overlay(assignment, config.roles[name]);
 		}
 		for (const [name, assignment] of Object.entries(config.roles) as [RuntimeRole, RoleAssignment][]) {
+			if (skipExtraRole(config, name)) {
+				continue;
+			}
 			if (!roles[name] && assignment) {
 				roles[name] = assignment;
 			}
 		}
-		if (effectiveMode === "hybrid") {
+		if (effectiveMode === "hybrid" && !skipExtraRole(config, "frontier")) {
 			roles.frontier = overlay(frontierRole(frontier), config.roles.frontier);
 		}
 	}
@@ -98,6 +109,7 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 	return {
 		mode: config.hierarchy.mode,
 		effectiveMode,
+		layering: config.hierarchy.layering,
 		suite: config.hierarchy.suite,
 		quant: config.hierarchy.quant,
 		rerank: true,
@@ -112,14 +124,27 @@ export function sessionLocalRoles(resolved: ResolvedRuntime): SessionLocalRole[]
 	if (resolved.effectiveMode === "api") {
 		return [];
 	}
-	return [...SESSION_LOCAL_ROLES];
+	return SESSION_LOCAL_ROLES.filter((role) => resolved.roles[role]?.source === "local");
+}
+
+export function skipExtraRole(config: RuntimeConfig, name: RuntimeRole): boolean {
+	if (config.hierarchy.unbound?.includes(name)) {
+		return true;
+	}
+	if (!isLayeringExtraRole(name)) {
+		return false;
+	}
+	if (config.hierarchy.layering === "single") {
+		return true;
+	}
+	return config.hierarchy.layering === "auto" && !config.roles[name];
 }
 
 function frontierRole(frontier: FrontierHint | undefined): RoleAssignment {
 	const role: RoleAssignment = {
 		source: "api",
 		id: frontier?.modelId ?? "frontier",
-		thinking: true,
+		thinking: "deep",
 	};
 	if (frontier?.provider) {
 		role.provider = frontier.provider;
@@ -145,23 +170,30 @@ function overlay(base: RoleAssignment | undefined, override: RoleAssignment | un
 export function formatRuntimeStatus(resolved: ResolvedRuntime): string {
 	const lines = [
 		`hierarchy.mode: ${resolved.mode}`,
+		`hierarchy.layering: ${resolved.layering}`,
 		`effective: ${resolved.effectiveMode}`,
 		`suite: ${resolved.suite}`,
 		`quant: ${resolved.quant}`,
 		`huggingFaceToken: ${resolved.requiresHuggingFaceToken ? "required for local weights" : "not required"}`,
 		`rerank: ${resolved.rerank ? "on" : "off"}`,
 	];
-	const order: RuntimeRole[] = ["decision", "tooling", "workhorse", "planning", "embedding", "reranker", "frontier"];
+	const order: RuntimeRole[] = [
+		"decision",
+		"tooling",
+		"workhorse",
+		"planning",
+		"frontier",
+		"verifier",
+		"embedding",
+		"reranker",
+	];
 	for (const name of order) {
 		const active = resolved.roles[name];
-		const preset = resolved.presetRoles[name];
-		const shown = active ?? preset;
-		if (!shown) {
+		if (!active) {
 			continue;
 		}
-		const state = active ? "active" : "inactive";
-		const provider = shown.provider ? ` provider ${shown.provider}` : "";
-		lines.push(`${name} ${shown.source} ${shown.id}${provider} thinking ${shown.thinking ? "on" : "off"} ${state}`);
+		const provider = active.provider ? ` provider ${active.provider}` : "";
+		lines.push(`${name} ${active.source} ${active.id}${provider} thinking ${active.thinking} active`);
 	}
 	return lines.join("\n");
 }

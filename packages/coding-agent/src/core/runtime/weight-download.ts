@@ -8,7 +8,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { weightFileExists } from "./process-manager.ts";
 import type { ResolvedRuntime } from "./resolve.ts";
-import { SESSION_LOCAL_ROLES } from "./types.ts";
+import { LOCAL_SERVER_ROLES } from "./types.ts";
 
 export interface WeightSource {
 	repo: string;
@@ -53,7 +53,7 @@ export function missingLocalWeights(resolved: ResolvedRuntime, dir = modelsDir()
 		return [];
 	}
 	const missing: MissingWeight[] = [];
-	for (const role of SESSION_LOCAL_ROLES) {
+	for (const role of LOCAL_SERVER_ROLES) {
 		const assignment = resolved.roles[role];
 		if (!assignment || assignment.source !== "local") {
 			continue;

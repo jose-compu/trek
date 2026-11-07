@@ -17,7 +17,9 @@ import type { SuiteId } from "../src/core/runtime/types.ts";
 const SUITES: SuiteId[] = ["mistral", "mistral-pro", "qwen", "lfm"];
 
 function resolved(suite: SuiteId) {
-	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite }), { frontier: null });
+	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite }), {
+		frontier: null,
+	});
 }
 
 describe("local suite roles", () => {
@@ -26,7 +28,7 @@ describe("local suite roles", () => {
 			const runtime = resolved(suite);
 			expect(runtime.roles.decision?.id, suite).toBe(DEFAULT_DECISION_MODEL_ID);
 			expect(runtime.roles.decision?.source, suite).toBe("local");
-			expect(runtime.roles.decision?.thinking, suite).toBe(false);
+			expect(runtime.roles.decision?.thinking, suite).toBe("off");
 		}
 	});
 

@@ -36,6 +36,7 @@ import {
 	sessionLocalRoles,
 	summarizePerformance,
 	withHierarchy,
+	withRoleOverride,
 	writeRuntimeConfigFile,
 } from "../src/core/runtime/index.ts";
 import { handleModelsCommand } from "../src/models-cli.ts";
@@ -63,7 +64,7 @@ function captureStdio(): { logs: string[]; errors: string[]; restore: () => void
 }
 
 function localConfig(suite: "mistral" | "mistral-pro" | "qwen" | "lfm" = "mistral") {
-	return withHierarchy(defaultRuntimeConfig(), { mode: "local", suite });
+	return withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite });
 }
 
 describe("0.8.0 runtime gate (#92)", () => {
@@ -227,8 +228,8 @@ describe("0.8.0 runtime gate (#92)", () => {
 		stopping.stop();
 		expect(stopped).toEqual([4242]);
 		expect(stopping.list()).toEqual([]);
-		expect(resolved.roles.workhorse?.thinking).toBe(false);
-		expect(resolved.roles.planning?.thinking).toBe(true);
+		expect(resolved.roles.workhorse?.thinking).toBe("off");
+		expect(resolved.roles.planning?.thinking).toBe("deep");
 	});
 
 	it("probing allocator skips ports already taken on the machine", () => {
@@ -252,9 +253,12 @@ describe("0.8.0 runtime gate (#92)", () => {
 			weightsAvailable: () => true,
 		});
 		manager.ensure("planning", resolved);
-		const other = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "qwen" }), {
-			frontier: null,
-		});
+		const other = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "qwen" }),
+			{
+				frontier: null,
+			},
+		);
 		expect(() => manager.ensure("planning", other)).toThrow(/already loaded/);
 	});
 
@@ -297,16 +301,16 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(mistral.roles.decision?.id).toBe("LiquidAI/d1-omni-600M");
 		expect(mistral.rerank).toBe(true);
 		expect(qwen.roles.workhorse?.id).toBe("Qwen3.5-4B");
-		expect(qwen.roles.workhorse?.thinking).toBe(false);
-		expect(qwen.roles.planning?.thinking).toBe(true);
+		expect(qwen.roles.workhorse?.thinking).toBe("off");
+		expect(qwen.roles.planning?.thinking).toBe("deep");
 		expect(qwen.roles.decision?.id).toBe("LiquidAI/d1-omni-600M");
 		expect(lfm.roles.embedding?.id).toBe("LFM2-ColBERT-350M");
 		expect(lfm.roles.reranker?.id).toBe("cross-encoder/ms-marco-MiniLM-L-6-v2");
 		expect(lfm.roles.decision?.id).toBe("LiquidAI/d1-omni-600M");
 		expect(lfm.rerank).toBe(true);
-		expect(lfm.roles.planning?.thinking).toBe(true);
+		expect(lfm.roles.planning?.thinking).toBe("deep");
 		expect(pro.roles.workhorse?.id).toBe("Devstral-Small-2507");
-		expect(pro.roles.workhorse?.thinking).toBe(false);
+		expect(pro.roles.workhorse?.thinking).toBe("off");
 		expect(pro.roles.planning?.id).toBe("Ministral-3-8B-Reasoning-2512");
 		expect(pro.roles.decision?.id).toBe("LiquidAI/d1-omni-600M");
 	});
@@ -376,24 +380,65 @@ describe("0.8.0 runtime gate (#92)", () => {
 			const globalConfig = localConfig();
 			writeRuntimeConfigFile(join(root, "models.yaml"), globalConfig);
 			writeRuntimeConfigFile(projectModelsYamlPath(cwd), {
-				hierarchy: { mode: "local", suite: "mistral", quant: "q4_k_m" },
+				hierarchy: { mode: "local", suite: "mistral", quant: "q4_k_m", layering: "single" },
 				roles: {
-					workhorse: { source: "local", id: "Ministral-3-3B-Instruct-2512", thinking: false },
+					workhorse: { source: "local", id: "Ministral-3-3B-Instruct-2512", thinking: "off" },
 				},
 			});
 			const loaded = loadRuntimeConfig({ agentDir, cwd });
 			const resolved = resolveRuntime(loaded, { frontier: null });
 			expect(resolved.roles.workhorse?.id).toBe("Ministral-3-3B-Instruct-2512");
-			expect(resolved.roles.planning?.id).toBe("Ministral-3-8B-Reasoning-2512");
+			expect(resolved.layering).toBe("single");
+			expect(resolved.roles.planning).toBeUndefined();
+			expect(sessionLocalRoles(resolved)).toEqual(["workhorse"]);
 			expect(() =>
 				writeRuntimeConfigFile(join(root, "models.yaml"), {
 					...globalConfig,
-					roles: { workhorse: { source: "local", id: "@private/needle", thinking: false } },
+					roles: { workhorse: { source: "local", id: "@private/needle", thinking: "off" } },
 				}),
 			).toThrow(/private or unpublished/);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	it("starts a local Frontier llama-server when the role is assigned locally", () => {
+		const resolved = resolveRuntime(
+			withRoleOverride(localConfig(), "frontier", {
+				source: "local",
+				id: "Ministral-3-8B-Reasoning-2512",
+				thinking: "deep",
+			}),
+			{ frontier: null },
+		);
+		expect(resolved.roles.frontier?.source).toBe("local");
+		const calls: string[] = [];
+		const manager = new LlamaProcessManager({
+			spawn: (request) => {
+				calls.push(request.role);
+				return { pid: 9 };
+			},
+			allocatePort: createPortAllocator(18100),
+			binaryAvailable: () => true,
+			weightsAvailable: () => true,
+		});
+		const handle = manager.ensure("frontier", resolved);
+		expect(handle.role).toBe("frontier");
+		expect(handle.modelId).toBe("Ministral-3-8B-Reasoning-2512");
+		expect(calls).toEqual(["frontier"]);
+		expect(() => manager.ensure("frontier", resolved)).not.toThrow();
+	});
+
+	it("single local resolve binds Workhorse only, not Tooling or Planning", () => {
+		const resolved = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "single", suite: "mistral" }),
+			{ frontier: null },
+		);
+		expect(resolved.roles.workhorse?.id).toBe("Ministral-3-3B-Instruct-2512");
+		expect(resolved.roles.tooling).toBeUndefined();
+		expect(resolved.roles.planning).toBeUndefined();
+		expect(resolved.roles.frontier).toBeUndefined();
+		expect(sessionLocalRoles(resolved)).toEqual(["workhorse"]);
 	});
 });
 
@@ -423,9 +468,11 @@ describe("trek models CLI (#89)", () => {
 		stdio.restore();
 		const text = stdio.logs.join("\n");
 		expect(text).toContain("hierarchy.mode: local");
+		expect(text).toContain("hierarchy.layering: single");
 		expect(text).toContain("suite: qwen");
 		expect(text).toContain("thinking off");
-		expect(text).toContain("Qwen3.5-9B");
+		expect(text).toContain("Qwen3.5-4B");
+		expect(text).not.toContain("Qwen3.5-9B");
 	});
 });
 

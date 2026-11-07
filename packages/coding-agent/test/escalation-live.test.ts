@@ -257,9 +257,12 @@ describe.skipIf(!live)("local models escalate when stuck (matrix)", () => {
 	});
 
 	it("mistral suite still starts on Tooling until Decision lands", () => {
-		const resolved = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "mistral" }), {
-			frontier: null,
-		});
+		const resolved = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "mistral" }),
+			{
+				frontier: null,
+			},
+		);
 		expect(startLadderRole(resolved)).toBe("tooling");
 	});
 
@@ -273,12 +276,18 @@ describe.skipIf(!live)("local models escalate when stuck (matrix)", () => {
 				continue;
 			}
 
-			const local = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite }), {
-				frontier: null,
-			});
-			const hybrid = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", suite }), {
-				frontier: { provider: "xai", modelId: "grok-4" },
-			});
+			const local = resolveRuntime(
+				withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite }),
+				{
+					frontier: null,
+				},
+			);
+			const hybrid = resolveRuntime(
+				withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", layering: "manual", suite }),
+				{
+					frontier: { provider: "xai", modelId: "grok-4" },
+				},
+			);
 			const modelId = local.roles[role]?.id;
 			const available = Boolean(modelId && fits(modelId));
 			const floor = role as LadderRole;
@@ -360,9 +369,12 @@ describe.skipIf(!live)("local models escalate when stuck (matrix)", () => {
 		if (SUITE_FILTER && SUITE_FILTER !== "mistral") {
 			return;
 		}
-		const hybrid = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", suite: "mistral" }), {
-			frontier: { provider: "xai", modelId: "grok-4" },
-		});
+		const hybrid = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", layering: "manual", suite: "mistral" }),
+			{
+				frontier: { provider: "xai", modelId: "grok-4" },
+			},
+		);
 		const toolingId = hybrid.roles.tooling?.id;
 		const workhorseId = hybrid.roles.workhorse?.id;
 		if (!toolingId || !workhorseId || !fits(toolingId) || !fits(workhorseId)) {
@@ -393,9 +405,12 @@ describe.skipIf(!live)("local models escalate when stuck (matrix)", () => {
 	}, 300_000);
 
 	it("parser accepts escalate JSON wrapped in markdown fences", () => {
-		const hybrid = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", suite: "mistral" }), {
-			frontier: { provider: "xai", modelId: "grok-4" },
-		});
+		const hybrid = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", layering: "manual", suite: "mistral" }),
+			{
+				frontier: { provider: "xai", modelId: "grok-4" },
+			},
+		);
 		const fenced = '```json\n{"escalate":"next","why":"needs plan"}\n```';
 		expect(parseEscalateSignal(fenced, "tooling", hybrid)?.tier).toBe("workhorse");
 		expect(parseEscalateAsk(fenced)?.explicit).toBe(true);

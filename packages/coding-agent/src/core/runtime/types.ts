@@ -9,19 +9,38 @@ export type HierarchyMode = (typeof HIERARCHY_MODES)[number];
 export const SUITE_IDS = ["mistral", "mistral-pro", "qwen", "lfm"] as const;
 export type SuiteId = (typeof SUITE_IDS)[number];
 
+export const LAYERING_MODES = ["single", "auto", "manual"] as const;
+export type LayeringMode = (typeof LAYERING_MODES)[number];
+
+export const ROLE_THINKING = ["off", "brief", "deep"] as const;
+export type RoleThinking = (typeof ROLE_THINKING)[number];
+
 export const RUNTIME_ROLES = [
 	"decision",
 	"tooling",
 	"workhorse",
 	"planning",
 	"frontier",
+	"verifier",
 	"embedding",
 	"reranker",
 ] as const;
 export type RuntimeRole = (typeof RUNTIME_ROLES)[number];
 
-/** Roles that may own a llama-server process. Decision and Frontier never do. */
-export const LOCAL_SERVER_ROLES = ["tooling", "workhorse", "planning", "embedding", "reranker"] as const;
+/** Extra stack roles cleared by `/hierarchy single`. */
+export const LAYERING_EXTRA_ROLES = ["tooling", "planning", "frontier", "verifier"] as const;
+export type LayeringExtraRole = (typeof LAYERING_EXTRA_ROLES)[number];
+
+/** Roles that may own a llama-server process. Decision never does. */
+export const LOCAL_SERVER_ROLES = [
+	"tooling",
+	"workhorse",
+	"planning",
+	"frontier",
+	"verifier",
+	"embedding",
+	"reranker",
+] as const;
 export type LocalServerRole = (typeof LOCAL_SERVER_ROLES)[number];
 
 /** Chat processes a local session may start. Ladder: tooling → workhorse → planning. */
@@ -36,7 +55,7 @@ export interface RoleAssignment {
 	source: RoleSource;
 	id: string;
 	provider?: string;
-	thinking: boolean;
+	thinking: RoleThinking;
 	repo?: string;
 	/** LM Studio or another OpenAI-compatible server. Default is 127.0.0.1:1234/v1. */
 	baseUrl?: string;
@@ -46,6 +65,10 @@ export interface HierarchySettings {
 	mode: HierarchyMode;
 	suite: SuiteId;
 	quant: string;
+	/** Factory default is single: one chat model on Workhorse. */
+	layering: LayeringMode;
+	/** Roles `/hierarchy role --clear` unbound. Suite presets do not fill these. */
+	unbound?: RuntimeRole[];
 }
 
 export const ROUTE_COMPONENTS = ["worldModel", "toolIntent", "mechanical", "intend"] as const;
@@ -87,6 +110,7 @@ export function defaultRuntimeConfig(): RuntimeConfig {
 			mode: "api",
 			suite: "mistral",
 			quant: DEFAULT_QUANT,
+			layering: "single",
 		},
 		roles: {},
 	};
@@ -94,6 +118,40 @@ export function defaultRuntimeConfig(): RuntimeConfig {
 
 export function isHierarchyMode(value: string): value is HierarchyMode {
 	return (HIERARCHY_MODES as readonly string[]).includes(value);
+}
+
+export function isLayeringMode(value: string): value is LayeringMode {
+	return (LAYERING_MODES as readonly string[]).includes(value);
+}
+
+export function isRoleThinking(value: string): value is RoleThinking {
+	return (ROLE_THINKING as readonly string[]).includes(value);
+}
+
+export function isLayeringExtraRole(value: string): value is LayeringExtraRole {
+	return (LAYERING_EXTRA_ROLES as readonly string[]).includes(value);
+}
+
+/** YAML 1.1 may parse `off`/`on` as booleans. `true`/`on` mean deep. */
+export function parseRoleThinking(value: unknown): RoleThinking | undefined {
+	if (value === true || value === "true" || value === "on") {
+		return "deep";
+	}
+	if (value === false || value === "false" || value === "off") {
+		return "off";
+	}
+	if (typeof value === "string" && isRoleThinking(value)) {
+		return value;
+	}
+	return undefined;
+}
+
+export function roleThinkingEnabled(thinking: RoleThinking): boolean {
+	return thinking !== "off";
+}
+
+export function defaultRoleThinking(role: RuntimeRole): RoleThinking {
+	return role === "planning" || role === "frontier" ? "deep" : "off";
 }
 
 export function isSuiteId(value: string): value is SuiteId {
