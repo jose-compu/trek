@@ -68,12 +68,15 @@ import {
 	type ArchonNode,
 	type ArchonWorkflow,
 	acceptTypedLesson,
+	attachLayerWorkflow,
 	checkWorkflowNodes,
 	completeDomainCommand,
 	completePatternCommand as completePatternArguments,
 	type DomainSelection,
 	runPatternCommand as executePatternCommand,
+	findLayerWorkflow,
 	formatWorkflowCheck,
+	isArchonNodeRole,
 	isSpecificFact,
 	lessonIsBlocked,
 	lessonIsOffered,
@@ -542,6 +545,7 @@ export class AgentSession {
 	private _turnSelection: DomainSelection = {
 		domain: "none",
 		workflow: "none",
+		layer_workflow: "none",
 		selectionReason: "none",
 		nodeIds: [],
 		yaml: "",
@@ -2550,6 +2554,7 @@ export class AgentSession {
 		const none: DomainSelection = {
 			domain: "none",
 			workflow: "none",
+			layer_workflow: "none",
 			selectionReason: "none",
 			nodeIds: [],
 			yaml: "",
@@ -2559,7 +2564,9 @@ export class AgentSession {
 			const catalog = loadDomainCatalog(this._cwd);
 			this._catalogIds = new Set(catalog.domains.map((domain) => domain.id));
 			this._alwaysOnIds = new Set(catalog.domains.filter((domain) => domain.alwaysOn).map((domain) => domain.id));
-			return selectDomain(catalog, { task, previous: this._previousTask });
+			const selection = selectDomain(catalog, { task, previous: this._previousTask });
+			const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+			return attachLayerWorkflow(selection, resolved.layering, task);
 		} catch {
 			return none;
 		}
@@ -4096,17 +4103,30 @@ export class AgentSession {
 		const facts = this._calledFacts;
 		this._calledWorkflow = undefined;
 		this._calledFacts = [];
+		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
+		const kimiSwarm = process.env.TREK_KIMI_SWARM === "1";
+		const layerName =
+			config.hierarchy.layering === "single" ? "none" : (this._turnSelection.layer_workflow ?? "none");
+		const layerWorkflow = layerName !== "none" ? findLayerWorkflow(layerName) : undefined;
 		const callable = workflow?.nodes.every((node) => node.kind === "prompt" || node.kind === "bash") ?? false;
-		if (!workflow || !callable) {
+		if ((!workflow || !callable) && !layerWorkflow) {
+			await this._runAgentPrompt(messages);
+			return;
+		}
+		if (workflow && !callable) {
 			await this._runAgentPrompt(messages);
 			return;
 		}
 		const previousTools = this.getActiveToolNames();
 		const turnStart = this.agent.state.messages.length;
+		const hierarchy = this.hierarchyRole;
+		const currentRole = hierarchy && isArchonNodeRole(hierarchy) ? hierarchy : "workhorse";
 		const archonOptions = {
 			cwd: this._cwd,
 			userMessage: this._lastPromptTask,
 			facts,
+			seed: this._reproducibility.seed,
+			currentRole,
 			runPrompt: async (prompt: string, node: ArchonNode) => {
 				this.setActiveToolsByName(node.allowedTools ?? []);
 				try {
@@ -4117,14 +4137,15 @@ export class AgentSession {
 				return stripHonestyFooter(this._lastAssistantText()).trim();
 			},
 		};
-		let results: Array<{ id: string; output: string }>;
-		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
-		const kimiSwarm = process.env.TREK_KIMI_SWARM === "1";
-		if (workflow.name.startsWith("layer-") && config.hierarchy.layering !== "single" && !kimiSwarm) {
+		let results: Array<{ id: string; output: string }> = [];
+		if (workflow && callable) {
+			results = await runArchonWorkflow(workflow, archonOptions);
+		}
+		if (layerWorkflow && config.hierarchy.layering !== "single" && !kimiSwarm) {
 			const outputs = new Map<string, string>();
 			let promptGate: Promise<void> = Promise.resolve();
 			const executed = await runLayerWorkflow({
-				workflow,
+				workflow: layerWorkflow,
 				layering: config.hierarchy.layering,
 				seed: this._reproducibility.seed,
 				kimiSwarm,
@@ -4136,7 +4157,7 @@ export class AgentSession {
 					});
 					await previous;
 					try {
-						const output = await runArchonNode(workflow, node, archonOptions, outputs);
+						const output = await runArchonNode(layerWorkflow, node, archonOptions, outputs);
 						outputs.set(node.id, output);
 						const parsed = tryLayerSubtaskResult(output);
 						if (parsed) {
@@ -4155,27 +4176,25 @@ export class AgentSession {
 					}
 				},
 			});
-			results = [...outputs.entries()].map(([id, output]) => ({ id, output }));
-			if (results.length === 0) {
-				results = [{ id: executed.result.workflow, output: executed.result.output }];
-			}
 			if (executed.result.status === "halt") {
 				this._workflowCheck = executed.result.output;
-				this._emit({ type: "workflow_check", text: executed.result.output });
+				this._emit({ type: "workflow_check", text: this._workflowCheck });
 				return;
 			}
-		} else {
-			results = await runArchonWorkflow(workflow, archonOptions);
 		}
-		const findings = checkWorkflowNodes(
-			this._lastPromptTask,
-			workflow.nodes.map((node) => ({
-				id: node.id,
-				prompt: node.body,
-				output: results.find((result) => result.id === node.id)?.output ?? "",
-				upstream: node.dependsOn.map((id) => results.find((result) => result.id === id)?.output ?? "").join("\n"),
-			})),
-		);
+		const findings = workflow
+			? checkWorkflowNodes(
+					this._lastPromptTask,
+					workflow.nodes.map((node) => ({
+						id: node.id,
+						prompt: node.body,
+						output: results.find((result) => result.id === node.id)?.output ?? "",
+						upstream: node.dependsOn
+							.map((id) => results.find((result) => result.id === id)?.output ?? "")
+							.join("\n"),
+					})),
+				)
+			: [];
 		this._noteAntiPatterns(turnStart);
 		this._workflowCheck = findings.length > 0 ? formatWorkflowCheck(findings) : undefined;
 		if (!this._workflowCheck) return;
@@ -4731,7 +4750,7 @@ export class AgentSession {
 					this._calledFacts = selection.parameters
 						.filter((fact) => isSpecificFact(fact.name, fact.value))
 						.map((fact) => ({ name: fact.name, value: fact.value }));
-					this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n<workflow domain="${selection.domain}" name="${selection.workflow}">\nThe session runs each node. Answer only the node you are given. Do not call a tool unless that node allows it. If a fact is not in the user turn or an earlier node reply, say it is not in the turn.\n</workflow>`;
+					this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n<workflow domain="${selection.domain}" name="${selection.workflow}" layer_workflow="${selection.layer_workflow}">\nThe session runs each node. Answer only the node you are given. Do not call a tool unless that node allows it. If a fact is not in the user turn or an earlier node reply, say it is not in the turn. Layer-* files are not domain jobs.\n</workflow>`;
 					this._emitWorkflowCard(selection);
 				},
 				phaseAllowed: (phase) => phaseIsOpen(this._operatorMode, phase, this._openPhases),

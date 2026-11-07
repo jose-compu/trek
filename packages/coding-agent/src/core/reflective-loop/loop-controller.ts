@@ -301,6 +301,7 @@ export class ReflectiveLoopController {
 			lawsPost: args.lawsPost,
 			domain: args.selection?.domain,
 			workflow: args.selection?.workflow,
+			layer_workflow: args.selection?.layer_workflow,
 			selectionReason: args.selection?.selectionReason,
 			nodeIds: args.selection?.nodeIds,
 		});

@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"action\":\"escalate\",\"target\":\"planning\",\"thinking\":\"brief\",\"confidence\":\"high\",\"reason\":\"need a plan after two failed edits\",\"evidence\":[\"lint error\"]}"
+			}
+		}
+	]
+}

@@ -8,6 +8,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ### Added
 
+- Domain workflows compose with `layer-*`. Trace `workflow` + `layer_workflow`; optional node `role:` ([#188](https://github.com/jose-compu/trek/issues/188)).
 - Mix-source / mix-vendor verifier, layer-route JSONL telemetry, remaining D26 packs, `trek models benchmark --layering` ([#198](https://github.com/jose-compu/trek/issues/198)).
 - `/thinking briefly|deep|off` and a compact thinking briefly card. #108 128-token floor remains unless deep is pinned ([#197](https://github.com/jose-compu/trek/issues/197)).
 - Layer-* workflows execute via cpa-agents; join is `layer_join` ([#195](https://github.com/jose-compu/trek/issues/195), [#196](https://github.com/jose-compu/trek/issues/196)).

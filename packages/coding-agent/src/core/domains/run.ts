@@ -7,7 +7,15 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { type ArchonNode, type ArchonWorkflow, orderNodes } from "./archon.ts";
+import { runToolSchedule, type ScheduledCall } from "../algebra/process-schedule.ts";
+import {
+	type ArchonNode,
+	type ArchonNodeRole,
+	type ArchonWorkflow,
+	nodeChatRole,
+	orderNodes,
+	workflowWaves,
+} from "./archon.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -27,6 +35,17 @@ export interface RunArchonOptions {
 	facts?: ReadonlyArray<{ name: string; value: string }>;
 	/** Required for a prompt node. Archon calls the model once per node. */
 	runPrompt?: (prompt: string, node: ArchonNode) => Promise<string>;
+	/** When set, independent nodes schedule through cpa-agents. */
+	seed?: number;
+	/** Default chat role for prompt nodes without `role:`. */
+	currentRole?: ArchonNodeRole;
+	/** Called before each prompt node so the session can bind that role. */
+	onNodeRole?: (role: ArchonNodeRole | undefined, node: ArchonNode) => void;
+}
+
+export interface RunArchonScheduled {
+	results: WorkflowNodeResult[];
+	schedulerUsed: boolean;
 }
 
 export async function runArchonWorkflow(
@@ -34,14 +53,70 @@ export async function runArchonWorkflow(
 	cwdOrOptions: string | RunArchonOptions,
 ): Promise<WorkflowNodeResult[]> {
 	const options: RunArchonOptions = typeof cwdOrOptions === "string" ? { cwd: cwdOrOptions } : cwdOrOptions;
+	if (options.seed !== undefined) {
+		return (await runArchonScheduled(workflow, options)).results;
+	}
 	const outputs = new Map<string, string>();
 	const results: WorkflowNodeResult[] = [];
 	for (const node of orderNodes(workflow)) {
+		noteNodeRole(node, options);
 		const output = await runArchonNode(workflow, node, options, outputs);
 		outputs.set(node.id, output);
 		results.push({ id: node.id, output });
 	}
 	return results;
+}
+
+export async function runArchonScheduled(
+	workflow: ArchonWorkflow,
+	options: RunArchonOptions,
+): Promise<RunArchonScheduled> {
+	const seed = options.seed ?? 0;
+	const outputs = new Map<string, string>();
+	const results: WorkflowNodeResult[] = [];
+	let schedulerUsed = false;
+	let promptGate: Promise<void> = Promise.resolve();
+	for (const wave of workflowWaves(workflow)) {
+		const scheduled: ScheduledCall[] = wave.map((node) => ({
+			id: node.id,
+			name: node.id,
+			args: {},
+		}));
+		const byId = new Map(wave.map((node) => [node.id, node]));
+		const batch = await runToolSchedule({
+			seed,
+			calls: scheduled,
+			run: async (call) => {
+				const node = byId.get(call.id);
+				if (!node) {
+					throw new Error(`missing node ${call.id}`);
+				}
+				const previous = promptGate;
+				let release: () => void = () => {};
+				promptGate = new Promise<void>((resolve) => {
+					release = resolve;
+				});
+				await previous;
+				try {
+					noteNodeRole(node, options);
+					const output = await runArchonNode(workflow, node, options, outputs);
+					outputs.set(node.id, output);
+					return { id: node.id, output };
+				} finally {
+					release();
+				}
+			},
+		});
+		schedulerUsed = schedulerUsed || batch.schedulerUsed;
+		for (const reply of batch.values) {
+			results.push(reply);
+		}
+	}
+	return { results, schedulerUsed };
+}
+
+function noteNodeRole(node: ArchonNode, options: RunArchonOptions): void {
+	options.onNodeRole?.(nodeChatRole(node, options.currentRole), node);
 }
 
 export async function runArchonNode(
