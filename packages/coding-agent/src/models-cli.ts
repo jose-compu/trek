@@ -25,6 +25,7 @@ import {
 	type RoleSource,
 	readRuntimeConfigFile,
 	resolveRuntime,
+	syncProjectAutoMap,
 	syncProjectLayering,
 	syncProjectRole,
 	weightFileExists,
@@ -159,7 +160,11 @@ function setLayering(rest: string[]): boolean {
 		}
 	}
 	writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), next);
-	syncProjectLayering(process.cwd(), next.hierarchy.layering, next.hierarchy.layering === "single");
+	if (mode === "auto" && flagValue(rest, "--catalog")) {
+		syncProjectAutoMap(process.cwd(), next);
+	} else {
+		syncProjectLayering(process.cwd(), next.hierarchy.layering, next.hierarchy.layering === "single");
+	}
 	printStatus();
 	return true;
 }

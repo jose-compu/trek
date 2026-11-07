@@ -22,6 +22,7 @@ import {
 	readRuntimeConfigFile,
 	resolveRuntime,
 	skipExtraRole,
+	syncProjectAutoMap,
 	syncProjectLayering,
 	syncProjectRole,
 	withClearedRole,
@@ -108,7 +109,11 @@ function setLayering(
 		}
 	}
 	writeRuntimeConfigFile(path, next);
-	syncProjectLayering(cwd, next.hierarchy.layering, next.hierarchy.layering === "single");
+	if (mode === "auto" && flagValue(rest, "--catalog")) {
+		syncProjectAutoMap(cwd, next);
+	} else {
+		syncProjectLayering(cwd, next.hierarchy.layering, next.hierarchy.layering === "single");
+	}
 	return nextSession(status(agentDir, cwd, path));
 }
 

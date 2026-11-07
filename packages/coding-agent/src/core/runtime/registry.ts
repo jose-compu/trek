@@ -351,6 +351,38 @@ export function syncProjectLayering(cwd: string, layering: LayeringMode, clearEx
 	writeProjectYaml(loaded.path, loaded.record);
 }
 
+const AUTO_MAPPED_ROLES = ["tooling", "workhorse", "planning", "frontier", "verifier"] as const;
+
+/** Write catalog-mapped chat roles into the project file so stale pins cannot win the merge. */
+export function syncProjectAutoMap(cwd: string, config: RuntimeConfig): void {
+	const loaded = readProjectYaml(cwd);
+	if (!loaded) {
+		return;
+	}
+	applyProjectLayering(loaded.record, config.hierarchy.layering, true);
+	const roles = projectRoles(loaded.record);
+	for (const name of AUTO_MAPPED_ROLES) {
+		const assignment = config.roles[name];
+		if (!assignment) {
+			delete roles[name];
+			continue;
+		}
+		roles[name] = {
+			source: assignment.source,
+			id: assignment.id,
+			thinking: assignment.thinking,
+			...(assignment.provider ? { provider: assignment.provider } : {}),
+			...(assignment.repo ? { repo: assignment.repo } : {}),
+			...(assignment.baseUrl ? { baseUrl: assignment.baseUrl } : {}),
+		};
+	}
+	const hierarchy = loaded.record.hierarchy as Record<string, unknown>;
+	delete hierarchy.unbound;
+	loaded.record.hierarchy = hierarchy;
+	loaded.record.roles = roles;
+	writeProjectYaml(loaded.path, loaded.record);
+}
+
 /** Bind or clear one role in the project file, and set layering to manual. */
 export function syncProjectRole(cwd: string, role: RuntimeRole, assignment: RoleAssignment | undefined): void {
 	const loaded = readProjectYaml(cwd);

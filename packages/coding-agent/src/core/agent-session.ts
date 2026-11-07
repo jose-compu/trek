@@ -2865,7 +2865,8 @@ export class AgentSession {
 			this._restoreApiSessionModel();
 			const api = this.model;
 			if (api && !(options?.keepDecisionDisplay && this._parkedOnDecision)) {
-				this._emitHierarchyModel(selection.role, api.provider, api.id);
+				const shown = sessionRoleForModel(resolved, api) ?? selection.role;
+				this._emitHierarchyModel(shown, api.provider, api.id);
 			}
 			return;
 		}

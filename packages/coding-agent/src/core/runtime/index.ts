@@ -202,6 +202,7 @@ export {
 	loadRuntimeConfig,
 	projectModelsYamlPath,
 	readRuntimeConfigFile,
+	syncProjectAutoMap,
 	syncProjectLayering,
 	syncProjectRole,
 	withClearedRole,
