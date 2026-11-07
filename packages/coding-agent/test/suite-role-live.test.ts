@@ -53,7 +53,9 @@ const TOOLS = [
 ];
 
 function runtime(suite: SuiteId) {
-	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite }), { frontier: null });
+	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite }), {
+		frontier: null,
+	});
 }
 
 function onDisk(modelId: string): boolean {

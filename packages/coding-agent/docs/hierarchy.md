@@ -22,7 +22,7 @@ Configure with `trek models set-mode …`, `~/.trek/models.yaml`, project `.trek
 | `auto` | `/hierarchy auto` stores the flag. Catalog map of slots lands in a follow-up. |
 | `manual` | Any `/hierarchy role` or `trek models set-role` write. |
 
-Role `thinking` is `off`, `brief`, or `deep`. YAML `true`/`on` still means deep; `false`/`off` means off. Frontier and verifier may use `source: local` or `lmstudio`. The 0.16 climb (Tooling on the ladder) is unchanged until the controller rewrite.
+Role `thinking` is `off`, `brief`, or `deep`. YAML `true`/`on` still means deep; `false`/`off` means off. Frontier and verifier may use `source: local` or `lmstudio`. In `single`, local/hybrid resolve only Decision, Workhorse, embedding, and reranker — not Tooling, Planning, Frontier, or verifier. The escalate parser still lists Tooling as a rung until the controller rewrite.
 
 `/hierarchy role <role> --clear` unbinds one extra role.
 

@@ -7,7 +7,9 @@ import { suiteChatDialects, toolDialect } from "../src/core/runtime/tool-dialect
 import { missingLocalWeights } from "../src/core/runtime/weight-download.ts";
 
 function resolved(suite: "mistral" | "mistral-pro") {
-	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite }), { frontier: null });
+	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite }), {
+		frontier: null,
+	});
 }
 
 describe("Mistral local suite", () => {

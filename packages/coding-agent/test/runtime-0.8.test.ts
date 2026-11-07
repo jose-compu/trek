@@ -63,7 +63,7 @@ function captureStdio(): { logs: string[]; errors: string[]; restore: () => void
 }
 
 function localConfig(suite: "mistral" | "mistral-pro" | "qwen" | "lfm" = "mistral") {
-	return withHierarchy(defaultRuntimeConfig(), { mode: "local", suite });
+	return withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite });
 }
 
 describe("0.8.0 runtime gate (#92)", () => {
@@ -252,9 +252,12 @@ describe("0.8.0 runtime gate (#92)", () => {
 			weightsAvailable: () => true,
 		});
 		manager.ensure("planning", resolved);
-		const other = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "qwen" }), {
-			frontier: null,
-		});
+		const other = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "qwen" }),
+			{
+				frontier: null,
+			},
+		);
 		expect(() => manager.ensure("planning", other)).toThrow(/already loaded/);
 	});
 
@@ -384,7 +387,9 @@ describe("0.8.0 runtime gate (#92)", () => {
 			const loaded = loadRuntimeConfig({ agentDir, cwd });
 			const resolved = resolveRuntime(loaded, { frontier: null });
 			expect(resolved.roles.workhorse?.id).toBe("Ministral-3-3B-Instruct-2512");
-			expect(resolved.roles.planning?.id).toBe("Ministral-3-8B-Reasoning-2512");
+			expect(resolved.layering).toBe("single");
+			expect(resolved.roles.planning).toBeUndefined();
+			expect(sessionLocalRoles(resolved)).toEqual(["workhorse"]);
 			expect(() =>
 				writeRuntimeConfigFile(join(root, "models.yaml"), {
 					...globalConfig,
@@ -394,6 +399,18 @@ describe("0.8.0 runtime gate (#92)", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	it("single local resolve binds Workhorse only, not Tooling or Planning", () => {
+		const resolved = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "single", suite: "mistral" }),
+			{ frontier: null },
+		);
+		expect(resolved.roles.workhorse?.id).toBe("Ministral-3-3B-Instruct-2512");
+		expect(resolved.roles.tooling).toBeUndefined();
+		expect(resolved.roles.planning).toBeUndefined();
+		expect(resolved.roles.frontier).toBeUndefined();
+		expect(sessionLocalRoles(resolved)).toEqual(["workhorse"]);
 	});
 });
 

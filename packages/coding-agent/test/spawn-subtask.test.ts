@@ -14,9 +14,12 @@ import { defaultRuntimeConfig, resolveRuntime, withHierarchy } from "../src/core
 import { createHarness, type Harness } from "./suite/harness.ts";
 
 function localResolved() {
-	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "mistral" }), {
-		frontier: null,
-	});
+	return resolveRuntime(
+		withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "mistral" }),
+		{
+			frontier: null,
+		},
+	);
 }
 
 describe("intention repair and spawn_subtask", () => {

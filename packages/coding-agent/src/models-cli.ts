@@ -184,7 +184,7 @@ function setRole(rest: string[]): boolean {
 	const source: RoleSource =
 		sourceFlag === "api" || sourceFlag === "local" || sourceFlag === "lmstudio"
 			? sourceFlag
-			: roleName === "frontier"
+			: roleName === "frontier" || roleName === "verifier"
 				? "api"
 				: "local";
 	if (sourceFlag !== undefined && sourceFlag !== "api" && sourceFlag !== "local" && sourceFlag !== "lmstudio") {

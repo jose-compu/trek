@@ -20,9 +20,12 @@ describe("benchmark report", () => {
 	});
 
 	it("records one measured row, skips absent weights, and writes JSON", () => {
-		const local = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "mistral" }), {
-			frontier: null,
-		});
+		const local = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "mistral" }),
+			{
+				frontier: null,
+			},
+		);
 		const rows = benchmarkRuntime(local, {
 			weightsAvailable: (role) => role === "workhorse",
 			measure: () => ({ tokensPerSecond: 12, toolCallLatencyMs: 40, memoryMb: 512 }),

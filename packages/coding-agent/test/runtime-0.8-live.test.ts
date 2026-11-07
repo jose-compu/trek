@@ -196,9 +196,12 @@ async function scoreWithGrok(label: string): Promise<PerformanceReport> {
 
 describe.skipIf(!grokLive)("optional Grok Frontier speed and IQ", () => {
 	it("hybrid Frontier is xAI and Grok is scored", async () => {
-		const resolved = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "mistral" }), {
-			env: { XAI_API_KEY: process.env.XAI_API_KEY ?? "", OPENAI_API_KEY: "" },
-		});
+		const resolved = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "mistral" }),
+			{
+				env: { XAI_API_KEY: process.env.XAI_API_KEY ?? "", OPENAI_API_KEY: "" },
+			},
+		);
 		expect(resolved.effectiveMode).toBe("hybrid");
 		const selection = selectSessionRole({ text: "/frontier say ok", resolved });
 		expect(selection).toMatchObject({ role: "frontier", source: "api", provider: "xai" });
@@ -212,9 +215,12 @@ describe.skipIf(!grokLive)("optional Grok Frontier speed and IQ", () => {
 
 describe("optional local or API stand-in speed and IQ", () => {
 	for (const suite of SUITES) {
-		const resolved = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite }), {
-			frontier: null,
-		});
+		const resolved = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite }),
+			{
+				frontier: null,
+			},
+		);
 		for (const role of LOCAL_ROLES) {
 			const modelId = resolved.roles[role]?.id ?? "";
 			const local = llamaLive && fitsLocally(modelId);

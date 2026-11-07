@@ -5,7 +5,7 @@
 
 import { suitePreset } from "./suites.ts";
 import type { HierarchyMode, RoleAssignment, RuntimeConfig, RuntimeRole } from "./types.ts";
-import { SESSION_LOCAL_ROLES, type SessionLocalRole } from "./types.ts";
+import { isLayeringExtraRole, SESSION_LOCAL_ROLES, type SessionLocalRole } from "./types.ts";
 
 export interface FrontierHint {
 	provider: string;
@@ -86,15 +86,22 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 		roles.embedding = overlay(preset.roles.embedding, config.roles.embedding);
 		roles.reranker = overlay(preset.roles.reranker, config.roles.reranker);
 	} else {
+		const single = config.hierarchy.layering === "single";
 		for (const [name, assignment] of Object.entries(preset.roles) as [RuntimeRole, RoleAssignment][]) {
+			if (single && isLayeringExtraRole(name)) {
+				continue;
+			}
 			roles[name] = overlay(assignment, config.roles[name]);
 		}
 		for (const [name, assignment] of Object.entries(config.roles) as [RuntimeRole, RoleAssignment][]) {
+			if (single && isLayeringExtraRole(name)) {
+				continue;
+			}
 			if (!roles[name] && assignment) {
 				roles[name] = assignment;
 			}
 		}
-		if (effectiveMode === "hybrid") {
+		if (effectiveMode === "hybrid" && !single) {
 			roles.frontier = overlay(frontierRole(frontier), config.roles.frontier);
 		}
 	}
@@ -116,6 +123,9 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 export function sessionLocalRoles(resolved: ResolvedRuntime): SessionLocalRole[] {
 	if (resolved.effectiveMode === "api") {
 		return [];
+	}
+	if (resolved.layering === "single") {
+		return resolved.roles.workhorse ? ["workhorse"] : [];
 	}
 	return [...SESSION_LOCAL_ROLES];
 }

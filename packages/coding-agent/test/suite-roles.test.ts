@@ -17,7 +17,9 @@ import type { SuiteId } from "../src/core/runtime/types.ts";
 const SUITES: SuiteId[] = ["mistral", "mistral-pro", "qwen", "lfm"];
 
 function resolved(suite: SuiteId) {
-	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite }), { frontier: null });
+	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite }), {
+		frontier: null,
+	});
 }
 
 describe("local suite roles", () => {

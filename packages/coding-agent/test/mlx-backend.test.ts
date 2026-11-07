@@ -28,9 +28,12 @@ describe("MLX on Apple Silicon", () => {
 	it("stays on llama.cpp when MLX is off", () => {
 		expect(preferMlx({ TREK_MLX: "0" })).toBe(false);
 		expect(preferMlx({ TREK_MLX: "1" })).toBe(true);
-		const resolved = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "lfm" }), {
-			frontier: null,
-		});
+		const resolved = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "lfm" }),
+			{
+				frontier: null,
+			},
+		);
 		const dir = mkdtempSync(join(tmpdir(), "trek-mlx-"));
 		dirs.push(dir);
 		process.env.TREK_MLX = "0";
@@ -39,9 +42,12 @@ describe("MLX on Apple Silicon", () => {
 	});
 
 	it("uses the MLX server when the 4-bit snapshot is on disk", async () => {
-		const resolved = resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "lfm" }), {
-			frontier: null,
-		});
+		const resolved = resolveRuntime(
+			withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "lfm" }),
+			{
+				frontier: null,
+			},
+		);
 		const dir = mkdtempSync(join(tmpdir(), "trek-mlx-"));
 		dirs.push(dir);
 		process.env.TREK_MLX = "1";

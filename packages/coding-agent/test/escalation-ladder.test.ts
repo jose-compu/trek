@@ -26,15 +26,21 @@ import {
 } from "../src/core/runtime/index.ts";
 
 function localResolved() {
-	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "local", suite: "mistral" }), {
-		frontier: null,
-	});
+	return resolveRuntime(
+		withHierarchy(defaultRuntimeConfig(), { mode: "local", layering: "manual", suite: "mistral" }),
+		{
+			frontier: null,
+		},
+	);
 }
 
 function hybridResolved() {
-	return resolveRuntime(withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", suite: "mistral" }), {
-		frontier: { provider: "xai", modelId: "grok-4" },
-	});
+	return resolveRuntime(
+		withHierarchy(defaultRuntimeConfig(), { mode: "hybrid", layering: "manual", suite: "mistral" }),
+		{
+			frontier: { provider: "xai", modelId: "grok-4" },
+		},
+	);
 }
 
 describe("escalation ladder", () => {
