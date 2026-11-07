@@ -145,6 +145,10 @@ export function acceptTypedLesson(text: string, pattern: LessonPattern): TypedLe
 		status: "pending",
 		recurrence_key: "",
 	};
+	const layerRole = textField(record, "layer_role");
+	if (layerRole && /^(workhorse|planning|tooling|frontier)$/.test(layerRole)) {
+		lesson.layer_role = layerRole;
+	}
 	lesson.recurrence_key = recurrenceKey(lesson);
 	return { lesson };
 }

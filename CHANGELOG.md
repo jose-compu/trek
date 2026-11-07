@@ -8,6 +8,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ### Added
 
+- Domain lessons on layered roles: Workhorse writes, meta layering triggers, recall into the acting role ([#189](https://github.com/jose-compu/trek/issues/189)).
 - Domain workflows compose with `layer-*`. Trace `workflow` + `layer_workflow`; optional node `role:` ([#188](https://github.com/jose-compu/trek/issues/188)).
 - Mix-source / mix-vendor verifier, layer-route JSONL telemetry, remaining D26 packs, `trek models benchmark --layering` ([#198](https://github.com/jose-compu/trek/issues/198)).
 - `/thinking briefly|deep|off` and a compact thinking briefly card. #108 128-token floor remains unless deep is pinned ([#197](https://github.com/jose-compu/trek/issues/197)).

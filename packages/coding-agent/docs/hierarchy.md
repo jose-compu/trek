@@ -34,6 +34,8 @@ Per-role `source` wins over `hierarchy.mode`. An api session may still start lla
 
 A turn may run the domain Archon DAG and a `layer-*` DAG together. The cycle trace stores `workflow` (domain) and `layer_workflow`. Prompt nodes follow the current role unless the node sets `role: workhorse|planning|tooling`. `layering: single` leaves `layer_workflow` as `none`.
 
+Domain lessons stay on that domain’s `lessons.yaml` when roles climb. Workhorse writes the lesson. Meta adds `misroute`, `over_escalate`, `over_think`, `runner_miss`, `verifier_reject`, and `budget_stop`. Recalled lessons are tagged with the role about to act. Promotion still needs a Yes.
+
 ## Ladder
 
 ```
