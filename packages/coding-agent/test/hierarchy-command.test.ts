@@ -121,6 +121,20 @@ describe("/hierarchy", () => {
 		expect(loaded.roles.planning).toBeUndefined();
 	});
 
+	it("role bind and --clear update project YAML so single cannot drop the override", () => {
+		const { agentDir, cwd } = isolated();
+		mkdirSync(dirname(projectModelsYamlPath(cwd)), { recursive: true });
+		writeFileSync(projectModelsYamlPath(cwd), ["hierarchy:", "  layering: single", "roles: {}", ""].join("\n"));
+		runHierarchyCommand(agentDir, cwd, "role planning --id Qwen3.5-9B --source local --thinking deep");
+		const bound = loadRuntimeConfig({ agentDir, cwd });
+		expect(bound.hierarchy.layering).toBe("manual");
+		expect(bound.roles.planning).toEqual({ source: "local", id: "Qwen3.5-9B", thinking: "deep" });
+		runHierarchyCommand(agentDir, cwd, "role planning --clear");
+		const cleared = loadRuntimeConfig({ agentDir, cwd });
+		expect(cleared.roles.planning).toBeUndefined();
+		expect(cleared.hierarchy.layering).toBe("manual");
+	});
+
 	it("clears one role with --clear", () => {
 		const { agentDir, cwd } = isolated();
 		runHierarchyCommand(agentDir, cwd, "role verifier --id other --source api --thinking off");

@@ -25,6 +25,7 @@ import {
 	readRuntimeConfigFile,
 	resolveRuntime,
 	syncProjectLayering,
+	syncProjectRole,
 	weightFileExists,
 	withHierarchy,
 	withRoleOverride,
@@ -226,6 +227,7 @@ function setRole(rest: string[]): boolean {
 			return true;
 		}
 		writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), withRoleOverride(current, roleName, assignment));
+		syncProjectRole(process.cwd(), roleName, assignment);
 	} catch (error) {
 		console.error(chalk.red(error instanceof Error ? error.message : String(error)));
 		process.exitCode = 1;
@@ -272,6 +274,9 @@ function setLmStudio(rest: string[]): boolean {
 		baseUrl,
 	});
 	writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), next);
+	syncProjectRole(process.cwd(), "tooling", next.roles.tooling);
+	syncProjectRole(process.cwd(), "workhorse", next.roles.workhorse);
+	syncProjectRole(process.cwd(), "planning", next.roles.planning);
 	printStatus();
 	return true;
 }

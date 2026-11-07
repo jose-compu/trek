@@ -24,7 +24,7 @@ Configure with `trek models set-mode …`, `~/.trek/models.yaml`, project `.trek
 
 Role `thinking` is `off`, `brief`, or `deep`. YAML `true`/`on` still means deep; `false`/`off` means off. Frontier and verifier may use `source: local` or `lmstudio`. In `single`, local/hybrid resolve only Decision, Workhorse, embedding, and reranker — not Tooling, Planning, Frontier, or verifier. The escalate parser still lists Tooling as a rung until the controller rewrite.
 
-`/hierarchy` and `trek models set-layering` write `~/.trek/models.yaml`. If the project has `.trek/models.yaml`, they also patch `hierarchy.layering` there so the project file cannot keep an older value after a successful command.
+`/hierarchy` and `trek models set-layering` write `~/.trek/models.yaml`. If the project has `.trek/models.yaml`, they also patch `hierarchy.layering` there so the project file cannot keep an older value after a successful command. Role bind, `--clear`, and `set-lmstudio` likewise patch the project file and set `layering: manual`.
 
 `/hierarchy role <role> --clear` unbinds one extra role.
 

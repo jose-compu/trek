@@ -260,11 +260,10 @@ export function withClearedRole(config: RuntimeConfig, role: RuntimeRole): Runti
 	};
 }
 
-/** Keep project `.trek/models.yaml` from overriding a global layering write. */
-export function syncProjectLayering(cwd: string, layering: LayeringMode, clearExtras: boolean): void {
+function readProjectYaml(cwd: string): { path: string; record: Record<string, unknown> } | undefined {
 	const path = projectModelsYamlPath(cwd);
 	if (!existsSync(path)) {
-		return;
+		return undefined;
 	}
 	let raw: unknown;
 	try {
@@ -274,19 +273,67 @@ export function syncProjectLayering(cwd: string, layering: LayeringMode, clearEx
 		throw new Error(`Cannot parse ${path}: ${message}`);
 	}
 	const record = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+	return { path, record };
+}
+
+function writeProjectYaml(path: string, record: Record<string, unknown>): void {
+	const body = stringify(record);
+	writeFileSync(path, body.endsWith("\n") ? body : `${body}\n`);
+}
+
+function projectRoles(record: Record<string, unknown>): Record<string, unknown> {
+	if (record.roles && typeof record.roles === "object" && !Array.isArray(record.roles)) {
+		return { ...(record.roles as Record<string, unknown>) };
+	}
+	return {};
+}
+
+function applyProjectLayering(record: Record<string, unknown>, layering: LayeringMode, clearExtras: boolean): void {
 	const hierarchy =
 		record.hierarchy && typeof record.hierarchy === "object" && !Array.isArray(record.hierarchy)
 			? { ...(record.hierarchy as Record<string, unknown>) }
 			: {};
 	hierarchy.layering = layering;
 	record.hierarchy = hierarchy;
-	if (clearExtras && record.roles && typeof record.roles === "object" && !Array.isArray(record.roles)) {
-		const roles = { ...(record.roles as Record<string, unknown>) };
+	if (clearExtras) {
+		const roles = projectRoles(record);
 		for (const role of LAYERING_EXTRA_ROLES) {
 			delete roles[role];
 		}
 		record.roles = roles;
 	}
-	const body = stringify(record);
-	writeFileSync(path, body.endsWith("\n") ? body : `${body}\n`);
+}
+
+/** Keep project `.trek/models.yaml` from overriding a global layering write. */
+export function syncProjectLayering(cwd: string, layering: LayeringMode, clearExtras: boolean): void {
+	const loaded = readProjectYaml(cwd);
+	if (!loaded) {
+		return;
+	}
+	applyProjectLayering(loaded.record, layering, clearExtras);
+	writeProjectYaml(loaded.path, loaded.record);
+}
+
+/** Bind or clear one role in the project file, and set layering to manual. */
+export function syncProjectRole(cwd: string, role: RuntimeRole, assignment: RoleAssignment | undefined): void {
+	const loaded = readProjectYaml(cwd);
+	if (!loaded) {
+		return;
+	}
+	applyProjectLayering(loaded.record, "manual", false);
+	const roles = projectRoles(loaded.record);
+	if (assignment) {
+		roles[role] = {
+			source: assignment.source,
+			id: assignment.id,
+			thinking: assignment.thinking,
+			...(assignment.provider ? { provider: assignment.provider } : {}),
+			...(assignment.repo ? { repo: assignment.repo } : {}),
+			...(assignment.baseUrl ? { baseUrl: assignment.baseUrl } : {}),
+		};
+	} else {
+		delete roles[role];
+	}
+	loaded.record.roles = roles;
+	writeProjectYaml(loaded.path, loaded.record);
 }

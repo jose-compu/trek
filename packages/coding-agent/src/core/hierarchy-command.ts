@@ -21,6 +21,7 @@ import {
 	readRuntimeConfigFile,
 	resolveRuntime,
 	syncProjectLayering,
+	syncProjectRole,
 	withClearedRole,
 	withHierarchy,
 	withRoleOverride,
@@ -105,6 +106,7 @@ function setRole(path: string, agentDir: string, cwd: string, rest: string[]): s
 	if (rest.includes("--clear")) {
 		const current = readRuntimeConfigFile(path);
 		writeRuntimeConfigFile(path, withClearedRole(current, roleName as RuntimeRole));
+		syncProjectRole(cwd, roleName as RuntimeRole, undefined);
 		return nextSession(status(agentDir, cwd, path));
 	}
 	const id = flagValue(rest, "--id");
@@ -136,6 +138,7 @@ function setRole(path: string, agentDir: string, cwd: string, rest: string[]): s
 	}
 	const current = readRuntimeConfigFile(path);
 	writeRuntimeConfigFile(path, withRoleOverride(current, roleName as RuntimeRole, assignment));
+	syncProjectRole(cwd, roleName as RuntimeRole, assignment);
 	return nextSession(status(agentDir, cwd, path));
 }
 

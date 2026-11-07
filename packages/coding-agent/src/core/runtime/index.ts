@@ -153,6 +153,7 @@ export {
 	projectModelsYamlPath,
 	readRuntimeConfigFile,
 	syncProjectLayering,
+	syncProjectRole,
 	withClearedRole,
 	withHierarchy,
 	withRoleOverride,
