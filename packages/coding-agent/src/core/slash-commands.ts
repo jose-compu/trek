@@ -32,6 +32,10 @@ export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
 		description:
 			"Set api, local, or hybrid, the suite, and one role. Writes ~/.trek/models.yaml. The next session reads it.",
 	},
+	{
+		name: "thinking",
+		description: "Pin thinking briefly, deep, or off. Compact thinking briefly card. /thinking briefly|deep|off",
+	},
 	{ name: "fork", description: "Create a new fork from a previous user message" },
 	{ name: "clone", description: "Duplicate the current session at the current position" },
 	{ name: "tree", description: "Navigate session tree (switch branches)" },

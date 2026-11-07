@@ -80,6 +80,7 @@ import { defaultModelPerProvider, findExactModelReferenceMatch, resolveModelScop
 import { DefaultPackageManager } from "../../core/package-manager.ts";
 import { BUILT_IN_PROVIDER_DISPLAY_NAMES } from "../../core/provider-display-names.ts";
 import type { ResourceDiagnostic } from "../../core/resource-loader.ts";
+import { runThinkingCommand } from "../../core/runtime/thinking-brief.ts";
 import { isSandboxAvailable } from "../../core/safety/index.ts";
 import { formatMissingSessionCwdPrompt, MissingSessionCwdError } from "../../core/session-cwd.ts";
 import { type SessionContext, SessionManager } from "../../core/session-manager.ts";
@@ -2793,6 +2794,12 @@ export class InteractiveMode {
 				this.showHierarchyCommand(arg);
 				return;
 			}
+			if (text === "/thinking" || text.startsWith("/thinking ")) {
+				const arg = text === "/thinking" ? "" : text.slice("/thinking ".length);
+				this.editor.setText("");
+				this.showThinkingCommand(arg);
+				return;
+			}
 			if (text === "/fork") {
 				this.showUserMessageSelector();
 				this.editor.setText("");
@@ -3096,6 +3103,7 @@ export class InteractiveMode {
 						this.getMarkdownThemeWithSettings(),
 						this.hiddenThinkingLabel,
 						this.toolOutputExpanded,
+						this.session.thinkingPin === "brief",
 					);
 					this.streamingMessage = event.message;
 					this.footer.setLiveAssistant(event.message);
@@ -3506,6 +3514,7 @@ export class InteractiveMode {
 					this.getMarkdownThemeWithSettings(),
 					this.hiddenThinkingLabel,
 					this.toolOutputExpanded,
+					this.session.thinkingPin === "brief",
 				);
 				this.chatContainer.addChild(assistantComponent);
 				break;
@@ -4069,6 +4078,16 @@ export class InteractiveMode {
 		const text = runHierarchyCommand(getAgentDir(), process.cwd(), arg);
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new Text(theme.fg("muted", text), 1, 0));
+		this.ui.requestRender();
+	}
+
+	showThinkingCommand(arg: string): void {
+		const result = runThinkingCommand(this.session.thinkingPin, arg);
+		this.session.setThinkingPin(result.pin);
+		this.streamingComponent?.setThinkingBrief(this.session.thinkingPin === "brief");
+		this.footer.invalidate();
+		this.chatContainer.addChild(new Spacer(1));
+		this.chatContainer.addChild(new Text(theme.fg("muted", result.message), 1, 0));
 		this.ui.requestRender();
 	}
 

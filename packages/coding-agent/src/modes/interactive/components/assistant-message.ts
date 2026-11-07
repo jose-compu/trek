@@ -2,6 +2,7 @@ import type { AssistantMessage } from "@trek/ai";
 import { isContextOverflow } from "@trek/ai";
 import { type Component, Container, Markdown, type MarkdownTheme, Spacer, Text } from "@trek/tui";
 import { honestyDisplay, stripHonestyFooter } from "../../../core/honesty/index.ts";
+import { thinkingCardTitle, thinkingCardViewport } from "../../../core/runtime/thinking-brief.ts";
 import { getMarkdownTheme, theme } from "../theme/theme.ts";
 import { cardGlyph } from "./card-glyph.ts";
 import { COMPACT_VIEWPORT_LINES, visibleCardText } from "./compact-card.ts";
@@ -46,12 +47,14 @@ function honestyCardLines(status: {
 	return lines;
 }
 
-/** Compact thinking: last 3 wrapped terminal rows, not 3 source paragraphs. */
+/** Compact thinking: last N wrapped terminal rows, not N source paragraphs. */
 class CompactThinkingViewport implements Component {
 	private thinking: string;
+	private viewport: number;
 
-	constructor(thinking: string) {
+	constructor(thinking: string, viewport = COMPACT_VIEWPORT_LINES) {
 		this.thinking = thinking;
+		this.viewport = viewport;
 	}
 
 	invalidate(): void {}
@@ -59,7 +62,7 @@ class CompactThinkingViewport implements Component {
 	render(width: number): string[] {
 		const styled = theme.italic(theme.fg("thinkingText", this.thinking.trim()));
 		const wrapped = new Text(styled, 1, 0).render(width).filter((line) => visibleCardText(line) !== "");
-		return wrapped.slice(-COMPACT_VIEWPORT_LINES);
+		return wrapped.slice(-this.viewport);
 	}
 }
 
@@ -78,6 +81,7 @@ export class AssistantMessageComponent extends Container {
 	private markdownTheme: MarkdownTheme;
 	private hiddenThinkingLabel: string;
 	private expanded = false;
+	private thinkingBrief = false;
 	private lastMessage?: AssistantMessage;
 	private hasToolCalls = false;
 
@@ -87,6 +91,7 @@ export class AssistantMessageComponent extends Container {
 		markdownTheme: MarkdownTheme = getMarkdownTheme(),
 		hiddenThinkingLabel = "Thinking...",
 		expanded = false,
+		thinkingBrief = false,
 	) {
 		super();
 
@@ -94,6 +99,7 @@ export class AssistantMessageComponent extends Container {
 		this.markdownTheme = markdownTheme;
 		this.hiddenThinkingLabel = hiddenThinkingLabel;
 		this.expanded = expanded;
+		this.thinkingBrief = thinkingBrief;
 
 		// Container for text/thinking content
 		this.contentContainer = new Container();
@@ -127,6 +133,13 @@ export class AssistantMessageComponent extends Container {
 
 	setExpanded(expanded: boolean): void {
 		this.expanded = expanded;
+		if (this.lastMessage) {
+			this.updateContent(this.lastMessage);
+		}
+	}
+
+	setThinkingBrief(thinkingBrief: boolean): void {
+		this.thinkingBrief = thinkingBrief;
 		if (this.lastMessage) {
 			this.updateContent(this.lastMessage);
 		}
@@ -194,15 +207,38 @@ export class AssistantMessageComponent extends Container {
 					}
 				} else if (!this.expanded) {
 					this.contentContainer.addChild(
-						new Text(theme.italic(theme.fg("thinkingText", `${cardGlyph("thinking")} thinking`)), 1, 0),
+						new Text(
+							theme.italic(
+								theme.fg(
+									"thinkingText",
+									`${cardGlyph("thinking")} ${thinkingCardTitle(this.thinkingBrief ? "brief" : undefined)}`,
+								),
+							),
+							1,
+							0,
+						),
 					);
-					this.contentContainer.addChild(new CompactThinkingViewport(content.thinking));
+					this.contentContainer.addChild(
+						new CompactThinkingViewport(
+							content.thinking,
+							thinkingCardViewport(this.thinkingBrief ? "brief" : undefined),
+						),
+					);
 					if (hasVisibleContentAfter) {
 						this.contentContainer.addChild(new Spacer(1));
 					}
 				} else {
 					this.contentContainer.addChild(
-						new Text(theme.italic(theme.fg("thinkingText", `${cardGlyph("thinking")} thinking`)), 1, 0),
+						new Text(
+							theme.italic(
+								theme.fg(
+									"thinkingText",
+									`${cardGlyph("thinking")} ${thinkingCardTitle(this.thinkingBrief ? "brief" : undefined)}`,
+								),
+							),
+							1,
+							0,
+						),
 					);
 					this.contentContainer.addChild(
 						new Markdown(content.thinking.trim(), 1, 0, this.markdownTheme, {

@@ -116,6 +116,12 @@ export function jsonSchemaHasLengthKeywords(schema: unknown): boolean {
 	return LENGTH_KEYWORDS.test(JSON.stringify(schema));
 }
 
+/** Undefined when the text is not a LayerDecision object. Does not fall back to SAFE_LAYER_DECISION. */
+export function tryParseLayerDecision(text: string): LayerDecision | undefined {
+	const parsed = tryLayerDecision(text);
+	return parsed ? applyLayerDecisionRules(parsed) : undefined;
+}
+
 export function parseLayerDecision(text: string, retry?: () => string | undefined): LayerDecision {
 	const first = tryLayerDecision(text);
 	if (first) {

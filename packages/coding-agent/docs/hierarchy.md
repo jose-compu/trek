@@ -22,7 +22,7 @@ Configure with `trek models set-mode …`, `~/.trek/models.yaml`, project `.trek
 | `auto` | `/hierarchy auto --catalog <file>` maps chat slots from that catalog (tags, thinking, price — not SKU names). One chat model stays `single`. Verifier and Decision stay unbound. Without `--catalog`, only the flag is stored. |
 | `manual` | Suite extras plus any `/hierarchy role` or `trek models set-role` write. `--clear` unbinds one role so the suite preset cannot fill it. |
 
-Role `thinking` is `off`, `brief`, or `deep`. YAML `true`/`on` still means deep; `false`/`off` means off. Frontier and verifier may use `source: local` or `lmstudio`. In `single`, local/hybrid resolve only Decision, Workhorse, embedding, and reranker — not Tooling, Planning, Frontier, or verifier. The climb is Workhorse ⇄ Planning ⇄ Frontier. Tooling is a delegate runner, not a rung.
+Role `thinking` is `off`, `brief`, or `deep`. YAML `true`/`on` still means deep; `false`/`off` means off. `/thinking briefly|deep|off` pins that for the session. `LayerDecision.thinking: brief` wins over the pin and the role default. Brief is a compact **thinking briefly** card (1–2 lines); the #108 128-token floor stays on tool turns. `/thinking deep` restores the 0.17 thinking card and skips that floor. Frontier and verifier may use `source: local` or `lmstudio`. In `single`, local/hybrid resolve only Decision, Workhorse, embedding, and reranker — not Tooling, Planning, Frontier, or verifier. The climb is Workhorse ⇄ Planning ⇄ Frontier. Tooling is a delegate runner, not a rung.
 
 `/hierarchy` and `trek models set-layering` write `~/.trek/models.yaml`. If the project has `.trek/models.yaml`, they also patch `hierarchy.layering` there so the project file cannot keep an older value after a successful command. Role bind, `--clear`, and `set-lmstudio` likewise patch the project file and set `layering: manual`.
 
@@ -126,6 +126,7 @@ roles:
 
 - `trek models list|set-mode|set-suite|set-layering|set-role|set-lmstudio|benchmark`
 - `/hierarchy` — in-session layering / mode / suite / role picker (0.16, layering in 0.18)
+- `/thinking briefly|deep|off` — pin short-think or restore deep thinking (0.18)
 
 ## Related tests
 

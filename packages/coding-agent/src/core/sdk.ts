@@ -19,6 +19,7 @@ import { DefaultResourceLoader } from "./resource-loader.ts";
 import { LMSTUDIO_PROVIDER, LOCAL_LLAMA_PROVIDER, LOCAL_LLAMA_TIMEOUT_MS } from "./runtime/local-model.ts";
 import { liftLocalToolText, localSuiteToolChoice, nudgeLocalWorkMessages } from "./runtime/local-work.ts";
 import { applyShortTraceContext, applyShortTraceOptions } from "./runtime/short-trace.ts";
+import { sessionThinkingPin, skipShortTraceCap } from "./runtime/thinking-brief.ts";
 import { getDefaultSessionDir, SessionManager } from "./session-manager.ts";
 import { SettingsManager } from "./settings-manager.ts";
 import { time } from "./timings.ts";
@@ -341,8 +342,9 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 				local && context.tools && context.tools.length > 0 ? localSuiteToolChoice(context.messages) : undefined;
 			const nudged = local ? { ...context, messages: nudgeLocalWorkMessages(context.messages) } : context;
 			const hasTools = (nudged.tools?.length ?? 0) > 0;
-			const requestContext = applyShortTraceContext(nudged);
-			const shortOptions = applyShortTraceOptions(options, hasTools);
+			const skipCap = skipShortTraceCap(sessionThinkingPin(sessionManager.getSessionId()));
+			const requestContext = applyShortTraceContext(nudged, skipCap);
+			const shortOptions = applyShortTraceOptions(options, hasTools, skipCap);
 			const stream = streamSimple(model, requestContext, {
 				...shortOptions,
 				apiKey: auth.apiKey,

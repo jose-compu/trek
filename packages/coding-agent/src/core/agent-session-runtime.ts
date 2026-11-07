@@ -11,6 +11,7 @@ import type { ReplacedSessionContext, SessionShutdownEvent, SessionStartEvent } 
 import type { EffortMode } from "./reflective-loop/index.ts";
 import { loadRuntimeConfig } from "./runtime/registry.ts";
 import { resolveRuntime } from "./runtime/resolve.ts";
+import type { RoleThinking } from "./runtime/types.ts";
 import type { OperatorMode } from "./safety/index.ts";
 import type { CreateAgentSessionResult } from "./sdk.ts";
 import { assertSessionCwdExists } from "./session-cwd.ts";
@@ -21,6 +22,7 @@ interface ParentSessionConfig {
 	modelProvider?: string;
 	modelId?: string;
 	thinkingLevel: ThinkingLevel;
+	thinkingPin?: RoleThinking;
 	effort: EffortMode;
 	sandboxBash: boolean;
 	operatorMode: OperatorMode | undefined;
@@ -233,6 +235,7 @@ export class AgentSessionRuntime {
 			modelProvider: session.model?.provider,
 			modelId: session.model?.id,
 			thinkingLevel: session.thinkingLevel,
+			thinkingPin: session.thinkingPin,
 			effort: session.getEffort(),
 			sandboxBash: session.isSandboxBash(),
 			operatorMode: session.getOperatorMode(),
@@ -253,6 +256,7 @@ export class AgentSessionRuntime {
 			}
 		}
 		this.session.setThinkingLevel(snapshot.thinkingLevel);
+		this.session.setThinkingPin(snapshot.thinkingPin);
 		this.session.setEffort(snapshot.effort);
 		this.session.setSandboxBash(snapshot.sandboxBash);
 		this.session.setOperatorMode(snapshot.operatorMode);

@@ -23,8 +23,8 @@ export interface ShortTraceContext {
 	tools?: readonly unknown[];
 }
 
-export function applyShortTraceContext<T extends ShortTraceContext>(context: T): T {
-	if (!context.tools || context.tools.length === 0) {
+export function applyShortTraceContext<T extends ShortTraceContext>(context: T, skipCap = false): T {
+	if (skipCap || !context.tools || context.tools.length === 0) {
 		return context;
 	}
 	const prompt = context.systemPrompt ?? "";
@@ -38,9 +38,10 @@ export function applyShortTraceContext<T extends ShortTraceContext>(context: T):
 export function applyShortTraceOptions<T extends { reasoning?: ThinkingLevel; thinkingBudgets?: ThinkingBudgets }>(
 	options: T | undefined,
 	hasTools: boolean,
+	skipCap = false,
 ): T & { thinkingBudgets?: ThinkingBudgets } {
 	const base = (options ?? {}) as T;
-	if (!hasTools) {
+	if (!hasTools || skipCap) {
 		return base;
 	}
 	return {

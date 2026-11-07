@@ -125,6 +125,7 @@ export {
 	parseLayerSubtaskResult,
 	SAFE_LAYER_DECISION,
 	tryLayerSubtaskResult,
+	tryParseLayerDecision,
 } from "./layer-decision.ts";
 export {
 	type LayerExecuteResult,
@@ -257,6 +258,20 @@ export {
 	tokensBeforeTool,
 } from "./short-trace.ts";
 export { DEFAULT_DECISION_MODEL_ID, SUITE_PRESETS, type SuitePreset, suitePreset } from "./suites.ts";
+export {
+	BRIEF_THINKING_VIEWPORT_LINES,
+	effectiveThinkingPin,
+	formatThinkingPin,
+	parseThinkingCommand,
+	runThinkingCommand,
+	sessionThinkingPin,
+	setSessionThinkingPin,
+	skipShortTraceCap,
+	THINKING_COMMAND_USAGE,
+	thinkingCardTitle,
+	thinkingCardViewport,
+	thinkingLevelForPin,
+} from "./thinking-brief.ts";
 export {
 	assertPublicModelId,
 	DEFAULT_LMSTUDIO_BASE_URL,

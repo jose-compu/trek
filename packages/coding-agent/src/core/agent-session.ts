@@ -228,7 +228,12 @@ import {
 	startLadderRole,
 	stripEscalateSignal,
 } from "./runtime/escalate.ts";
-import { climbHandoffBrief, type HandoffBrief, tryLayerSubtaskResult } from "./runtime/layer-decision.ts";
+import {
+	climbHandoffBrief,
+	type HandoffBrief,
+	tryLayerSubtaskResult,
+	tryParseLayerDecision,
+} from "./runtime/layer-decision.ts";
 import { runLayerWorkflow } from "./runtime/layer-execute.ts";
 import { localLlamaChatModel } from "./runtime/local-llama-model.ts";
 import { LMSTUDIO_PROVIDER, LOCAL_LLAMA_PROVIDER, lmStudioChatModel } from "./runtime/local-model.ts";
@@ -254,6 +259,8 @@ import {
 	selectThinkRole,
 	sessionRoleForModel,
 } from "./runtime/select-role.ts";
+import { setSessionThinkingPin, thinkingLevelForPin } from "./runtime/thinking-brief.ts";
+import type { RoleThinking } from "./runtime/types.ts";
 import {
 	type AntiPattern,
 	applyTone,
@@ -2284,6 +2291,24 @@ export class AgentSession {
 		return this.agent.state.thinkingLevel;
 	}
 
+	/** Session `/thinking` pin. Undefined until the user or a LayerDecision sets one. */
+	get thinkingPin(): RoleThinking | undefined {
+		return this._thinkingPin;
+	}
+
+	setThinkingPin(pin: RoleThinking | undefined): void {
+		this._thinkingPin = pin;
+		setSessionThinkingPin(this.sessionManager.getSessionId(), pin);
+		this._honorThinkingPin();
+	}
+
+	private _honorThinkingPin(): void {
+		if (!this._thinkingPin) {
+			return;
+		}
+		this.setThinkingLevel(thinkingLevelForPin(this._thinkingPin));
+	}
+
 	/** Whether agent is currently streaming a response */
 	get isStreaming(): boolean {
 		return this.agent.state.isStreaming;
@@ -2786,6 +2811,8 @@ export class AgentSession {
 	/** Footer model id for the active hierarchy role (may differ from chat `model`). */
 	private _hierarchyModelId?: string;
 	private _hierarchyModelProvider?: string;
+	/** `/thinking briefly|deep|off` pin. LayerDecision.thinking brief wins. */
+	private _thinkingPin?: RoleThinking;
 	/** Idle on Decision until the first prompt routes to Workhorse. */
 	private _parkedOnDecision = false;
 	/** Tools since the last Planning brief; drives optional mid-turn replan. */
@@ -2856,6 +2883,7 @@ export class AgentSession {
 				} else if (selection.thinking && this.agent.state.thinkingLevel === "off") {
 					this.agent.state.thinkingLevel = "medium";
 				}
+				this._honorThinkingPin();
 				if (!modelsAreEqual(previous, mapped)) {
 					this.sessionManager.appendModelChange(mapped.provider, mapped.id);
 					await this._emitModelSelect(mapped, previous, "set");
@@ -2886,6 +2914,7 @@ export class AgentSession {
 		} else if (selection.thinking && this.agent.state.thinkingLevel === "off") {
 			this.agent.state.thinkingLevel = "medium";
 		}
+		this._honorThinkingPin();
 		if (!modelsAreEqual(previous, registered)) {
 			this.sessionManager.appendModelChange(registered.provider, registered.id);
 			await this._emitModelSelect(registered, previous, "set");
@@ -3347,6 +3376,10 @@ export class AgentSession {
 			.filter((part): part is TextContent => part.type === "text" && typeof part.text === "string")
 			.map((part) => part.text)
 			.join("\n");
+		const decision = tryParseLayerDecision(text);
+		if (decision?.thinking === "brief") {
+			this.setThinkingPin("brief");
+		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
 		const from = this._ladderRole ?? this._lastHierarchyRole ?? startLadderRole(resolved);

@@ -108,6 +108,31 @@ describe("AssistantMessageComponent", () => {
 		expect(expanded).toContain("five");
 	});
 
+	test("thinking briefly uses a compact title and a 1–2 line viewport", () => {
+		initTheme("dark");
+		const component = new AssistantMessageComponent(
+			createAssistantMessage([{ type: "thinking", thinking: "one\ntwo\nthree\nfour" }]),
+			false,
+			getMarkdownTheme(),
+			"Thinking...",
+			false,
+			true,
+		);
+		const lines = component
+			.render(80)
+			.map((line) =>
+				line
+					.replace(/\x1b\[[0-9;]*m/g, "")
+					.replace(/\x1b\]133;[ABC]\x07/g, "")
+					.trim(),
+			)
+			.filter(Boolean);
+		expect(lines[0]).toContain("thinking briefly");
+		expect(lines).not.toContain("one");
+		expect(lines).not.toContain("two");
+		expect(lines.length).toBeLessThanOrEqual(3);
+	});
+
 	test("compact thinking is 3 wrapped visual lines, not 3 source paragraphs", () => {
 		initTheme("dark");
 		const paragraph =
