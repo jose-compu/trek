@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runHierarchyCommand } from "../src/core/hierarchy-command.ts";
 import { globalModelsYamlPath, loadRuntimeConfig, projectModelsYamlPath } from "../src/core/runtime/registry.ts";
+import { resolveRuntime } from "../src/core/runtime/resolve.ts";
 import { parseRoleThinking } from "../src/core/runtime/types.ts";
 
 describe("/hierarchy", () => {
@@ -96,6 +97,8 @@ describe("/hierarchy", () => {
 		expect(after.roles.workhorse?.id).toBe("Qwen3.5-4B");
 		expect(runHierarchyCommand(agentDir, cwd, "auto")).toContain("layering auto");
 		expect(loadRuntimeConfig({ agentDir, cwd }).hierarchy.layering).toBe("auto");
+		runHierarchyCommand(agentDir, cwd, "mode local");
+		expect(resolveRuntime(loadRuntimeConfig({ agentDir, cwd }), { frontier: null }).roles.planning).toBeUndefined();
 	});
 
 	it("patches project layering so a project YAML cannot keep manual after single", () => {
@@ -140,6 +143,14 @@ describe("/hierarchy", () => {
 		runHierarchyCommand(agentDir, cwd, "role verifier --id other --source api --thinking off");
 		runHierarchyCommand(agentDir, cwd, "role verifier --clear");
 		expect(loadRuntimeConfig({ agentDir, cwd }).roles.verifier).toBeUndefined();
+		runHierarchyCommand(agentDir, cwd, "mode local");
+		runHierarchyCommand(agentDir, cwd, "manual");
+		expect(resolveRuntime(loadRuntimeConfig({ agentDir, cwd }), { frontier: null }).roles.planning).toBeDefined();
+		runHierarchyCommand(agentDir, cwd, "role planning --clear");
+		const afterClear = loadRuntimeConfig({ agentDir, cwd });
+		expect(afterClear.roles.planning).toBeUndefined();
+		expect(afterClear.hierarchy.unbound).toContain("planning");
+		expect(resolveRuntime(afterClear, { frontier: null }).roles.planning).toBeUndefined();
 	});
 
 	it("reads legacy YAML thinking booleans", () => {

@@ -67,6 +67,8 @@ export interface HierarchySettings {
 	quant: string;
 	/** Factory default is single: one chat model on Workhorse. */
 	layering: LayeringMode;
+	/** Roles `/hierarchy role --clear` unbound. Suite presets do not fill these. */
+	unbound?: RuntimeRole[];
 }
 
 export const ROUTE_COMPONENTS = ["worldModel", "toolIntent", "mechanical", "intend"] as const;

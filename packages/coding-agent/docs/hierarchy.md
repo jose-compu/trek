@@ -19,8 +19,8 @@ Configure with `trek models set-mode …`, `~/.trek/models.yaml`, project `.trek
 | Value | Behavior |
 | --- | --- |
 | `single` | One Workhorse. `/hierarchy single` and `trek models set-layering single` clear extra roles. |
-| `auto` | `/hierarchy auto` stores the flag. Catalog map of slots lands in a follow-up. |
-| `manual` | Any `/hierarchy role` or `trek models set-role` write. |
+| `auto` | `/hierarchy auto` stores the flag. Resolve does not load suite extras until the catalog map lands. |
+| `manual` | Suite extras plus any `/hierarchy role` or `trek models set-role` write. `--clear` unbinds one role so the suite preset cannot fill it. |
 
 Role `thinking` is `off`, `brief`, or `deep`. YAML `true`/`on` still means deep; `false`/`off` means off. Frontier and verifier may use `source: local` or `lmstudio`. In `single`, local/hybrid resolve only Decision, Workhorse, embedding, and reranker — not Tooling, Planning, Frontier, or verifier. The escalate parser still lists Tooling as a rung until the controller rewrite.
 

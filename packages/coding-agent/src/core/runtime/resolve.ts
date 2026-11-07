@@ -86,22 +86,21 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 		roles.embedding = overlay(preset.roles.embedding, config.roles.embedding);
 		roles.reranker = overlay(preset.roles.reranker, config.roles.reranker);
 	} else {
-		const single = config.hierarchy.layering === "single";
 		for (const [name, assignment] of Object.entries(preset.roles) as [RuntimeRole, RoleAssignment][]) {
-			if (single && isLayeringExtraRole(name)) {
+			if (skipExtraRole(config, name)) {
 				continue;
 			}
 			roles[name] = overlay(assignment, config.roles[name]);
 		}
 		for (const [name, assignment] of Object.entries(config.roles) as [RuntimeRole, RoleAssignment][]) {
-			if (single && isLayeringExtraRole(name)) {
+			if (skipExtraRole(config, name)) {
 				continue;
 			}
 			if (!roles[name] && assignment) {
 				roles[name] = assignment;
 			}
 		}
-		if (effectiveMode === "hybrid" && !single) {
+		if (effectiveMode === "hybrid" && !skipExtraRole(config, "frontier")) {
 			roles.frontier = overlay(frontierRole(frontier), config.roles.frontier);
 		}
 	}
@@ -124,10 +123,20 @@ export function sessionLocalRoles(resolved: ResolvedRuntime): SessionLocalRole[]
 	if (resolved.effectiveMode === "api") {
 		return [];
 	}
-	if (resolved.layering === "single") {
-		return resolved.roles.workhorse ? ["workhorse"] : [];
+	return SESSION_LOCAL_ROLES.filter((role) => resolved.roles[role]?.source === "local");
+}
+
+function skipExtraRole(config: RuntimeConfig, name: RuntimeRole): boolean {
+	if (config.hierarchy.unbound?.includes(name)) {
+		return true;
 	}
-	return [...SESSION_LOCAL_ROLES];
+	if (!isLayeringExtraRole(name)) {
+		return false;
+	}
+	if (config.hierarchy.layering === "single") {
+		return true;
+	}
+	return config.hierarchy.layering === "auto" && !config.roles[name];
 }
 
 function frontierRole(frontier: FrontierHint | undefined): RoleAssignment {
