@@ -3770,7 +3770,9 @@ export class AgentSession {
 			const lesson = await this._draftLesson(evidence, pattern);
 			if (!lesson) return;
 			lesson.source_turn = evidence.task.slice(0, 80);
-			lesson.layer_role = actingLessonRole(this.hierarchyRole);
+			if (!lesson.layer_role) {
+				lesson.layer_role = actingLessonRole(this.hierarchyRole);
+			}
 			if (lessonIsBlocked(lesson, pattern)) {
 				this.sessionManager.appendCustomEntry("trek:lesson_dropped", {
 					reason: "redacted",
@@ -3930,15 +3932,16 @@ export class AgentSession {
 		fallback: string,
 		extra?: { correction?: string; failures?: string[] },
 	): string {
+		const correction = Boolean(extra?.correction);
 		const meta = detectMetaLessonTrigger({
 			task,
 			correction: extra?.correction,
 			failures: extra?.failures,
-			layerWorkflow: this._turnSelection.layer_workflow,
-			thinking: this._decisionThinking ?? this._thinkingPin,
-			action: this._turnLayerAction,
-			verifierDenied: this._verifierDeniedThisTurn,
-			budgetStopped: this._effort.stopReason()?.includes("spent budget") === true,
+			layerWorkflow: correction ? undefined : this._turnSelection.layer_workflow,
+			thinking: correction ? undefined : (this._decisionThinking ?? this._thinkingPin),
+			action: correction ? undefined : this._turnLayerAction,
+			verifierDenied: correction ? false : this._verifierDeniedThisTurn,
+			budgetStopped: correction ? false : this._effort.stopReason()?.includes("spent budget") === true,
 		});
 		return meta ? "meta" : fallback;
 	}
@@ -4300,6 +4303,7 @@ export class AgentSession {
 		} finally {
 			this._hierarchyDisplayRole = previousDisplay;
 			this._ladderRole = previousLadder;
+			this._retagLessonRecall(previousDisplay);
 		}
 	}
 
