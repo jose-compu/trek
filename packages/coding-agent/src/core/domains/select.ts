@@ -11,6 +11,8 @@ export type SelectionReason = "match" | "none" | "operator_override";
 export interface DomainSelection {
 	domain: string;
 	workflow: string;
+	/** Bundled layer-* id for this turn, or `none`. */
+	layer_workflow: string;
 	selectionReason: SelectionReason;
 	nodeIds: string[];
 	yaml: string;
@@ -26,6 +28,7 @@ export interface SelectDomainInput {
 const NONE: DomainSelection = {
 	domain: "none",
 	workflow: "none",
+	layer_workflow: "none",
 	selectionReason: "none",
 	nodeIds: [],
 	yaml: "",
@@ -108,6 +111,7 @@ function selectionFrom(
 	return {
 		domain: domain.id,
 		workflow: domain.workflowName,
+		layer_workflow: "none",
 		selectionReason,
 		nodeIds: domain.nodeIds,
 		yaml: domain.yaml,
@@ -117,5 +121,6 @@ function selectionFrom(
 
 export function formatSelection(selection: DomainSelection): string {
 	const nodes = selection.nodeIds.length > 0 ? ` nodes=${selection.nodeIds.join(",")}` : "";
-	return `domain=${selection.domain} workflow=${selection.workflow} reason=${selection.selectionReason}${nodes}`;
+	const layer = selection.layer_workflow ?? "none";
+	return `domain=${selection.domain} workflow=${selection.workflow} layer_workflow=${layer} reason=${selection.selectionReason}${nodes}`;
 }

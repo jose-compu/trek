@@ -1,0 +1,7 @@
+{
+	"action": "escalate",
+	"target": "planning",
+	"workflow": "defect-fix",
+	"layer_workflow": "layer-escalate",
+	"layering": "auto"
+}

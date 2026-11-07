@@ -1,6 +1,8 @@
 import { debugLog } from "../../utils/debug-log.ts";
 import { loadDomainCatalog } from "../domains/catalog.ts";
+import { attachLayerWorkflow } from "../domains/layer-compose.ts";
 import { type DomainSelection, formatSelection, selectDomain } from "../domains/select.ts";
+import type { LayeringMode } from "../runtime/types.ts";
 import { CHECKPOINT_ACT_REASON } from "../safety/operator-mode.ts";
 import type { SessionManager } from "../session-manager.ts";
 import {
@@ -54,6 +56,8 @@ export interface RunPromptCycleOptions {
 	onDomainSelected?: (selection: DomainSelection) => void;
 	/** When set, the cycle does not select again. */
 	selection?: DomainSelection;
+	/** Used when `selection` is omitted so `layer_workflow` still composes. */
+	layering?: LayeringMode;
 	/** Checkpoint mode closes act until this returns true. Other modes omit it. */
 	phaseAllowed?: (phase: ReflectivePhase) => boolean;
 }
@@ -158,7 +162,7 @@ export class ReflectiveLoopController {
 		const guarded = runOutputGuard(intention);
 		intention = guarded.intention;
 		components.push(...guarded.components);
-		const selection = options.selection ?? this.selectForTurn(options.task, options.cwd);
+		const selection = options.selection ?? this.selectForTurn(options.task, options.cwd, options.layering);
 		if (options.selection) this.previousTask = options.task;
 		phases.intend = {
 			phase: "intend",
@@ -301,15 +305,16 @@ export class ReflectiveLoopController {
 			lawsPost: args.lawsPost,
 			domain: args.selection?.domain,
 			workflow: args.selection?.workflow,
+			layer_workflow: args.selection?.layer_workflow,
 			selectionReason: args.selection?.selectionReason,
 			nodeIds: args.selection?.nodeIds,
 		});
 	}
 
-	private selectForTurn(task: string, cwd: string): DomainSelection {
+	private selectForTurn(task: string, cwd: string, layering: LayeringMode = "single"): DomainSelection {
 		const catalog = loadDomainCatalog(cwd);
 		const selection = selectDomain(catalog, { task, previous: this.previousTask });
 		this.previousTask = task;
-		return selection;
+		return attachLayerWorkflow(selection, layering, task);
 	}
 }

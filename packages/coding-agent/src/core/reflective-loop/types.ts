@@ -70,6 +70,8 @@ export interface ReflectiveCycleTrace {
 	domain?: string;
 	/** Archon workflow name selected for this turn, or `none`. */
 	workflow?: string;
+	/** Layer-* workflow id for this turn, or `none`. */
+	layer_workflow?: string;
 	selectionReason?: "match" | "none" | "operator_override";
 	nodeIds?: string[];
 }

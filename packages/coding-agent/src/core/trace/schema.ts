@@ -148,6 +148,7 @@ export function parseCycleTrace(data: unknown, options: ParseCycleTraceOptions =
 		lawsVerdict: normalizeLawsVerdict(raw.lawsVerdict),
 		domain: typeof raw.domain === "string" ? raw.domain : undefined,
 		workflow: typeof raw.workflow === "string" ? raw.workflow : undefined,
+		layer_workflow: typeof raw.layer_workflow === "string" ? raw.layer_workflow : undefined,
 		selectionReason: parseSelectionReason(raw.selectionReason),
 		nodeIds: parseToolNames(raw.nodeIds),
 	};
@@ -183,6 +184,7 @@ export interface BuildTraceCycleInput {
 	lawsPost?: LawsVerdictRecord;
 	domain?: string;
 	workflow?: string;
+	layer_workflow?: string;
 	selectionReason?: ReflectiveCycleTrace["selectionReason"];
 	nodeIds?: string[];
 }
@@ -204,6 +206,7 @@ export function buildTraceCycleV1(input: BuildTraceCycleInput): ReflectiveCycleT
 		lawsVerdict: { pre: input.lawsPre, post: input.lawsPost },
 		domain: input.domain,
 		workflow: input.workflow,
+		layer_workflow: input.layer_workflow,
 		selectionReason: input.selectionReason,
 		nodeIds: input.nodeIds,
 	};

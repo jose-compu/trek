@@ -32,6 +32,8 @@ Frontier `source: local` starts llama-server like Planning. `source: lmstudio` u
 
 Per-role `source` wins over `hierarchy.mode`. An api session may still start llama-server for a locally bound Tooling (or other) role. A bound verifier must be a different `provider` than Workhorse when mix-vendor is on. Escalates write `trek:layer_route` (includes `source`) to the session JSONL. `trek models benchmark --layering` emits `trek-layering-benchmark.json` from fixture traces; CI does not run live keys.
 
+A turn may run the domain Archon DAG and a `layer-*` DAG together. The cycle trace stores `workflow` (domain) and `layer_workflow`. Prompt nodes follow the current role unless the node sets `role: workhorse|planning|tooling`. `layering: single` leaves `layer_workflow` as `none`.
+
 ## Ladder
 
 ```

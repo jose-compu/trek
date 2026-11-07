@@ -4,7 +4,7 @@
  */
 
 import { runToolSchedule, type ScheduledCall } from "../algebra/process-schedule.ts";
-import { type ArchonNode, type ArchonWorkflow, orderNodes } from "../domains/archon.ts";
+import { type ArchonNode, type ArchonWorkflow, workflowWaves } from "../domains/archon.ts";
 import { LAYER_JOIN, type LayerSubtaskResult, type LayerSubtaskStatus } from "./layer-decision.ts";
 import type { LayeringMode } from "./types.ts";
 
@@ -33,31 +33,7 @@ export interface LayerExecuteResult {
 }
 
 export function layerWaves(workflow: ArchonWorkflow): ArchonNode[][] {
-	orderNodes(workflow);
-	const remaining = new Map(workflow.nodes.map((node) => [node.id, new Set(node.dependsOn)]));
-	const byId = new Map(workflow.nodes.map((node) => [node.id, node]));
-	const index = new Map(workflow.nodes.map((node, position) => [node.id, position]));
-	const waves: ArchonNode[][] = [];
-	while (remaining.size > 0) {
-		const ready = [...remaining.entries()]
-			.filter(([, deps]) => deps.size === 0)
-			.map(([id]) => byId.get(id))
-			.filter((node): node is ArchonNode => Boolean(node))
-			.sort((a, b) => (index.get(a.id) ?? 0) - (index.get(b.id) ?? 0));
-		if (ready.length === 0) {
-			throw new Error("workflow has a cycle");
-		}
-		waves.push(ready);
-		for (const node of ready) {
-			remaining.delete(node.id);
-		}
-		for (const deps of remaining.values()) {
-			for (const node of ready) {
-				deps.delete(node.id);
-			}
-		}
-	}
-	return waves;
+	return workflowWaves(workflow);
 }
 
 export async function runLayerWorkflow(input: RunLayerWorkflowInput): Promise<LayerExecuteResult> {

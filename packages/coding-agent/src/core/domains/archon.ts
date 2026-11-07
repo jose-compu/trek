@@ -9,6 +9,9 @@ import { parse } from "yaml";
 export const ARCHON_NODE_KINDS = ["prompt", "command", "bash", "script", "loop"] as const;
 export type ArchonNodeKind = (typeof ARCHON_NODE_KINDS)[number];
 
+export const ARCHON_NODE_ROLES = ["workhorse", "planning", "tooling"] as const;
+export type ArchonNodeRole = (typeof ARCHON_NODE_ROLES)[number];
+
 export interface ArchonNode {
 	id: string;
 	kind: ArchonNodeKind;
@@ -19,6 +22,8 @@ export interface ArchonNode {
 	allowedTools?: string[];
 	/** Present when `kind` is `loop`. Archon stores this as an object, not a string. */
 	loop?: { until: string; maxIterations: number };
+	/** Prompt nodes only. Default is the current layer role. */
+	role?: ArchonNodeRole;
 }
 
 export interface ArchonWorkflow {
@@ -105,13 +110,40 @@ function parseNode(value: unknown, index: number): ArchonNode {
 	if (kind === "script" && record.runtime !== "bun" && record.runtime !== "uv") {
 		throw new Error(`node ${id} script requires runtime bun or uv`);
 	}
+	const role = readNodeRole(record.role, id, kind);
 	return {
 		id,
 		kind,
 		body: (record[kind] as string).trim(),
 		dependsOn,
 		allowedTools,
+		...(role ? { role } : {}),
 	};
+}
+
+function readNodeRole(value: unknown, nodeId: string, kind: ArchonNodeKind): ArchonNodeRole | undefined {
+	if (value === undefined) {
+		return undefined;
+	}
+	if (typeof value !== "string" || !isArchonNodeRole(value)) {
+		throw new Error(`node ${nodeId} role must be workhorse, planning, or tooling`);
+	}
+	if (kind !== "prompt") {
+		throw new Error(`node ${nodeId} role is only valid on prompt nodes`);
+	}
+	return value;
+}
+
+export function isArchonNodeRole(value: string): value is ArchonNodeRole {
+	return (ARCHON_NODE_ROLES as readonly string[]).includes(value);
+}
+
+/** Prompt nodes follow the current role unless `role:` is set. Bash/command/script never bind a chat role. */
+export function nodeChatRole(node: ArchonNode, currentRole?: ArchonNodeRole): ArchonNodeRole | undefined {
+	if (node.kind !== "prompt") {
+		return undefined;
+	}
+	return node.role ?? currentRole;
 }
 
 function presentKinds(record: Record<string, unknown>): ArchonNodeKind[] {
@@ -194,4 +226,33 @@ export function orderNodes(workflow: ArchonWorkflow): ArchonNode[] {
 		}
 	}
 	return ordered;
+}
+
+/** Independent nodes (empty depends_on) share a wave for cpa-agents. */
+export function workflowWaves(workflow: ArchonWorkflow): ArchonNode[][] {
+	orderNodes(workflow);
+	const remaining = new Map(workflow.nodes.map((node) => [node.id, new Set(node.dependsOn)]));
+	const byId = new Map(workflow.nodes.map((node) => [node.id, node]));
+	const index = new Map(workflow.nodes.map((node, position) => [node.id, position]));
+	const waves: ArchonNode[][] = [];
+	while (remaining.size > 0) {
+		const ready = [...remaining.entries()]
+			.filter(([, deps]) => deps.size === 0)
+			.map(([id]) => byId.get(id))
+			.filter((node): node is ArchonNode => Boolean(node))
+			.sort((a, b) => (index.get(a.id) ?? 0) - (index.get(b.id) ?? 0));
+		if (ready.length === 0) {
+			throw new Error("workflow has a cycle");
+		}
+		waves.push(ready);
+		for (const node of ready) {
+			remaining.delete(node.id);
+		}
+		for (const deps of remaining.values()) {
+			for (const node of ready) {
+				deps.delete(node.id);
+			}
+		}
+	}
+	return waves;
 }
