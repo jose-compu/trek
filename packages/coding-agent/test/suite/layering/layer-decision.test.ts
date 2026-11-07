@@ -5,13 +5,13 @@
 
 import { describe, expect, it } from "vitest";
 import {
-	constrainDecisionRoute,
 	HANDOFF_BRIEF_JSON_SCHEMA,
 	jsonSchemaHasLengthKeywords,
 	LAYER_DECISION_JSON_SCHEMA,
 	LAYER_JOIN,
 	LAYER_SUBTASK_RESULT_JSON_SCHEMA,
 	layerDecisionTextFromEnvelope,
+	parseDecisionRoute,
 	parseHandoffBrief,
 	parseLayerDecision,
 	parseLayerSubtaskResult,
@@ -67,16 +67,14 @@ describe("LayerDecision schema", () => {
 	});
 
 	it("does not let Decision route to Tooling", () => {
-		const routed = constrainDecisionRoute(
-			parseLayerDecision(
-				JSON.stringify({
-					action: "continue",
-					target: "tooling",
-					confidence: "high",
-					reason: "grep the log",
-					evidence: ["path"],
-				}),
-			),
+		const routed = parseDecisionRoute(
+			JSON.stringify({
+				action: "continue",
+				target: "tooling",
+				confidence: "high",
+				reason: "grep the log",
+				evidence: ["path"],
+			}),
 		);
 		expect(routed.target).toBe("workhorse");
 		expect(routed.action).toBe("continue");
@@ -120,7 +118,7 @@ describe("faux envelopes", () => {
 		const pack = loadLayeringCase("openai", "decision", "decision-route");
 		expect(pack.prompt).toMatch(/format/);
 		const text = layerDecisionTextFromEnvelope("openai", pack.response);
-		const decision = constrainDecisionRoute(parseLayerDecision(text));
+		const decision = parseDecisionRoute(text);
 		expect(decision).toMatchObject(pack.expect);
 		expect(decision.target).not.toBe("tooling");
 	});
@@ -128,19 +126,19 @@ describe("faux envelopes", () => {
 	it("xai decision-route", () => {
 		const pack = loadLayeringCase("xai", "decision", "decision-route");
 		const text = layerDecisionTextFromEnvelope("xai", pack.response);
-		expect(constrainDecisionRoute(parseLayerDecision(text))).toMatchObject(pack.expect);
+		expect(parseDecisionRoute(text)).toMatchObject(pack.expect);
 	});
 
 	it("glm decision-route", () => {
 		const pack = loadLayeringCase("glm", "decision", "decision-route");
 		const text = layerDecisionTextFromEnvelope("glm", pack.response);
-		expect(constrainDecisionRoute(parseLayerDecision(text))).toMatchObject(pack.expect);
+		expect(parseDecisionRoute(text)).toMatchObject(pack.expect);
 	});
 
 	it("kimi decision-route", () => {
 		const pack = loadLayeringCase("kimi", "decision", "decision-route");
 		const text = layerDecisionTextFromEnvelope("kimi", pack.response);
-		expect(constrainDecisionRoute(parseLayerDecision(text))).toMatchObject(pack.expect);
+		expect(parseDecisionRoute(text)).toMatchObject(pack.expect);
 	});
 
 	it("anthropic planning-escalate rejects empty evidence", () => {
@@ -158,7 +156,7 @@ describe("faux envelopes", () => {
 	it("liquid-d1 decision-route maps choice to script|workhorse", () => {
 		const pack = loadLayeringCase("liquid-d1", "decision", "decision-route");
 		const text = layerDecisionTextFromEnvelope("liquid-d1", pack.response);
-		expect(constrainDecisionRoute(parseLayerDecision(text))).toMatchObject(pack.expect);
+		expect(parseDecisionRoute(text)).toMatchObject(pack.expect);
 	});
 
 	it.skip("scripts dialect has no chat completion (no model)", () => {

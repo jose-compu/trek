@@ -174,6 +174,11 @@ export function parseLayerSubtaskResult(text: string, retry?: () => string | und
 	};
 }
 
+/** Parse a Decision-route checkpoint. Tooling is never a Decision target. */
+export function parseDecisionRoute(text: string, retry?: () => string | undefined): LayerDecision {
+	return constrainDecisionRoute(parseLayerDecision(text, retry));
+}
+
 /** Decision Index / layer-route: never climb to Tooling. */
 export function constrainDecisionRoute(decision: LayerDecision): LayerDecision {
 	if (decision.target === "tooling") {

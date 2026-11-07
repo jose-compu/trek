@@ -101,6 +101,7 @@ export {
 	type LayerThinking,
 	layerDecisionTextFromEnvelope,
 	needsHandoffBrief,
+	parseDecisionRoute,
 	parseHandoffBrief,
 	parseLayerDecision,
 	parseLayerSubtaskResult,
