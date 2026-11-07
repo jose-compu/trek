@@ -6,6 +6,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ### Added
 
+- Fourteen bundled `domains/meta/layer-*.yaml` Archon workflows. `/workflows` lists them beside domain DAGs. Parse tests only ([#192](https://github.com/jose-compu/trek/issues/192)).
 - `hierarchy.layering`: `single` (factory default), `auto`, or `manual`. `/hierarchy auto|single` and `trek models set-layering`. Role thinking is `off|brief|deep`. Verifier role. Frontier may be local. Binding a role sets `manual`; `--clear` records `hierarchy.unbound` so the suite preset cannot refill that slot; `single` clears Tooling/Planning/Frontier/verifier ([#190](https://github.com/jose-compu/trek/issues/190)).
 
 ## [0.17.0] - 2026-11-07

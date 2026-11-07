@@ -1,0 +1,15 @@
+name: layer-topic-reset
+description: |
+  New topic or /new-topic drops to Decision, then layer-route.
+nodes:
+  - id: detect-reset
+    prompt: |
+      Detect a topic reset from the user turn or {"new_topic":true}.
+  - id: drop-to-decision
+    prompt: |
+      Drop the climb floor to Decision. Footer shows d1.
+    depends_on: [detect-reset]
+  - id: layer-route
+    prompt: |
+      Re-run layer-route for the new generative turn.
+    depends_on: [drop-to-decision]

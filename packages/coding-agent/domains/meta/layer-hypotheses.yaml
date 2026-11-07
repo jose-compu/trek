@@ -1,0 +1,15 @@
+name: layer-hypotheses
+description: |
+  Hard debug. Spawn theories in parallel. Planning picks the winner.
+nodes:
+  - id: spawn-theories
+    prompt: |
+      Name up to three theories. Each is a Workhorse branch.
+  - id: gather
+    prompt: |
+      Gather evidence for each theory. Tooling may fetch.
+    depends_on: [spawn-theories]
+  - id: pick
+    prompt: |
+      Planning picks the winner. Discard the rest.
+    depends_on: [gather]

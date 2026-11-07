@@ -1,0 +1,9 @@
+name: layer-scripts
+description: |
+  Mechanical format, lint, and recipes. No prompt node. No chat model.
+nodes:
+  - id: command
+    command: format
+  - id: bash
+    bash: echo layer-scripts
+    depends_on: [command]

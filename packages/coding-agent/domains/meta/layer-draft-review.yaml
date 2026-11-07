@@ -1,0 +1,11 @@
+name: layer-draft-review
+description: |
+  Cheaper bound role drafts. Stronger bound role reviews the diff.
+nodes:
+  - id: draft
+    prompt: |
+      Draft the change. Do not apply irreversible tools.
+  - id: review-diff
+    prompt: |
+      Review the diff. Verdict before mutate.
+    depends_on: [draft]

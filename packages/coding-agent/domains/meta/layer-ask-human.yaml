@@ -1,0 +1,15 @@
+name: layer-ask-human
+description: |
+  Irreversible without verifier, spent budget, or empty evidence on escalate.
+nodes:
+  - id: state-risk
+    prompt: |
+      State the risk in one line.
+  - id: ask
+    prompt: |
+      Ask the human. Do not continue silently.
+    depends_on: [state-risk]
+  - id: wait
+    prompt: |
+      Wait for a reply. No extra model loop.
+    depends_on: [ask]

@@ -8,6 +8,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ### Added
 
+- Fourteen bundled `layer-*` Archon workflows; `/workflows` lists them ([#192](https://github.com/jose-compu/trek/issues/192)).
 - Layering config: `single` / `auto` / `manual`, `/hierarchy auto|single`, `trek models set-layering` ([#190](https://github.com/jose-compu/trek/issues/190)).
 
 ## [0.17.0] - 2026-11-07

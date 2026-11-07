@@ -1,0 +1,15 @@
+name: layer-cooldown
+description: |
+  After Planning or Frontier solves a class, write a short lesson so Workhorse can handle the next one. Confirm before L1.
+nodes:
+  - id: name-pattern
+    prompt: |
+      Name the pattern in one line.
+  - id: write-lesson
+    prompt: |
+      Write a domain lesson. Do not auto-promote.
+    depends_on: [name-pattern]
+  - id: next-on-workhorse
+    prompt: |
+      The next similar turn stays on Workhorse.
+    depends_on: [write-lesson]
