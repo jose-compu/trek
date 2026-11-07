@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { defaultRuntimeConfig, resolveRuntime, withHierarchy } from "../src/core/runtime/index.ts";
+import { defaultRuntimeConfig, resolveRuntime, withHierarchy, withRoleOverride } from "../src/core/runtime/index.ts";
 import { localLlamaChatModel } from "../src/core/runtime/local-llama-model.ts";
 import { missingMlxWeights, offerMissingMlx, preferMlx, useMlx } from "../src/core/runtime/mlx-backend.ts";
 import { localServerCommand, waitForLocalServer } from "../src/core/runtime/process-manager.ts";
@@ -23,6 +23,21 @@ describe("MLX on Apple Silicon", () => {
 		restore("TREK_MODELS_DIR", previous.dir);
 		restore("TREK_MLX_SERVER", previous.server);
 		restore("TREK_LLAMA_SERVER", previous.llama);
+	});
+
+	it("offers MLX download for a local role in an api session", () => {
+		let config = withHierarchy(defaultRuntimeConfig(), { mode: "api", layering: "manual" });
+		config = withRoleOverride(config, "planning", {
+			source: "local",
+			id: "LFM2.5-8B-A1B",
+			thinking: "deep",
+		});
+		const resolved = resolveRuntime(config, { frontier: null });
+		const dir = mkdtempSync(join(tmpdir(), "trek-mlx-api-"));
+		dirs.push(dir);
+		expect(missingMlxWeights(resolved, { TREK_MLX: "1", TREK_MODELS_DIR: dir }).map((item) => item.role)).toEqual([
+			"planning",
+		]);
 	});
 
 	it("stays on llama.cpp when MLX is off", () => {

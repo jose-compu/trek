@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"action\":\"ask_human\",\"target\":\"workhorse\",\"thinking\":\"brief\",\"confidence\":\"high\",\"reason\":\"budget spent\",\"evidence\":[\"tokens\"]}"
+			}
+		}
+	]
+}

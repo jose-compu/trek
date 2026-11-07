@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"action\":\"delegate\",\"target\":\"tooling\",\"thinking\":\"off\",\"confidence\":\"high\",\"reason\":\"grok fast search\",\"evidence\":[\"grok-4.1-fast\"]}"
+			}
+		}
+	]
+}

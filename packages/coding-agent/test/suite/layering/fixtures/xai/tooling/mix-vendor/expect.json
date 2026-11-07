@@ -1,0 +1,7 @@
+{
+	"action": "delegate",
+	"target": "tooling",
+	"writerProvider": "openai",
+	"toolingProvider": "xai",
+	"verifierProvider": "anthropic"
+}

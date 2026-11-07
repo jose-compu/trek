@@ -7,6 +7,7 @@ import chalk from "chalk";
 import { APP_NAME, getAgentDir } from "./config.ts";
 import { applyAutoLayering, loadCatalogFixture } from "./core/runtime/catalog-map.ts";
 import {
+	benchmarkLayering,
 	benchmarkRuntime,
 	DEFAULT_LMSTUDIO_BASE_URL,
 	defaultRoleThinking,
@@ -20,6 +21,7 @@ import {
 	isRuntimeRole,
 	isSuiteId,
 	loadRuntimeConfig,
+	mixVendorVerifierError,
 	parseRoleThinking,
 	type RoleAssignment,
 	type RoleSource,
@@ -33,6 +35,7 @@ import {
 	withHierarchy,
 	withRoleOverride,
 	writeBenchmarkJson,
+	writeLayeringBenchmarkJson,
 	writeRuntimeConfigFile,
 } from "./core/runtime/index.ts";
 
@@ -46,6 +49,7 @@ function printHelp(): void {
 	);
 	console.log(`${APP_NAME} models set-lmstudio --id <id> | --tooling <id> --workhorse <id> --planning <id>`);
 	console.log(`${APP_NAME} models benchmark`);
+	console.log(`${APP_NAME} models benchmark --layering   Fixture traces; not a CI gate`);
 	console.log("  Role registry in ~/.trek/models.yaml. Project .trek/models.yaml overrides it.");
 	console.log("  Default mode is api: one session model. Local and hybrid are opt-in.");
 	console.log("  Workhorse acts. Planning thinks. Frontier is API for deep work.");
@@ -92,6 +96,9 @@ export async function handleModelsCommand(args: string[]): Promise<boolean> {
 		return setLmStudio(rest.slice(1));
 	}
 	if (sub === "benchmark") {
+		if (rest.includes("--layering")) {
+			return benchmarkLayeringCli();
+		}
 		return benchmark();
 	}
 
@@ -255,6 +262,12 @@ function setRole(rest: string[]): boolean {
 		if (process.exitCode) {
 			return true;
 		}
+		const mixVendor = mixVendorVerifierError({ ...current.roles, [roleName]: assignment });
+		if (mixVendor) {
+			console.error(chalk.red(mixVendor));
+			process.exitCode = 1;
+			return true;
+		}
 		writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), withRoleOverride(current, roleName, assignment));
 		syncProjectRole(process.cwd(), roleName, assignment);
 	} catch (error) {
@@ -319,6 +332,17 @@ function benchmark(): boolean {
 	const out = join(process.cwd(), "trek-benchmark.json");
 	writeBenchmarkJson(out, rows);
 	console.log(formatBenchmark(rows));
+	console.log(out);
+	return true;
+}
+
+function benchmarkLayeringCli(): boolean {
+	const report = benchmarkLayering();
+	const out = join(process.cwd(), "trek-layering-benchmark.json");
+	writeLayeringBenchmarkJson(out, report);
+	console.log(
+		`single usd/solved ${report.costPerSolved.single}  layered usd/solved ${report.costPerSolved.layered}  liveSkipped ${report.liveSkipped}`,
+	);
 	console.log(out);
 	return true;
 }

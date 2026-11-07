@@ -231,10 +231,19 @@ import {
 import {
 	climbHandoffBrief,
 	type HandoffBrief,
+	type LayerDecision,
 	tryLayerSubtaskResult,
 	tryParseLayerDecision,
 } from "./runtime/layer-decision.ts";
 import { runLayerWorkflow } from "./runtime/layer-execute.ts";
+import { LAYER_ROUTE_CUSTOM_TYPE, layerRouteTrace } from "./runtime/layer-telemetry.ts";
+import {
+	consumeVerifierGrant,
+	pendingVerifierDecision,
+	toolNeedsVerifier,
+	verifierBlockReason,
+	verifierBound,
+} from "./runtime/layer-verifier.ts";
 import { localLlamaChatModel } from "./runtime/local-llama-model.ts";
 import { LMSTUDIO_PROVIDER, LOCAL_LLAMA_PROVIDER, lmStudioChatModel } from "./runtime/local-model.ts";
 import { LOCAL_SUITE_WORK_SECTION } from "./runtime/local-work.ts";
@@ -1546,7 +1555,22 @@ export class AgentSession {
 			fileExists: async (absPath: string) => existsSync(absPath),
 			resolvePath: (filePath: string) => resolveToCwd(filePath, this._cwd),
 		};
-		return this._safetyChecker.checkToolCall({ toolName, args: (args ?? {}) as Record<string, unknown>, tier }, env);
+		const verdict = await this._safetyChecker.checkToolCall(
+			{ toolName, args: (args ?? {}) as Record<string, unknown>, tier },
+			env,
+		);
+		if (!verdict.allowed) {
+			return verdict;
+		}
+		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		if (toolNeedsVerifier(toolName, (args ?? {}) as Record<string, unknown>, verifierBound(resolved.roles))) {
+			const grant = consumeVerifierGrant(this._verifierDecision);
+			this._verifierDecision = grant.remaining;
+			if (!grant.allowed) {
+				return { allowed: false, reason: verifierBlockReason(grant.remaining) };
+			}
+		}
+		return verdict;
 	}
 
 	/**
@@ -2828,6 +2852,7 @@ export class AgentSession {
 	/** `/thinking briefly|deep|off` pin. LayerDecision.thinking brief wins for the next span. */
 	private _thinkingPin?: RoleThinking;
 	private _decisionThinking?: RoleThinking;
+	private _verifierDecision?: LayerDecision;
 	/** Idle on Decision until the first prompt routes to Workhorse. */
 	private _parkedOnDecision = false;
 	/** Tools since the last Planning brief; drives optional mid-turn replan. */
@@ -3248,6 +3273,10 @@ export class AgentSession {
 			from,
 			to: signal.tier,
 		});
+		this.sessionManager.appendCustomEntry(
+			LAYER_ROUTE_CUSTOM_TYPE,
+			layerRouteTrace(from, signal.tier, "descalate", resolved.roles[signal.tier], signal.why),
+		);
 		this._pendingElevate = undefined;
 		this._ladderRole = signal.tier;
 		this._lastHierarchyRole = signal.tier;
@@ -3384,6 +3413,11 @@ export class AgentSession {
 			from,
 			to,
 		});
+		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		this.sessionManager.appendCustomEntry(
+			LAYER_ROUTE_CUSTOM_TYPE,
+			layerRouteTrace(from, to, "escalate", resolved.roles[to], why),
+		);
 	}
 
 	private async _noteWorkhorseElevation(message: AssistantMessage): Promise<void> {
@@ -3393,6 +3427,7 @@ export class AgentSession {
 			.join("\n");
 		const decision = tryParseLayerDecision(text);
 		this._decisionThinking = decision?.thinking;
+		this._verifierDecision = pendingVerifierDecision(this._verifierDecision, decision);
 		if (decision?.thinking === "brief") {
 			this._honorThinkingPin();
 		}

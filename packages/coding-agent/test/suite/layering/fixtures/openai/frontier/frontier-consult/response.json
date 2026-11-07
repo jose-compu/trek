@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"action\":\"stop\",\"target\":\"frontier\",\"thinking\":\"deep\",\"confidence\":\"high\",\"reason\":\"diagnosis complete\",\"evidence\":[\"stack\"]}"
+			}
+		}
+	]
+}

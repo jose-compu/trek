@@ -30,6 +30,8 @@ Role `thinking` is `off`, `brief`, or `deep`. YAML `true`/`on` still means deep;
 
 Frontier `source: local` starts llama-server like Planning. `source: lmstudio` uses the LM Studio endpoint. API Frontier stays hybrid/api only.
 
+Per-role `source` wins over `hierarchy.mode`. An api session may still start llama-server for a locally bound Tooling (or other) role. A bound verifier must be a different `provider` than Workhorse when mix-vendor is on. Escalates write `trek:layer_route` (includes `source`) to the session JSONL. `trek models benchmark --layering` emits `trek-layering-benchmark.json` from fixture traces; CI does not run live keys.
+
 ## Ladder
 
 ```

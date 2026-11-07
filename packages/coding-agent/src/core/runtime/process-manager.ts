@@ -117,11 +117,11 @@ export class LlamaProcessManager {
 	}
 
 	ensure(role: string, resolved: ResolvedRuntime): LlamaServerHandle {
-		if (resolved.effectiveMode === "api") {
-			throw new Error("api mode does not start llama-server. Use trek models set-mode local or hybrid.");
-		}
 		if (!isLocalServerRole(role)) {
 			throw new Error(`Unknown local role ${role}.`);
+		}
+		if (resolved.effectiveMode === "api" && resolved.roles[role]?.source !== "local") {
+			throw new Error("api mode does not start llama-server. Use trek models set-mode local or hybrid.");
 		}
 		const assignment = resolved.roles[role];
 		if (!assignment || assignment.source !== "local") {

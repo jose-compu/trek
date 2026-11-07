@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"action\":\"continue\",\"target\":\"workhorse\",\"thinking\":\"brief\",\"confidence\":\"high\",\"reason\":\"effort before climb\",\"evidence\":[\"gpt-6.1-terra\"]}"
+			}
+		}
+	]
+}

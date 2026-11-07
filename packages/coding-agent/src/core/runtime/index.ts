@@ -93,6 +93,14 @@ export {
 	stripEscalateSignal,
 } from "./escalate.ts";
 export {
+	benchmarkLayering,
+	defaultLayeringTraces,
+	type LayeringBenchmarkArm,
+	type LayeringBenchmarkReport,
+	type LayeringBenchmarkTrace,
+	writeLayeringBenchmarkJson,
+} from "./layer-benchmark.ts";
+export {
 	climbHandoffBrief,
 	constrainDecisionRoute,
 	DECISION_ROUTE_TARGETS,
@@ -134,6 +142,25 @@ export {
 	type RunLayerWorkflowInput,
 	runLayerWorkflow,
 } from "./layer-execute.ts";
+export {
+	formatLayerRoute,
+	isLayerRouteEntry,
+	LAYER_ROUTE_ACTIONS,
+	LAYER_ROUTE_CUSTOM_TYPE,
+	type LayerRouteAction,
+	type LayerRouteTrace,
+	layerRouteTrace,
+	mixVendorVerifier,
+	mixVendorVerifierError,
+} from "./layer-telemetry.ts";
+export {
+	consumeVerifierGrant,
+	pendingVerifierDecision,
+	toolNeedsVerifier,
+	verifierAllows,
+	verifierBlockReason,
+	verifierBound,
+} from "./layer-verifier.ts";
 export { localLlamaChatModel } from "./local-llama-model.ts";
 export {
 	LMSTUDIO_PROVIDER,

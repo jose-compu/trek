@@ -3,6 +3,7 @@
  * local promotes to hybrid when a Frontier API key is present (issue #87, #90).
  */
 
+import { mixVendorVerifierError } from "./layer-telemetry.ts";
 import { suitePreset } from "./suites.ts";
 import type { HierarchyMode, RoleAssignment, RuntimeConfig, RuntimeRole } from "./types.ts";
 import { isLayeringExtraRole, SESSION_LOCAL_ROLES, type SessionLocalRole } from "./types.ts";
@@ -57,10 +58,7 @@ export function requiresHuggingFaceToken(mode: HierarchyMode): boolean {
 	return mode !== "api";
 }
 
-function sessionNeedsLocalWeights(mode: HierarchyMode, roles: Partial<Record<RuntimeRole, RoleAssignment>>): boolean {
-	if (mode === "api") {
-		return false;
-	}
+function sessionNeedsLocalWeights(roles: Partial<Record<RuntimeRole, RoleAssignment>>): boolean {
 	const chatRoles = [...SESSION_LOCAL_ROLES, "frontier", "verifier"] as const;
 	return chatRoles.some((role) => roles[role]?.source === "local");
 }
@@ -122,6 +120,18 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 		}
 	}
 
+	// Explicit per-role source wins over hierarchy.mode (D16 mix-source).
+	for (const [name, assignment] of Object.entries(config.roles) as [RuntimeRole, RoleAssignment][]) {
+		if (skipExtraRole(config, name) || !assignment) {
+			continue;
+		}
+		roles[name] = overlay(roles[name], assignment);
+	}
+
+	if (mixVendorVerifierError(roles)) {
+		delete roles.verifier;
+	}
+
 	return {
 		mode: config.hierarchy.mode,
 		effectiveMode,
@@ -131,15 +141,12 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 		rerank: true,
 		presetRoles,
 		roles,
-		requiresHuggingFaceToken: sessionNeedsLocalWeights(effectiveMode, roles),
+		requiresHuggingFaceToken: sessionNeedsLocalWeights(roles),
 		frontierAvailable,
 	};
 }
 
 export function sessionLocalRoles(resolved: ResolvedRuntime): SessionLocalRole[] {
-	if (resolved.effectiveMode === "api") {
-		return [];
-	}
 	return SESSION_LOCAL_ROLES.filter((role) => resolved.roles[role]?.source === "local");
 }
 

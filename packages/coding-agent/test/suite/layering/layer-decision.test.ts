@@ -159,7 +159,9 @@ describe("faux envelopes", () => {
 		expect(parseDecisionRoute(text)).toMatchObject(pack.expect);
 	});
 
-	it.skip("scripts dialect has no chat completion (no model)", () => {
-		// Scripts are recipes/bash. Pack lands with C4 route rewrite.
+	it("scripts dialect has no chat completion (no model)", () => {
+		const pack = loadLayeringCase("scripts", "scripts", "script-format");
+		const text = layerDecisionTextFromEnvelope("scripts", pack.response);
+		expect(parseLayerDecision(text)).toMatchObject({ action: "continue", target: "script" });
 	});
 });

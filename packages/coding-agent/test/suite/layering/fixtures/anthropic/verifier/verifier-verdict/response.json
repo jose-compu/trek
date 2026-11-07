@@ -1,0 +1,8 @@
+{
+	"content": [
+		{
+			"type": "text",
+			"text": "{\"action\":\"verify\",\"target\":\"verifier\",\"thinking\":\"off\",\"confidence\":\"high\",\"reason\":\"safe to deploy\",\"evidence\":[\"diff\"]}"
+		}
+	]
+}

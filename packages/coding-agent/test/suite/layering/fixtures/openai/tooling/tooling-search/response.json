@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"action\":\"delegate\",\"target\":\"tooling\",\"thinking\":\"off\",\"confidence\":\"high\",\"reason\":\"search the log\",\"evidence\":[\"app.log\"]}"
+			}
+		}
+	]
+}
