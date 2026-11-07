@@ -12,7 +12,7 @@ export interface LayerNodeReply {
 	id: string;
 	output: string;
 	evidence?: string[];
-	status?: Exclude<LayerSubtaskStatus, "partial">;
+	status?: LayerSubtaskStatus;
 	winner?: string;
 	handoff?: LayerSubtaskResult["handoff"];
 }
