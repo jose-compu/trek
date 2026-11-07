@@ -72,7 +72,7 @@ describe("layer lessons", () => {
 				action: "escalate",
 			}),
 		).toBe("over_escalate");
-		expect(detectMetaLessonTrigger({ task: "Fix a typo.", action: "escalate" })).toBe("over_escalate");
+		expect(detectMetaLessonTrigger({ task: "Fix a typo.", action: "escalate" })).toBeUndefined();
 		expect(
 			detectMetaLessonTrigger({
 				task: "Fix a typo.",
@@ -80,7 +80,7 @@ describe("layer lessons", () => {
 			}),
 		).toBe("over_escalate");
 		expect(detectMetaLessonTrigger({ task: "over-think a one-line rename", thinking: "deep" })).toBe("over_think");
-		expect(detectMetaLessonTrigger({ task: "one-line rename", thinking: "deep" })).toBe("over_think");
+		expect(detectMetaLessonTrigger({ task: "one-line rename", thinking: "deep" })).toBeUndefined();
 		expect(tagRecallForRole("<memory>\nRule: x\n</memory>", "planning")).toContain('role="planning"');
 		expect(retagRecallForRole('<memory role="workhorse">\nRule: x\n</memory>', "planning")).toContain(
 			'role="planning"',

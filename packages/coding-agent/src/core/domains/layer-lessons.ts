@@ -44,15 +44,9 @@ export function detectMetaLessonTrigger(input: {
 	if (/\b(runner miss|missed grep)\b/.test(hay)) {
 		return "runner_miss";
 	}
-	if (/\bover.?escalate\b/.test(hay) || /\b(needless climb|should have stayed on workhorse)\b/.test(hay)) {
+	const needless = /\bover.?escalate\b/.test(hay) || /\b(needless climb|should have stayed on workhorse)\b/.test(hay);
+	if (needless) {
 		return "over_escalate";
-	}
-	const climbed = input.action === "escalate" || input.layerWorkflow === "layer-escalate" || /\bescalate\b/.test(hay);
-	if (climbed && /\b(typo|rename|one.line|trivial)\b/.test(hay)) {
-		return "over_escalate";
-	}
-	if (input.thinking === "deep" && /\b(one.line|typo|trivial)\b/.test(hay)) {
-		return "over_think";
 	}
 	if (/\bover.?think\b/.test(hay)) {
 		return "over_think";
