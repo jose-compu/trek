@@ -8,6 +8,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ### Added
 
+- Mix-source / mix-vendor verifier, layer-route JSONL telemetry, remaining D26 packs, `trek models benchmark --layering` ([#198](https://github.com/jose-compu/trek/issues/198)).
 - `/thinking briefly|deep|off` and a compact thinking briefly card. #108 128-token floor remains unless deep is pinned ([#197](https://github.com/jose-compu/trek/issues/197)).
 - Layer-* workflows execute via cpa-agents; join is `layer_join` ([#195](https://github.com/jose-compu/trek/issues/195), [#196](https://github.com/jose-compu/trek/issues/196)).
 - `/hierarchy auto --catalog` maps Tooling/Workhorse/Planning/Frontier from a provider catalog fixture. One-model catalogs stay single. Verifier and Decision stay unbound. Layered `api` climbs the mapped SKUs ([#194](https://github.com/jose-compu/trek/issues/194)).

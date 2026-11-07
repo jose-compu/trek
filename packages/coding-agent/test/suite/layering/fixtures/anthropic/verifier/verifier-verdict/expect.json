@@ -1,0 +1,5 @@
+{
+	"action": "verify",
+	"target": "verifier",
+	"confidence": "high"
+}

@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"action\":\"continue\",\"target\":\"workhorse\",\"thinking\":\"deep\",\"confidence\":\"high\",\"reason\":\"thinking on same id\",\"evidence\":[\"qwen3-27b\"]}"
+			}
+		}
+	]
+}

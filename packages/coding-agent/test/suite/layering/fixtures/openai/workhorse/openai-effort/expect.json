@@ -1,0 +1,6 @@
+{
+	"action": "continue",
+	"target": "workhorse",
+	"thinking": "brief",
+	"boundId": "gpt-6.1-terra"
+}

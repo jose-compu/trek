@@ -355,6 +355,7 @@ ${chalk.bold("Commands:")}
   ${APP_NAME} models set-role <role>    Override one role (--id, --source, --thinking)
   ${APP_NAME} models set-lmstudio       One or two models already loaded in LM Studio
   ${APP_NAME} models benchmark          Tokens/s per local role; skips missing weights
+  ${APP_NAME} models benchmark --layering  Fixture traces → trek-layering-benchmark.json (not a CI gate)
   ${APP_NAME} <command> --help          Show help for install/remove/uninstall/update/list
 
 ${chalk.bold("Options:")}
