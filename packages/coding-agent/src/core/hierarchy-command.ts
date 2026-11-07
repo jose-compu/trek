@@ -20,6 +20,7 @@ import {
 	type RuntimeRole,
 	readRuntimeConfigFile,
 	resolveRuntime,
+	syncProjectLayering,
 	withClearedRole,
 	withHierarchy,
 	withRoleOverride,
@@ -92,6 +93,7 @@ function setLayering(path: string, agentDir: string, cwd: string, mode: "auto" |
 	const current = readRuntimeConfigFile(path);
 	const next = mode === "single" ? flattenToSingle(current) : withHierarchy(current, { layering: mode });
 	writeRuntimeConfigFile(path, next);
+	syncProjectLayering(cwd, mode, mode === "single");
 	return nextSession(status(agentDir, cwd, path));
 }
 

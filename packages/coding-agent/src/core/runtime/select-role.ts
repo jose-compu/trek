@@ -211,7 +211,7 @@ export function sessionRoleForModel(
 		}
 		return undefined;
 	}
-	for (const role of ["planning", "workhorse", "tooling"] as const) {
+	for (const role of ["frontier", "planning", "workhorse", "tooling"] as const) {
 		const id = resolved.roles[role]?.id;
 		if (!id) {
 			continue;

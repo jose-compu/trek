@@ -24,6 +24,7 @@ import {
 	type RoleSource,
 	readRuntimeConfigFile,
 	resolveRuntime,
+	syncProjectLayering,
 	weightFileExists,
 	withHierarchy,
 	withRoleOverride,
@@ -143,6 +144,7 @@ function setLayering(rest: string[]): boolean {
 	}
 	const next = mode === "single" ? flattenToSingle(current) : withHierarchy(current, { layering: mode });
 	writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), next);
+	syncProjectLayering(process.cwd(), mode, mode === "single");
 	printStatus();
 	return true;
 }

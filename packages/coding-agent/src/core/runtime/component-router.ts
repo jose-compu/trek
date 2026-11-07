@@ -3,7 +3,7 @@
  * Ladder: Tooling → Workhorse → Planning → Frontier.
  */
 
-import { nextLadderRole, startLadderRole } from "./escalate.ts";
+import { frontierBound, nextLadderRole, startLadderRole } from "./escalate.ts";
 import type { ResolvedRuntime } from "./resolve.ts";
 import type { RoleSelection } from "./select-role.ts";
 import { FRONTIER_COMPLEXITY_THRESHOLD } from "./select-role.ts";
@@ -72,7 +72,7 @@ function floorRole(base: RouteRole, minRole: RouteRole | undefined, resolved: Re
 
 function resolveAvailable(role: RouteRole, resolved: ResolvedRuntime): RouteRole {
 	if (role === "frontier") {
-		if (resolved.roles.frontier && resolved.effectiveMode !== "local") {
+		if (frontierBound(resolved)) {
 			return "frontier";
 		}
 		return resolveAvailable("planning", resolved);
@@ -88,10 +88,7 @@ function resolveAvailable(role: RouteRole, resolved: ResolvedRuntime): RouteRole
 }
 
 function escalationTarget(resolved: ResolvedRuntime): RouteRole {
-	if (resolved.effectiveMode === "hybrid" && resolved.roles.frontier) {
-		return "frontier";
-	}
-	if (resolved.effectiveMode === "api") {
+	if (frontierBound(resolved) || resolved.effectiveMode === "api") {
 		return "frontier";
 	}
 	return "planning";
@@ -116,7 +113,7 @@ function nextTier(role: RouteRole, resolved: ResolvedRuntime): RouteRole {
 			continue;
 		}
 		if (candidate === "frontier") {
-			if (resolved.roles.frontier && resolved.effectiveMode !== "local") {
+			if (frontierBound(resolved)) {
 				return "frontier";
 			}
 			continue;

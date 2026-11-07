@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runHierarchyCommand } from "../src/core/hierarchy-command.ts";
-import { globalModelsYamlPath, loadRuntimeConfig } from "../src/core/runtime/registry.ts";
+import { globalModelsYamlPath, loadRuntimeConfig, projectModelsYamlPath } from "../src/core/runtime/registry.ts";
 import { parseRoleThinking } from "../src/core/runtime/types.ts";
 
 describe("/hierarchy", () => {
@@ -96,6 +96,29 @@ describe("/hierarchy", () => {
 		expect(after.roles.workhorse?.id).toBe("Qwen3.5-4B");
 		expect(runHierarchyCommand(agentDir, cwd, "auto")).toContain("layering auto");
 		expect(loadRuntimeConfig({ agentDir, cwd }).hierarchy.layering).toBe("auto");
+	});
+
+	it("patches project layering so a project YAML cannot keep manual after single", () => {
+		const { agentDir, cwd } = isolated();
+		mkdirSync(dirname(projectModelsYamlPath(cwd)), { recursive: true });
+		writeFileSync(
+			projectModelsYamlPath(cwd),
+			[
+				"hierarchy:",
+				"  layering: manual",
+				"roles:",
+				"  planning:",
+				"    source: local",
+				"    id: Qwen3.5-9B",
+				"    thinking: deep",
+				"",
+			].join("\n"),
+		);
+		const written = runHierarchyCommand(agentDir, cwd, "single");
+		expect(written).toContain("layering single");
+		const loaded = loadRuntimeConfig({ agentDir, cwd });
+		expect(loaded.hierarchy.layering).toBe("single");
+		expect(loaded.roles.planning).toBeUndefined();
 	});
 
 	it("clears one role with --clear", () => {

@@ -90,9 +90,20 @@ export function isLowerLadderRole(current: LadderRole, candidate: LadderRole): b
 	return ladderIndex(candidate) < ladderIndex(current);
 }
 
+export function frontierBound(resolved: ResolvedRuntime): boolean {
+	const assignment = resolved.roles.frontier;
+	if (!assignment) {
+		return false;
+	}
+	if (assignment.source !== "api") {
+		return true;
+	}
+	return resolved.effectiveMode !== "local";
+}
+
 export function roleAvailable(resolved: ResolvedRuntime, role: LadderRole): boolean {
 	if (role === "frontier") {
-		return Boolean(resolved.roles.frontier) && resolved.effectiveMode !== "local";
+		return frontierBound(resolved);
 	}
 	return Boolean(resolved.roles[role]);
 }

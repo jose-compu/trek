@@ -20,6 +20,7 @@ import {
 	isRuntimeRole,
 	isSuiteId,
 	LAYERING_EXTRA_ROLES,
+	type LayeringMode,
 	parseRoleThinking,
 	type RoleAssignment,
 	type RoleSource,
@@ -257,4 +258,35 @@ export function withClearedRole(config: RuntimeConfig, role: RuntimeRole): Runti
 		roles,
 		...(config.routing ? { routing: config.routing } : {}),
 	};
+}
+
+/** Keep project `.trek/models.yaml` from overriding a global layering write. */
+export function syncProjectLayering(cwd: string, layering: LayeringMode, clearExtras: boolean): void {
+	const path = projectModelsYamlPath(cwd);
+	if (!existsSync(path)) {
+		return;
+	}
+	let raw: unknown;
+	try {
+		raw = parse(readFileSync(path, "utf-8"));
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		throw new Error(`Cannot parse ${path}: ${message}`);
+	}
+	const record = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+	const hierarchy =
+		record.hierarchy && typeof record.hierarchy === "object" && !Array.isArray(record.hierarchy)
+			? { ...(record.hierarchy as Record<string, unknown>) }
+			: {};
+	hierarchy.layering = layering;
+	record.hierarchy = hierarchy;
+	if (clearExtras && record.roles && typeof record.roles === "object" && !Array.isArray(record.roles)) {
+		const roles = { ...(record.roles as Record<string, unknown>) };
+		for (const role of LAYERING_EXTRA_ROLES) {
+			delete roles[role];
+		}
+		record.roles = roles;
+	}
+	const body = stringify(record);
+	writeFileSync(path, body.endsWith("\n") ? body : `${body}\n`);
 }

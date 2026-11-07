@@ -120,9 +120,6 @@ export class LlamaProcessManager {
 		if (resolved.effectiveMode === "api") {
 			throw new Error("api mode does not start llama-server. Use trek models set-mode local or hybrid.");
 		}
-		if (role === "frontier") {
-			throw new Error("frontier is an API role and does not start llama-server.");
-		}
 		if (!isLocalServerRole(role)) {
 			throw new Error(`Unknown local role ${role}.`);
 		}

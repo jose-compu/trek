@@ -24,7 +24,11 @@ Configure with `trek models set-mode …`, `~/.trek/models.yaml`, project `.trek
 
 Role `thinking` is `off`, `brief`, or `deep`. YAML `true`/`on` still means deep; `false`/`off` means off. Frontier and verifier may use `source: local` or `lmstudio`. In `single`, local/hybrid resolve only Decision, Workhorse, embedding, and reranker — not Tooling, Planning, Frontier, or verifier. The escalate parser still lists Tooling as a rung until the controller rewrite.
 
+`/hierarchy` and `trek models set-layering` write `~/.trek/models.yaml`. If the project has `.trek/models.yaml`, they also patch `hierarchy.layering` there so the project file cannot keep an older value after a successful command.
+
 `/hierarchy role <role> --clear` unbinds one extra role.
+
+Frontier `source: local` starts llama-server like Planning. `source: lmstudio` uses the LM Studio endpoint. API Frontier stays hybrid/api only.
 
 ## Ladder
 
@@ -37,7 +41,7 @@ Decision  →  Tooling  →  Workhorse  →  Planning  →  Frontier
 2. **Tooling** — Small generative model for mechanical tool calls (`read` / `bash` / simple edits). Law 1 read-before-write does **not** apply (fast mechanical edits).
 3. **Workhorse** — Default Act model for builds and multi-step tool work. Read-before-write enforced.
 4. **Planning** — Thinking / plan brief; may act after elevation. Read-before-write enforced.
-5. **Frontier** — Hybrid only. Deep debug, research, hard architecture. Read-before-write enforced.
+5. **Frontier** — Deep debug, research, hard architecture. Default is API (hybrid). `source: local` or `lmstudio` is allowed. Read-before-write enforced.
 
 **Policy:** new sessions and idle LFM/hybrid consoles park on **Decision** (footer shows d1). Generative work routes Decision → Tooling. After a climb, the floor **sticks** for the same topic until a new topic, an escalate, or a descalate.
 

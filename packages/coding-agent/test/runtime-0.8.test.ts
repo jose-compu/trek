@@ -36,6 +36,7 @@ import {
 	sessionLocalRoles,
 	summarizePerformance,
 	withHierarchy,
+	withRoleOverride,
 	writeRuntimeConfigFile,
 } from "../src/core/runtime/index.ts";
 import { handleModelsCommand } from "../src/models-cli.ts";
@@ -399,6 +400,33 @@ describe("0.8.0 runtime gate (#92)", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	it("starts a local Frontier llama-server when the role is assigned locally", () => {
+		const resolved = resolveRuntime(
+			withRoleOverride(localConfig(), "frontier", {
+				source: "local",
+				id: "Ministral-3-8B-Reasoning-2512",
+				thinking: "deep",
+			}),
+			{ frontier: null },
+		);
+		expect(resolved.roles.frontier?.source).toBe("local");
+		const calls: string[] = [];
+		const manager = new LlamaProcessManager({
+			spawn: (request) => {
+				calls.push(request.role);
+				return { pid: 9 };
+			},
+			allocatePort: createPortAllocator(18100),
+			binaryAvailable: () => true,
+			weightsAvailable: () => true,
+		});
+		const handle = manager.ensure("frontier", resolved);
+		expect(handle.role).toBe("frontier");
+		expect(handle.modelId).toBe("Ministral-3-8B-Reasoning-2512");
+		expect(calls).toEqual(["frontier"]);
+		expect(() => manager.ensure("frontier", resolved)).not.toThrow();
 	});
 
 	it("single local resolve binds Workhorse only, not Tooling or Planning", () => {
