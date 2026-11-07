@@ -6,7 +6,7 @@ Trek can run one API chat model, or a local / hybrid **ladder** of roles. Each t
 
 | Mode | Behavior |
 | --- | --- |
-| `api` | Single session Frontier (configured provider). No llama.cpp. Decision optional later via Liquid API. |
+| `api` | Factory `single`: one session Frontier. `layering: auto` with bound Workhorse climbs remote SKUs. No llama.cpp. Decision optional later via Liquid API. |
 | `local` | Decision → Workhorse → Planning. Tooling is a runner. No Frontier. |
 | `hybrid` | Same as local, plus Frontier (API) at the top. |
 

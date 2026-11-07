@@ -145,9 +145,9 @@ export function roleAvailable(resolved: ResolvedRuntime, role: LadderRole): bool
 	return Boolean(resolved.roles[role]);
 }
 
-/** Lowest assigned climb role. Local/hybrid start on Workhorse. */
+/** Lowest assigned climb role. Bound Workhorse starts the climb, including layered api. */
 export function startLadderRole(resolved: ResolvedRuntime): LadderRole {
-	if (resolved.effectiveMode === "api") {
+	if (resolved.effectiveMode === "api" && !resolved.roles.workhorse) {
 		return "frontier";
 	}
 	for (const role of ESCALATION_LADDER) {

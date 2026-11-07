@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { applyAutoLayering, loadCatalogFixture, mapCatalogToRoles } from "../../../src/core/runtime/catalog-map.ts";
 import { defaultRuntimeConfig, flattenToSingle, withHierarchy } from "../../../src/core/runtime/index.ts";
 import { resolveRuntime } from "../../../src/core/runtime/resolve.ts";
+import { selectSessionRole } from "../../../src/core/runtime/select-role.ts";
 
 const catalogs = join(dirname(fileURLToPath(import.meta.url)), "fixtures/catalogs");
 
@@ -117,5 +118,27 @@ describe("catalog auto-map", () => {
 		expect(config.hierarchy.layering).toBe("single");
 		expect(config.roles.workhorse?.id).toBe("gpt-6.1-terra");
 		expect(resolveRuntime(config, { frontier: null }).roles.planning).toBeUndefined();
+	});
+
+	it("layered api climbs mapped SKUs instead of collapsing to Frontier", () => {
+		const openai = resolveRuntime(applyAutoLayering(defaultRuntimeConfig(), load("openai")), {
+			frontier: { provider: "openai", modelId: "frontier" },
+		});
+		expect(selectSessionRole({ text: "list the files", resolved: openai })).toMatchObject({
+			role: "workhorse",
+			modelId: "gpt-6.1-terra",
+		});
+		expect(selectSessionRole({ text: "debug the hard bug", resolved: openai })).toMatchObject({
+			role: "frontier",
+			modelId: "gpt-6-astra",
+		});
+		const anthropic = resolveRuntime(applyAutoLayering(defaultRuntimeConfig(), load("anthropic")), {
+			frontier: { provider: "anthropic", modelId: "frontier" },
+		});
+		expect(anthropic.roles.frontier).toBeUndefined();
+		expect(selectSessionRole({ text: "debug the hard bug", resolved: anthropic })).toMatchObject({
+			role: "planning",
+			modelId: "claude-opus-4-5",
+		});
 	});
 });

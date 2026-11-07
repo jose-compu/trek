@@ -1,6 +1,6 @@
 /**
  * Session routing. Ladder: Workhorse ⇄ Planning ⇄ Frontier.
- * Act starts on Workhorse. Tooling is a runner via delegate. api mode is one session model.
+ * Act starts on Workhorse. Tooling is a runner via delegate. Factory api is one session model; layered api climbs.
  */
 
 import { routeComponent } from "./component-router.ts";
@@ -94,7 +94,7 @@ export function selectThinkRole(input: {
 	elevateTo?: LadderRole;
 	overrides?: Parameters<typeof routeComponent>[0]["overrides"];
 }): RoleSelection | undefined {
-	if (input.resolved.effectiveMode === "api") {
+	if (input.resolved.effectiveMode === "api" && !input.resolved.roles.workhorse) {
 		return undefined;
 	}
 	if (input.elevateTo === "planning" || input.elevateTo === "frontier") {
@@ -143,7 +143,7 @@ export function selectSessionRole(input: {
 	overrides?: Parameters<typeof routeComponent>[0]["overrides"];
 }): RoleSelection {
 	const { resolved } = input;
-	if (resolved.effectiveMode === "api") {
+	if (resolved.effectiveMode === "api" && !resolved.roles.workhorse) {
 		return routeComponent({
 			component: "toolIntent",
 			resolved,

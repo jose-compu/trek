@@ -149,7 +149,7 @@ function setLayering(rest: string[]): boolean {
 	if (mode === "auto") {
 		const catalogPath = flagValue(rest, "--catalog");
 		if (catalogPath) {
-			next = applyAutoLayering(current, loadCatalogFixture(catalogPath));
+			next = applyAutoLayering(next, loadCatalogFixture(catalogPath));
 		}
 	}
 	writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), next);

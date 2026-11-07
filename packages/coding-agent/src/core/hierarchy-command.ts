@@ -104,7 +104,7 @@ function setLayering(
 	if (mode === "auto") {
 		const catalogPath = flagValue(rest, "--catalog");
 		if (catalogPath) {
-			next = applyAutoLayering(current, loadCatalogFixture(catalogPath));
+			next = applyAutoLayering(next, loadCatalogFixture(catalogPath));
 		}
 	}
 	writeRuntimeConfigFile(path, next);
