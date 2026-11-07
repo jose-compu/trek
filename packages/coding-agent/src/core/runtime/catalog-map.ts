@@ -149,6 +149,7 @@ export function applyAutoLayering(config: RuntimeConfig, catalog: CatalogFixture
 	}
 	Object.assign(roles, mapped.roles);
 	const hierarchy = { ...config.hierarchy, layering: "auto" as const };
+	// Full remap: auto --catalog replaces prior --clear unbinds for mapped slots.
 	delete hierarchy.unbound;
 	return {
 		hierarchy,

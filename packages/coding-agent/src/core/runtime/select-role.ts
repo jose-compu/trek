@@ -205,10 +205,7 @@ export function sessionRoleForModel(
 	resolved: ResolvedRuntime,
 	model: { provider?: string; id?: string; name?: string } | undefined,
 ): RoleSelection["role"] | undefined {
-	if (!model || (model.provider !== "local" && model.provider !== "lmstudio")) {
-		if (model?.provider && model.provider !== "local") {
-			return resolved.roles.frontier ? "frontier" : undefined;
-		}
+	if (!model) {
 		return undefined;
 	}
 	for (const role of ["frontier", "planning", "workhorse", "tooling"] as const) {
@@ -219,6 +216,9 @@ export function sessionRoleForModel(
 		if (model.name === id || model.id === id || model.id?.endsWith(`/${id}`) || model.id?.endsWith(`${id}.gguf`)) {
 			return role;
 		}
+	}
+	if (model.provider && model.provider !== "local" && model.provider !== "lmstudio") {
+		return resolved.roles.workhorse ? undefined : resolved.roles.frontier ? "frontier" : undefined;
 	}
 	return undefined;
 }

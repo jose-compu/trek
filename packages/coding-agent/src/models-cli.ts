@@ -149,7 +149,13 @@ function setLayering(rest: string[]): boolean {
 	if (mode === "auto") {
 		const catalogPath = flagValue(rest, "--catalog");
 		if (catalogPath) {
-			next = applyAutoLayering(next, loadCatalogFixture(catalogPath));
+			try {
+				next = applyAutoLayering(next, loadCatalogFixture(catalogPath));
+			} catch (error) {
+				console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+				process.exitCode = 1;
+				return true;
+			}
 		}
 	}
 	writeRuntimeConfigFile(globalModelsYamlPath(getAgentDir()), next);

@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { applyAutoLayering, loadCatalogFixture, mapCatalogToRoles } from "../../../src/core/runtime/catalog-map.ts";
 import { defaultRuntimeConfig, flattenToSingle, withHierarchy } from "../../../src/core/runtime/index.ts";
 import { resolveRuntime } from "../../../src/core/runtime/resolve.ts";
-import { selectSessionRole } from "../../../src/core/runtime/select-role.ts";
+import { selectSessionRole, sessionRoleForModel } from "../../../src/core/runtime/select-role.ts";
 
 const catalogs = join(dirname(fileURLToPath(import.meta.url)), "fixtures/catalogs");
 
@@ -140,5 +140,8 @@ describe("catalog auto-map", () => {
 			role: "planning",
 			modelId: "claude-opus-4-5",
 		});
+		expect(sessionRoleForModel(openai, { provider: "openai", id: "gpt-6.1-terra" })).toBe("workhorse");
+		expect(sessionRoleForModel(openai, { provider: "openai", id: "gpt-6.1-sol" })).toBe("planning");
+		expect(sessionRoleForModel(openai, { provider: "openai", id: "unrelated" })).toBeUndefined();
 	});
 });
