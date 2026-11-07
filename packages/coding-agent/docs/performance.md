@@ -2,7 +2,7 @@
 
 Agent-side latency. Model and network time that cannot be halved is a written exception. The release gate is wall clock from Enter to a finished answer on the faux-provider e2e script.
 
-Package versions stay **0.16.1** until the 0.17.0 tag. This page matches `main`.
+Package versions are **0.17.0**. This page matches the tagged release.
 
 ## Commands
 
