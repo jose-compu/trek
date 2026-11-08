@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+	formatHandoffBrief,
 	HANDOFF_BRIEF_JSON_SCHEMA,
 	jsonSchemaHasLengthKeywords,
 	LAYER_DECISION_JSON_SCHEMA,
@@ -93,6 +94,18 @@ describe("handoff brief and LayerSubtaskResult", () => {
 		});
 		expect(brief?.goal).toBe("find the leak");
 		expect(brief?.openQuestion).toMatch(/handle/);
+		expect(
+			formatHandoffBrief(
+				{
+					goal: "Architect a migration.",
+					constraints: "not in the turn",
+					tried: "not in the turn",
+					evidence: [],
+					openQuestion: "not in the turn",
+				},
+				{ omitEmpty: true },
+			),
+		).toBe("goal: Architect a migration.");
 	});
 
 	it("parses a Grok labeled one-liner into the same five fields", () => {

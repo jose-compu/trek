@@ -4,6 +4,8 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-11-08
+
 ### Fixed
 
 - Ladder control JSON (`{"descalate":…}`, LayerDecision escalate/delegate) is hidden in the console. The dim `↑` / `↓` / `→` line stays.
@@ -16,6 +18,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 - `layer-consult` continues on Frontier with a real consult, then restores the prior floor. Mute handoff JSON that echoes “Consult only” does not climb again.
 - `descalate to tooling` binds the Tooling runner. It does not drop Workhorse to Decision. The word “descalate” in a handoff is not a soft ladder drop.
 - Mute internal steps do not climb or drop the ladder. A parsed handoff brief survives the Planning climb.
+- Honesty status is one card on the final reply. Internal workflow steps do not print it.
+- Workflows keep the original user prompt at the top. Handoff JSON renders as labeled lines, not a raw object.
+- After `descalate to tooling` / delegate, the footer stays on Tooling for that turn. Role bind no longer overwrites it back to Workhorse.
+- Named climbs (`use planning`, `swith to planning`) bind that SKU. Soft intent uses the Decision chat SKU (`planning|tooling|workhorse|same-topic|new-topic`); Jaccard no longer drops the floor. Workhorse stays the actor unless the user names a climb, a tool fails, or live Decision returns `planning`.
 
 ### Added
 

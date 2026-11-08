@@ -241,9 +241,11 @@ import {
 	parseEscalateAsk,
 	parseEscalateSignal,
 	prevLadderRole,
+	shouldRebindSessionRole,
 	startLadderRole,
 	stripEscalateSignal,
 } from "./runtime/escalate.ts";
+import { parseControlAsk } from "./runtime/layer-control.ts";
 import {
 	climbHandoffBrief,
 	type HandoffBrief,
@@ -252,6 +254,12 @@ import {
 	tryParseLayerDecision,
 } from "./runtime/layer-decision.ts";
 import { layerContinuePrompt, layerContinueTarget, runLayerWorkflow } from "./runtime/layer-execute.ts";
+import {
+	type LayerIntent,
+	layerIntentPrompt,
+	parseLayerIntentReply,
+	shouldAskDecisionIntent,
+} from "./runtime/layer-intent.ts";
 import {
 	layeringNetworkSection,
 	shouldAutoDelegateLiveNetwork,
@@ -268,7 +276,7 @@ import {
 import { localLlamaChatModel } from "./runtime/local-llama-model.ts";
 import { LMSTUDIO_PROVIDER, LOCAL_LLAMA_PROVIDER, lmStudioChatModel } from "./runtime/local-model.ts";
 import { LOCAL_SUITE_WORK_SECTION } from "./runtime/local-work.ts";
-import { detectTopicReset, parseNewTopicSignal, stripNewTopicSignal } from "./runtime/new-topic.ts";
+import { detectTopicReset, parseNewTopicSignal, stripNewTopicSignal, type TopicReset } from "./runtime/new-topic.ts";
 import {
 	applyPlanBlock,
 	extractPlanBody,
@@ -2897,6 +2905,8 @@ export class AgentSession {
 	private _verifierDecision?: LayerDecision;
 	/** Last trek:layer_route action this prompt (climb/route). */
 	private _turnLayerAction?: string;
+	/** Soft Decision/heuristic intent for this prompt (named control wins). */
+	private _layerIntent?: LayerIntent;
 	private _verifierDeniedThisTurn = false;
 	/** Idle on Decision until the first prompt routes to Workhorse. */
 	private _parkedOnDecision = false;
@@ -2932,6 +2942,9 @@ export class AgentSession {
 	 * PI_NO_LOCAL_LLM=1 keeps the session model, so the CI suite does not spawn llama.cpp.
 	 */
 	private async _bindLocalCompletion(text: string, options?: { keepDecisionDisplay?: boolean }): Promise<void> {
+		if (!shouldRebindSessionRole(this._turnLayerAction)) {
+			return;
+		}
 		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
 			return;
 		}
@@ -3509,6 +3522,9 @@ export class AgentSession {
 	}
 
 	private async _maybeDelegateLiveNetwork(task: string): Promise<void> {
+		if (!shouldRebindSessionRole(this._turnLayerAction)) {
+			return;
+		}
 		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
 			return;
 		}
@@ -3517,6 +3533,57 @@ export class AgentSession {
 			return;
 		}
 		await this._delegateToTooling("live fetch");
+	}
+
+	/** API Decision SKU classifies ambiguous follow-ups. CI and local d1 stay heuristic. */
+	private async _maybeClassifyLayerIntent(previous: string, next: string): Promise<LayerIntent | undefined> {
+		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			return undefined;
+		}
+		if (!shouldAskDecisionIntent(previous, next)) {
+			return undefined;
+		}
+		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const decision = resolved.roles.decision;
+		if (!decision || decision.source !== "api") {
+			return undefined;
+		}
+		const mapped = this._apiRoleModel(decision.provider, decision.id);
+		if (!mapped) {
+			return undefined;
+		}
+		try {
+			const raw = await this._sideCallLayerIntent(mapped, layerIntentPrompt(previous, next));
+			return parseLayerIntentReply(raw);
+		} catch (error) {
+			debugLog("runtime", "layer intent classify failed", {
+				error: error instanceof Error ? error.message : String(error),
+			});
+			return undefined;
+		}
+	}
+
+	private async _sideCallLayerIntent(model: Model<any>, prompt: string): Promise<string> {
+		const auth = await this._getCompactionRequestAuth(model);
+		const reply = await completeSimple(
+			model,
+			{
+				systemPrompt: "You classify Trek layer intent. Reply with JSON only.",
+				messages: [{ role: "user", content: [{ type: "text", text: prompt }], timestamp: Date.now() }],
+			},
+			{
+				apiKey: auth.apiKey,
+				headers: auth.headers,
+				maxTokens: 48,
+				temperature: 0,
+				signal: AbortSignal.timeout(8_000),
+			},
+		);
+		const text = reply.content
+			.filter((part): part is TextContent => part.type === "text")
+			.map((part) => part.text)
+			.join("\n");
+		return stripHonestyFooter(text).trim();
 	}
 
 	/** User named Tooling. Bind the runner; do not drop the climb floor to Decision. */
@@ -4967,15 +5034,27 @@ export class AgentSession {
 
 			// Topic/task reset before any bind so sticky Planning/Frontier cannot stick.
 			const previousTask = this._previousTask;
-			const topicReset = detectTopicReset(previousTask, expandedText);
+			let topicReset: TopicReset = detectTopicReset(previousTask, expandedText);
 			expandedText = stripNewTopicSignal(expandedText);
 			this._previousTask = expandedText;
 			this._toolsSincePlan = 0;
 			this._planningBriefActive = false;
 			this._toolErrorStreak = 0;
 			this._pendingElevate = undefined;
-			const runDecision = topicReset.reset || this._parkedOnDecision || !this._lastHierarchyRole;
-			if (topicReset.reset) {
+			this._layerIntent = undefined;
+			const control = parseControlAsk(expandedText);
+			if (!control) {
+				const intent = await this._maybeClassifyLayerIntent(previousTask, expandedText);
+				this._layerIntent = intent;
+				if (intent === "new-topic") {
+					topicReset = { reset: true, reason: "intent-shift", label: "task changed" };
+				} else if (intent === "planning") {
+					this._pendingElevate = { tier: "planning", why: "decision intent" };
+				}
+			}
+			const holdFloor = Boolean(control) || Boolean(this._pendingElevate);
+			const runDecision = !holdFloor && (topicReset.reset || this._parkedOnDecision || !this._lastHierarchyRole);
+			if (topicReset.reset && !holdFloor) {
 				this._resetLadderForNewTopic(topicReset.label ?? "new topic");
 			} else if (!runDecision && this._lastHierarchyRole) {
 				this._ladderRole = this._lastHierarchyRole;
@@ -5088,6 +5167,9 @@ export class AgentSession {
 				}
 			}
 			await this._maybeUserDelegate(expandedText);
+			if (this._layerIntent === "tooling" && this._turnLayerAction !== "delegate") {
+				await this._delegateToTooling("decision intent");
+			}
 			// Explicit user descalate yields sticky floor before brief/bind.
 			await this._maybeUserDescalate(expandedText);
 			await this._attachPlanningBrief(expandedText);

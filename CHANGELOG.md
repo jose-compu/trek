@@ -1,10 +1,12 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.18.0`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.18.1`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.18.1] - 2026-11-08
 
 ### Changed
 
@@ -22,6 +24,8 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 - Archon workflows use `when:`, `trigger_rule`, `loop`, `output_format`, and `allowed_tools` on layer-* and all domain DAGs.
 - Independent Archon waves use cpa-agents in parallel. The shared session agent stays sequential. `layer-hypotheses` fans out three theories.
 - Static Archon × subtask fixtures cover hypotheses fan-out, escalate handoff, parallel runners, and consult/descalate/finance compose.
+- Delegate/descalate to Tooling keeps `tooling · <sku>` in the lower-right footer for that turn.
+- Named climbs stay on that SKU. Soft intent uses Decision; Jaccard no longer drops the floor. Workhorse stays the actor until a named climb, a failure, or live Decision `planning`.
 
 ## [0.18.0] - 2026-11-07
 

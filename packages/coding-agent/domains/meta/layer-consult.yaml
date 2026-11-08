@@ -8,7 +8,8 @@ nodes:
     allowed_tools: []
     output_type: findings
     prompt: |
-      Fill goal, constraints, what was tried, evidence, and the open question for: $USER_MESSAGE
+      Write labeled lines (goal, constraints, tried, evidence, open question) for: $USER_MESSAGE
+      Do not write JSON.
   - id: diagnose
     role: frontier
     effort: high

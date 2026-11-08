@@ -4,6 +4,7 @@
  * Climb on escalate/stuck/failures; drop on descalate or new topic (→ Decision).
  */
 
+import { isControlPrompt, parseControlAsk } from "./layer-control.ts";
 import { parseLayerDecision } from "./layer-decision.ts";
 import type { ResolvedRuntime } from "./resolve.ts";
 
@@ -75,10 +76,6 @@ const DELEGATE_JSON = /\{\s*"(?:delegate|action)"\s*:\s*"(?:delegate|tooling)"[\
 
 const DELEGATE_LOOSE = /\b(?:delegate|hand off) to tooling\b|"target"\s*:\s*"tooling"/i;
 
-/** User names the Tooling runner. Not a ladder drop, not a climb. */
-const USER_DELEGATE =
-	/(?:^|\s)(?:(?:\/)?(?:delegate|descalate|use|move|switch|go|hand\s*off)(?:\s+(?:layering|the\s+ladder))?(?:\s+to)?(?:\s+the)?\s+tooling(?:\s+model)?)\b/i;
-
 // Soft stuck only — do NOT match "Escalate to tooling? No." (tiny models refuse and babble).
 const STUCK =
 	/\b(i(?:'m| am) (?:stuck|unsure|confused)|need (?:a )?(?:plan|help|guidance|stronger model)|too (?:hard|complex|ambiguous)|cannot (?:decide|design|architect)|escalation needed|please escalate|ask (?:planning|workhorse|frontier)|hand off to (?:planning|frontier|workhorse))\b/i;
@@ -86,18 +83,6 @@ const STUCK =
 /** Soft drop — Planning/Frontier handing simple remaining work down. Not a Tooling bind. */
 const SIMPLE_AGAIN =
 	/\b(this is (?:simple|easy|trivial)|simple (?:edit|fix|typo|rename)|hand off to workhorse|please descalate|descalat(?:e|ion) needed|too (?:much|heavy|strong) (?:a )?model|overkill|drop (?:to|down)|go back to (?:workhorse|decision)|new topic(?:\s+now)?|user switched (?:task|topic))\b/i;
-
-/** User asks to drop a tier (or to a named lower role). "use tooling" is a runner, not a drop. */
-const USER_DESCALATE =
-	/^(?:\/descalate\b(?!\s+to\s+tooling)|descalate(?!\s+to\s+tooling)(?:\s+to\s+(?:workhorse|planning|decision))?|(?:use|move(?:\s+to)?|switch(?:\s+to)?|go(?:\s+to)?)(?:\s+the)?\s+workhorse(?:\s+model)?|go back to (?:workhorse|decision)|simpler model|↓\s*(?:workhorse|planning|decision)?)\b/i;
-
-/** User asked to climb (not a model stuck-phrase). Tooling is never a climb. */
-const USER_ESCALATE =
-	/(?:^|\s)(?:\/(planning|frontier)\b|e?s?calate(?:\s+(?:layering|the\s+ladder))?(?:\s+to)?\s+(?:the\s+)?(planning|frontier)|consult(?:\s+only|\s+(frontier|planning))|(?:move|switch|go|use)(?:\s+to)?(?:\s+the)?\s+(planning|frontier)(?:\s+(?:grok\s+)?model)?)\b/i;
-
-/** Prompt only names a ladder tier — not a new coding task. */
-const LADDER_NAV =
-	/(?:^|\s)(?:\/(?:planning|frontier|workhorse|descalate|escalate)\b|descalate(?:\s+to\s+(?:workhorse|planning|decision))?|go back to (?:workhorse|decision)|e?s?calate(?:\s+(?:layering|the\s+ladder))?(?:\s+to)?\s+(?:the\s+)?(?:planning|frontier|workhorse)|consult(?:\s+only|\s+(?:frontier|planning))|(?:move|switch|go|use)(?:\s+to)?(?:\s+the)?\s+(?:planning|frontier|workhorse)(?:\s+(?:grok\s+)?model)?)\b/i;
 
 export type DescalateTarget = LadderRole | "next" | "decision";
 
@@ -107,16 +92,7 @@ export function isLadderRole(value: string): value is LadderRole {
 
 /** User asked to move the session between Workhorse / Planning / Frontier. */
 export function isLadderNavPrompt(text: string): boolean {
-	return LADDER_NAV.test(text.trim());
-}
-
-function namedClimb(match: RegExpMatchArray): LadderRole {
-	for (const group of match.slice(1)) {
-		if (group === "planning" || group === "frontier") {
-			return group;
-		}
-	}
-	return "frontier";
+	return isControlPrompt(text);
 }
 
 export function ladderIndex(role: LadderRole): number {
@@ -276,6 +252,14 @@ export function resolveDescalateTarget(
 	return prevLadderRole(current, resolved) ?? "decision";
 }
 
+/**
+ * After an explicit Tooling delegate, skip `selectSessionRole` bind.
+ * Bind re-picks Workhorse from the user text and overwrites the footer SKU.
+ */
+export function shouldRebindSessionRole(turnLayerAction: string | undefined): boolean {
+	return turnLayerAction !== "delegate";
+}
+
 export function parseDelegateAsk(text: string): DelegateAsk | undefined {
 	const trimmed = text.trim();
 	if (!trimmed) {
@@ -289,8 +273,12 @@ export function parseDelegateAsk(text: string): DelegateAsk | undefined {
 			explicit: true,
 		};
 	}
-	if (USER_DELEGATE.test(trimmed) || DELEGATE_JSON.test(trimmed) || DELEGATE_LOOSE.test(trimmed)) {
+	if (DELEGATE_JSON.test(trimmed) || DELEGATE_LOOSE.test(trimmed)) {
 		return { target: "tooling", why: "delegate to tooling", explicit: true };
+	}
+	const control = parseControlAsk(trimmed);
+	if (control?.kind === "delegate") {
+		return { target: "tooling", why: control.why, explicit: true };
 	}
 	return undefined;
 }
@@ -314,10 +302,9 @@ export function parseEscalateAsk(text: string, source: "user" | "model" = "user"
 		return { requested, why, explicit: true };
 	}
 	if (source === "user") {
-		const user = trimmed.match(USER_ESCALATE);
-		if (user) {
-			const named = namedClimb(user);
-			return { requested: named, why: "user requested elevation", explicit: true };
+		const control = parseControlAsk(trimmed);
+		if (control?.kind === "climb") {
+			return { requested: control.role, why: control.why, explicit: true };
 		}
 		return undefined;
 	}
@@ -347,14 +334,11 @@ export function parseDescalateAsk(text: string): DescalateAsk | undefined {
 		}
 		return undefined;
 	}
-	if (USER_DESCALATE.test(trimmed)) {
-		if (/\bdecision\b/i.test(trimmed)) {
-			return { requested: "decision", why: "user requested descalation", explicit: true };
-		}
-		const named = trimmed.match(/\b(workhorse|planning)\b/i)?.[1]?.toLowerCase();
+	const control = parseControlAsk(trimmed);
+	if (control?.kind === "drop") {
 		return {
-			requested: named && isLadderRole(named) ? named : "next",
-			why: "user requested descalation",
+			requested: control.role,
+			why: control.why,
 			explicit: true,
 		};
 	}

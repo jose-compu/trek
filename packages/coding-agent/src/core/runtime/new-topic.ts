@@ -1,14 +1,14 @@
-import { isLadderNavPrompt } from "./escalate.ts";
+import { parseControlAsk } from "./layer-control.ts";
 
 /**
  * Detect when the user resets the topic/task so the ladder can descalate
  * back to Decision (lowest), then route Tooling for the new generative turn.
  *
  * Stickiness: same-topic follow-ups keep the climbed floor. A reset must be
- * explicit, signaled, or clearly a different intent (low overlap / done→new).
+ * explicit, signaled, done→new, or a live Decision `new-topic` intent.
  */
 
-export type TopicResetReason = "first" | "explicit" | "signal" | "low-overlap" | "done-then-new" | "intent-shift";
+export type TopicResetReason = "first" | "explicit" | "signal" | "done-then-new" | "intent-shift";
 
 export interface TopicReset {
 	reset: boolean;
@@ -44,7 +44,6 @@ const LABEL: Record<TopicResetReason, string> = {
 	first: "new session",
 	explicit: "new topic",
 	signal: "new topic signal",
-	"low-overlap": "new topic",
 	"done-then-new": "task done",
 	"intent-shift": "task changed",
 };
@@ -114,17 +113,21 @@ export function detectTopicReset(previous: string, next: string): TopicReset {
 	if (!curr) {
 		return { reset: false };
 	}
+	const control = parseControlAsk(curr);
+	if (control?.kind === "climb" || control?.kind === "delegate") {
+		return { reset: false };
+	}
 	if (!prev) {
 		return hit("first");
-	}
-	if (isLadderNavPrompt(curr)) {
-		return { reset: false };
 	}
 	if (parseNewTopicSignal(curr)) {
 		return hit("signal");
 	}
 	if (EXPLICIT_NEW.test(curr)) {
 		return hit("explicit");
+	}
+	if (control) {
+		return { reset: false };
 	}
 	if (CONTINUATION.test(curr) || CAPABILITY.test(curr)) {
 		return { reset: false };
@@ -149,22 +152,6 @@ export function detectTopicReset(previous: string, next: string): TopicReset {
 		return hit("done-then-new");
 	}
 
-	// Short, zero-overlap imperative with no anaphora → new task.
-	if (currImperative && overlap === 0 && curr.length >= 12 && !SHORT_REF.test(curr)) {
-		return hit("intent-shift");
-	}
-
-	// Both look like tasks, no shared files, weak lexical overlap.
-	if (currImperative && IMPERATIVE.test(prev) && overlap < 0.18 && curr.length >= 16) {
-		return hit("intent-shift");
-	}
-
-	if (curr.length >= 24 && overlap < 0.12) {
-		return hit("low-overlap");
-	}
-	if (curr.length >= 80 && overlap < 0.2) {
-		return hit("low-overlap");
-	}
 	return { reset: false };
 }
 

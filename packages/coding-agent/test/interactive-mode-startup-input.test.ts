@@ -123,4 +123,28 @@ describe("InteractiveMode startup input", () => {
 		expect(interactiveModePrototype.consumeEarlyPrompt.call(context, "<skill>close</skill>")).toBe(false);
 		expect(children).toEqual([]);
 	});
+
+	it("keeps the original prompt when a workflow step arrives", () => {
+		const component = { id: "prompt" };
+		const spacer = { id: "spacer" };
+		const children: object[] = [spacer, component];
+		const context: EarlyPromptContext = {
+			earlyPrompt: {
+				text: "consult frontier. Architect a migration. Consult only.",
+				spacer,
+				component,
+			},
+			chatContainer: {
+				children,
+				removeChild(child) {
+					const index = children.indexOf(child);
+					if (index !== -1) children.splice(index, 1);
+				},
+			},
+		};
+		const step = ["Answer this step only.", "", "Step handoff-brief:", "Write labeled lines."].join("\n");
+		expect(interactiveModePrototype.consumeEarlyPrompt.call(context, step)).toBe(false);
+		expect(children).toEqual([spacer, component]);
+		expect(context.earlyPrompt?.text).toMatch(/consult frontier/);
+	});
 });

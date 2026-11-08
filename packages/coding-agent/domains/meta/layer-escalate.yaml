@@ -7,18 +7,9 @@ nodes:
     effort: low
     allowed_tools: []
     output_type: findings
-    output_format:
-      type: object
-      additionalProperties: false
-      required: [goal, constraints, tried, evidence, openQuestion]
-      properties:
-        goal: { type: string }
-        constraints: { type: string }
-        tried: { type: string }
-        evidence: { type: array, items: { type: string } }
-        openQuestion: { type: string }
     prompt: |
-      Fill goal, constraints, what was tried, evidence, and the open question for: $USER_MESSAGE
+      Write labeled lines (goal, constraints, tried, evidence, open question) for: $USER_MESSAGE
+      Do not write JSON.
   - id: plan
     role: planning
     effort: high

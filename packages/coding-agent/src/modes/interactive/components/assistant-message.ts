@@ -3,6 +3,7 @@ import { isContextOverflow } from "@trek/ai";
 import { type Component, Container, Markdown, type MarkdownTheme, Spacer, Text } from "@trek/tui";
 import { honestyDisplay, stripHonestyFooter } from "../../../core/honesty/index.ts";
 import { stripEscalateSignal } from "../../../core/runtime/escalate.ts";
+import { formatHandoffBrief, parseHandoffBriefFromText } from "../../../core/runtime/layer-decision.ts";
 import { thinkingCardTitle, thinkingCardViewport } from "../../../core/runtime/thinking-brief.ts";
 import { getMarkdownTheme, theme } from "../theme/theme.ts";
 import { cardGlyph } from "./card-glyph.ts";
@@ -64,7 +65,15 @@ class CompactThinkingViewport implements Component {
 }
 
 function visibleAssistantText(text: string): string {
-	return stripEscalateSignal(stripHonestyFooter(text)).trim();
+	const stripped = stripEscalateSignal(stripHonestyFooter(text)).trim();
+	if (!stripped.startsWith("{")) {
+		return stripped;
+	}
+	const brief = parseHandoffBriefFromText(stripped);
+	if (brief) {
+		return formatHandoffBrief(brief, { omitEmpty: true });
+	}
+	return stripped;
 }
 
 function collectTrimmedTextBlocks(content: AssistantMessage["content"]): string[] {
@@ -190,7 +199,7 @@ export class AssistantMessageComponent extends Container {
 					continue;
 				}
 				this.contentContainer.addChild(new Markdown(visible, 1, 0, this.markdownTheme));
-				const status = honestyDisplay(content.text);
+				const status = this.omitThinking ? undefined : honestyDisplay(content.text);
 				if (status) {
 					for (const line of honestyCardLines(status)) {
 						this.contentContainer.addChild(new Text(line, 1, 0));

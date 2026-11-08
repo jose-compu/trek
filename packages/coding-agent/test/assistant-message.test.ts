@@ -114,7 +114,10 @@ describe("AssistantMessageComponent", () => {
 		const component = new AssistantMessageComponent(
 			createAssistantMessage([
 				{ type: "thinking", thinking: "I must answer this Archon node in one line." },
-				{ type: "text", text: "Named remaining steps." },
+				{
+					type: "text",
+					text: "Named remaining steps.\n<honesty>\nconfidence: medium\nassumption: none\nunverified: none\n</honesty>",
+				},
 			]),
 			false,
 			getMarkdownTheme(),
@@ -127,6 +130,23 @@ describe("AssistantMessageComponent", () => {
 		expect(rendered).toContain("Named remaining steps.");
 		expect(rendered).not.toContain("Archon");
 		expect(rendered).not.toContain("thinking");
+		expect(rendered).not.toContain("honesty");
+	});
+
+	test("renders a handoff JSON object as labeled lines", () => {
+		initTheme("dark");
+		const component = new AssistantMessageComponent(
+			createAssistantMessage([
+				{
+					type: "text",
+					text: '{"goal":"Architect a zero-downtime migration.","constraints":"not in the turn","tried":"not in the turn","evidence":[],"openQuestion":"not in the turn"}',
+				},
+			]),
+		);
+		const rendered = component.render(80).join("\n");
+		expect(rendered).toContain("goal: Architect a zero-downtime migration.");
+		expect(rendered).not.toContain('"constraints"');
+		expect(rendered).not.toContain("not in the turn");
 	});
 
 	test("thinking briefly uses a compact title and a 1–2 line viewport", () => {

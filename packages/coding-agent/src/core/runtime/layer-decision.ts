@@ -205,14 +205,29 @@ export function parseHandoffBriefFromText(text: string): HandoffBrief | undefine
 	});
 }
 
-export function formatHandoffBrief(brief: HandoffBrief): string {
-	return [
-		`goal: ${brief.goal}`,
-		`constraints: ${brief.constraints}`,
-		`tried: ${brief.tried}`,
-		`evidence: ${brief.evidence.join("; ") || "(none)"}`,
-		`open question: ${brief.openQuestion}`,
-	].join("\n");
+const HANDOFF_PLACEHOLDER = /^(not in the turn|not in turn)$/i;
+
+function isHandoffPlaceholder(value: string): boolean {
+	return value.trim().length === 0 || HANDOFF_PLACEHOLDER.test(value.trim());
+}
+
+export function formatHandoffBrief(brief: HandoffBrief, options?: { omitEmpty?: boolean }): string {
+	const lines: string[] = [];
+	const push = (label: string, value: string): void => {
+		if (options?.omitEmpty && isHandoffPlaceholder(value)) {
+			return;
+		}
+		lines.push(`${label}: ${value}`);
+	};
+	push("goal", brief.goal);
+	push("constraints", brief.constraints);
+	push("tried", brief.tried);
+	const evidence = brief.evidence.filter((item) => !isHandoffPlaceholder(item));
+	if (!options?.omitEmpty || evidence.length > 0) {
+		lines.push(`evidence: ${evidence.join("; ") || "(none)"}`);
+	}
+	push("open question", brief.openQuestion);
+	return lines.join("\n");
 }
 
 export function tryLayerSubtaskResult(text: string): LayerSubtaskResult | undefined {

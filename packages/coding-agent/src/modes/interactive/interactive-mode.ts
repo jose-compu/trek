@@ -132,7 +132,7 @@ import { SkillInvocationMessageComponent } from "./components/skill-invocation-m
 import { ToolExecutionComponent } from "./components/tool-execution.ts";
 import { TreeSelectorComponent } from "./components/tree-selector.ts";
 import { UndoSelectorComponent } from "./components/undo-selector.ts";
-import { UserMessageComponent } from "./components/user-message.ts";
+import { quietArchonLabel, UserMessageComponent } from "./components/user-message.ts";
 import { UserMessageSelectorComponent } from "./components/user-message-selector.ts";
 import {
 	getAvailableThemes,
@@ -1905,6 +1905,7 @@ export class InteractiveMode {
 	private consumeEarlyPrompt(text: string): boolean {
 		const early = this.earlyPrompt;
 		if (!early) return false;
+		if (quietArchonLabel(text)) return false;
 		this.earlyPrompt = undefined;
 		const stillShown = this.chatContainer.children.includes(early.component);
 		if (stillShown && (early.text === text || text.length === 0)) return true;

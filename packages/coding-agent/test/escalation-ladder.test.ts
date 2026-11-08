@@ -27,6 +27,7 @@ import {
 	resolveRuntime,
 	selectSessionRole,
 	selectThinkRole,
+	shouldRebindSessionRole,
 	startLadderRole,
 	stripEscalateSignal,
 	withHierarchy,
@@ -156,6 +157,17 @@ describe("escalation ladder", () => {
 		expect(isLadderNavPrompt("descalate to workhorse.")).toBe(true);
 		expect(isLadderNavPrompt("go back to decision")).toBe(true);
 		expect(isLadderNavPrompt("build a tetris game in js")).toBe(false);
+		const trip = "swith to planning model to plan a trip to eiffel tower pls";
+		expect(parseEscalateAsk(trip)).toMatchObject({ requested: "planning", explicit: true });
+		expect(isLadderNavPrompt(trip)).toBe(true);
+		expect(selectSessionRole({ text: trip, resolved: hybrid, ladderRole: "workhorse" }).role).toBe("planning");
+		expect(
+			selectSessionRole({
+				text: "switch to planning model to plan a trip to eiffel tower",
+				resolved: hybrid,
+				ladderRole: "workhorse",
+			}).role,
+		).toBe("planning");
 	});
 
 	it("in-tier answers do not escalate", () => {
@@ -278,6 +290,9 @@ Received arguments:
 		).toBeUndefined();
 		expect(parseDescalateSignal("descalate to tooling model", "planning", resolved)).toBeUndefined();
 		expect(formatDelegateCard("workhorse", "live fetch")).toBe("→ workhorse ⇄ tooling · live fetch");
+		expect(shouldRebindSessionRole("delegate")).toBe(false);
+		expect(shouldRebindSessionRole("escalate")).toBe(true);
+		expect(shouldRebindSessionRole(undefined)).toBe(true);
 	});
 
 	it("aliases Frontier consult to Planning when no third id is bound", () => {

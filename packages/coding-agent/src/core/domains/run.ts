@@ -244,6 +244,7 @@ function renderPrompt(
 	const lines = [
 		"Answer this step only.",
 		"One line. No preamble.",
+		"Do not write an honesty footer.",
 		toolLine,
 		"If a fact is not in the user turn, the known facts, or an earlier reply, say it is not in the turn.",
 		"",

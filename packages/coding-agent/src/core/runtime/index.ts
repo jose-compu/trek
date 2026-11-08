@@ -91,6 +91,7 @@ export {
 	resolveDescalateTarget,
 	resolveEscalateTarget,
 	roleAvailable,
+	shouldRebindSessionRole,
 	startLadderRole,
 	stripEscalateSignal,
 } from "./escalate.ts";
@@ -102,6 +103,7 @@ export {
 	type LayeringBenchmarkTrace,
 	writeLayeringBenchmarkJson,
 } from "./layer-benchmark.ts";
+export { type ControlAsk, isControlPrompt, parseControlAsk } from "./layer-control.ts";
 export {
 	climbHandoffBrief,
 	constrainDecisionRoute,
@@ -151,6 +153,14 @@ export {
 	type RunLayerWorkflowInput,
 	runLayerWorkflow,
 } from "./layer-execute.ts";
+export {
+	classifyLayerIntentHeuristic,
+	LAYER_INTENTS,
+	type LayerIntent,
+	layerIntentPrompt,
+	parseLayerIntentReply,
+	shouldAskDecisionIntent,
+} from "./layer-intent.ts";
 export {
 	LAYERING_DELEGATE_SECTION,
 	LAYERING_NETWORK_SECTION,

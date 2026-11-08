@@ -82,7 +82,9 @@ The console shows a discreet dim line: `↑ workhorse → planning · reason` or
 - `{"new_topic":true}` from user or model (current tier can request the drop),
 - `{"descalate":"decision"}`,
 - done→new (prior turn closed with thanks/done, next is a new imperative),
-- intent shift / low lexical overlap with no shared files.
+- live API Decision intent `new-topic` on an ambiguous follow-up.
+
+Named pins (`use planning`, `descalate to tooling`, including `swith`) are a closed control grammar and never count as a new topic. Lexical Jaccard overlap does not drop the floor. Soft intent (`planning | tooling | workhorse | same-topic | new-topic`) uses the Decision SKU when that role is an API chat model; the heuristic fallback stays sticky and never auto-climbs to Planning. Workhorse remains the actor until a named climb, a failure, or a live Decision `planning` reply.
 
 Then: `↓ … → decision · <label>`, footer shows d1, then `↑ decision → tooling · route` for the generative turn. Same-topic follow-ups keep the climbed floor.
 
