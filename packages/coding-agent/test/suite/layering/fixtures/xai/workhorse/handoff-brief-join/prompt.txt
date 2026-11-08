@@ -1,0 +1,1 @@
+The lint error is in src/foo.ts. Escalate to planning with a handoff.

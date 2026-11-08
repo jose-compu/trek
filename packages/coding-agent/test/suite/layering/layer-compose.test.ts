@@ -12,6 +12,7 @@ import { loadDomainCatalog } from "../../../src/core/domains/catalog.ts";
 import {
 	attachLayerWorkflow,
 	selectLayerWorkflow,
+	skipLayerArchon,
 	toolingWorkflowView,
 } from "../../../src/core/domains/layer-compose.ts";
 import { checkWorkflowNodes } from "../../../src/core/domains/node-check.ts";
@@ -86,6 +87,20 @@ nodes:
 		expect(nodeChatRole(workflow.nodes[0]!, "workhorse")).toBe("planning");
 		expect(nodeChatRole(workflow.nodes[1]!, "workhorse")).toBe("workhorse");
 		expect(nodeChatRole(workflow.nodes[2]!, "workhorse")).toBeUndefined();
+		expect(
+			nodeChatRole(
+				parseArchonWorkflow(`
+name: consult-pin
+description: Frontier diagnose.
+nodes:
+  - id: diagnose
+    role: frontier
+    prompt: |
+      Diagnose.
+`).nodes[0]!,
+				"workhorse",
+			),
+		).toBe("frontier");
 		expect(() =>
 			parseArchonWorkflow(`
 name: bad-bash-role
@@ -98,7 +113,7 @@ nodes:
 		).toThrow(/role is only valid on prompt nodes/);
 	});
 
-	it("schedules independent domain nodes through cpa-agents", async () => {
+	it("schedules independent domain nodes through cpa-agents in overlapping time", async () => {
 		const workflow = parseArchonWorkflow(`
 name: two-independent
 description: Two prompt nodes with no depends_on.
@@ -112,12 +127,27 @@ nodes:
 `);
 		expect(workflowWaves(workflow)).toHaveLength(1);
 		expect(workflowWaves(workflow)[0]?.map((node) => node.id)).toEqual(["left", "right"]);
+		const delay = 80;
+		const started: string[] = [];
+		const t0 = performance.now();
 		const executed = await runArchonScheduled(workflow, {
 			cwd: mkdtempSync(join(tmpdir(), "trek-compose-cpa-")),
 			seed: 7,
-			runPrompt: async (_prompt, node) => `${node.id} ok`,
+			runPrompt: async (_prompt, node) => {
+				started.push(`start ${node.id}`);
+				await new Promise((resolve) => {
+					setTimeout(resolve, delay);
+				});
+				started.push(`end ${node.id}`);
+				return `${node.id} ok`;
+			},
 		});
+		const elapsed = performance.now() - t0;
+		console.log("archon independent nodes ms", Math.round(elapsed), started.join(","));
 		expect(executed.schedulerUsed).toBe(true);
+		expect(started[0]).toMatch(/^start /);
+		expect(started[1]).toMatch(/^start /);
+		expect(elapsed).toBeLessThan(delay * 1.8);
 		expect(executed.results.map((row) => row.id).sort()).toEqual(["left", "right"]);
 	});
 
@@ -160,6 +190,34 @@ nodes:
 
 	it("does not treat incidental planning wording as escalate", () => {
 		expect(selectLayerWorkflow("auto", "help me planning the refactor of the adapter")).toBe("none");
+	});
+
+	it("does not run layer-descalate when the user names the Tooling runner", () => {
+		expect(selectLayerWorkflow("auto", "descalate to tooling model")).toBe("none");
+		expect(selectLayerWorkflow("auto", "Drop to workhorse. Descalate with named mechanical steps.")).toBe(
+			"layer-descalate",
+		);
+	});
+
+	it("does not attach layer-tool-runners to a live weather fetch", () => {
+		const weather =
+			"What is the weather in Paris right now? Fetch a live source with curl. Do not invent the temperature.";
+		expect(selectLayerWorkflow("auto", weather)).toBe("none");
+		expect(skipLayerArchon({ layerWorkflow: "layer-tool-runners", role: "tooling", task: weather })).toBe(true);
+		expect(skipLayerArchon({ layerWorkflow: "layer-escalate", role: "workhorse", task: weather })).toBe(true);
+		expect(
+			skipLayerArchon({
+				layerWorkflow: "layer-escalate",
+				role: "workhorse",
+				task: "The lint error is in src/foo.ts. Escalate to planning with a handoff.",
+			}),
+		).toBe(false);
+	});
+
+	it("skips mute Archon for grep/logs runner DAG so bash can run", () => {
+		const grep = "grep the log for the last TypeError and summarize the failing path. Search only.";
+		expect(selectLayerWorkflow("auto", grep)).toBe("layer-tool-runners");
+		expect(skipLayerArchon({ layerWorkflow: "layer-tool-runners", role: "workhorse", task: grep })).toBe(true);
 	});
 
 	it("skips layer-scripts command nodes without a chat model", async () => {

@@ -23,37 +23,34 @@ describe("UserMessageComponent", () => {
 		expect(lines[2].endsWith(BG_RESET)).toBe(true);
 	});
 
-	test("paints an Archon node card in three shades on one grey background", () => {
+	test("collapses an internal step prompt to one dim line without a grey bar", () => {
 		initTheme("dark");
 		const component = new UserMessageComponent(
 			[
-				"Answer only this Archon node.",
+				"Answer this step only.",
 				"One line. No preamble.",
 				"",
 				"User turn:",
 				"Close the unused admin port.",
 				"",
-				"Known facts:",
-				"reconciliation break: the west cistern",
-				"",
-				"Node quantify-break:",
+				"Step quantify-break:",
 				"Separate what is known from what is estimated.",
-				"",
-				"$name-account.output:",
-				"account period amount not in the turn",
 			].join("\n"),
 		);
 		const rendered = component.render(80).join("\n");
-		expect(rendered).toContain(theme.fg("dim", "Answer only this Archon node."));
-		expect(rendered).toContain(theme.fg("dim", "One line. No preamble."));
-		expect(rendered).toContain(theme.fg("accent", "User turn:"));
-		expect(rendered).toContain(theme.fg("accent", "Known facts:"));
-		expect(rendered).toContain(theme.fg("accent", "Node quantify-break:"));
-		expect(rendered).toContain(theme.fg("accent", "$name-account.output:"));
-		expect(rendered).toContain(theme.fg("text", "Close the unused admin port."));
-		expect(rendered).toContain(
-			`${theme.fg("muted", "reconciliation break:")} ${theme.fg("text", "the west cistern")}`,
-		);
-		expect(rendered).toContain(theme.bg("userMessageBg", "test").slice(0, 8));
+		expect(rendered).toContain(theme.fg("dim", "· quantify-break"));
+		expect(rendered).not.toContain("Answer this step only.");
+		expect(rendered).not.toContain("Archon");
+		expect(rendered).not.toContain("User turn:");
+		expect(rendered).not.toContain(theme.bg("userMessageBg", "test").slice(0, 8));
+	});
+
+	test("collapses a layering continue prompt to one dim line", () => {
+		initTheme("dark");
+		const rendered = new UserMessageComponent("Continue the layering task.\n\nUser turn:\nDebug the race.")
+			.render(80)
+			.join("\n");
+		expect(rendered).toContain(theme.fg("dim", "· continue"));
+		expect(rendered).not.toContain("User turn:");
 	});
 });

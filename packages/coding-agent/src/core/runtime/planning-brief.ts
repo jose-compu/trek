@@ -2,7 +2,7 @@
  * Planning brief + optional mid-turn replan when Workhorse elevates or a tool fails.
  */
 
-import type { HandoffBrief } from "./layer-decision.ts";
+import { formatHandoffBrief, type HandoffBrief } from "./layer-decision.ts";
 
 export const PLANNING_REPLAN_EVERY = 3;
 
@@ -88,15 +88,7 @@ function appendHandoff(lines: string[], handoff?: HandoffBrief): void {
 	if (!handoff) {
 		return;
 	}
-	lines.push(
-		"",
-		"Handoff brief:",
-		`goal: ${handoff.goal}`,
-		`constraints: ${handoff.constraints}`,
-		`tried: ${handoff.tried}`,
-		`evidence: ${handoff.evidence.join("; ") || "(none)"}`,
-		`open question: ${handoff.openQuestion}`,
-	);
+	lines.push("", "Handoff brief:", formatHandoffBrief(handoff));
 }
 
 export function extractPlanBody(systemPrompt: string): string {

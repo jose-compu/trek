@@ -121,6 +121,14 @@ describe("component router", () => {
 		const heavy = routeComponent({ component: "intend", resolved: hybrid, depth: 0, complexity: 0.85 });
 		expect(heavy.role).toBe("frontier");
 		expect(heavy.reason).toMatch(/complexity 0\.85 escalates/);
+		const namedPlanning = routeComponent({
+			component: "intend",
+			resolved: hybrid,
+			depth: 0,
+			complexity: 0.85,
+			minRole: "planning",
+		});
+		expect(namedPlanning.role).toBe("planning");
 		const cheap = routeComponent({
 			component: "toolIntent",
 			resolved: hybrid,

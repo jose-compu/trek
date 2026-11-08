@@ -4,6 +4,33 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-11-08
+
+### Fixed
+
+- Ladder control JSON (`{"descalate":…}`, LayerDecision escalate/delegate) is hidden in the console. The dim `↑` / `↓` / `→` line stays.
+- Tooling no longer runs mute Archon `layer-tool-runners` nodes (search/logs/fetch/summarize). Live weather/grep uses bash.
+- Internal step prompts collapse to `· <id>` with no grey bar. The model is not told “Archon”. Assistant replies no longer paint Terminal OSC 133 grey blocks. After `layer-escalate`, the turn continues on Planning with tools instead of stopping at steps-back.
+- Layer-* handoff pins roles (Workhorse → Planning / Frontier) and rebinds that SKU. Labeled `goal/constraints/tried/evidence/open` briefs parse into the five-field handoff. Consult restores the prior floor.
+- Archon DAGs honor `when:`, `trigger_rule`, `context`, `effort`, `output_format`, `output_type`, `allowed_tools`, bash `timeout`, and `loop` until/max_iterations. Layer-* and all twenty domain workflows declare those fields. `layer-route` branches with `when:`.
+- Independent Archon waves run through cpa-agents `mapPar` (real overlap). A shared session agent stays sequential (`serialize`) so two prompts do not share one model. `layer-hypotheses` fans out three Workhorse theories in one wave.
+- Explicit `Escalate to planning` stays on Planning. Deep keywords (debug, root cause) no longer skip to Frontier after the first bind.
+- `layer-consult` continues on Frontier with a real consult, then restores the prior floor. Mute handoff JSON that echoes “Consult only” does not climb again.
+- `descalate to tooling` binds the Tooling runner. It does not drop Workhorse to Decision. The word “descalate” in a handoff is not a soft ladder drop.
+- Mute internal steps do not climb or drop the ladder. A parsed handoff brief survives the Planning climb.
+- Honesty status is one card on the final reply. Internal workflow steps do not print it.
+- Workflows keep the original user prompt at the top. Handoff JSON renders as labeled lines, not a raw object.
+- After `descalate to tooling` / delegate, the footer stays on Tooling for that turn. Role bind no longer overwrites it back to Workhorse.
+- Named climbs (`use planning`, `swith to planning`) bind that SKU. Soft intent uses the Decision chat SKU (`planning|tooling|workhorse|same-topic|new-topic`); Jaccard no longer drops the floor. Workhorse stays the actor unless the user names a climb, a tool fails, or live Decision returns `planning`.
+
+### Added
+
+- Static xAI Grok replies for the complex layering prompts (workhorse/tooling/planning/frontier). Explicit user `consult frontier` / `escalate to planning` climbs; “first do the Plan” still starts on Workhorse until the model emits escalate.
+- Static Archon × subtask packs: hypotheses fan-out, escalate handoff join, parallel tool-runners, consult/descalate/finance compose. No live APIs.
+- Prompts can move the session (`move to frontier`, `use planning`). API stacks skip local d1.
+- `/hierarchy auto --catalog` binds Decision: `kind: decision` (Liquid d1, Qwen 4B) or the cheapest chat (Grok Fast, Luna, Haiku). Verifier stays unbound.
+- Static xAI packs for descalate, new-topic haiku, Decision yes/no, and ladder-nav (`use planning`, `move to frontier`).
+
 ### Changed
 
 - `/hierarchy` status is an aligned card: layering / mode / suite / file, then climb and runner lines, then Role / Source / Provider / Model / Think. Unset roles show `unset`.

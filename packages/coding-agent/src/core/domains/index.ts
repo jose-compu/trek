@@ -11,6 +11,14 @@ export {
 	workflowWaves,
 } from "./archon.ts";
 export {
+	ARCHON_TRIGGER_RULES,
+	type ArchonTriggerRule,
+	evaluateWhen,
+	isArchonTriggerRule,
+	type NodeRunStatus,
+	shouldRunByTrigger,
+} from "./archon-when.ts";
+export {
 	addDomain,
 	bundledDomainsRoot,
 	type DomainCatalog,
@@ -29,6 +37,7 @@ export {
 	attachLayerWorkflow,
 	layerWorkflowOrNone,
 	selectLayerWorkflow,
+	skipLayerArchon,
 	toolingWorkflowView,
 } from "./layer-compose.ts";
 export {

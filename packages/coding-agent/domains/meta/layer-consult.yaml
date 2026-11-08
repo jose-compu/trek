@@ -1,15 +1,30 @@
 name: layer-consult
 description: |
-  Frontier (or Planning + deep) diagnoses, then exits. Not the main loop.
+  Workhorse hands a brief to Frontier (or Planning + deep). Diagnose, then exit. Do not stay.
 nodes:
   - id: handoff-brief
+    role: workhorse
+    effort: low
+    allowed_tools: []
+    output_type: findings
     prompt: |
-      Fill goal, constraints, what was tried, evidence, and the open question.
+      Write labeled lines (goal, constraints, tried, evidence, open question) for: $USER_MESSAGE
+      Do not write JSON.
   - id: diagnose
+    role: frontier
+    effort: high
+    allowed_tools: []
+    output_type: findings
+    context: fresh
+    trigger_rule: all_success
     prompt: |
-      Diagnose. Do not take over the session.
+      Diagnose using $handoff-brief.output. Do not take over the session.
     depends_on: [handoff-brief]
   - id: exit
+    role: frontier
+    allowed_tools: []
+    output_type: findings
+    trigger_rule: all_success
     prompt: |
-      Return a consult result and exit. Do not stay on Frontier.
+      Return a consult result from $diagnose.output and exit. Do not stay on Frontier.
     depends_on: [diagnose]

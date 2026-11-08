@@ -1,0 +1,1 @@
+format json in package.json with prettier. Rename the symbol fooBar to foo_bar with sed. No design.

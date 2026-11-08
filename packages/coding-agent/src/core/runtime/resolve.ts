@@ -125,6 +125,9 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 		if (skipExtraRole(config, name) || !assignment) {
 			continue;
 		}
+		if (effectiveMode === "api" && name === "decision" && assignment.source !== "api") {
+			continue;
+		}
 		roles[name] = overlay(roles[name], assignment);
 	}
 

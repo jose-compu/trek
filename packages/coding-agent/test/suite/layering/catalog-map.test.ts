@@ -7,7 +7,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { applyAutoLayering, loadCatalogFixture, mapCatalogToRoles } from "../../../src/core/runtime/catalog-map.ts";
-import { defaultRuntimeConfig, flattenToSingle, withHierarchy } from "../../../src/core/runtime/index.ts";
+import {
+	defaultRuntimeConfig,
+	flattenToSingle,
+	withHierarchy,
+	withRoleOverride,
+} from "../../../src/core/runtime/index.ts";
 import { resolveRuntime } from "../../../src/core/runtime/resolve.ts";
 import { selectSessionRole, sessionRoleForModel } from "../../../src/core/runtime/select-role.ts";
 
@@ -21,6 +26,7 @@ describe("catalog auto-map", () => {
 	it("maps OpenAI Luna/Terra/Sol/Astra from tags, not SKU names in code", () => {
 		const mapped = mapCatalogToRoles(load("openai"));
 		expect(mapped.layering).toBe("auto");
+		expect(mapped.roles.decision).toMatchObject({ id: "gpt-6-luna", provider: "openai", thinking: "off" });
 		expect(mapped.roles.tooling).toMatchObject({ id: "gpt-6-luna", provider: "openai", thinking: "off" });
 		expect(mapped.roles.workhorse).toMatchObject({ id: "gpt-6.1-terra", thinking: "brief" });
 		expect(mapped.roles.planning).toMatchObject({ id: "gpt-6.1-sol", thinking: "deep" });
@@ -31,6 +37,7 @@ describe("catalog auto-map", () => {
 		const mapped = mapCatalogToRoles(load("openai-single"));
 		expect(mapped.layering).toBe("single");
 		expect(mapped.roles.workhorse?.id).toBe("gpt-6.1-terra");
+		expect(mapped.roles.decision).toBeUndefined();
 		expect(mapped.roles.planning).toBeUndefined();
 		expect(mapped.roles.tooling).toBeUndefined();
 		expect(mapped.roles.frontier).toBeUndefined();
@@ -38,6 +45,7 @@ describe("catalog auto-map", () => {
 
 	it("maps xAI Fast/mid/coding/multi-agent from catalog tags", () => {
 		const mapped = mapCatalogToRoles(load("xai"));
+		expect(mapped.roles.decision?.id).toBe("grok-4.1-fast");
 		expect(mapped.roles.tooling?.id).toBe("grok-4.1-fast");
 		expect(mapped.roles.workhorse?.id).toBe("grok-4.3");
 		expect(mapped.roles.planning?.id).toBe("grok-4.5");
@@ -46,6 +54,7 @@ describe("catalog auto-map", () => {
 
 	it("binds Workhorse + Planning when Anthropic has no Frontier tag", () => {
 		const mapped = mapCatalogToRoles(load("anthropic"));
+		expect(mapped.roles.decision?.id).toBe("claude-haiku-4-5");
 		expect(mapped.roles.workhorse?.id).toBe("claude-sonnet-4-5");
 		expect(mapped.roles.planning?.id).toBe("claude-opus-4-5");
 		expect(mapped.roles.tooling?.id).toBe("claude-haiku-4-5");
@@ -54,6 +63,7 @@ describe("catalog auto-map", () => {
 
 	it("maps GLM Flash to Workhorse and GLM-5.3 to Planning", () => {
 		const mapped = mapCatalogToRoles(load("glm"));
+		expect(mapped.roles.decision?.id).toBe("glm-5.3-flash");
 		expect(mapped.roles.workhorse?.id).toBe("glm-5.3-flash");
 		expect(mapped.roles.planning?.id).toBe("glm-5.3");
 		expect(mapped.roles.frontier).toBeUndefined();
@@ -61,29 +71,33 @@ describe("catalog auto-map", () => {
 
 	it("maps Kimi K2.7 Workhorse and K3 Planning; same-id Frontier is an alias", () => {
 		const mapped = mapCatalogToRoles(load("kimi"));
+		expect(mapped.roles.decision?.id).toBe("kimi-k2.7-code");
 		expect(mapped.roles.workhorse?.id).toBe("kimi-k2.7-code");
 		expect(mapped.roles.planning?.id).toBe("kimi-k3");
 		expect(mapped.roles.frontier).toBeUndefined();
 	});
 
-	it("skips Qwen Decision rows and keeps local source on Tooling/Workhorse", () => {
+	it("binds Qwen 4B as Decision and keeps local source on Tooling/Workhorse", () => {
 		const mapped = mapCatalogToRoles(load("qwen"));
+		expect(mapped.roles.decision).toMatchObject({ id: "Qwen3.5-4B", source: "local", thinking: "off" });
 		expect(mapped.roles.tooling).toMatchObject({ id: "Qwen3.5-9B", source: "local" });
 		expect(mapped.roles.workhorse).toMatchObject({ id: "Qwen3.8-27B", source: "local", thinking: "brief" });
 		expect(mapped.roles.planning).toBeUndefined();
 		expect(mapped.roles.frontier).toBeUndefined();
 	});
 
-	it("leaves a Decision-only Liquid catalog as single with no extra roles", () => {
+	it("maps a Decision-only Liquid catalog to d1", () => {
 		const mapped = mapCatalogToRoles(load("liquid-d1"));
 		expect(mapped.layering).toBe("single");
-		expect(mapped.roles).toEqual({});
+		expect(mapped.roles.decision).toMatchObject({ id: "d1.1", provider: "liquid", thinking: "off" });
+		expect(mapped.roles.workhorse).toBeUndefined();
+		expect(mapped.roles.tooling).toBeUndefined();
 	});
 
-	it("does not auto-bind verifier or Decision", () => {
+	it("does not auto-bind verifier", () => {
 		const mapped = mapCatalogToRoles(load("openai"));
 		expect("verifier" in mapped.roles).toBe(false);
-		expect("decision" in mapped.roles).toBe(false);
+		expect(mapped.roles.decision?.id).toBe("gpt-6-luna");
 	});
 
 	it("auto without a catalog keeps factory api Frontier", () => {
@@ -97,12 +111,13 @@ describe("catalog auto-map", () => {
 		const config = applyAutoLayering(defaultRuntimeConfig(), load("openai"));
 		expect(config.hierarchy.layering).toBe("auto");
 		expect(config.roles.verifier).toBeUndefined();
-		expect(config.roles.decision).toBeUndefined();
+		expect(config.roles.decision?.id).toBe("gpt-6-luna");
 		const resolved = resolveRuntime(config, { frontier: null });
 		expect(resolved.roles.workhorse?.id).toBe("gpt-6.1-terra");
 		expect(resolved.roles.planning?.id).toBe("gpt-6.1-sol");
 		expect(resolved.roles.frontier?.id).toBe("gpt-6-astra");
 		expect(resolved.roles.tooling?.id).toBe("gpt-6-luna");
+		expect(resolved.roles.decision?.id).toBe("gpt-6-luna");
 		expect(resolved.roles.verifier).toBeUndefined();
 	});
 
@@ -118,6 +133,7 @@ describe("catalog auto-map", () => {
 		expect(switched.roles.workhorse?.id).toBe("grok-4.3");
 		expect(switched.roles.planning?.id).toBe("grok-4.5");
 		expect(switched.roles.tooling?.id).toBe("grok-4.1-fast");
+		expect(switched.roles.decision?.id).toBe("grok-4.1-fast");
 	});
 
 	it("one-model apply stays single and does not expand extras", () => {
@@ -150,5 +166,38 @@ describe("catalog auto-map", () => {
 		expect(sessionRoleForModel(openai, { provider: "openai", id: "gpt-6.1-terra" })).toBe("workhorse");
 		expect(sessionRoleForModel(openai, { provider: "openai", id: "gpt-6.1-sol" })).toBe("planning");
 		expect(sessionRoleForModel(openai, { provider: "openai", id: "unrelated" })).toBeUndefined();
+	});
+
+	it("replaces leftover local d1 with the catalog Decision on auto-map", () => {
+		const leftover = withRoleOverride(defaultRuntimeConfig(), "decision", {
+			source: "local",
+			id: "LiquidAI/d1-omni-600M",
+			thinking: "off",
+		});
+		const grok = applyAutoLayering(leftover, load("xai"));
+		expect(grok.roles.decision).toMatchObject({
+			source: "api",
+			id: "grok-4.1-fast",
+			provider: "xai",
+			thinking: "off",
+		});
+		const liquid = applyAutoLayering(leftover, load("liquid-d1"));
+		expect(liquid.roles.decision).toMatchObject({ id: "d1.1", provider: "liquid" });
+	});
+
+	it("omits a leftover local d1 Decision on api auto stacks (xAI / OpenAI / Anthropic)", () => {
+		for (const name of ["xai", "openai", "anthropic"] as const) {
+			let config = applyAutoLayering(defaultRuntimeConfig(), load(name));
+			config = withRoleOverride(config, "decision", {
+				source: "local",
+				id: "LiquidAI/d1-omni-600M",
+				thinking: "off",
+			});
+			const resolved = resolveRuntime(config, {
+				frontier: { provider: name === "xai" ? "xai" : name, modelId: "frontier" },
+			});
+			expect(resolved.effectiveMode, name).toBe("api");
+			expect(resolved.roles.decision, name).toBeUndefined();
+		}
 	});
 });

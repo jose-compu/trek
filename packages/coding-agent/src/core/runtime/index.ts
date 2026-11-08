@@ -75,6 +75,7 @@ export {
 	frontierConsultRole,
 	type HierarchyRole,
 	isHigherLadderRole,
+	isLadderNavPrompt,
 	isLadderRole,
 	isLowerLadderRole,
 	isToolArgumentValidationError,
@@ -90,6 +91,7 @@ export {
 	resolveDescalateTarget,
 	resolveEscalateTarget,
 	roleAvailable,
+	shouldRebindSessionRole,
 	startLadderRole,
 	stripEscalateSignal,
 } from "./escalate.ts";
@@ -101,11 +103,13 @@ export {
 	type LayeringBenchmarkTrace,
 	writeLayeringBenchmarkJson,
 } from "./layer-benchmark.ts";
+export { type ControlAsk, isControlPrompt, parseControlAsk } from "./layer-control.ts";
 export {
 	climbHandoffBrief,
 	constrainDecisionRoute,
 	DECISION_ROUTE_TARGETS,
 	type DecisionRouteTarget,
+	formatHandoffBrief,
 	HANDOFF_BRIEF_JSON_SCHEMA,
 	type HandoffBrief,
 	jsonSchemaHasLengthKeywords,
@@ -130,6 +134,7 @@ export {
 	needsHandoffBrief,
 	parseDecisionRoute,
 	parseHandoffBrief,
+	parseHandoffBriefFromText,
 	parseLayerDecision,
 	parseLayerSubtaskResult,
 	SAFE_LAYER_DECISION,
@@ -137,12 +142,25 @@ export {
 	tryParseLayerDecision,
 } from "./layer-decision.ts";
 export {
+	handoffRoleIds,
+	type LayerContinueTarget,
 	type LayerExecuteResult,
 	type LayerNodeReply,
+	layerContinuePrompt,
+	layerContinueTarget,
+	layerNodeRoles,
 	layerWaves,
 	type RunLayerWorkflowInput,
 	runLayerWorkflow,
 } from "./layer-execute.ts";
+export {
+	classifyLayerIntentHeuristic,
+	LAYER_INTENTS,
+	type LayerIntent,
+	layerIntentPrompt,
+	parseLayerIntentReply,
+	shouldAskDecisionIntent,
+} from "./layer-intent.ts";
 export {
 	LAYERING_DELEGATE_SECTION,
 	LAYERING_NETWORK_SECTION,

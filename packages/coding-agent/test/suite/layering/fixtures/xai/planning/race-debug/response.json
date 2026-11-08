@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "I'll inspect the workspace for the concurrent queue and any flaky tests, then draft a plan, hypotheses, and a minimal failing reproduction before handing off."
+			}
+		}
+	]
+}

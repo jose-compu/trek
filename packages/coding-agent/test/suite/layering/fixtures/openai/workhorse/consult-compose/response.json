@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"action\":\"continue\",\"target\":\"frontier\",\"thinking\":\"deep\",\"confidence\":\"high\",\"reason\":\"consult then restore\",\"evidence\":[\"sqlite ledger\"]}"
+			}
+		}
+	]
+}

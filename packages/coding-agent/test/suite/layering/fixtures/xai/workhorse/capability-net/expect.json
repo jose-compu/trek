@@ -1,0 +1,8 @@
+{
+	"kind": "act",
+	"startRole": "workhorse",
+	"boundId": "grok-4.3",
+	"reply": "none",
+	"liveNetwork": true,
+	"autoDelegate": true
+}

@@ -2,7 +2,8 @@
  * Call an Archon DAG the way Archon does.
  * A prompt node is one model step. A bash node is a shell step with no model.
  * `$USER_MESSAGE` and `$id.output` are substituted once, and the inserted text is not scanned again.
- * command, script, and loop parse as Archon. This release does not call them.
+ * `when:` and `trigger_rule` skip nodes. `loop` iterates until `until` or max_iterations.
+ * command and script still skip unless skipUncallable is false (then they throw).
  */
 
 import { execFile } from "node:child_process";
@@ -16,6 +17,7 @@ import {
 	orderNodes,
 	workflowWaves,
 } from "./archon.ts";
+import { evaluateWhen, type NodeRunStatus, shouldRunByTrigger } from "./archon-when.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -35,8 +37,10 @@ export interface RunArchonOptions {
 	facts?: ReadonlyArray<{ name: string; value: string }>;
 	/** Required for a prompt node. Archon calls the model once per node. */
 	runPrompt?: (prompt: string, node: ArchonNode) => Promise<string>;
-	/** When set, independent nodes schedule through cpa-agents. */
+	/** When set, independent Archon waves run through cpa-agents `mapPar`. Omit on a shared agent session. */
 	seed?: number;
+	/** One shared model must not prompt in parallel. Sequential Archon, no CPA. */
+	serialize?: boolean;
 	/** Default chat role for prompt nodes without `role:`. */
 	currentRole?: ArchonNodeRole;
 	/** Called before each prompt node so the session can bind that role. */
@@ -55,16 +59,15 @@ export async function runArchonWorkflow(
 	cwdOrOptions: string | RunArchonOptions,
 ): Promise<WorkflowNodeResult[]> {
 	const options: RunArchonOptions = typeof cwdOrOptions === "string" ? { cwd: cwdOrOptions } : cwdOrOptions;
-	if (options.seed !== undefined) {
+	if (options.seed !== undefined && !options.serialize) {
 		return (await runArchonScheduled(workflow, options)).results;
 	}
 	const outputs = new Map<string, string>();
+	const statuses = new Map<string, NodeRunStatus>();
 	const results: WorkflowNodeResult[] = [];
 	for (const node of orderNodes(workflow)) {
-		noteNodeRole(node, options);
-		const output = await runArchonNode(workflow, node, options, outputs);
-		outputs.set(node.id, output);
-		results.push({ id: node.id, output });
+		const ran = await runOrSkip(workflow, node, options, outputs, statuses);
+		results.push(ran);
 	}
 	return results;
 }
@@ -75,10 +78,17 @@ export async function runArchonScheduled(
 ): Promise<RunArchonScheduled> {
 	const seed = options.seed ?? 0;
 	const outputs = new Map<string, string>();
+	const statuses = new Map<string, NodeRunStatus>();
 	const results: WorkflowNodeResult[] = [];
 	let schedulerUsed = false;
-	let promptGate: Promise<void> = Promise.resolve();
 	for (const wave of workflowWaves(workflow)) {
+		if (wave.length <= 1) {
+			const node = wave[0];
+			if (node) {
+				results.push(await runOrSkip(workflow, node, options, outputs, statuses));
+			}
+			continue;
+		}
 		const scheduled: ScheduledCall[] = wave.map((node) => ({
 			id: node.id,
 			name: node.id,
@@ -93,20 +103,7 @@ export async function runArchonScheduled(
 				if (!node) {
 					throw new Error(`missing node ${call.id}`);
 				}
-				const previous = promptGate;
-				let release: () => void = () => {};
-				promptGate = new Promise<void>((resolve) => {
-					release = resolve;
-				});
-				await previous;
-				try {
-					noteNodeRole(node, options);
-					const output = await runArchonNode(workflow, node, options, outputs);
-					outputs.set(node.id, output);
-					return { id: node.id, output };
-				} finally {
-					release();
-				}
+				return runOrSkip(workflow, node, options, outputs, statuses);
 			},
 		});
 		schedulerUsed = schedulerUsed || batch.schedulerUsed;
@@ -119,6 +116,52 @@ export async function runArchonScheduled(
 
 function noteNodeRole(node: ArchonNode, options: RunArchonOptions): void {
 	options.onNodeRole?.(nodeChatRole(node, options.currentRole), node);
+}
+
+async function runOrSkip(
+	workflow: ArchonWorkflow,
+	node: ArchonNode,
+	options: RunArchonOptions,
+	outputs: Map<string, string>,
+	statuses: Map<string, NodeRunStatus>,
+): Promise<WorkflowNodeResult> {
+	const userMessage = options.userMessage ?? "";
+	if (!shouldRunByTrigger(node.triggerRule, node.dependsOn, statuses)) {
+		return skipNode(node, outputs, statuses);
+	}
+	try {
+		if (!evaluateWhen(node.when, { userMessage, outputs })) {
+			return skipNode(node, outputs, statuses);
+		}
+	} catch {
+		statuses.set(node.id, "failed");
+		outputs.set(node.id, "");
+		return { id: node.id, output: "" };
+	}
+	noteNodeRole(node, options);
+	try {
+		const output = await runArchonNode(workflow, node, options, outputs);
+		outputs.set(node.id, output);
+		statuses.set(node.id, "ok");
+		return { id: node.id, output };
+	} catch (error) {
+		if (options.skipUncallable && node.kind !== "prompt" && node.kind !== "bash" && node.kind !== "loop") {
+			throw error;
+		}
+		statuses.set(node.id, "failed");
+		outputs.set(node.id, "");
+		throw error;
+	}
+}
+
+function skipNode(
+	node: ArchonNode,
+	outputs: Map<string, string>,
+	statuses: Map<string, NodeRunStatus>,
+): WorkflowNodeResult {
+	outputs.set(node.id, "(skipped)");
+	statuses.set(node.id, "skipped");
+	return { id: node.id, output: "(skipped)" };
 }
 
 export async function runArchonNode(
@@ -141,7 +184,7 @@ export async function runArchonNode(
 		}
 		const { stdout } = await execFileAsync("bash", ["-c", script], {
 			cwd: options.cwd,
-			timeout: 10_000,
+			timeout: node.timeout ?? 10_000,
 			maxBuffer: 1_000_000,
 		});
 		return String(stdout).trim();
@@ -160,12 +203,29 @@ export async function runArchonNode(
 			`script node ${node.id} is not called in this release. This release calls prompt and bash nodes.`,
 		);
 	}
-	if (options.skipUncallable) {
-		return `loop ${node.id} skipped; no model`;
+	if (!options.runPrompt) {
+		if (options.skipUncallable) {
+			return `loop ${node.id} skipped; no model`;
+		}
+		throw new Error(`loop node ${node.id} is an AI step and needs a model call`);
 	}
-	throw new Error(
-		`loop node ${node.id} repeats until ${node.loop?.until ?? "COMPLETE"}. This release calls prompt and bash nodes.`,
-	);
+	const until = node.loop?.until ?? "COMPLETE";
+	const max = node.loop?.maxIterations ?? 1;
+	let last = "";
+	for (let iteration = 0; iteration < max; iteration++) {
+		const prompt = renderPrompt(workflow, node, options.userMessage ?? "", outputs, options.facts ?? []);
+		last = (
+			await options.runPrompt(
+				`${prompt}\n\nLoop iteration ${iteration + 1} of ${max}. Stop when the reply contains ${until}.`,
+				node,
+			)
+		).trim();
+		outputs.set(node.id, last);
+		if (last.includes(until)) {
+			break;
+		}
+	}
+	return last;
 }
 
 function renderPrompt(
@@ -176,26 +236,37 @@ function renderPrompt(
 	facts: ReadonlyArray<{ name: string; value: string }>,
 ): string {
 	const body = substitute(node.body, workflow, node.id, userMessage, outputs);
+	const tools = node.allowedTools;
+	const toolLine =
+		tools && tools.length > 0
+			? `You may use these tools: ${tools.join(", ")}.`
+			: "Do not call a tool. Earlier replies are below.";
 	const lines = [
-		"Answer only this Archon node.",
+		"Answer this step only.",
 		"One line. No preamble.",
-		"Do not call a tool. The earlier node replies are below.",
+		"Do not write an honesty footer.",
+		toolLine,
 		"If a fact is not in the user turn, the known facts, or an earlier reply, say it is not in the turn.",
 		"",
 		"User turn:",
 		userMessage,
 	];
+	if (node.outputFormat) {
+		lines.push("", "output_format:", JSON.stringify(node.outputFormat));
+	}
 	if (facts.length > 0) {
 		lines.push("", "Known facts:");
 		for (const fact of facts) {
 			lines.push(`${fact.name}: ${fact.value}`);
 		}
 	}
-	lines.push("", `Node ${node.id}:`, body);
-	for (const dep of node.dependsOn) {
-		if (!node.body.includes(`$${dep}.output`)) {
-			const reply = outputs.get(dep)?.trim();
-			lines.push("", `$${dep}.output:`, reply && reply.length > 0 ? reply : "(none)");
+	lines.push("", `Step ${node.id}:`, body);
+	if (node.context !== "fresh") {
+		for (const dep of node.dependsOn) {
+			if (!node.body.includes(`$${dep}.output`)) {
+				const reply = outputs.get(dep)?.trim();
+				lines.push("", `$${dep}.output:`, reply && reply.length > 0 ? reply : "(none)");
+			}
 		}
 	}
 	return lines.join("\n");

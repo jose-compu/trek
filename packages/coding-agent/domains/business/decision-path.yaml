@@ -3,17 +3,28 @@ description: |
   Unblock an operational decision. Name the KPI definition, the approval bottleneck, and the stakeholder handoff.
 nodes:
   - id: name-decision
+    allowed_tools: []
+    output_type: findings
     prompt: |
       State the decision, who owns it, and the date it is late.
   - id: list-blockers
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       List the approval bottleneck and any policy that conflicts with the request.
     depends_on: [name-decision]
   - id: align-kpi
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Name the KPI definition each side is using. Do not invent a target.
     depends_on: [list-blockers]
   - id: next-handoff
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Name the next stakeholder handoff and what that person must decide. Do not decide for them.
     depends_on: [align-kpi]

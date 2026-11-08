@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"escalate\":\"planning\",\"why\":\"user explicitly asked to first do the Plan\"}"
+			}
+		}
+	]
+}

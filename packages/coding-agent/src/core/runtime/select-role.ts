@@ -5,7 +5,7 @@
 
 import { routeComponent } from "./component-router.ts";
 import type { LadderRole } from "./escalate.ts";
-import { escalateComplexity, startLadderRole } from "./escalate.ts";
+import { escalateComplexity, parseEscalateAsk, resolveEscalateTarget, startLadderRole } from "./escalate.ts";
 import type { ResolvedRuntime } from "./resolve.ts";
 import type { RoleSource, RouteComponent, RouteRole } from "./types.ts";
 
@@ -23,7 +23,7 @@ const MAKE_ARTIFACT =
 const SMALL_EDIT = /\b(typo|format|lint|rename|spell(?:ing)?)\b/i;
 
 const DEEP_WORK =
-	/\b(debug|diagnos|root[- ]cause|hard bug|investigate|architect(?:ure)?|deep (?:think|plan|dive)|research)\b/i;
+	/\b(debug|diagnos|root[- ]cause|hard bug|investigate|architect(?:ure)?|deep (?:think|plan|dive)|research|consult(?:\s+only|\s+frontier|\s+planning))\b/i;
 
 const PLAN_CUES =
 	/\b(then|after that|and then|steps?|how (?:do|should|can)|why|explain|compare|review|improve|migrate|architect|design|refactor|implement)\b/i;
@@ -163,6 +163,25 @@ export function selectSessionRole(input: {
 	const complexity =
 		input.complexity ??
 		(kind === "deep" ? 0.85 : kind === "plan" ? Math.max(classified.complexity, 0.4) : classified.complexity);
+
+	const userClimb = parseEscalateAsk(text);
+	if (userClimb?.explicit) {
+		const named = userClimb.requested === "next" ? undefined : userClimb.requested;
+		const tier =
+			resolveEscalateTarget(floor, userClimb.requested, resolved) ??
+			(named && (named === "planning" || named === "frontier") ? named : undefined);
+		if (tier === "planning" || tier === "frontier") {
+			return routeComponent({
+				component: "intend",
+				resolved,
+				complexity: escalateComplexity(tier),
+				retries: input.retries ?? 0,
+				depth: 0,
+				minRole: tier,
+				overrides: input.overrides,
+			});
+		}
+	}
 
 	if (kind === "deep" || floor === "frontier") {
 		return routeComponent({

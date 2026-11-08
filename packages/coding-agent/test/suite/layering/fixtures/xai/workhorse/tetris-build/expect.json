@@ -1,0 +1,9 @@
+{
+	"kind": "plan",
+	"startRole": "workhorse",
+	"boundId": "grok-4.3",
+	"reply": "escalate",
+	"replyTarget": "planning",
+	"liveNetwork": false,
+	"autoDelegate": false
+}

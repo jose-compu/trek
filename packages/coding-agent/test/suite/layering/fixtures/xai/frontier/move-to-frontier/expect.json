@@ -1,0 +1,9 @@
+{
+	"kind": "act",
+	"startRole": "frontier",
+	"boundId": "grok-4.20-multi-agent",
+	"reply": "escalate",
+	"replyTarget": "frontier",
+	"liveNetwork": false,
+	"autoDelegate": false
+}

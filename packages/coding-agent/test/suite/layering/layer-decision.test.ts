@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+	formatHandoffBrief,
 	HANDOFF_BRIEF_JSON_SCHEMA,
 	jsonSchemaHasLengthKeywords,
 	LAYER_DECISION_JSON_SCHEMA,
@@ -13,6 +14,7 @@ import {
 	layerDecisionTextFromEnvelope,
 	parseDecisionRoute,
 	parseHandoffBrief,
+	parseHandoffBriefFromText,
 	parseLayerDecision,
 	parseLayerSubtaskResult,
 	SAFE_LAYER_DECISION,
@@ -92,6 +94,40 @@ describe("handoff brief and LayerSubtaskResult", () => {
 		});
 		expect(brief?.goal).toBe("find the leak");
 		expect(brief?.openQuestion).toMatch(/handle/);
+		expect(
+			formatHandoffBrief(
+				{
+					goal: "Architect a migration.",
+					constraints: "not in the turn",
+					tried: "not in the turn",
+					evidence: [],
+					openQuestion: "not in the turn",
+				},
+				{ omitEmpty: true },
+			),
+		).toBe("goal: Architect a migration.");
+	});
+
+	it("parses a Grok labeled one-liner into the same five fields", () => {
+		const brief = parseHandoffBriefFromText(
+			"goal: debug concurrent-queue race (shared-map corruption under load); constraints: plan→hypotheses→one failing repro only, no fix yet; tried: same edit failed twice; evidence: writers corrupt shared map, tests flake only under load; open: root cause still unclear.",
+		);
+		expect(brief?.goal).toMatch(/concurrent-queue/);
+		expect(brief?.constraints).toMatch(/plan/);
+		expect(brief?.tried).toMatch(/failed twice/);
+		expect(brief?.evidence.length).toBeGreaterThan(0);
+		expect(brief?.openQuestion).toMatch(/root cause/);
+		expect(
+			parseHandoffBriefFromText(
+				JSON.stringify({
+					goal: "find leak",
+					constraints: "no rewrite",
+					tried: "two patches",
+					evidence: ["log:1"],
+					openQuestion: "which handle?",
+				}),
+			)?.goal,
+		).toBe("find leak");
 	});
 
 	it("joins a subtask as layer_join or halts after retry", () => {

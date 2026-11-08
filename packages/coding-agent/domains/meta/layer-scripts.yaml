@@ -6,4 +6,5 @@ nodes:
     command: format
   - id: bash
     bash: echo layer-scripts
+    timeout: 5000
     depends_on: [command]

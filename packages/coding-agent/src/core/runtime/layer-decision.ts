@@ -159,6 +159,77 @@ export function parseHandoffBrief(value: unknown): HandoffBrief | undefined {
 	};
 }
 
+/** JSON object or a labeled one-liner (`goal: …; constraints: …; tried: …; evidence: …; open: …`). */
+export function parseHandoffBriefFromText(text: string): HandoffBrief | undefined {
+	const trimmed = text.trim();
+	if (!trimmed) {
+		return undefined;
+	}
+	if (trimmed.startsWith("{")) {
+		try {
+			const parsed = JSON.parse(trimmed) as unknown;
+			const brief = parseHandoffBrief(parsed);
+			if (brief) {
+				return brief;
+			}
+		} catch {
+			// labeled prose below
+		}
+	}
+	const fields = new Map<string, string>();
+	for (const part of trimmed.split(/[;\n]+/)) {
+		const cut = part.indexOf(":");
+		if (cut <= 0) {
+			continue;
+		}
+		const key = part.slice(0, cut).trim().toLowerCase().replace(/\s+/g, " ");
+		const value = part.slice(cut + 1).trim();
+		if (key && value) {
+			fields.set(key, value);
+		}
+	}
+	const openQuestion = fields.get("open question") ?? fields.get("openquestion") ?? fields.get("open");
+	const evidenceRaw = fields.get("evidence");
+	const evidence = evidenceRaw
+		? evidenceRaw
+				.split(/,(?![^()]*\))/)
+				.map((item) => item.trim())
+				.filter(Boolean)
+		: undefined;
+	return parseHandoffBrief({
+		goal: fields.get("goal"),
+		constraints: fields.get("constraints"),
+		tried: fields.get("tried"),
+		evidence: evidence && evidence.length > 0 ? evidence : evidenceRaw ? [evidenceRaw] : undefined,
+		openQuestion,
+	});
+}
+
+const HANDOFF_PLACEHOLDER = /^(not in the turn|not in turn)$/i;
+
+function isHandoffPlaceholder(value: string): boolean {
+	return value.trim().length === 0 || HANDOFF_PLACEHOLDER.test(value.trim());
+}
+
+export function formatHandoffBrief(brief: HandoffBrief, options?: { omitEmpty?: boolean }): string {
+	const lines: string[] = [];
+	const push = (label: string, value: string): void => {
+		if (options?.omitEmpty && isHandoffPlaceholder(value)) {
+			return;
+		}
+		lines.push(`${label}: ${value}`);
+	};
+	push("goal", brief.goal);
+	push("constraints", brief.constraints);
+	push("tried", brief.tried);
+	const evidence = brief.evidence.filter((item) => !isHandoffPlaceholder(item));
+	if (!options?.omitEmpty || evidence.length > 0) {
+		lines.push(`evidence: ${evidence.join("; ") || "(none)"}`);
+	}
+	push("open question", brief.openQuestion);
+	return lines.join("\n");
+}
+
 export function tryLayerSubtaskResult(text: string): LayerSubtaskResult | undefined {
 	return trySubtask(text);
 }

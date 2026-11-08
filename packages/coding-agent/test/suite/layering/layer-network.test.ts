@@ -32,7 +32,9 @@ describe("layer network", () => {
 		expect(pinned).toMatch(/curl or wget/);
 		expect(pinned).toMatch(/Do not say you have no internet/);
 		expect(pinned).toContain('{"action":"delegate","target":"tooling","reason":"live fetch"}');
+		expect(pinned).toMatch(/Do not say you cannot change models/);
 		expect(layeringNetworkSection(false)).not.toMatch(/delegate/);
+		expect(layeringNetworkSection(false)).toMatch(/Workhorse ⇄ Planning ⇄ Frontier/);
 	});
 
 	it("auto-delegates weather on xAI auto layering, not on single", () => {

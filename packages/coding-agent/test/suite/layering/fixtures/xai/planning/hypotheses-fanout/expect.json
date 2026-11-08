@@ -1,0 +1,14 @@
+{
+	"kind": "plan",
+	"startRole": "workhorse",
+	"boundId": "grok-4.3",
+	"reply": "none",
+	"liveNetwork": false,
+	"autoDelegate": false,
+	"domain": "none",
+	"workflow": "none",
+	"layer_workflow": "layer-hypotheses",
+	"continueTarget": "planning",
+	"winner": "theory-b",
+	"join": "layer_join"
+}

@@ -3,13 +3,21 @@ description: |
   Check a campaign miss: a CTR drop, a brand sentiment shift, or broken UTM attribution. Do not publish.
 nodes:
   - id: name-metric
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Name the metric, the channel, and the comparison window.
   - id: separate-signal
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Separate a real CTR drop or sentiment shift from a broken UTM attribution or a definition change.
     depends_on: [name-metric]
   - id: one-change
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Propose one message or measurement change. Do not publish it.
     depends_on: [separate-signal]

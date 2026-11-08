@@ -3,17 +3,28 @@ description: |
   Review an engineering change: a build failed, an architecture violation, a flaky test, or tech debt. Trek is a coding agent, so this domain stays on.
 nodes:
   - id: state-constraint
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Quote the architecture violation in the words the user turn already uses. One line. If it is not named, say it is not in the turn. Do not invent one.
   - id: check-build
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Quote the build, test, or CI failure from the user turn. One line. If none is named, say none has been run. Do not invent one.
     depends_on: [state-constraint]
   - id: name-debt
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Quote the tech debt from the user turn. One line. If it is not named, say it is not in the turn. Do not invent one.
     depends_on: [check-build]
   - id: apply-or-refuse
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       State the constraint the turn already names. One line. If none is named, say it is not in the turn.
       Do not refuse a fix. Do not say tools are forbidden. Do not invent a rule or a debt.

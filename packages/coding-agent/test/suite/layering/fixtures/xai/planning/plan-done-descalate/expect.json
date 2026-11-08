@@ -1,0 +1,9 @@
+{
+	"kind": "mechanical",
+	"startRole": "workhorse",
+	"boundId": "grok-4.3",
+	"reply": "descalate",
+	"replyTarget": "workhorse",
+	"liveNetwork": false,
+	"autoDelegate": false
+}

@@ -5,12 +5,19 @@
 
 import { readFileSync } from "node:fs";
 import { parse } from "yaml";
+import { type ArchonTriggerRule, isArchonTriggerRule } from "./archon-when.ts";
 
 export const ARCHON_NODE_KINDS = ["prompt", "command", "bash", "script", "loop"] as const;
 export type ArchonNodeKind = (typeof ARCHON_NODE_KINDS)[number];
 
-export const ARCHON_NODE_ROLES = ["workhorse", "planning", "tooling"] as const;
+export const ARCHON_NODE_ROLES = ["workhorse", "planning", "frontier", "tooling"] as const;
 export type ArchonNodeRole = (typeof ARCHON_NODE_ROLES)[number];
+
+export const ARCHON_CONTEXTS = ["fresh", "shared"] as const;
+export type ArchonContext = (typeof ARCHON_CONTEXTS)[number] | { resume: string };
+
+export const ARCHON_EFFORTS = ["minimal", "low", "medium", "high"] as const;
+export type ArchonEffort = (typeof ARCHON_EFFORTS)[number];
 
 export interface ArchonNode {
 	id: string;
@@ -24,6 +31,22 @@ export interface ArchonNode {
 	loop?: { until: string; maxIterations: number };
 	/** Prompt nodes only. Default is the current layer role. */
 	role?: ArchonNodeRole;
+	/** Archon `when:`. Skip the node when false. */
+	when?: string;
+	/** Archon `trigger_rule`. Default `all_success`. */
+	triggerRule?: ArchonTriggerRule;
+	/** Archon `context:` fresh | shared | { resume }. */
+	context?: ArchonContext;
+	/** Archon `skills:`. Exact skill names for this node. */
+	skills?: string[];
+	/** Archon `output_type`. Semantic label for `$id.output`. */
+	outputType?: string;
+	/** Archon `effort:` reasoning depth. */
+	effort?: ArchonEffort;
+	/** Archon `output_format` JSON Schema. */
+	outputFormat?: Record<string, unknown>;
+	/** Archon bash/script `timeout` in ms. */
+	timeout?: number;
 }
 
 export interface ArchonWorkflow {
@@ -96,6 +119,11 @@ function parseNode(value: unknown, index: number): ArchonNode {
 	const kind = present[0];
 	const dependsOn = record.depends_on === undefined ? [] : stringList(record.depends_on, id);
 	const allowedTools = readAllowedTools(record.allowed_tools, id);
+	if (kind === "script" && record.runtime !== "bun" && record.runtime !== "uv") {
+		throw new Error(`node ${id} script requires runtime bun or uv`);
+	}
+	const role = readNodeRole(record.role, id, kind);
+	const extras = readNodeExtras(record, id, kind);
 	if (kind === "loop") {
 		const loop = readLoop(record.loop, id);
 		return {
@@ -105,20 +133,93 @@ function parseNode(value: unknown, index: number): ArchonNode {
 			dependsOn,
 			allowedTools,
 			loop: { until: loop.until, maxIterations: loop.maxIterations },
+			...extras,
 		};
 	}
-	if (kind === "script" && record.runtime !== "bun" && record.runtime !== "uv") {
-		throw new Error(`node ${id} script requires runtime bun or uv`);
-	}
-	const role = readNodeRole(record.role, id, kind);
 	return {
 		id,
 		kind,
 		body: (record[kind] as string).trim(),
 		dependsOn,
 		allowedTools,
+		...extras,
 		...(role ? { role } : {}),
 	};
+}
+
+function readNodeExtras(
+	record: Record<string, unknown>,
+	id: string,
+	kind: ArchonNodeKind,
+): Pick<
+	ArchonNode,
+	"when" | "triggerRule" | "context" | "skills" | "outputType" | "effort" | "outputFormat" | "timeout"
+> {
+	const extras: ReturnType<typeof readNodeExtras> = {};
+	if (typeof record.when === "string" && record.when.trim().length > 0) {
+		extras.when = record.when.trim();
+	}
+	if (record.trigger_rule !== undefined) {
+		if (typeof record.trigger_rule !== "string" || !isArchonTriggerRule(record.trigger_rule)) {
+			throw new Error(
+				`node ${id} trigger_rule must be all_success, any_success, all_done, or none_failed_min_one_success`,
+			);
+		}
+		extras.triggerRule = record.trigger_rule;
+	}
+	if (record.context !== undefined) {
+		extras.context = readContext(record.context, id);
+	}
+	if (record.skills !== undefined) {
+		extras.skills = stringListField(record.skills, id, "skills");
+	}
+	if (typeof record.output_type === "string" && record.output_type.trim().length === 0) {
+		throw new Error(`node ${id} output_type must be a non-empty string`);
+	}
+	if (typeof record.output_type === "string") {
+		extras.outputType = record.output_type.trim();
+	}
+	if (record.effort !== undefined) {
+		if (typeof record.effort !== "string" || !ARCHON_EFFORTS.includes(record.effort as ArchonEffort)) {
+			throw new Error(`node ${id} effort must be minimal, low, medium, or high`);
+		}
+		extras.effort = record.effort as ArchonEffort;
+	}
+	if (record.output_format !== undefined) {
+		if (!record.output_format || typeof record.output_format !== "object" || Array.isArray(record.output_format)) {
+			throw new Error(`node ${id} output_format must be a JSON Schema object`);
+		}
+		extras.outputFormat = record.output_format as Record<string, unknown>;
+	}
+	if (record.timeout !== undefined) {
+		if (kind !== "bash" && kind !== "script") {
+			throw new Error(`node ${id} timeout is only valid on bash or script nodes`);
+		}
+		if (typeof record.timeout !== "number" || !Number.isInteger(record.timeout) || record.timeout < 1) {
+			throw new Error(`node ${id} timeout must be a positive integer (ms)`);
+		}
+		extras.timeout = record.timeout;
+	}
+	return extras;
+}
+
+function readContext(value: unknown, id: string): ArchonContext {
+	if (value === "fresh" || value === "shared") {
+		return value;
+	}
+	if (
+		value &&
+		typeof value === "object" &&
+		!Array.isArray(value) &&
+		typeof (value as { resume?: unknown }).resume === "string"
+	) {
+		const resume = (value as { resume: string }).resume.trim();
+		if (!resume) {
+			throw new Error(`node ${id} context.resume is required`);
+		}
+		return { resume };
+	}
+	throw new Error(`node ${id} context must be fresh, shared, or { resume: node-id }`);
 }
 
 function readNodeRole(value: unknown, nodeId: string, kind: ArchonNodeKind): ArchonNodeRole | undefined {
@@ -126,7 +227,7 @@ function readNodeRole(value: unknown, nodeId: string, kind: ArchonNodeKind): Arc
 		return undefined;
 	}
 	if (typeof value !== "string" || !isArchonNodeRole(value)) {
-		throw new Error(`node ${nodeId} role must be workhorse, planning, or tooling`);
+		throw new Error(`node ${nodeId} role must be workhorse, planning, frontier, or tooling`);
 	}
 	if (kind !== "prompt") {
 		throw new Error(`node ${nodeId} role is only valid on prompt nodes`);
@@ -197,6 +298,13 @@ function stringList(value: unknown, nodeId: string): string[] {
 	return value.map((item) => (item as string).trim());
 }
 
+function stringListField(value: unknown, nodeId: string, field: string): string[] {
+	if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || item.trim().length === 0)) {
+		throw new Error(`node ${nodeId} ${field} must be a list of strings`);
+	}
+	return value.map((item) => (item as string).trim());
+}
+
 /** Topological order. Independent nodes keep their file order. */
 export function orderNodes(workflow: ArchonWorkflow): ArchonNode[] {
 	const byId = new Map(workflow.nodes.map((node) => [node.id, node]));
@@ -228,7 +336,7 @@ export function orderNodes(workflow: ArchonWorkflow): ArchonNode[] {
 	return ordered;
 }
 
-/** Independent nodes (empty depends_on) share a wave for cpa-agents. */
+/** Independent nodes (empty depends_on) share a wave. cpa-agents mapPar may run that wave. */
 export function workflowWaves(workflow: ArchonWorkflow): ArchonNode[][] {
 	orderNodes(workflow);
 	const remaining = new Map(workflow.nodes.map((node) => [node.id, new Set(node.dependsOn)]));

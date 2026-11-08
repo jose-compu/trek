@@ -1,0 +1,7 @@
+{
+	"action": "continue",
+	"target": "planning",
+	"workflow": "none",
+	"layer_workflow": "layer-hypotheses",
+	"layering": "auto"
+}

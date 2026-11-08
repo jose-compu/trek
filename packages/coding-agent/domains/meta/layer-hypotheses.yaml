@@ -1,15 +1,58 @@
 name: layer-hypotheses
 description: |
-  Hard debug. Spawn theories in parallel. Planning picks the winner.
+  Workhorse names theories, three branches run in parallel, Tooling gathers, Planning picks the winner.
 nodes:
   - id: spawn-theories
+    role: workhorse
+    effort: medium
+    allowed_tools: []
+    output_type: findings
     prompt: |
-      Name up to three theories. Each is a Workhorse branch.
-  - id: gather
+      Name up to three theories for: $USER_MESSAGE. Each is a Workhorse branch.
+  - id: theory-a
+    role: workhorse
+    effort: low
+    allowed_tools: []
+    output_type: findings
+    context: fresh
+    trigger_rule: all_success
     prompt: |
-      Gather evidence for each theory. Tooling may fetch.
+      Develop theory A from $spawn-theories.output. One theory only.
     depends_on: [spawn-theories]
-  - id: pick
+  - id: theory-b
+    role: workhorse
+    effort: low
+    allowed_tools: []
+    output_type: findings
+    context: fresh
+    trigger_rule: all_success
     prompt: |
-      Planning picks the winner. Discard the rest.
+      Develop theory B from $spawn-theories.output. One theory only.
+    depends_on: [spawn-theories]
+  - id: theory-c
+    role: workhorse
+    effort: low
+    allowed_tools: []
+    output_type: findings
+    context: fresh
+    trigger_rule: all_success
+    prompt: |
+      Develop theory C from $spawn-theories.output. One theory only.
+    depends_on: [spawn-theories]
+  - id: gather
+    role: tooling
+    allowed_tools: [read, grep, bash]
+    output_type: findings
+    trigger_rule: all_done
+    prompt: |
+      Gather evidence for $theory-a.output, $theory-b.output, and $theory-c.output. Tooling may fetch.
+    depends_on: [theory-a, theory-b, theory-c]
+  - id: pick
+    role: planning
+    effort: high
+    allowed_tools: []
+    output_type: plan
+    trigger_rule: all_success
+    prompt: |
+      Planning picks the winner from $gather.output. Discard the rest.
     depends_on: [gather]

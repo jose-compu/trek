@@ -2,14 +2,12 @@ import type { AssistantMessage } from "@trek/ai";
 import { isContextOverflow } from "@trek/ai";
 import { type Component, Container, Markdown, type MarkdownTheme, Spacer, Text } from "@trek/tui";
 import { honestyDisplay, stripHonestyFooter } from "../../../core/honesty/index.ts";
+import { stripEscalateSignal } from "../../../core/runtime/escalate.ts";
+import { formatHandoffBrief, parseHandoffBriefFromText } from "../../../core/runtime/layer-decision.ts";
 import { thinkingCardTitle, thinkingCardViewport } from "../../../core/runtime/thinking-brief.ts";
 import { getMarkdownTheme, theme } from "../theme/theme.ts";
 import { cardGlyph } from "./card-glyph.ts";
 import { COMPACT_VIEWPORT_LINES, visibleCardText } from "./compact-card.ts";
-
-const OSC133_ZONE_START = "\x1b]133;A\x07";
-const OSC133_ZONE_END = "\x1b]133;B\x07";
-const OSC133_ZONE_FINAL = "\x1b]133;C\x07";
 
 /** Drop text blocks that are strict prefixes of another text block (streaming/provider artifact). */
 export function shouldRenderAssistantTextBlock(text: string, allTextBlocks: readonly string[]): boolean {
@@ -66,10 +64,22 @@ class CompactThinkingViewport implements Component {
 	}
 }
 
+function visibleAssistantText(text: string): string {
+	const stripped = stripEscalateSignal(stripHonestyFooter(text)).trim();
+	if (!stripped.startsWith("{")) {
+		return stripped;
+	}
+	const brief = parseHandoffBriefFromText(stripped);
+	if (brief) {
+		return formatHandoffBrief(brief, { omitEmpty: true });
+	}
+	return stripped;
+}
+
 function collectTrimmedTextBlocks(content: AssistantMessage["content"]): string[] {
 	return content
-		.filter((block) => block.type === "text" && block.text.trim())
-		.map((block) => (block.type === "text" ? stripHonestyFooter(block.text).trim() : ""));
+		.filter((block) => block.type === "text" && visibleAssistantText(block.text))
+		.map((block) => (block.type === "text" ? visibleAssistantText(block.text) : ""));
 }
 
 /**
@@ -82,8 +92,8 @@ export class AssistantMessageComponent extends Container {
 	private hiddenThinkingLabel: string;
 	private expanded = false;
 	private thinkingBrief = false;
+	private omitThinking = false;
 	private lastMessage?: AssistantMessage;
-	private hasToolCalls = false;
 
 	constructor(
 		message?: AssistantMessage,
@@ -92,6 +102,7 @@ export class AssistantMessageComponent extends Container {
 		hiddenThinkingLabel = "Thinking...",
 		expanded = false,
 		thinkingBrief = false,
+		omitThinking = false,
 	) {
 		super();
 
@@ -100,6 +111,7 @@ export class AssistantMessageComponent extends Container {
 		this.hiddenThinkingLabel = hiddenThinkingLabel;
 		this.expanded = expanded;
 		this.thinkingBrief = thinkingBrief;
+		this.omitThinking = omitThinking;
 
 		// Container for text/thinking content
 		this.contentContainer = new Container();
@@ -145,15 +157,11 @@ export class AssistantMessageComponent extends Container {
 		}
 	}
 
-	override render(width: number): string[] {
-		const lines = super.render(width);
-		if (this.hasToolCalls || lines.length === 0) {
-			return lines;
+	setOmitThinking(omitThinking: boolean): void {
+		this.omitThinking = omitThinking;
+		if (this.lastMessage) {
+			this.updateContent(this.lastMessage);
 		}
-
-		lines[0] = OSC133_ZONE_START + lines[0];
-		lines[lines.length - 1] = OSC133_ZONE_END + OSC133_ZONE_FINAL + lines[lines.length - 1];
-		return lines;
 	}
 
 	updateContent(message: AssistantMessage): void {
@@ -162,12 +170,19 @@ export class AssistantMessageComponent extends Container {
 		// Clear content container
 		this.contentContainer.clear();
 
+		const thinkingVisible = (thinking: string): boolean =>
+			!this.omitThinking && Boolean(stripEscalateSignal(thinking).trim());
+
 		const hasVisibleContent = message.content.some(
-			(c) => (c.type === "text" && c.text.trim()) || (c.type === "thinking" && c.thinking.trim()),
+			(c) =>
+				(c.type === "text" && visibleAssistantText(c.text)) ||
+				(c.type === "thinking" && thinkingVisible(c.thinking)),
 		);
 
 		const firstVisible = message.content.find(
-			(c) => (c.type === "text" && c.text.trim()) || (c.type === "thinking" && c.thinking.trim()),
+			(c) =>
+				(c.type === "text" && visibleAssistantText(c.text)) ||
+				(c.type === "thinking" && thinkingVisible(c.thinking)),
 		);
 		if (hasVisibleContent && (this.expanded || this.hideThinkingBlock || firstVisible?.type !== "thinking")) {
 			this.contentContainer.addChild(new Spacer(1));
@@ -178,24 +193,29 @@ export class AssistantMessageComponent extends Container {
 		// Render content in order
 		for (let i = 0; i < message.content.length; i++) {
 			const content = message.content[i];
-			if (content.type === "text" && content.text.trim()) {
-				const visible = stripHonestyFooter(content.text).trim();
+			if (content.type === "text" && visibleAssistantText(content.text)) {
+				const visible = visibleAssistantText(content.text);
 				if (!visible || !shouldRenderAssistantTextBlock(visible, trimmedTextBlocks)) {
 					continue;
 				}
 				this.contentContainer.addChild(new Markdown(visible, 1, 0, this.markdownTheme));
-				const status = honestyDisplay(content.text);
+				const status = this.omitThinking ? undefined : honestyDisplay(content.text);
 				if (status) {
 					for (const line of honestyCardLines(status)) {
 						this.contentContainer.addChild(new Text(line, 1, 0));
 					}
 				}
-			} else if (content.type === "thinking" && content.thinking.trim()) {
+			} else if (content.type === "thinking" && thinkingVisible(content.thinking)) {
+				const thinking = stripEscalateSignal(content.thinking).trim();
 				// Add spacing only when another visible assistant content block follows.
 				// This avoids a superfluous blank line before separately-rendered tool execution blocks.
 				const hasVisibleContentAfter = message.content
 					.slice(i + 1)
-					.some((c) => (c.type === "text" && c.text.trim()) || (c.type === "thinking" && c.thinking.trim()));
+					.some(
+						(c) =>
+							(c.type === "text" && visibleAssistantText(c.text)) ||
+							(c.type === "thinking" && stripEscalateSignal(c.thinking).trim()),
+					);
 
 				if (this.hideThinkingBlock) {
 					// Show static thinking label when hidden
@@ -219,10 +239,7 @@ export class AssistantMessageComponent extends Container {
 						),
 					);
 					this.contentContainer.addChild(
-						new CompactThinkingViewport(
-							content.thinking,
-							thinkingCardViewport(this.thinkingBrief ? "brief" : undefined),
-						),
+						new CompactThinkingViewport(thinking, thinkingCardViewport(this.thinkingBrief ? "brief" : undefined)),
 					);
 					if (hasVisibleContentAfter) {
 						this.contentContainer.addChild(new Spacer(1));
@@ -241,7 +258,7 @@ export class AssistantMessageComponent extends Container {
 						),
 					);
 					this.contentContainer.addChild(
-						new Markdown(content.thinking.trim(), 1, 0, this.markdownTheme, {
+						new Markdown(thinking, 1, 0, this.markdownTheme, {
 							color: (text: string) => theme.fg("thinkingText", text),
 							italic: true,
 						}),
@@ -256,7 +273,6 @@ export class AssistantMessageComponent extends Container {
 		// Check if aborted - show after partial content
 		// But only if there are no tool calls (tool execution components will show the error)
 		const hasToolCalls = message.content.some((c) => c.type === "toolCall");
-		this.hasToolCalls = hasToolCalls;
 		if (!hasToolCalls) {
 			if (message.stopReason === "aborted") {
 				const abortMessage =

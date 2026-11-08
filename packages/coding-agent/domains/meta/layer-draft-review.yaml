@@ -3,9 +3,18 @@ description: |
   Cheaper bound role drafts. Stronger bound role reviews the diff.
 nodes:
   - id: draft
+    role: workhorse
+    effort: low
+    allowed_tools: [read, write, edit]
+    output_type: code
     prompt: |
-      Draft the change. Do not apply irreversible tools.
+      Draft the change for: $USER_MESSAGE. Do not apply irreversible tools.
   - id: review-diff
+    role: planning
+    effort: high
+    allowed_tools: [read]
+    output_type: findings
+    trigger_rule: all_success
     prompt: |
-      Review the diff. Verdict before mutate.
+      Review the diff from $draft.output. Verdict before mutate.
     depends_on: [draft]

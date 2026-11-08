@@ -26,6 +26,21 @@ describe("isNewTopic / detectTopicReset", () => {
 		expect(isNewTopic("fetch https://example.com", "are you online")).toBe(false);
 	});
 
+	it("does not treat ladder navigation as a new topic", () => {
+		const tetris = "please build a tetris game in js and start locally, first do the Plan";
+		expect(isNewTopic(tetris, "move to frontier model")).toBe(false);
+		expect(isNewTopic(tetris, "scalate layering to frontier grok model")).toBe(false);
+		expect(isNewTopic(tetris, "use workhorse")).toBe(false);
+		expect(detectTopicReset(tetris, "move to frontier model").reset).toBe(false);
+		expect(
+			detectTopicReset(
+				"descalate to tooling model and grep the log",
+				"swith to planning model to plan a trip to eiffel tower pls",
+			).reset,
+		).toBe(false);
+		expect(detectTopicReset("", "use planning")).toEqual({ reset: false });
+	});
+
 	it("detects an explicit new task", () => {
 		expect(isNewTopic("Fix README.md typo", "new task: write a poem about mountains")).toBe(true);
 		expect(detectTopicReset("Fix README.md typo", "/new-topic").reason).toBe("explicit");
@@ -39,23 +54,16 @@ describe("isNewTopic / detectTopicReset", () => {
 		expect(stripNewTopicSignal(text)).toBe("ok");
 	});
 
-	it("detects unrelated long prompts via low overlap", () => {
+	it("keeps unrelated follow-ups sticky until Decision or an explicit reset", () => {
 		expect(
 			isNewTopic(
 				"Fix the typo in the title of README.md on disk",
 				"Design a REST API for inventory with Postgres and Redis caching",
 			),
-		).toBe(true);
-	});
-
-	it("detects intent shift between distinct imperatives", () => {
-		const reset = detectTopicReset(
-			"Write a hello world script that prints the date",
-			"Explain how TCP handshakes work",
-		);
-		expect(reset.reset).toBe(true);
-		expect(reset.reason).toBe("intent-shift");
-		expect(reset.label).toBe("task changed");
+		).toBe(false);
+		expect(
+			detectTopicReset("Write a hello world script that prints the date", "Explain how TCP handshakes work").reset,
+		).toBe(false);
 	});
 
 	it("detects done-then-new", () => {

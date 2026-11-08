@@ -1,5 +1,5 @@
 /**
- * Execute layer-* via Archon + cpa-agents. Mocked node replies; no live APIs.
+ * Execute layer-* via Archon waves. Independent waves use cpa-agents mapPar.
  * Run: npx vitest run test/suite/layering/layer-execute.test.ts --reporter=verbose
  */
 
@@ -9,8 +9,19 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { ArchonNode } from "../../../src/core/domains/archon.ts";
 import { parseArchonWorkflow } from "../../../src/core/domains/archon.ts";
+import { applyAutoLayering, loadCatalogFixture } from "../../../src/core/runtime/catalog-map.ts";
 import { LAYER_JOIN } from "../../../src/core/runtime/layer-decision.ts";
-import { type LayerNodeReply, layerWaves, runLayerWorkflow } from "../../../src/core/runtime/layer-execute.ts";
+import {
+	handoffRoleIds,
+	type LayerNodeReply,
+	layerContinuePrompt,
+	layerContinueTarget,
+	layerNodeRoles,
+	layerWaves,
+	runLayerWorkflow,
+} from "../../../src/core/runtime/layer-execute.ts";
+import { resolveRuntime } from "../../../src/core/runtime/resolve.ts";
+import { defaultRuntimeConfig } from "../../../src/core/runtime/types.ts";
 
 const meta = join(dirname(fileURLToPath(import.meta.url)), "../../../domains/meta");
 
@@ -33,25 +44,50 @@ function replies(map: Record<string, Partial<LayerNodeReply>>): (node: ArchonNod
 }
 
 describe("layer execute", () => {
-	it("runs independent tool-runner nodes through cpa-agents", async () => {
+	it("runs independent tool-runner nodes through cpa-agents in overlapping time", async () => {
 		const workflow = load("layer-tool-runners");
 		expect(layerWaves(workflow)).toHaveLength(1);
 		expect(layerWaves(workflow)[0]?.map((node) => node.id)).toEqual(["search", "logs", "fetch", "summarize"]);
+		const delay = 80;
+		const started: string[] = [];
 		const ran: string[] = [];
+		const t0 = performance.now();
 		const executed = await runLayerWorkflow({
 			workflow,
 			layering: "auto",
 			seed: 7,
 			runNode: async (node) => {
+				started.push(`start ${node.id}`);
+				await new Promise((resolve) => {
+					setTimeout(resolve, delay);
+				});
 				ran.push(node.id);
+				started.push(`end ${node.id}`);
 				return { id: node.id, output: node.id, evidence: [node.id], status: "ok" };
 			},
 		});
+		const elapsed = performance.now() - t0;
+		console.log("archon tool-runners ms", Math.round(elapsed), started.join(","));
 		expect(executed.schedulerUsed).toBe(true);
 		expect(executed.result.join).toBe(LAYER_JOIN);
 		expect(executed.result.status).toBe("ok");
 		expect(ran.sort()).toEqual(["fetch", "logs", "search", "summarize"]);
+		expect(started[0]).toMatch(/^start /);
+		expect(started[1]).toMatch(/^start /);
+		expect(elapsed).toBeLessThan(delay * 2.5);
 		expect(executed.result.evidence[0]).toBe("seed 7");
+	});
+
+	it("does not start CPA on a shared session (serialize)", async () => {
+		const executed = await runLayerWorkflow({
+			workflow: load("layer-tool-runners"),
+			layering: "auto",
+			seed: 7,
+			serialize: true,
+			runNode: async (node) => ({ id: node.id, output: node.id, status: "ok" }),
+		});
+		expect(executed.schedulerUsed).toBe(false);
+		expect(executed.result.status).toBe("ok");
 	});
 
 	it("does not start CPA when layering is single", async () => {
@@ -161,17 +197,62 @@ describe("layer execute", () => {
 	});
 
 	it("halts the parent when a node returns halt", async () => {
+		const ran: string[] = [];
 		const executed = await runLayerWorkflow({
 			workflow: load("layer-hypotheses"),
 			layering: "auto",
 			seed: 8,
-			runNode: replies({
-				"spawn-theories": { status: "halt", output: "budget" },
-			}),
+			runNode: async (node) => {
+				ran.push(node.id);
+				return {
+					id: node.id,
+					output: node.id === "spawn-theories" ? "budget" : node.id,
+					status: node.id === "spawn-theories" ? "halt" : "ok",
+				};
+			},
 		});
+		expect(ran).toEqual(["spawn-theories"]);
 		expect(executed.result.status).toBe("halt");
 		expect(executed.result.output).toBe("budget");
 		expect(executed.result.join).toBe(LAYER_JOIN);
+	});
+
+	it("overlaps the three hypothesis branches in one Archon wave", async () => {
+		const delay = 80;
+		const started: string[] = [];
+		const t0 = performance.now();
+		const executed = await runLayerWorkflow({
+			workflow: load("layer-hypotheses"),
+			layering: "auto",
+			seed: 12,
+			runNode: async (node) => {
+				if (node.id.startsWith("theory-")) {
+					started.push(`start ${node.id}`);
+					await new Promise((resolve) => {
+						setTimeout(resolve, delay);
+					});
+					started.push(`end ${node.id}`);
+				}
+				return {
+					id: node.id,
+					output: node.id === "pick" ? "theory B" : node.id,
+					status: "ok",
+					...(node.id === "pick" ? { winner: "theory-b" } : {}),
+				};
+			},
+		});
+		const elapsed = performance.now() - t0;
+		console.log("archon hypotheses theories ms", Math.round(elapsed), started.join(","));
+		expect(executed.schedulerUsed).toBe(true);
+		expect(executed.result.winner).toBe("theory-b");
+		expect(started.filter((row) => row.startsWith("start ")).sort()).toEqual([
+			"start theory-a",
+			"start theory-b",
+			"start theory-c",
+		]);
+		expect(started[0]).toMatch(/^start /);
+		expect(started[1]).toMatch(/^start /);
+		expect(elapsed).toBeLessThan(delay * 2.5);
 	});
 
 	it("finishes a parallel wave on halt, then skips later waves", async () => {
@@ -207,5 +288,91 @@ describe("layer execute", () => {
 		expect(executed.result.winner).toBe("theory-b");
 		expect(executed.result.output).toBe("theory B");
 		expect(executed.result.status).toBe("partial");
+	});
+
+	it("continues layer-escalate after mute handoff nodes so Workhorse/Planning can finish", () => {
+		const follow = layerContinuePrompt({
+			workflow: "layer-escalate",
+			userTask: "Debug the race. Escalate to planning with a handoff.",
+			joinOutput: "Workhorse next: write hypotheses then one failing repro.",
+		});
+		expect(follow).toMatch(/^Continue the layering task\./);
+		expect(follow).toMatch(/Use tools/);
+		expect(follow).toMatch(/hypotheses then one failing repro/);
+		expect(
+			layerContinuePrompt({ workflow: "layer-tool-runners", userTask: "grep the log", joinOutput: "ok" }),
+		).toBeUndefined();
+		expect(layerContinueTarget("layer-consult")).toBe("consult");
+		expect(
+			layerContinuePrompt({
+				workflow: "layer-consult",
+				userTask: "consult frontier. Architect a migration. Consult only.",
+				joinOutput: "consult result",
+			}),
+		).toMatch(/Consult only/);
+		expect(layerContinueTarget("layer-descalate")).toBe("workhorse");
+	});
+
+	it("pins escalate/descalate/consult/hypotheses roles and maps them to Grok SKUs", () => {
+		expect(layerNodeRoles(load("layer-escalate"))).toEqual(["workhorse", "planning", "planning"]);
+		expect(layerNodeRoles(load("layer-descalate"))).toEqual(["planning", "planning", "workhorse"]);
+		expect(layerNodeRoles(load("layer-consult"))).toEqual(["workhorse", "frontier", "frontier"]);
+		expect(layerNodeRoles(load("layer-hypotheses"))).toEqual([
+			"workhorse",
+			"workhorse",
+			"workhorse",
+			"workhorse",
+			"tooling",
+			"planning",
+		]);
+		expect(layerWaves(load("layer-hypotheses")).map((wave) => wave.map((node) => node.id))).toEqual([
+			["spawn-theories"],
+			["theory-a", "theory-b", "theory-c"],
+			["gather"],
+			["pick"],
+		]);
+		const catalogs = join(dirname(fileURLToPath(import.meta.url)), "fixtures/catalogs");
+		const grok = resolveRuntime(
+			applyAutoLayering(defaultRuntimeConfig(), loadCatalogFixture(join(catalogs, "xai.json"))),
+		);
+		expect(handoffRoleIds(grok.roles, ["workhorse", "planning", "frontier"])).toEqual([
+			"grok-4.3",
+			"grok-4.5",
+			"grok-4.20-multi-agent",
+		]);
+		expect(handoffRoleIds(grok.roles, layerNodeRoles(load("layer-escalate")))).toEqual([
+			"grok-4.3",
+			"grok-4.5",
+			"grok-4.5",
+		]);
+	});
+
+	it("parses a labeled handoff-brief reply into the five-field brief on join", async () => {
+		const executed = await runLayerWorkflow({
+			workflow: load("layer-escalate"),
+			layering: "auto",
+			seed: 11,
+			runNode: async (node) => ({
+				id: node.id,
+				output:
+					node.id === "handoff-brief"
+						? "goal: debug concurrent-queue race; constraints: plan then one repro; tried: same edit failed twice; evidence: writers corrupt shared map; open: root cause still unclear."
+						: node.id,
+				status: "ok",
+			}),
+		});
+		expect(executed.result.handoff).toMatchObject({
+			goal: "debug concurrent-queue race",
+			tried: "same edit failed twice",
+			openQuestion: "root cause still unclear.",
+		});
+		expect(
+			layerContinuePrompt({
+				workflow: "layer-escalate",
+				userTask: "Debug the race.",
+				joinOutput: executed.result.output,
+				handoff: executed.result.handoff,
+			}),
+		).toMatch(/Handoff brief:/);
 	});
 });

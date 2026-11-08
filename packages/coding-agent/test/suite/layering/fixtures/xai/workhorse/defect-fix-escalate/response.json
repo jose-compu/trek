@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"escalate\":\"planning\",\"why\":\"lint error in src/foo.ts with handoff requested\"}"
+			}
+		}
+	]
+}
