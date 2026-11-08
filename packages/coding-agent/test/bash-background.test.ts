@@ -5,7 +5,10 @@ import {
 	formatBackgroundedBash,
 	isServerReadyOutput,
 	looksLikeServerCommand,
+	MAX_TIMEOUT_SECONDS,
 	resolveBlockUntilMs,
+	resolveTimeoutSeconds,
+	SERVER_BLOCK_UNTIL_MS,
 } from "../src/core/tools/bash-background.ts";
 import { killProcessTree } from "../src/utils/shell.ts";
 
@@ -36,20 +39,39 @@ describe("looksLikeServerCommand", () => {
 });
 
 describe("resolveBlockUntilMs", () => {
-	it("defaults every command to 8s", () => {
-		expect(resolveBlockUntilMs("python3 -m http.server 8000")).toBe(DEFAULT_BLOCK_UNTIL_MS);
+	it("defaults every command to 8s, servers to 1.5s", () => {
+		expect(resolveBlockUntilMs("python3 -m http.server 8000")).toBe(SERVER_BLOCK_UNTIL_MS);
 		expect(resolveBlockUntilMs("echo hi")).toBe(DEFAULT_BLOCK_UNTIL_MS);
 	});
 
 	it("honors an explicit wait, and 0 means wait for exit", () => {
 		expect(resolveBlockUntilMs("sleep 30", 250)).toBe(250);
-		expect(resolveBlockUntilMs("python3 -m http.server", 0)).toBeUndefined();
+		expect(resolveBlockUntilMs("sleep 30", 0)).toBeUndefined();
+	});
+
+	it("does not wait for exit on http.server even when the model passes 0 or a huge wait", () => {
+		expect(resolveBlockUntilMs("python3 -m http.server 8000", 0)).toBe(SERVER_BLOCK_UNTIL_MS);
+		expect(resolveBlockUntilMs("python3 -m http.server", 8000000)).toBe(SERVER_BLOCK_UNTIL_MS);
+	});
+});
+
+describe("resolveTimeoutSeconds", () => {
+	it("ignores timeout on server-like commands so 8000s cannot stall the turn", () => {
+		expect(resolveTimeoutSeconds("python3 -m http.server 8000", 8000)).toBeUndefined();
+		expect(resolveTimeoutSeconds("npx vite", 8000)).toBeUndefined();
+	});
+
+	it("caps ordinary command timeouts", () => {
+		expect(resolveTimeoutSeconds("sleep 30", 30)).toBe(30);
+		expect(resolveTimeoutSeconds("sleep 30", 8000)).toBe(MAX_TIMEOUT_SECONDS);
 	});
 });
 
 describe("isServerReadyOutput", () => {
 	it("matches python http.server bind lines", () => {
 		expect(isServerReadyOutput("Serving HTTP on 127.0.0.1 port 62593 (http://127.0.0.1:62593/) ...")).toBe(true);
+		expect(isServerReadyOutput("Serving HTTP on :: port 8000 (http://[::]:8000/) ...")).toBe(true);
+		expect(isServerReadyOutput('::1 - - [08/Nov/2026 15:56:28] "GET /calculator.js HTTP/1.1" 404 -')).toBe(true);
 		expect(isServerReadyOutput("error: address already in use")).toBe(false);
 	});
 });
@@ -111,6 +133,21 @@ describe("bash background", () => {
 		expect(result.details?.backgrounded).toBeUndefined();
 		expect(getText(result)).toContain("ready");
 		expect(getText(result)).not.toContain("Started in background");
+	});
+
+	it("backgrounds http.server even when the model passes timeout 8000 and block_until_ms 0", async () => {
+		const bash = createBashTool(process.cwd());
+		const started = Date.now();
+		const result = await bash.execute("bg-http", {
+			command: "python3 -m http.server 0",
+			timeout: 8000,
+			block_until_ms: 0,
+		});
+		const elapsed = Date.now() - started;
+		expect(elapsed).toBeLessThan(5000);
+		expect(result.details?.backgrounded).toBe(true);
+		expect(getText(result)).toContain("Started in background");
+		killProcessTree(result.details?.pid as number);
 	});
 });
 

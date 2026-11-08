@@ -8,6 +8,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 - `/hierarchy` status is an aligned card: layering / mode / suite / file, then climb and runner lines, then Role / Source / Provider / Model / Think. Unset roles show `unset`.
 - Layered API Workhorse is told bash can reach the network. Weather, URLs, and live facts auto-delegate to Tooling when that runner is bound. Capability follow-ups do not drop to Decision.
+- `python -m http.server` (and other server-like bash) ignores `timeout: 8000` and `block_until_ms: 0` so the turn does not stay on Working... while the server runs.
 
 ## [0.18.0] - 2026-11-07
 

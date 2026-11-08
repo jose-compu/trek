@@ -16,7 +16,13 @@ import {
 	untrackDetachedChildPid,
 } from "../../utils/shell.ts";
 import type { ToolDefinition, ToolRenderResultOptions } from "../extensions/types.ts";
-import { formatBackgroundedBash, isServerReadyOutput, resolveBlockUntilMs } from "./bash-background.ts";
+import {
+	formatBackgroundedBash,
+	isServerReadyOutput,
+	looksLikeServerCommand,
+	resolveBlockUntilMs,
+	resolveTimeoutSeconds,
+} from "./bash-background.ts";
 import { bashRecipeSuggestion } from "./bash-recipes.ts";
 import { OutputAccumulator } from "./output-accumulator.ts";
 import { getTextOutput, invalidArgText, str } from "./render-utils.ts";
@@ -29,7 +35,7 @@ const bashSchema = Type.Object({
 	block_until_ms: Type.Optional(
 		Type.Number({
 			description:
-				"Wait this many milliseconds then leave the process running and return. 0 waits for exit. Server-like commands (python -m http.server, vite, npm start, …) default to 8000. Unlike timeout, the process is not killed.",
+				"Wait this many milliseconds then leave the process running and return. 0 waits for exit. Server-like commands (python -m http.server, vite, npm start, …) return after 1.5s and ignore timeout. Unlike timeout, the process is not killed.",
 		}),
 	),
 });
@@ -282,7 +288,9 @@ function firstCommandLine(command: string): string {
 function formatBashCall(args: { command?: string; timeout?: number } | undefined, compact = false): string {
 	const command = str(args?.command);
 	const timeout = args?.timeout as number | undefined;
-	const timeoutSuffix = timeout ? theme.fg("muted", ` (timeout ${timeout}s)`) : "";
+	const shownTimeout =
+		command && looksLikeServerCommand(command) ? undefined : resolveTimeoutSeconds(command ?? "", timeout);
+	const timeoutSuffix = shownTimeout ? theme.fg("muted", ` (timeout ${shownTimeout}s)`) : "";
 	let commandDisplay = command === null ? invalidArgText(theme) : command ? command : theme.fg("toolOutput", "...");
 	if (compact && command) {
 		commandDisplay = firstCommandLine(command);
@@ -391,7 +399,7 @@ export function createBashToolDefinition(
 		name: "bash",
 		label: "bash",
 		reversibilityTier: "gated",
-		description: `Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). If truncated, full output is saved to a temp file. A still-running command returns after 8s and keeps running (so http.server does not block the turn); it also returns as soon as it prints a listen/bind line. timeout kills the process. block_until_ms: 0 waits for exit. Recipes: ${bashRecipeSuggestion()}.`,
+		description: `Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). If truncated, full output is saved to a temp file. A still-running command returns after 8s and keeps running. Server-like commands (python -m http.server, vite, npm start) return after 1.5s, ignore timeout, and ignore block_until_ms: 0. They also return as soon as they print a listen/bind line. timeout kills other processes. Recipes: ${bashRecipeSuggestion()}.`,
 		promptSnippet: "Execute bash commands (ls, grep, find, etc.)",
 		parameters: bashSchema,
 		async execute(
@@ -501,7 +509,7 @@ export function createBashToolDefinition(
 					const result = await ops.exec(spawnContext.command, spawnContext.cwd, {
 						onData: handleData,
 						signal,
-						timeout,
+						timeout: resolveTimeoutSeconds(command, timeout),
 						blockUntilMs: resolveBlockUntilMs(command, block_until_ms),
 						env: spawnContext.env,
 					});
