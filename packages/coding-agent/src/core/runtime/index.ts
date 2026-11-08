@@ -218,7 +218,6 @@ export {
 export {
 	classifyLongTaskResume,
 	isLongTaskPrompt,
-	LONG_TASK_MAX_CONTINUES,
 	longTaskContinuePrompt,
 	looksLikeLongTaskDone,
 	looksLikePartialMilestone,

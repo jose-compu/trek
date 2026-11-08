@@ -7,7 +7,6 @@ import { describe, expect, it } from "vitest";
 import {
 	classifyLongTaskResume,
 	isLongTaskPrompt,
-	LONG_TASK_MAX_CONTINUES,
 	longTaskContinuePrompt,
 	looksLikeLongTaskDone,
 	looksLikePartialMilestone,
@@ -15,11 +14,12 @@ import {
 } from "../src/core/runtime/index.ts";
 
 describe("long task pin", () => {
-	it("pins until-complete language and not a single continue", () => {
+	it("pins continue and start-building language", () => {
 		expect(isLongTaskPrompt("load autopilot skill and continue until you complete the whole v6")).toBe(true);
 		expect(isLongTaskPrompt("don't stop until v6 is done")).toBe(true);
-		expect(isLongTaskPrompt("continue")).toBe(false);
-		expect(isLongTaskPrompt("start building pls v6")).toBe(false);
+		expect(isLongTaskPrompt("continue")).toBe(true);
+		expect(isLongTaskPrompt("start building pls v6")).toBe(true);
+		expect(isLongTaskPrompt("what is 2+2")).toBe(false);
 	});
 
 	it("resumes after a milestone yield and stops when the task is done", () => {
@@ -29,7 +29,6 @@ describe("long task pin", () => {
 		expect(
 			shouldResumeLongTask({
 				pinned: true,
-				continues: 0,
 				assistantText: partial,
 				queued: false,
 			}),
@@ -39,7 +38,6 @@ describe("long task pin", () => {
 		expect(
 			shouldResumeLongTask({
 				pinned: true,
-				continues: 1,
 				assistantText: "v6.0.0 is complete. Release published.",
 				queued: false,
 			}),
@@ -47,17 +45,15 @@ describe("long task pin", () => {
 		expect(
 			shouldResumeLongTask({
 				pinned: true,
-				continues: LONG_TASK_MAX_CONTINUES,
 				assistantText: partial,
 				queued: false,
 			}),
-		).toBe(false);
+		).toBe(true);
 		expect(longTaskContinuePrompt("complete the whole v6")).toMatch(/Do not stop after one commit/);
 		expect(longTaskContinuePrompt("complete the whole v6")).toMatch(/escalate/);
 		expect(
 			shouldResumeLongTask({
 				pinned: true,
-				continues: 0,
 				assistantText: partial,
 				queued: false,
 				hold: true,

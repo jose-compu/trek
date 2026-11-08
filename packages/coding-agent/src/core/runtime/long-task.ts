@@ -7,10 +7,8 @@
 import { parseDelegateAsk, parseDescalateAsk, parseEscalateAsk } from "./escalate.ts";
 import { parseNewTopicSignal } from "./new-topic.ts";
 
-export const LONG_TASK_MAX_CONTINUES = 8;
-
 const LONG_TASK =
-	/\b(?:until you (?:complete|finish|done)|complete the whole|finish the whole|finish all|don'?t stop|do not stop|keep going until|keep building until|without stopping|run until done|autopilot)\b/i;
+	/\b(?:until you (?:complete|finish|done)|complete the whole|finish the whole|finish all|don'?t stop|do not stop|keep going(?: until)?|keep building(?: until)?|start building|start working|without stopping|run until done|autopilot|continue)\b/i;
 
 const PARTIAL =
 	/\b(?:next:|will keep|remaining|milestone|progress is ongoing|started v\d|bumped versions|preparing the release|next milestone|pushed\.?$)\b/i;
@@ -41,7 +39,6 @@ export function looksLikeLongTaskDone(text: string): boolean {
 
 export function shouldResumeLongTask(input: {
 	pinned: boolean;
-	continues: number;
 	assistantText: string;
 	queued: boolean;
 	stopReason?: string;
@@ -51,9 +48,6 @@ export function shouldResumeLongTask(input: {
 		return false;
 	}
 	if (input.stopReason === "error" || input.stopReason === "aborted") {
-		return false;
-	}
-	if (input.continues >= LONG_TASK_MAX_CONTINUES) {
 		return false;
 	}
 	const text = stripForMatch(input.assistantText);

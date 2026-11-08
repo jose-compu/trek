@@ -280,7 +280,6 @@ import { LOCAL_SUITE_WORK_SECTION } from "./runtime/local-work.ts";
 import {
 	classifyLongTaskResume,
 	isLongTaskPrompt,
-	LONG_TASK_MAX_CONTINUES,
 	longTaskContinuePrompt,
 	looksLikeLongTaskDone,
 	shouldResumeLongTask,
@@ -4989,14 +4988,13 @@ export class AgentSession {
 		if (
 			!shouldResumeLongTask({
 				pinned: Boolean(pin),
-				continues: pin?.continues ?? 0,
 				assistantText,
 				queued: this.agent.hasQueuedMessages(),
 				stopReason,
 				hold: this._longTaskHold > 0 || this._muteThinking,
 			})
 		) {
-			if (pin && (pin.continues >= LONG_TASK_MAX_CONTINUES || looksLikeLongTaskDone(assistantText))) {
+			if (pin && looksLikeLongTaskDone(assistantText)) {
 				this._longTask = undefined;
 			}
 			return false;
@@ -5009,7 +5007,7 @@ export class AgentSession {
 		pin.continues += 1;
 		this._emit({
 			type: "hierarchy_escalate",
-			text: `· ${floor} · continue ${pin.continues}/${LONG_TASK_MAX_CONTINUES}`,
+			text: `· ${floor} · continue ${pin.continues}`,
 			from: floor,
 			to: floor,
 		});

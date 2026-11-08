@@ -89,6 +89,7 @@ describe("layer intent", () => {
 		expect(isKeepGoingPrompt("ok read plan and build it")).toBe(true);
 		expect(isKeepGoingPrompt("new task: write a haiku about rain")).toBe(false);
 		expect(isLongTaskPrompt("load autopilot skill and continue until you complete the whole v6")).toBe(true);
-		expect(isLongTaskPrompt("continue")).toBe(false);
+		expect(isLongTaskPrompt("continue")).toBe(true);
+		expect(isLongTaskPrompt("start building pls v6")).toBe(true);
 	});
 });
