@@ -3,17 +3,28 @@ description: |
   Look at a repeated incident: MTTR over target, alert fatigue, or toil that is still manual.
 nodes:
   - id: name-repeat
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Name the incident and whether it happened again inside 30 days.
   - id: timeline
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Give the short timeline. Mark what is measured and what is recalled.
     depends_on: [name-repeat]
   - id: manual-step
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Name the manual step, the noisy alert, or the toil.
     depends_on: [timeline]
   - id: one-change
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Propose one runbook or automation change. Do not page anyone.
     depends_on: [manual-step]

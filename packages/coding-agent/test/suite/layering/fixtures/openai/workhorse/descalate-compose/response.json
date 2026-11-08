@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"action\":\"descalate\",\"target\":\"workhorse\",\"thinking\":\"brief\",\"confidence\":\"high\",\"reason\":\"named steps remain\",\"evidence\":[\"lint then test\"]}"
+			}
+		}
+	]
+}

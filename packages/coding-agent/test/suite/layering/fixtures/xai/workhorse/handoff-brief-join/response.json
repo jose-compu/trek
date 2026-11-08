@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "goal: fix lint in src/foo.ts; constraints: smallest change; tried: two identical edits; evidence: type mismatch on line 12; open: which check proves it."
+			}
+		}
+	]
+}

@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"descalate\":\"workhorse\",\"why\":\"One-line typo rename left; workhorse is enough\"}"
+			}
+		}
+	]
+}

@@ -1,0 +1,1 @@
+consult frontier. Architect a zero-downtime migration from a single-node SQLite ledger to Postgres with dual-write, cutover, and rollback. Consult only. Do not edit files yet.

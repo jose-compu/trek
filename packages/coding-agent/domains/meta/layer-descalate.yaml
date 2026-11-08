@@ -1,15 +1,28 @@
 name: layer-descalate
 description: |
-  Planning or Frontier hands named steps back to Workhorse.
+  Planning writes the handoff and named steps, then Workhorse acts.
 nodes:
   - id: handoff-brief
+    role: planning
+    effort: medium
+    allowed_tools: []
+    output_type: findings
     prompt: |
-      Fill goal, constraints, what was tried, evidence, and the open question.
+      Fill goal, constraints, what was tried, evidence, and the open question for: $USER_MESSAGE
   - id: named-steps
+    role: planning
+    allowed_tools: []
+    output_type: plan
+    trigger_rule: all_success
     prompt: |
-      Name the remaining mechanical steps. No new architecture.
+      Name the remaining mechanical steps from $handoff-brief.output. No new architecture.
     depends_on: [handoff-brief]
   - id: workhorse-act
+    role: workhorse
+    effort: low
+    allowed_tools: [read, write, edit, bash]
+    output_type: code
+    trigger_rule: all_success
     prompt: |
-      Hand the named steps to Workhorse.
+      Hand the named steps to Workhorse: $named-steps.output
     depends_on: [named-steps]

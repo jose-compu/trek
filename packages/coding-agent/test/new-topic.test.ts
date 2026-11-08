@@ -26,6 +26,14 @@ describe("isNewTopic / detectTopicReset", () => {
 		expect(isNewTopic("fetch https://example.com", "are you online")).toBe(false);
 	});
 
+	it("does not treat ladder navigation as a new topic", () => {
+		const tetris = "please build a tetris game in js and start locally, first do the Plan";
+		expect(isNewTopic(tetris, "move to frontier model")).toBe(false);
+		expect(isNewTopic(tetris, "scalate layering to frontier grok model")).toBe(false);
+		expect(isNewTopic(tetris, "use workhorse")).toBe(false);
+		expect(detectTopicReset(tetris, "move to frontier model").reset).toBe(false);
+	});
+
 	it("detects an explicit new task", () => {
 		expect(isNewTopic("Fix README.md typo", "new task: write a poem about mountains")).toBe(true);
 		expect(detectTopicReset("Fix README.md typo", "/new-topic").reason).toBe("explicit");

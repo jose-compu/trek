@@ -1,0 +1,13 @@
+{
+	"kind": "mechanical",
+	"startRole": "planning",
+	"boundId": "grok-4.5",
+	"reply": "none",
+	"liveNetwork": false,
+	"autoDelegate": false,
+	"domain": "coding",
+	"workflow": "defect-fix",
+	"layer_workflow": "layer-escalate",
+	"continueTarget": "planning",
+	"handoffGoal": "fix lint in src/foo.ts"
+}

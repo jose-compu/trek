@@ -1,15 +1,40 @@
 name: layer-escalate
 description: |
-  Climb to Planning with a handoff brief, then a plan and the steps back.
+  Workhorse writes the handoff brief, Planning takes the plan and the steps back.
 nodes:
   - id: handoff-brief
+    role: workhorse
+    effort: low
+    allowed_tools: []
+    output_type: findings
+    output_format:
+      type: object
+      additionalProperties: false
+      required: [goal, constraints, tried, evidence, openQuestion]
+      properties:
+        goal: { type: string }
+        constraints: { type: string }
+        tried: { type: string }
+        evidence: { type: array, items: { type: string } }
+        openQuestion: { type: string }
     prompt: |
-      Fill goal, constraints, what was tried, evidence, and the open question.
+      Fill goal, constraints, what was tried, evidence, and the open question for: $USER_MESSAGE
   - id: plan
+    role: planning
+    effort: high
+    allowed_tools: []
+    output_type: plan
+    context: shared
+    trigger_rule: all_success
     prompt: |
-      Write a short plan. Do not repeat failed steps.
+      Write a short plan from $handoff-brief.output. Do not repeat failed steps.
     depends_on: [handoff-brief]
   - id: steps-back
+    role: planning
+    effort: medium
+    allowed_tools: []
+    output_type: plan
+    trigger_rule: all_success
     prompt: |
-      Name the steps Workhorse should take after this climb.
+      Name the steps Workhorse should take after this climb. Plan: $plan.output
     depends_on: [plan]

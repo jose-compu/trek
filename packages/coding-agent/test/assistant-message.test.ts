@@ -31,15 +31,16 @@ function createAssistantMessage(content: AssistantMessage["content"]): Assistant
 }
 
 describe("AssistantMessageComponent", () => {
-	test("adds OSC 133 zone markers to assistant messages without tool calls", () => {
+	test("does not paint OSC 133 zone markers on assistant messages", () => {
 		initTheme("dark");
 
 		const component = new AssistantMessageComponent(createAssistantMessage([{ type: "text", text: "hello" }]));
-		const lines = component.render(40);
+		const rendered = component.render(40).join("\n");
 
-		expect(lines).not.toHaveLength(0);
-		expect(lines[0]).toContain(OSC133_ZONE_START);
-		expect(lines[lines.length - 1].startsWith(OSC133_ZONE_END + OSC133_ZONE_FINAL)).toBe(true);
+		expect(rendered).toContain("hello");
+		expect(rendered.includes(OSC133_ZONE_START)).toBe(false);
+		expect(rendered.includes(OSC133_ZONE_END)).toBe(false);
+		expect(rendered.includes(OSC133_ZONE_FINAL)).toBe(false);
 	});
 
 	test("does not add OSC 133 zone markers when assistant message contains tool calls", () => {
@@ -106,6 +107,26 @@ describe("AssistantMessageComponent", () => {
 		const expanded = component.render(80).join("\n");
 		expect(expanded).toContain("one");
 		expect(expanded).toContain("five");
+	});
+
+	test("omitThinking hides step-prompt reasoning", () => {
+		initTheme("dark");
+		const component = new AssistantMessageComponent(
+			createAssistantMessage([
+				{ type: "thinking", thinking: "I must answer this Archon node in one line." },
+				{ type: "text", text: "Named remaining steps." },
+			]),
+			false,
+			getMarkdownTheme(),
+			"Thinking...",
+			false,
+			false,
+			true,
+		);
+		const rendered = component.render(80).join("\n");
+		expect(rendered).toContain("Named remaining steps.");
+		expect(rendered).not.toContain("Archon");
+		expect(rendered).not.toContain("thinking");
 	});
 
 	test("thinking briefly uses a compact title and a 1–2 line viewport", () => {

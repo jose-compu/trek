@@ -1,0 +1,1 @@
+grep the log for the last TypeError and summarize the failing path. Search only.

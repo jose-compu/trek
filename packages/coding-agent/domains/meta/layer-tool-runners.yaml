@@ -3,14 +3,29 @@ description: |
   Workhorse or Planning delegates search, logs, fetch, and summarize to Tooling. Independent nodes run in parallel.
 nodes:
   - id: search
+    role: tooling
+    allowed_tools: [grep, read]
+    output_type: findings
+    when: "$USER_MESSAGE contains 'grep' || $USER_MESSAGE contains 'search' || $USER_MESSAGE contains 'log'"
     prompt: |
-      Search the repo or logs. Read-only.
+      Search the repo or logs for: $USER_MESSAGE. Read-only.
   - id: logs
+    role: tooling
+    allowed_tools: [read, bash]
+    output_type: findings
+    when: "$USER_MESSAGE contains 'log' || $USER_MESSAGE contains 'TypeError'"
     prompt: |
-      Fetch recent logs for the failing path.
+      Fetch recent logs for the failing path in: $USER_MESSAGE
   - id: fetch
+    role: tooling
+    allowed_tools: [bash]
+    output_type: findings
+    when: "$USER_MESSAGE contains 'fetch' || $USER_MESSAGE contains 'http' || $USER_MESSAGE contains 'weather'"
     prompt: |
-      Fetch a URL or file the Workhorse named.
+      Fetch a URL or file the Workhorse named: $USER_MESSAGE
   - id: summarize
+    role: tooling
+    allowed_tools: []
+    output_type: findings
     prompt: |
-      Summarize long output for the parent role.
+      Summarize long output for the parent role. Turn: $USER_MESSAGE

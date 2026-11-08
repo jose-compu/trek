@@ -1,0 +1,8 @@
+{
+	"action": "descalate",
+	"target": "workhorse",
+	"workflow": "none",
+	"layer_workflow": "layer-descalate",
+	"layering": "auto",
+	"continueTarget": "workhorse"
+}

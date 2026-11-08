@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"action\":\"continue\",\"target\":\"workhorse\",\"thinking\":\"off\",\"confidence\":\"high\",\"reason\":\"finance DAG only\",\"evidence\":[\"account 4100\"]}"
+			}
+		}
+	]
+}

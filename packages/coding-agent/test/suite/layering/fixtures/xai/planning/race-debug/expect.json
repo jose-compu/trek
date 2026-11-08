@@ -1,0 +1,8 @@
+{
+	"kind": "deep",
+	"startRole": "planning",
+	"boundId": "grok-4.5",
+	"reply": "none",
+	"liveNetwork": false,
+	"autoDelegate": false
+}

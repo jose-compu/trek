@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "Understood—reverting to decision mode. What's the current decision point or options to evaluate?"
+			}
+		}
+	]
+}

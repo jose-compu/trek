@@ -6,7 +6,7 @@ Trek can run one API chat model, or a local / hybrid **ladder** of roles. Each t
 
 | Mode | Behavior |
 | --- | --- |
-| `api` | Factory `single`: one session Frontier. `layering: auto` with bound Workhorse climbs remote SKUs. No llama.cpp. Decision optional later via Liquid API. |
+| `api` | Factory `single`: one session Frontier. `layering: auto` with bound Workhorse climbs remote SKUs. No llama.cpp. Decision is the catalog cheap chat (Grok Fast / Luna / Haiku), not local d1. |
 | `local` | Decision → Workhorse → Planning. Tooling is a runner. No Frontier. |
 | `hybrid` | Same as local, plus Frontier (API) at the top. |
 
@@ -19,7 +19,7 @@ Configure with `trek models set-mode …`, `~/.trek/models.yaml`, project `.trek
 | Value | Behavior |
 | --- | --- |
 | `single` | One Workhorse. `/hierarchy single` and `trek models set-layering single` clear extra roles. |
-| `auto` | `/hierarchy auto --catalog <file>` maps chat slots from that catalog (tags, thinking, price — not SKU names). One chat model stays `single`. Verifier and Decision stay unbound. Without `--catalog`, only the flag is stored. |
+| `auto` | `/hierarchy auto --catalog <file>` maps chat slots from that catalog (tags, thinking, price — not SKU names). Decision is `kind: decision` or the cheapest chat (`thinking: off`). Verifier stays unbound. One chat model stays `single`. Without `--catalog`, only the flag is stored. |
 | `manual` | Suite extras plus any `/hierarchy role` or `trek models set-role` write. `--clear` unbinds one role so the suite preset cannot fill it. |
 
 Role `thinking` is `off`, `brief`, or `deep`. YAML `true`/`on` still means deep; `false`/`off` means off. `/thinking briefly|deep|off` pins that for the session. `LayerDecision.thinking: brief` wins over the pin and the role default. Brief is a compact **thinking briefly** card (1–2 lines); the #108 128-token floor stays on tool turns. `/thinking deep` restores the 0.17 thinking card and skips that floor. Frontier and verifier may use `source: local` or `lmstudio`. In `single`, local/hybrid resolve only Decision, Workhorse, embedding, and reranker — not Tooling, Planning, Frontier, or verifier. The climb is Workhorse ⇄ Planning ⇄ Frontier. Tooling is a delegate runner, not a rung.
@@ -34,6 +34,8 @@ Per-role `source` wins over `hierarchy.mode`. An api session may still start lla
 
 Layered API sessions pin that bash can reach the network. Weather, URLs, and live facts auto-delegate to Tooling when that runner is bound (`→ workhorse ⇄ tooling`). Workhorse must not claim it has no internet. A capability follow-up (`do you have internet access?`) does not drop to Decision.
 
+Prompts can move the session: `move to frontier`, `use planning`, `escalate to frontier`, `use workhorse`. Those are ladder navigation, not a new topic, and they bind that SKU. A true new task parks on the catalog Decision (Grok Fast / Luna / Haiku); leftover local d1 is never parked on an api stack.
+
 A turn may run the domain Archon DAG and a `layer-*` DAG together. The cycle trace stores `workflow` (domain) and `layer_workflow`. Prompt nodes follow the current role unless the node sets `role: workhorse|planning|tooling`. `layering: single` leaves `layer_workflow` as `none`.
 
 Domain lessons stay on that domain’s `lessons.yaml` when roles climb. Workhorse writes the lesson. Meta adds `misroute`, `over_escalate`, `over_think`, `runner_miss`, `verifier_reject`, and `budget_stop`. Recalled lessons are tagged with the role about to act. Promotion still needs a Yes.
@@ -47,13 +49,13 @@ Decision  →  Workhorse  ⇄  Planning  ⇄  Frontier
              Tooling (runner)
 ```
 
-1. **Decision** (0.16) — Liquid AI **d1** decision model. One forward pass, **zero generated tokens**. Classifies the turn: handle / route Scripts or Workhorse. Not a chat model; not started as llama-server.
+1. **Decision** — Local Liquid / LFM: **d1** (one forward pass, zero generated tokens). API stacks: cheapest catalog chat with thinking off (xAI `grok-4.1-fast`, OpenAI Luna, Anthropic Haiku). Idle park and new-topic floor only on api; the d1 Index stays Liquid-local.
 2. **Workhorse** — Default Act model. Read-before-write enforced. Starts the climb after Decision.
 3. **Planning** — Thinking / plan brief; may act after elevation. Read-before-write enforced.
 4. **Frontier** — Deep debug, research, hard architecture. Unbound Frontier aliases Planning with deep thinking. Default is API (hybrid). `source: local` or `lmstudio` is allowed.
 5. **Tooling** — Optional runner for search / logs / fetch / summarize. Workhorse or Planning **delegate** here. Decision never routes a user turn to Tooling.
 
-**Policy:** new sessions and idle LFM/hybrid consoles park on **Decision** (footer shows d1). Generative work routes Decision → Workhorse. After a climb, the floor **sticks** for the same topic until a new topic, an escalate, or a descalate.
+**Policy:** new sessions park on **Decision** (footer shows d1 on Liquid; Grok Fast / Luna / Haiku on api). Generative work routes Decision → Workhorse. After a climb, the floor **sticks** for the same topic until a new topic, an escalate, or a descalate.
 
 Climb on:
 

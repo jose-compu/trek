@@ -75,22 +75,48 @@ const DELEGATE_JSON = /\{\s*"(?:delegate|action)"\s*:\s*"(?:delegate|tooling)"[\
 
 const DELEGATE_LOOSE = /\b(?:delegate|hand off) to tooling\b|"target"\s*:\s*"tooling"/i;
 
+/** User names the Tooling runner. Not a ladder drop, not a climb. */
+const USER_DELEGATE =
+	/(?:^|\s)(?:(?:\/)?(?:delegate|descalate|use|move|switch|go|hand\s*off)(?:\s+(?:layering|the\s+ladder))?(?:\s+to)?(?:\s+the)?\s+tooling(?:\s+model)?)\b/i;
+
 // Soft stuck only — do NOT match "Escalate to tooling? No." (tiny models refuse and babble).
 const STUCK =
 	/\b(i(?:'m| am) (?:stuck|unsure|confused)|need (?:a )?(?:plan|help|guidance|stronger model)|too (?:hard|complex|ambiguous)|cannot (?:decide|design|architect)|escalation needed|please escalate|ask (?:planning|workhorse|frontier)|hand off to (?:planning|frontier|workhorse))\b/i;
 
 /** Soft drop — Planning/Frontier handing simple remaining work down. Not a Tooling bind. */
 const SIMPLE_AGAIN =
-	/\b(this is (?:simple|easy|trivial)|simple (?:edit|fix|typo|rename)|hand off to workhorse|descalat(?:e|ion)(?:\s+needed)?|please descalate|too (?:much|heavy|strong) (?:a )?model|overkill|drop (?:to|down)|go back to (?:workhorse|decision)|new topic(?:\s+now)?|user switched (?:task|topic))\b/i;
+	/\b(this is (?:simple|easy|trivial)|simple (?:edit|fix|typo|rename)|hand off to workhorse|please descalate|descalat(?:e|ion) needed|too (?:much|heavy|strong) (?:a )?model|overkill|drop (?:to|down)|go back to (?:workhorse|decision)|new topic(?:\s+now)?|user switched (?:task|topic))\b/i;
 
 /** User asks to drop a tier (or to a named lower role). "use tooling" is a runner, not a drop. */
 const USER_DESCALATE =
-	/^(?:\/descalate\b|descalate(?:\s+to\s+(?:workhorse|planning|decision))?|use (?:the )?workhorse(?:\s+model)?|go back to (?:workhorse|decision)|simpler model|↓\s*(?:workhorse|planning|decision)?)\b/i;
+	/^(?:\/descalate\b(?!\s+to\s+tooling)|descalate(?!\s+to\s+tooling)(?:\s+to\s+(?:workhorse|planning|decision))?|(?:use|move(?:\s+to)?|switch(?:\s+to)?|go(?:\s+to)?)(?:\s+the)?\s+workhorse(?:\s+model)?|go back to (?:workhorse|decision)|simpler model|↓\s*(?:workhorse|planning|decision)?)\b/i;
+
+/** User asked to climb (not a model stuck-phrase). Tooling is never a climb. */
+const USER_ESCALATE =
+	/(?:^|\s)(?:\/(planning|frontier)\b|e?s?calate(?:\s+(?:layering|the\s+ladder))?(?:\s+to)?\s+(?:the\s+)?(planning|frontier)|consult(?:\s+only|\s+(frontier|planning))|(?:move|switch|go|use)(?:\s+to)?(?:\s+the)?\s+(planning|frontier)(?:\s+(?:grok\s+)?model)?)\b/i;
+
+/** Prompt only names a ladder tier — not a new coding task. */
+const LADDER_NAV =
+	/(?:^|\s)(?:\/(?:planning|frontier|workhorse|descalate|escalate)\b|descalate(?:\s+to\s+(?:workhorse|planning|decision))?|go back to (?:workhorse|decision)|e?s?calate(?:\s+(?:layering|the\s+ladder))?(?:\s+to)?\s+(?:the\s+)?(?:planning|frontier|workhorse)|consult(?:\s+only|\s+(?:frontier|planning))|(?:move|switch|go|use)(?:\s+to)?(?:\s+the)?\s+(?:planning|frontier|workhorse)(?:\s+(?:grok\s+)?model)?)\b/i;
 
 export type DescalateTarget = LadderRole | "next" | "decision";
 
 export function isLadderRole(value: string): value is LadderRole {
 	return (ESCALATION_LADDER as readonly string[]).includes(value);
+}
+
+/** User asked to move the session between Workhorse / Planning / Frontier. */
+export function isLadderNavPrompt(text: string): boolean {
+	return LADDER_NAV.test(text.trim());
+}
+
+function namedClimb(match: RegExpMatchArray): LadderRole {
+	for (const group of match.slice(1)) {
+		if (group === "planning" || group === "frontier") {
+			return group;
+		}
+	}
+	return "frontier";
 }
 
 export function ladderIndex(role: LadderRole): number {
@@ -204,6 +230,12 @@ export function resolveEscalateTarget(
 	if (requested === "next") {
 		return nextLadderRole(current, resolved);
 	}
+	if (requested === current) {
+		if (requested === "planning" || requested === "frontier") {
+			return undefined;
+		}
+		return nextLadderRole(current, resolved);
+	}
 	if (requested === "frontier") {
 		const consult = frontierConsultRole(resolved);
 		if (consult.role === current) {
@@ -217,7 +249,10 @@ export function resolveEscalateTarget(
 	if (isHigherLadderRole(current, requested) && roleAvailable(resolved, requested)) {
 		return requested;
 	}
-	return nextLadderRole(current, resolved);
+	if (isHigherLadderRole(current, requested)) {
+		return nextLadderRole(current, resolved);
+	}
+	return undefined;
 }
 
 /**
@@ -254,13 +289,13 @@ export function parseDelegateAsk(text: string): DelegateAsk | undefined {
 			explicit: true,
 		};
 	}
-	if (DELEGATE_JSON.test(trimmed) || DELEGATE_LOOSE.test(trimmed)) {
-		return { target: "tooling", why: "delegate to tooling", explicit: /delegate/i.test(trimmed) };
+	if (USER_DELEGATE.test(trimmed) || DELEGATE_JSON.test(trimmed) || DELEGATE_LOOSE.test(trimmed)) {
+		return { target: "tooling", why: "delegate to tooling", explicit: true };
 	}
 	return undefined;
 }
 
-export function parseEscalateAsk(text: string): EscalateAsk | undefined {
+export function parseEscalateAsk(text: string, source: "user" | "model" = "user"): EscalateAsk | undefined {
 	const trimmed = text.trim();
 	if (!trimmed) {
 		return undefined;
@@ -278,6 +313,14 @@ export function parseEscalateAsk(text: string): EscalateAsk | undefined {
 		const why = (match[2] ?? "").replace(/\\"/g, '"').trim() || "model requested elevation";
 		return { requested, why, explicit: true };
 	}
+	if (source === "user") {
+		const user = trimmed.match(USER_ESCALATE);
+		if (user) {
+			const named = namedClimb(user);
+			return { requested: named, why: "user requested elevation", explicit: true };
+		}
+		return undefined;
+	}
 	if (STUCK.test(trimmed)) {
 		return { requested: "next", why: "model reported being stuck", explicit: false };
 	}
@@ -287,6 +330,9 @@ export function parseEscalateAsk(text: string): EscalateAsk | undefined {
 export function parseDescalateAsk(text: string): DescalateAsk | undefined {
 	const trimmed = text.trim();
 	if (!trimmed) {
+		return undefined;
+	}
+	if (parseDelegateAsk(trimmed)) {
 		return undefined;
 	}
 	const match = trimmed.match(DESCALATE_JSON) ?? trimmed.match(DESCALATE_LOOSE);
@@ -331,8 +377,9 @@ export function parseEscalateSignal(
 	text: string,
 	current: LadderRole,
 	resolved: ResolvedRuntime,
+	source: "user" | "model" = "model",
 ): EscalateSignal | undefined {
-	const ask = parseEscalateAsk(text);
+	const ask = parseEscalateAsk(text, source);
 	if (!ask) {
 		return undefined;
 	}
@@ -363,13 +410,123 @@ export function parseDescalateSignal(
 
 /** Strip escalate / descalate JSON so the user does not see the control line. */
 export function stripEscalateSignal(text: string): string {
-	return text
+	let next = stripIncompleteControlTail(text);
+	next = stripControlObjects(next);
+	next = next
 		.replace(DESCALATE_JSON, "")
 		.replace(DESCALATE_LOOSE, "")
 		.replace(ESCALATE_JSON, "")
 		.replace(ESCALATE_LOOSE, "")
-		.replace(/\n{3,}/g, "\n\n")
-		.trim();
+		.replace(DELEGATE_JSON, "")
+		.replace(/\{\s*"new_topic"\s*:\s*true\s*(?:,\s*"why"\s*:\s*"((?:\\.|[^"\\])*)")?\s*\}/gis, "")
+		.replace(/```(?:json)?\s*```/gi, "");
+	return next.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function isLayeringControl(value: unknown): boolean {
+	if (!value || typeof value !== "object" || Array.isArray(value)) {
+		return false;
+	}
+	const record = value as Record<string, unknown>;
+	if (typeof record.escalate === "string" || typeof record.descalate === "string") {
+		return true;
+	}
+	if (record.new_topic === true) {
+		return true;
+	}
+	return record.action === "escalate" || record.action === "descalate" || record.action === "delegate";
+}
+
+function tryJson(slice: string): unknown {
+	try {
+		return JSON.parse(slice) as unknown;
+	} catch {
+		return undefined;
+	}
+}
+
+function balancedObject(text: string, start: number): string | undefined {
+	if (text[start] !== "{") {
+		return undefined;
+	}
+	let depth = 0;
+	let inString = false;
+	let escaped = false;
+	for (let i = start; i < text.length; i++) {
+		const ch = text[i];
+		if (inString) {
+			if (escaped) {
+				escaped = false;
+				continue;
+			}
+			if (ch === "\\") {
+				escaped = true;
+				continue;
+			}
+			if (ch === '"') {
+				inString = false;
+			}
+			continue;
+		}
+		if (ch === '"') {
+			inString = true;
+			continue;
+		}
+		if (ch === "{") {
+			depth++;
+		} else if (ch === "}") {
+			depth--;
+			if (depth === 0) {
+				return text.slice(start, i + 1);
+			}
+		}
+	}
+	return undefined;
+}
+
+function stripControlObjects(text: string): string {
+	const next = text.replace(/```(?:json)?\s*([\s\S]*?)```/gi, (full, body: string) => {
+		const trimmed = body.trim();
+		const start = trimmed.indexOf("{");
+		if (start < 0) {
+			return full;
+		}
+		const slice = balancedObject(trimmed, start);
+		if (!slice || !isLayeringControl(tryJson(slice))) {
+			return full;
+		}
+		const rest = `${trimmed.slice(0, start)}${trimmed.slice(start + slice.length)}`.trim();
+		return rest;
+	});
+	let i = 0;
+	let out = "";
+	while (i < next.length) {
+		if (next[i] === "{") {
+			const slice = balancedObject(next, i);
+			if (slice && isLayeringControl(tryJson(slice))) {
+				i += slice.length;
+				continue;
+			}
+		}
+		out += next[i];
+		i++;
+	}
+	return out;
+}
+
+function stripIncompleteControlTail(text: string): string {
+	const start = text.lastIndexOf("{");
+	if (start < 0 || balancedObject(text, start)) {
+		return text;
+	}
+	const tail = text.slice(start);
+	if (
+		/"?(?:escalate|descalate|new_topic)"?\s*:/i.test(tail) ||
+		/"action"\s*:\s*"(?:escalate|descalate|delegate)"/i.test(tail)
+	) {
+		return text.slice(0, start).trimEnd();
+	}
+	return text;
 }
 
 /**

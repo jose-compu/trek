@@ -98,6 +98,7 @@ import {
 	runDomainSessionCommand,
 	saveDomainWorkflow,
 	selectDomain,
+	skipLayerArchon,
 	tagRecallForRole,
 	toolingWorkflowView,
 	tryWorkflowYaml,
@@ -229,12 +230,15 @@ import {
 	formatDelegateCard,
 	formatDescalateCard,
 	formatEscalateCard,
+	frontierConsultRole,
 	type HierarchyRole,
+	isHigherLadderRole,
 	isToolArgumentValidationError,
 	type LadderRole,
 	nextLadderRole,
 	parseDelegateAsk,
 	parseDescalateSignal,
+	parseEscalateAsk,
 	parseEscalateSignal,
 	prevLadderRole,
 	startLadderRole,
@@ -247,7 +251,7 @@ import {
 	tryLayerSubtaskResult,
 	tryParseLayerDecision,
 } from "./runtime/layer-decision.ts";
-import { runLayerWorkflow } from "./runtime/layer-execute.ts";
+import { layerContinuePrompt, layerContinueTarget, runLayerWorkflow } from "./runtime/layer-execute.ts";
 import {
 	layeringNetworkSection,
 	shouldAutoDelegateLiveNetwork,
@@ -2349,6 +2353,11 @@ export class AgentSession {
 		return this._thinkingPin;
 	}
 
+	/** Hide thinking while an internal step prompt is running. */
+	get muteThinking(): boolean {
+		return this._muteThinking;
+	}
+
 	setThinkingPin(pin: RoleThinking | undefined): void {
 		const changed = pin !== this._thinkingPin;
 		this._thinkingPin = pin;
@@ -2883,6 +2892,7 @@ export class AgentSession {
 	private _hierarchyModelProvider?: string;
 	/** `/thinking briefly|deep|off` pin. LayerDecision.thinking brief wins for the next span. */
 	private _thinkingPin?: RoleThinking;
+	private _muteThinking = false;
 	private _decisionThinking?: RoleThinking;
 	private _verifierDecision?: LayerDecision;
 	/** Last trek:layer_route action this prompt (climb/route). */
@@ -2946,6 +2956,12 @@ export class AgentSession {
 			overrides: config.routing?.components,
 		});
 		this._lastHierarchyRole = asClimbRole(selection.role, resolved);
+		const from = asClimbRole(previousRole ?? floor, resolved);
+		const to = this._lastHierarchyRole;
+		if (to !== from && isHigherLadderRole(from, to) && !options?.keepDecisionDisplay) {
+			this._emitEscalateCard(from, to, parseEscalateAsk(text)?.why ?? selection.reason);
+			this._ladderRole = to;
+		}
 		if (selection.source === "api") {
 			const mapped = resolved.roles.workhorse
 				? this._apiRoleModel(selection.provider ?? resolved.roles[selection.role]?.provider, selection.modelId)
@@ -3011,15 +3027,23 @@ export class AgentSession {
 		this._emit({ type: "hierarchy_model", role, provider, modelId });
 	}
 
-	/** Idle floor: footer shows Decision / d1. Returns true when parked. */
+	/** Idle floor: footer shows Decision (d1 local, or catalog cheap chat on api). Returns true when parked. */
 	private _parkOnDecisionFloor(): boolean {
 		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
 			return false;
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
-		if (resolved.effectiveMode === "api" && !resolved.roles.workhorse) {
-			return false;
+		if (resolved.effectiveMode === "api") {
+			const apiDecision = resolved.roles.decision;
+			if (!apiDecision || apiDecision.source !== "api") {
+				return false;
+			}
+			this._lastHierarchyRole = undefined;
+			this._ladderRole = undefined;
+			this._parkedOnDecision = true;
+			this._emitHierarchyModel("decision", apiDecision.provider ?? apiDecision.source, apiDecision.id);
+			return true;
 		}
 		const decision = resolved.roles.decision;
 		if (!decision) {
@@ -3048,13 +3072,35 @@ export class AgentSession {
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const resolved = resolveRuntime(config);
-		if (resolved.effectiveMode === "api" && !resolved.roles.workhorse) {
+		if (resolved.effectiveMode === "api") {
+			const fromApi: HierarchyRole | undefined =
+				this._hierarchyDisplayRole ?? this._ladderRole ?? this._lastHierarchyRole;
 			this._lastHierarchyRole = undefined;
 			this._ladderRole = undefined;
-			this._hierarchyDisplayRole = undefined;
-			this._hierarchyModelId = undefined;
-			this._hierarchyModelProvider = undefined;
+			this._planningBriefActive = false;
+			this._toolsSincePlan = 0;
+			const parked = this._parkOnDecisionFloor();
+			if (parked) {
+				if (fromApi && fromApi !== "decision") {
+					this._emit({
+						type: "hierarchy_escalate",
+						text: formatDescalateCard(fromApi, "decision", label),
+						from: fromApi,
+						to: "decision",
+					});
+				}
+				return;
+			}
+			const floor = startLadderRole(resolved);
 			this._parkedOnDecision = false;
+			if (fromApi && fromApi !== floor) {
+				this._emit({
+					type: "hierarchy_escalate",
+					text: formatDescalateCard(fromApi, floor, label),
+					from: fromApi,
+					to: floor,
+				});
+			}
 			return;
 		}
 		const from: HierarchyRole | undefined = this._hierarchyDisplayRole ?? this._ladderRole ?? this._lastHierarchyRole;
@@ -3467,6 +3513,87 @@ export class AgentSession {
 			return;
 		}
 		await this._delegateToTooling("live fetch");
+	}
+
+	/** User named Tooling. Bind the runner; do not drop the climb floor to Decision. */
+	private async _maybeUserDelegate(text: string): Promise<boolean> {
+		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			return false;
+		}
+		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		if (!resolved.roles.tooling) {
+			return false;
+		}
+		const ask = parseDelegateAsk(text);
+		if (!ask?.explicit) {
+			return false;
+		}
+		return this._delegateToTooling(ask.why);
+	}
+
+	/** Switch the session model to a ladder/runner role without a climb card. */
+	private async _bindHierarchyRole(role: HierarchyRole): Promise<boolean> {
+		if (role === "decision") {
+			return this._parkOnDecisionFloor();
+		}
+		if (role === "tooling") {
+			const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+			if (!resolved.roles.tooling) {
+				return false;
+			}
+			const previous = this.model;
+			const tooling = resolved.roles.tooling;
+			let mapped = previous;
+			if (tooling.source === "api") {
+				mapped = this._apiRoleModel(tooling.provider, tooling.id) ?? previous;
+			} else if (tooling.source === "lmstudio") {
+				mapped = this._lmStudioRoleModel(tooling.id, tooling.baseUrl);
+			} else {
+				mapped = this._localRoleModel("tooling", tooling.id, resolved);
+			}
+			if (!mapped) {
+				return false;
+			}
+			this.agent.state.model = mapped;
+			this._honorThinkingPin();
+			if (previous && !modelsAreEqual(previous, mapped)) {
+				this.sessionManager.appendModelChange(mapped.provider, mapped.id);
+				await this._emitModelSelect(mapped, previous, "set");
+			}
+			this._emitHierarchyModel("tooling", mapped.provider, mapped.id);
+			return true;
+		}
+		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		let bindRole: LadderRole = role;
+		if (role === "frontier" && !resolved.roles.frontier) {
+			bindRole = frontierConsultRole(resolved).role;
+		}
+		const assignment = resolved.roles[bindRole];
+		if (!assignment) {
+			return false;
+		}
+		const previous = this.model;
+		let mapped = previous;
+		if (assignment.source === "api") {
+			mapped = this._apiRoleModel(assignment.provider, assignment.id) ?? previous;
+		} else if (assignment.source === "lmstudio") {
+			mapped = this._lmStudioRoleModel(assignment.id, assignment.baseUrl);
+		} else {
+			mapped = this._localRoleModel(bindRole === "frontier" ? "planning" : bindRole, assignment.id, resolved);
+		}
+		if (!mapped) {
+			return false;
+		}
+		this.agent.state.model = mapped;
+		this._honorThinkingPin();
+		if (previous && !modelsAreEqual(previous, mapped)) {
+			this.sessionManager.appendModelChange(mapped.provider, mapped.id);
+			await this._emitModelSelect(mapped, previous, "set");
+		}
+		this._ladderRole = bindRole;
+		this._lastHierarchyRole = bindRole;
+		this._emitHierarchyModel(bindRole, mapped.provider, mapped.id);
+		return true;
 	}
 
 	/** Bind Tooling as a runner. The climb floor stays Workhorse/Planning/Frontier. */
@@ -4262,13 +4389,22 @@ export class AgentSession {
 		const facts = this._calledFacts;
 		this._calledWorkflow = undefined;
 		this._calledFacts = [];
+		if (this.hierarchyRole === "tooling" || this._turnLayerAction === "delegate") {
+			await this._runAgentPrompt(messages);
+			return;
+		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const kimiSwarm = process.env.TREK_KIMI_SWARM === "1";
 		const layerName =
 			config.hierarchy.layering === "single"
 				? "none"
 				: layerWorkflowOrNone(this._turnSelection.layer_workflow ?? "none");
-		const layerWorkflow = layerName !== "none" ? findLayerWorkflow(layerName) : undefined;
+		const skipLayer = skipLayerArchon({
+			layerWorkflow: layerName,
+			role: this.hierarchyRole,
+			task: this._lastPromptTask,
+		});
+		const layerWorkflow = !skipLayer && layerName !== "none" ? findLayerWorkflow(layerName) : undefined;
 		const callable = workflow?.nodes.every((node) => node.kind === "prompt" || node.kind === "bash") ?? false;
 		if (!workflow && !layerWorkflow) {
 			await this._runAgentPrompt(messages);
@@ -4291,11 +4427,14 @@ export class AgentSession {
 			learned = true;
 		}
 		let layerStart: number | undefined;
+		let continuePrompt: string | undefined;
+		let continueTo: ReturnType<typeof layerContinueTarget>;
+		let keepLadder = false;
 		const archonOptions = {
 			cwd: this._cwd,
 			userMessage: this._lastPromptTask,
 			facts,
-			seed: this._reproducibility.seed,
+			serialize: true,
 			currentRole,
 			skipUncallable: true,
 			onNodeRole: (role: ArchonNodeRole | undefined) => {
@@ -4309,10 +4448,19 @@ export class AgentSession {
 				this._retagLessonRecall(role);
 			},
 			runPrompt: async (prompt: string, node: ArchonNode) => {
+				if (node.role) {
+					await this._bindHierarchyRole(node.role);
+				}
 				this.setActiveToolsByName(node.allowedTools ?? []);
+				const previousThinking = this.agent.state.thinkingLevel;
+				this.agent.state.thinkingLevel = "off";
+				this._muteThinking = true;
 				try {
 					await this.agent.prompt(prompt);
 				} finally {
+					this._muteThinking = false;
+					this.agent.state.thinkingLevel = previousThinking;
+					this._honorThinkingPin();
 					this.setActiveToolsByName(previousTools);
 				}
 				return stripHonestyFooter(this._lastAssistantText()).trim();
@@ -4326,37 +4474,27 @@ export class AgentSession {
 			if (layerWorkflow && config.hierarchy.layering !== "single" && !kimiSwarm) {
 				layerStart = this.agent.state.messages.length;
 				const outputs = new Map<string, string>();
-				let promptGate: Promise<void> = Promise.resolve();
 				const executed = await runLayerWorkflow({
 					workflow: layerWorkflow,
 					layering: config.hierarchy.layering,
 					seed: this._reproducibility.seed,
 					kimiSwarm,
+					serialize: true,
 					runNode: async (node) => {
-						const previous = promptGate;
-						let release: () => void = () => {};
-						promptGate = new Promise<void>((resolve) => {
-							release = resolve;
-						});
-						await previous;
-						try {
-							const output = await runArchonNode(layerWorkflow, node, archonOptions, outputs);
-							outputs.set(node.id, output);
-							const parsed = tryLayerSubtaskResult(output);
-							if (parsed) {
-								return {
-									id: node.id,
-									output: parsed.output || output,
-									evidence: parsed.evidence,
-									status: parsed.status,
-									...(parsed.winner ? { winner: parsed.winner } : {}),
-									...(parsed.handoff ? { handoff: parsed.handoff } : {}),
-								};
-							}
-							return { id: node.id, output, status: "ok" as const };
-						} finally {
-							release();
+						const output = await runArchonNode(layerWorkflow, node, archonOptions, outputs);
+						outputs.set(node.id, output);
+						const parsed = tryLayerSubtaskResult(output);
+						if (parsed) {
+							return {
+								id: node.id,
+								output: parsed.output || output,
+								evidence: parsed.evidence,
+								status: parsed.status,
+								...(parsed.winner ? { winner: parsed.winner } : {}),
+								...(parsed.handoff ? { handoff: parsed.handoff } : {}),
+							};
 						}
+						return { id: node.id, output, status: "ok" as const };
 					},
 				});
 				if (executed.result.status === "halt") {
@@ -4366,6 +4504,20 @@ export class AgentSession {
 						executed.result.output || "layer workflow halt",
 					]);
 					return;
+				}
+				continueTo = layerContinueTarget(layerWorkflow.name);
+				continuePrompt = layerContinuePrompt({
+					workflow: layerWorkflow.name,
+					userTask: this._lastPromptTask,
+					joinOutput: executed.result.output,
+					handoff: executed.result.handoff,
+				});
+				if (continueTo === "planning" && executed.result.handoff) {
+					this._pendingElevate = {
+						tier: "planning",
+						why: "layer handoff",
+						handoff: executed.result.handoff,
+					};
 				}
 			}
 			const findings = workflow
@@ -4388,15 +4540,44 @@ export class AgentSession {
 				await this._learnFromTurn(turnStart);
 			}
 			this._workflowCheck = findings.length > 0 ? formatWorkflowCheck(findings) : undefined;
-			if (!this._workflowCheck) return;
-			const message = this._findLastAssistantMessage();
-			const part = message ? [...message.content].reverse().find((item) => item.type === "text") : undefined;
-			if (part && part.type === "text") part.text = `${part.text}\n\n${this._workflowCheck}`;
-			this._emit({ type: "workflow_check", text: this._workflowCheck });
+			if (this._workflowCheck) {
+				const message = this._findLastAssistantMessage();
+				const part = message ? [...message.content].reverse().find((item) => item.type === "text") : undefined;
+				if (part && part.type === "text") part.text = `${part.text}\n\n${this._workflowCheck}`;
+				this._emit({ type: "workflow_check", text: this._workflowCheck });
+			}
+			if (continueTo === "restore") {
+				keepLadder = false;
+			} else if (continuePrompt && continueTo === "consult") {
+				this.setActiveToolsByName(previousTools);
+				const floor = this._ladderRole ?? this._lastHierarchyRole;
+				if (floor !== "frontier") {
+					await this._climbLadder("consult", "frontier");
+				}
+				await this._bindHierarchyRole("frontier");
+				await this._runAgentPrompt(continuePrompt);
+				const restoreRole = previousLadder && previousLadder !== "frontier" ? previousLadder : "workhorse";
+				await this._dropLadder("consult complete", restoreRole);
+				await this._bindHierarchyRole(restoreRole);
+				keepLadder = true;
+			} else if (continuePrompt && (continueTo === "planning" || continueTo === "workhorse")) {
+				keepLadder = true;
+				this.setActiveToolsByName(previousTools);
+				const floor = this._ladderRole ?? this._lastHierarchyRole;
+				if (continueTo === "planning" && floor !== "planning" && floor !== "frontier") {
+					await this._climbLadder("handoff", "planning");
+				} else if (continueTo === "workhorse" && floor && floor !== "workhorse") {
+					await this._dropLadder("handoff", "workhorse");
+				}
+				await this._bindHierarchyRole(continueTo);
+				await this._runAgentPrompt(continuePrompt);
+			}
 		} finally {
-			this._hierarchyDisplayRole = previousDisplay;
-			this._ladderRole = previousLadder;
-			this._retagLessonRecall(previousDisplay);
+			if (!keepLadder) {
+				this._hierarchyDisplayRole = previousDisplay;
+				this._ladderRole = previousLadder;
+				this._retagLessonRecall(previousDisplay);
+			}
 		}
 	}
 
@@ -4522,7 +4703,7 @@ export class AgentSession {
 			.trim();
 	}
 
-	private async _runAgentPrompt(messages: AgentMessage | AgentMessage[]): Promise<void> {
+	private async _runAgentPrompt(messages: string | AgentMessage | AgentMessage[]): Promise<void> {
 		try {
 			this._processTree = undefined;
 			this._processBatches = [];
@@ -4543,7 +4724,11 @@ export class AgentSession {
 				this._effort.beginPrompt();
 			}
 			const turnStart = this.agent.state.messages.length;
-			await this.agent.prompt(messages);
+			if (typeof messages === "string") {
+				await this.agent.prompt(messages);
+			} else {
+				await this.agent.prompt(messages);
+			}
 			this._applyToneToLastAssistant();
 			this._noteAntiPatterns(turnStart);
 			await this._learnFromTurn(turnStart);
@@ -4897,6 +5082,7 @@ export class AgentSession {
 					this.model.maxTokens = budget.outputTokens;
 				}
 			}
+			await this._maybeUserDelegate(expandedText);
 			// Explicit user descalate yields sticky floor before brief/bind.
 			await this._maybeUserDescalate(expandedText);
 			await this._attachPlanningBrief(expandedText);
@@ -4955,7 +5141,7 @@ export class AgentSession {
 						? toolingWorkflowView(selection)
 						: { domain: selection.domain, workflow: selection.workflow };
 					const layerId = tooling ? "none" : (selection.layer_workflow ?? "none");
-					this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n<workflow domain="${view.domain}" name="${view.workflow}" layer_workflow="${layerId}">\nThe session runs each node. Answer only the node you are given. Do not call a tool unless that node allows it. If a fact is not in the user turn or an earlier node reply, say it is not in the turn. Layer-* files are not domain jobs.\n</workflow>`;
+					this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n<workflow domain="${view.domain}" name="${view.workflow}" layer_workflow="${layerId}">\nAnswer only the step you are given. Do not call a tool unless this step allows it. If a fact is not in the user turn or an earlier reply, say it is not in the turn.\n</workflow>`;
 					this._emitWorkflowCard(selection);
 				},
 				phaseAllowed: (phase) => phaseIsOpen(this._operatorMode, phase, this._openPhases),

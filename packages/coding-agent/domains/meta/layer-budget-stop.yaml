@@ -3,9 +3,15 @@ description: |
   Circuit breaker. Pin brief thinking, then escalate or ask_human. Never another silent loop.
 nodes:
   - id: pin-brief
+    allowed_tools: []
+    output_type: plan
+    effort: low
     prompt: |
-      Pin thinking briefly for the next span.
+      Pin thinking briefly for the next span. Turn: $USER_MESSAGE
   - id: escalate
+    allowed_tools: []
+    output_type: findings
+    trigger_rule: all_success
     prompt: |
-      Escalate with evidence, or ask_human if evidence is empty.
+      Escalate with evidence from $pin-brief.output, or ask_human if evidence is empty.
     depends_on: [pin-brief]

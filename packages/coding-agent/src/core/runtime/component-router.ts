@@ -45,7 +45,15 @@ export function routeComponent(input: ComponentRouteInput): RoleSelection {
 	const heavy = complexity > FRONTIER_COMPLEXITY_THRESHOLD;
 
 	if (heavy) {
-		return assign(input.resolved, escalationTarget(input.resolved), escalationReason(input));
+		const target = escalationTarget(input.resolved);
+		if (input.minRole === "planning" && target === "frontier") {
+			return assign(
+				input.resolved,
+				resolveAvailable("planning", input.resolved),
+				`${input.component} stays on planning under complexity ${complexity}`,
+			);
+		}
+		return assign(input.resolved, target, escalationReason(input));
 	}
 	if (retries >= 2) {
 		const after = nextTier(base, input.resolved);

@@ -3,17 +3,28 @@ description: |
   Fix a lint error, a type mismatch, or an anti-pattern with the smallest change that the project can verify.
 nodes:
   - id: reproduce
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Restate the lint error, type mismatch, or anti-pattern and the file it is in.
   - id: locate
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Name the lines that cause it. Do not rewrite the file before that.
     depends_on: [reproduce]
   - id: smallest-change
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Describe the smallest edit. Leave unrelated style alone.
     depends_on: [locate]
   - id: verify
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Name the check that proves the fix: the typecheck, the test, or the linter. Do not claim it passed unless it ran.
     depends_on: [smallest-change]

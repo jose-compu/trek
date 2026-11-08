@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"escalate\":\"frontier\",\"why\":\"Zero-downtime SQLite→Postgres dual-write/cutover/rollback architecture; consult-only, no edits\"}"
+			}
+		}
+	]
+}

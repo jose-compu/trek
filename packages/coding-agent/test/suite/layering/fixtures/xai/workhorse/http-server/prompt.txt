@@ -1,0 +1,1 @@
+Add index.html that loads main.js. Start it with python3 -m http.server 8765. Then stop the server and fix any 404.

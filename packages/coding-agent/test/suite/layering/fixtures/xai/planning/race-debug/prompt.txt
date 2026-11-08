@@ -1,0 +1,1 @@
+The same edit failed twice. Root cause is still unclear. Debug the race in a concurrent queue: writers corrupt a shared map, tests flake only under load. Write a plan, then hypotheses, then one failing reproduction. Escalate to planning with a handoff.

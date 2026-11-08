@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "```bash\nmkdir -p src && cat > src/calc.ts << 'EOF'\nexport const add = (a: number, b: number) => a + b;\n// test: console.log(add(2,3)===5)\nEOF\n```"
+			}
+		}
+	]
+}

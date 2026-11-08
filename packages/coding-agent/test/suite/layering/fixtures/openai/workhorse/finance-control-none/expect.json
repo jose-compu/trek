@@ -1,0 +1,8 @@
+{
+	"action": "continue",
+	"target": "workhorse",
+	"workflow": "control-break",
+	"layer_workflow": "none",
+	"layering": "auto",
+	"domain": "finance"
+}

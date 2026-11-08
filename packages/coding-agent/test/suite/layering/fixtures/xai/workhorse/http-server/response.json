@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "I'll create the files, start the server in background, test for 404s, stop it, and fix."
+			}
+		}
+	]
+}

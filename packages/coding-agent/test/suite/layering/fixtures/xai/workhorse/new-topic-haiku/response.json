@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"action\":\"delegate\",\"target\":\"tooling\",\"reason\":\"write haiku to specified file via bash\"}"
+			}
+		}
+	]
+}

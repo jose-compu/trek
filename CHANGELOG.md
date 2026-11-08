@@ -11,6 +11,17 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 - `/hierarchy` prints an aligned layering card (climb, runner, role table) instead of a flat dump.
 - Layered API sessions pin network via bash and auto-delegate live facts (weather, URLs) to Tooling.
 - Server-like bash (`python -m http.server`) no longer stalls Working... when the model passes `timeout: 8000`.
+- Ladder control JSON is hidden in the console; the dim climb/delegate line remains.
+- Checked-in Grok replies cover the complex layering prompts; explicit user climbs bind Planning/Frontier.
+- Ladder-nav prompts bind the named tier; API stacks park on the catalog Decision (Grok Fast / Luna / Haiku), not local d1.
+- `/hierarchy auto --catalog` binds Decision from `kind: decision` or the cheapest chat SKU. Liquid catalogs keep d1. Verifier stays unbound.
+- Static Grok packs cover descalate, new-topic haiku, Decision yes/no, and ladder-nav.
+- Tooling skips mute Archon `layer-tool-runners` so live fetch/grep can use bash.
+- Archon node cards are one dim line. `layer-escalate` continues on Planning with tools after the handoff nodes.
+- Layer-* handoff pins a role per node and rebinds that model. Handoff briefs parse from labeled prose. Consult restores the prior floor.
+- Archon workflows use `when:`, `trigger_rule`, `loop`, `output_format`, and `allowed_tools` on layer-* and all domain DAGs.
+- Independent Archon waves use cpa-agents in parallel. The shared session agent stays sequential. `layer-hypotheses` fans out three theories.
+- Static Archon × subtask fixtures cover hypotheses fan-out, escalate handoff, parallel runners, and consult/descalate/finance compose.
 
 ## [0.18.0] - 2026-11-07
 

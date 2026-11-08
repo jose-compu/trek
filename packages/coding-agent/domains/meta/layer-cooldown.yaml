@@ -3,13 +3,22 @@ description: |
   After Planning or Frontier solves a class, write a short lesson so Workhorse can handle the next one. Confirm before L1.
 nodes:
   - id: name-pattern
+    allowed_tools: []
+    output_type: findings
     prompt: |
-      Name the pattern in one line.
+      Name the pattern in one line from: $USER_MESSAGE
   - id: write-lesson
+    allowed_tools: []
+    output_type: plan
+    trigger_rule: all_success
     prompt: |
-      Write a domain lesson. Do not auto-promote.
+      Write a domain lesson for $name-pattern.output. Do not auto-promote.
     depends_on: [name-pattern]
   - id: next-on-workhorse
+    role: workhorse
+    allowed_tools: []
+    output_type: plan
+    trigger_rule: all_success
     prompt: |
-      The next similar turn stays on Workhorse.
+      The next similar turn stays on Workhorse. Lesson: $write-lesson.output
     depends_on: [write-lesson]

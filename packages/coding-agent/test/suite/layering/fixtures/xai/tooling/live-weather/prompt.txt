@@ -1,0 +1,1 @@
+What is the weather in Paris right now? Fetch a live source with curl. Do not invent the temperature.

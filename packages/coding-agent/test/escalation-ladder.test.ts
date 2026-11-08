@@ -12,6 +12,7 @@ import {
 	formatDescalateCard,
 	formatEscalateCard,
 	frontierConsultRole,
+	isLadderNavPrompt,
 	isToolArgumentValidationError,
 	nextLadderRole,
 	parseDelegateAsk,
@@ -117,6 +118,46 @@ describe("escalation ladder", () => {
 		expect(soft).toMatchObject({ tier: "planning", explicit: false });
 	});
 
+	it("honors an explicit user climb to Planning or Frontier", () => {
+		const resolved = localResolved();
+		expect(parseEscalateAsk("Escalate to planning with a handoff")).toMatchObject({
+			requested: "planning",
+			explicit: true,
+		});
+		expect(parseEscalateAsk("consult frontier. Architect a migration")).toMatchObject({
+			requested: "frontier",
+			explicit: true,
+		});
+		expect(parseEscalateAsk("consult only")).toMatchObject({ requested: "frontier", explicit: true });
+		expect(
+			parseEscalateAsk(
+				'{"goal":"Architect a migration. Consult only. Do not edit files yet.","constraints":"not in the turn"}',
+				"model",
+			),
+		).toBeUndefined();
+		expect(selectSessionRole({ text: "Escalate to planning with a handoff", resolved }).role).toBe("planning");
+		const race =
+			"The same edit failed twice. Root cause is still unclear. Debug the race in a concurrent queue: writers corrupt a shared map, tests flake only under load. Write a plan, then hypotheses, then one failing reproduction. Escalate to planning with a handoff.";
+		expect(parseEscalateAsk(race)).toMatchObject({ requested: "planning", explicit: true });
+		const hybrid = hybridResolved();
+		expect(selectSessionRole({ text: race, resolved: hybrid }).role).toBe("planning");
+		expect(selectSessionRole({ text: race, resolved: hybrid, ladderRole: "planning" }).role).toBe("planning");
+		expect(resolveEscalateTarget("planning", "planning", hybrid)).toBeUndefined();
+		expect(parseEscalateAsk("move to frontier model")).toMatchObject({
+			requested: "frontier",
+			explicit: true,
+		});
+		expect(parseEscalateAsk("scalate layering to frontier grok model")).toMatchObject({
+			requested: "frontier",
+			explicit: true,
+		});
+		expect(isLadderNavPrompt("move to frontier model")).toBe(true);
+		expect(isLadderNavPrompt("use workhorse")).toBe(true);
+		expect(isLadderNavPrompt("descalate to workhorse.")).toBe(true);
+		expect(isLadderNavPrompt("go back to decision")).toBe(true);
+		expect(isLadderNavPrompt("build a tetris game in js")).toBe(false);
+	});
+
 	it("in-tier answers do not escalate", () => {
 		const resolved = localResolved();
 		const answers = [
@@ -196,6 +237,17 @@ Received arguments:
 		expect(parseDescalateSignal("hand off to tooling", "planning", resolved)).toBeUndefined();
 		expect(parseEscalateAsk('{"descalate":"workhorse","why":"x"}')).toBeUndefined();
 		expect(stripEscalateSignal('done\n{"descalate":"next","why":"x"}\nmore')).toBe("done\n\nmore");
+		expect(stripEscalateSignal('{"descalate":"workhorse","why":"plan done"}')).toBe("");
+		expect(stripEscalateSignal('```json\n{"descalate":"workhorse","why":"plan done"}\n```')).toBe("");
+		expect(
+			stripEscalateSignal(
+				'{"action":"descalate","target":"workhorse","confidence":"high","reason":"plan done","evidence":[]}',
+			),
+		).toBe("");
+		expect(stripEscalateSignal('Here is the plan.\n{"descalate":"workhorse","why":"plan done"')).toBe(
+			"Here is the plan.",
+		);
+		expect(stripEscalateSignal('score = {"hits": 3}')).toBe('score = {"hits": 3}');
 		expect(formatDescalateCard("planning", "workhorse", "simple typo")).toBe("↓ planning → workhorse · simple typo");
 	});
 
@@ -211,6 +263,20 @@ Received arguments:
 		});
 		expect(parseDelegateAsk("hand off to tooling")?.target).toBe("tooling");
 		expect(parseEscalateAsk("hand off to tooling")).toBeUndefined();
+		expect(parseDelegateAsk("descalate to tooling model")).toEqual({
+			target: "tooling",
+			why: "delegate to tooling",
+			explicit: true,
+		});
+		expect(parseDescalateAsk("descalate to tooling model")).toBeUndefined();
+		expect(parseDescalateAsk("descalate to workhorse")?.requested).toBe("workhorse");
+		expect(
+			parseDescalateAsk('{"goal":"descalate to tooling model","constraints":"not in the turn"}'),
+		).toBeUndefined();
+		expect(
+			parseDescalateAsk("Descalation complete: handoff emitted, tooling shell run, results returned upward."),
+		).toBeUndefined();
+		expect(parseDescalateSignal("descalate to tooling model", "planning", resolved)).toBeUndefined();
 		expect(formatDelegateCard("workhorse", "live fetch")).toBe("→ workhorse ⇄ tooling · live fetch");
 	});
 

@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "**Yes**, format `package.json` with the repo's Prettier config.\n\n### Why\n- Keeps the whole repo consistent (JSON is just another file type Prettier handles cleanly).\n- Avoids the \"one file that looks different\" problem.\n- Prettier doesn't reorder keys, so it won't fight with the logical grouping you already have.\n\n### When to skip it\nOnly exclude it if you have a concrete pain point:\n- Your package manager (pnpm/yarn/npm) keeps rewriting the file on every install and the diffs become noisy.\n- You rely on a specific key order that Prettier would change (rare).\n\nMost projects that use Prettier end up including `package.json` (and `package-lock.json` / `pnpm-lock.yaml` are usually the ones that get ignored instead).\n\nIf you don't already have it, add it to your Prettier glob or just stop excluding it in `.prettierignore`."
+			}
+		}
+	]
+}

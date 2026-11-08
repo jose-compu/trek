@@ -3,21 +3,35 @@ description: |
   Decide whether a metric can be trusted. Check the metric definition, data freshness, the ETL pipeline, and the dashboard.
 nodes:
   - id: name-metric
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Name the metric, the grain, and the time window. If two teams use the same name, say both definitions.
   - id: check-freshness
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       State the latest timestamp and whether the data freshness SLA is missed.
     depends_on: [name-metric]
   - id: compare-definitions
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       If definitions disagree, quote both. Do not average them.
     depends_on: [check-freshness]
   - id: locate-break
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Point at the ETL pipeline step, schema change, or dashboard filter that explains the number.
     depends_on: [compare-definitions]
   - id: correct
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       State the correction or the next query. Do not publish a replacement number you have not calculated.
     depends_on: [locate-break]

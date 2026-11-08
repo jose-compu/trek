@@ -3,9 +3,17 @@ description: |
   Verifier reads the diff and emits a verdict. Off until bound.
 nodes:
   - id: read-diff
+    allowed_tools: [read]
+    output_type: findings
     prompt: |
-      Read the pending diff. Do not rewrite it.
+      Read the pending diff for: $USER_MESSAGE. Do not rewrite it.
   - id: verdict
-    prompt: |
-      Emit a LayerDecision verify verdict.
+    allowed_tools: []
+    output_type: findings
+    trigger_rule: all_success
+    loop:
+      prompt: |
+        Emit a LayerDecision verify verdict from $read-diff.output until LGTM or reject.
+      until: LGTM
+      max_iterations: 3
     depends_on: [read-diff]

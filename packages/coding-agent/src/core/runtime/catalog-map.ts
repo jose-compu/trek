@@ -1,6 +1,7 @@
 /**
  * /hierarchy auto fills slots from a provider catalog.
  * Ids come from the catalog only. Heuristic uses tags, thinking, and price — not SKU names.
+ * Decision is `kind: decision` (Liquid d1, Qwen 4B) or else the cheapest chat SKU (Grok Fast, Luna, Haiku).
  */
 
 import { readFileSync } from "node:fs";
@@ -38,14 +39,20 @@ export interface CatalogFixture {
 	models: CatalogModel[];
 }
 
-export type AutoMappedRole = "tooling" | "workhorse" | "planning" | "frontier";
+export type AutoMappedRole = "decision" | "tooling" | "workhorse" | "planning" | "frontier";
 
 export interface AutoMapResult {
 	layering: "single" | "auto";
 	roles: Partial<Record<AutoMappedRole, RoleAssignment>>;
 }
 
-const MAPPED_EXTRAS = ["tooling", "planning", "frontier", "verifier"] as const satisfies readonly RuntimeRole[];
+const MAPPED_EXTRAS = [
+	"decision",
+	"tooling",
+	"planning",
+	"frontier",
+	"verifier",
+] as const satisfies readonly RuntimeRole[];
 
 export function loadCatalogFixture(path: string): CatalogFixture {
 	const raw = JSON.parse(readFileSync(path, "utf8")) as unknown;
@@ -88,11 +95,19 @@ export function loadCatalogFixture(path: string): CatalogFixture {
 
 export function mapCatalogToRoles(catalog: CatalogFixture): AutoMapResult {
 	const chat = catalog.models.filter((model) => (model.kind ?? "chat") === "chat");
+	const dedicatedDecision = catalog.models.find((model) => model.kind === "decision");
 	if (chat.length === 0) {
+		if (dedicatedDecision) {
+			return { layering: "single", roles: { decision: assign(dedicatedDecision, "decision") } };
+		}
 		return { layering: "single", roles: {} };
 	}
 	if (chat.length === 1) {
-		return { layering: "single", roles: { workhorse: assign(chat[0]!, "workhorse") } };
+		const roles: AutoMapResult["roles"] = { workhorse: assign(chat[0]!, "workhorse") };
+		if (dedicatedDecision && dedicatedDecision.id !== chat[0]!.id) {
+			roles.decision = assign(dedicatedDecision, "decision");
+		}
+		return { layering: "single", roles };
 	}
 
 	const taken = new Set<string>();
@@ -124,6 +139,10 @@ export function mapCatalogToRoles(catalog: CatalogFixture): AutoMapResult {
 	if (tooling && tooling.id !== workhorse?.id && tooling.id !== planning?.id && tooling.id !== frontier?.id) {
 		roles.tooling = assign(tooling, "tooling");
 	}
+	const decision = dedicatedDecision ?? pickTagged(chat, ["cheap"]) ?? [...chat].sort(byCost)[0];
+	if (decision) {
+		roles.decision = assign(decision, "decision");
+	}
 	if (!roles.workhorse) {
 		return { layering: "single", roles: {} };
 	}
@@ -135,13 +154,16 @@ export function applyAutoLayering(config: RuntimeConfig, catalog: CatalogFixture
 	const mapped = mapCatalogToRoles(catalog);
 	if (mapped.layering === "single") {
 		const flat = flattenToSingle(config);
-		if (!mapped.roles.workhorse) {
-			return flat;
+		const roles = { ...flat.roles };
+		if (mapped.roles.workhorse) {
+			roles.workhorse = mapped.roles.workhorse;
 		}
-		return {
-			...flat,
-			roles: { ...flat.roles, workhorse: mapped.roles.workhorse },
-		};
+		if (mapped.roles.decision) {
+			roles.decision = mapped.roles.decision;
+		} else {
+			delete roles.decision;
+		}
+		return { ...flat, roles };
 	}
 	const roles = { ...config.roles };
 	for (const extra of MAPPED_EXTRAS) {
@@ -215,6 +237,9 @@ function assign(model: CatalogModel, role: AutoMappedRole): RoleAssignment {
 }
 
 function thinkingFor(model: CatalogModel, role: AutoMappedRole): RoleThinking {
+	if (role === "decision") {
+		return "off";
+	}
 	if (role === "planning" || role === "frontier") {
 		return "deep";
 	}

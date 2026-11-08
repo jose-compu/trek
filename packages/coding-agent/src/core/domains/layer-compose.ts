@@ -3,6 +3,8 @@
  * Detection still chooses the domain. Layering wraps how roles cooperate.
  */
 
+import { parseDelegateAsk } from "../runtime/escalate.ts";
+import { needsLiveNetwork } from "../runtime/layer-network.ts";
 import type { LayeringMode } from "../runtime/types.ts";
 import { findLayerWorkflow, loadLayerWorkflows } from "./catalog.ts";
 import type { DomainSelection } from "./select.ts";
@@ -26,6 +28,9 @@ const LAYER_HINTS: Record<string, string[]> = {
 
 export function selectLayerWorkflow(layering: LayeringMode, task: string): string {
 	if (layering === "single") {
+		return "none";
+	}
+	if (needsLiveNetwork(task) || parseDelegateAsk(task)) {
 		return "none";
 	}
 	const haystack = task.toLowerCase();
@@ -70,4 +75,18 @@ export function layerWorkflowOrNone(name: string): string {
 		return "none";
 	}
 	return findLayerWorkflow(name) ? name : "none";
+}
+
+/**
+ * Mute Archon nodes ("Do not call a tool") must not replace Tooling.
+ * layer-tool-runners is a routing hint; live fetch/grep need bash.
+ */
+export function skipLayerArchon(input: { layerWorkflow: string; role?: string; task: string }): boolean {
+	if (input.role === "tooling") {
+		return true;
+	}
+	if (input.layerWorkflow === "layer-tool-runners") {
+		return true;
+	}
+	return needsLiveNetwork(input.task);
 }

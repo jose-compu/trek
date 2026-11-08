@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "Yes, via bash commands (e.g. curl, wget)."
+			}
+		}
+	]
+}

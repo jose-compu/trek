@@ -3,17 +3,28 @@ description: |
   Review a deal that slipped, a pricing mistake, or a win loss pattern. Do not discount.
 nodes:
   - id: name-stage
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Name the stage, the slip, and the date. Do not invent a forecast.
   - id: objection
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Name the objection that has shown up more than once, or say none was given.
     depends_on: [name-stage]
   - id: pricing-error
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       If there is a pricing mistake, state the figure the user supplied. Do not offer a discount.
     depends_on: [objection]
   - id: next-question
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
     prompt: |
       Give the next question to ask. Do not commit a price.
     depends_on: [pricing-error]

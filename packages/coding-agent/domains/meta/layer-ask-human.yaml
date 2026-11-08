@@ -3,13 +3,21 @@ description: |
   Irreversible without verifier, spent budget, or empty evidence on escalate.
 nodes:
   - id: state-risk
+    allowed_tools: []
+    output_type: findings
     prompt: |
-      State the risk in one line.
+      State the risk in one line for: $USER_MESSAGE
   - id: ask
+    allowed_tools: []
+    output_type: findings
+    trigger_rule: all_success
     prompt: |
-      Ask the human. Do not continue silently.
+      Ask the human about $state-risk.output. Do not continue silently.
     depends_on: [state-risk]
   - id: wait
+    allowed_tools: []
+    output_type: findings
+    trigger_rule: all_success
     prompt: |
-      Wait for a reply. No extra model loop.
+      Wait for a reply to $ask.output. No extra model loop.
     depends_on: [ask]

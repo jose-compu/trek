@@ -42,6 +42,21 @@ describe("layer-* Archon workflows", () => {
 		expect(
 			workflows.find((item) => item.name === "layer-escalate")?.nodes.some((node) => node.id === "handoff-brief"),
 		).toBe(true);
+		expect(workflows.find((item) => item.name === "layer-escalate")?.nodes.map((node) => node.role)).toEqual([
+			"workhorse",
+			"planning",
+			"planning",
+		]);
+		expect(workflows.find((item) => item.name === "layer-descalate")?.nodes.map((node) => node.role)).toEqual([
+			"planning",
+			"planning",
+			"workhorse",
+		]);
+		expect(workflows.find((item) => item.name === "layer-consult")?.nodes.map((node) => node.role)).toEqual([
+			"workhorse",
+			"frontier",
+			"frontier",
+		]);
 		expect(
 			workflows
 				.find((item) => item.name === "layer-tool-runners")

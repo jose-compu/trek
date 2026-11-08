@@ -3,13 +3,22 @@ description: |
   New topic or /new-topic drops to Decision, then layer-route.
 nodes:
   - id: detect-reset
+    allowed_tools: []
+    output_type: findings
     prompt: |
-      Detect a topic reset from the user turn or {"new_topic":true}.
+      Detect a topic reset from $USER_MESSAGE or {"new_topic":true}.
   - id: drop-to-decision
+    allowed_tools: []
+    output_type: plan
+    trigger_rule: all_success
+    when: "$detect-reset.output contains 'reset' || $USER_MESSAGE contains 'new topic'"
     prompt: |
-      Drop the climb floor to Decision. Footer shows d1.
+      Drop the climb floor to Decision. Footer shows d1. Signal: $detect-reset.output
     depends_on: [detect-reset]
   - id: layer-route
+    allowed_tools: []
+    output_type: plan
+    trigger_rule: all_success
     prompt: |
-      Re-run layer-route for the new generative turn.
+      Re-run layer-route for the new generative turn after $drop-to-decision.output
     depends_on: [drop-to-decision]

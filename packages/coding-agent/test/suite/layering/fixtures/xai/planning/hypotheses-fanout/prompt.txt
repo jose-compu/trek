@@ -1,0 +1,1 @@
+Run three hypotheses on the concurrent-queue race. Writers corrupt a shared map. Parallel Workhorse branches, then Planning picks.

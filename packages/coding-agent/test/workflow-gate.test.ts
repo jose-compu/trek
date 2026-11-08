@@ -74,7 +74,8 @@ describe("workflow gate", () => {
 		]);
 		expect(prompts).toHaveLength(4);
 		for (const prompt of prompts) {
-			expect(prompt).toContain("Answer only this Archon node.");
+			expect(prompt).toContain("Answer this step only.");
+			expect(prompt).not.toContain("Archon");
 			expect(prompt).toContain(FINANCE_TURN);
 			expect(prompt).toContain("not in the turn");
 		}

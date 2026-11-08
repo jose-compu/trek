@@ -3,5 +3,8 @@ description: |
   Forced thinking briefly. One short span, then the next tool. #108 128-token floor.
 nodes:
   - id: observe-next-tool
+    effort: low
+    allowed_tools: [read, grep, bash]
+    output_type: plan
     prompt: |
-      Think briefly, then call the next tool. Do not write a monologue.
+      Think briefly about $USER_MESSAGE, then call the next tool. Do not write a monologue.

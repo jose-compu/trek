@@ -1,3 +1,5 @@
+import { isLadderNavPrompt } from "./escalate.ts";
+
 /**
  * Detect when the user resets the topic/task so the ladder can descalate
  * back to Decision (lowest), then route Tooling for the new generative turn.
@@ -114,6 +116,9 @@ export function detectTopicReset(previous: string, next: string): TopicReset {
 	}
 	if (!prev) {
 		return hit("first");
+	}
+	if (isLadderNavPrompt(curr)) {
+		return { reset: false };
 	}
 	if (parseNewTopicSignal(curr)) {
 		return hit("signal");

@@ -1,0 +1,10 @@
+{
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "{\"join\":\"layer_join\",\"status\":\"ok\",\"workflow\":\"layer-tool-runners\",\"output\":\"search\\nlogs\\nfetch\\nsummarize\",\"evidence\":[\"seed 7\"]}"
+			}
+		}
+	]
+}
