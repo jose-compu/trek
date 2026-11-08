@@ -1,10 +1,17 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.18.1`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.18.2`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.18.2] - 2026-11-08
+
+### Fixed
+
+- Long tasks stay on Workhorse. Keep-going prompts (`continue`, `start building`, `until you complete`) skip the Decision park and resume until the task is done or blocked. Live Decision `new-topic` no longer resets the ladder. Escalate, descalate, and Tooling delegate still switch models. Archon consult restores the prior floor.
+- After a Decision park on API stacks, bind emits `↑ decision → workhorse · route` so the footer matches the actor.
 
 ## [0.18.1] - 2026-11-08
 

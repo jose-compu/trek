@@ -27,6 +27,7 @@ import {
 	resolveRuntime,
 	selectSessionRole,
 	selectThinkRole,
+	shouldAnnounceDecisionClimb,
 	shouldRebindSessionRole,
 	startLadderRole,
 	stripEscalateSignal,
@@ -293,6 +294,11 @@ Received arguments:
 		expect(shouldRebindSessionRole("delegate")).toBe(false);
 		expect(shouldRebindSessionRole("escalate")).toBe(true);
 		expect(shouldRebindSessionRole(undefined)).toBe(true);
+		expect(shouldAnnounceDecisionClimb(true)).toBe(true);
+		expect(shouldAnnounceDecisionClimb(true, false)).toBe(true);
+		expect(shouldAnnounceDecisionClimb(true, true)).toBe(false);
+		expect(shouldAnnounceDecisionClimb(false)).toBe(false);
+		expect(formatEscalateCard("decision", "workhorse", "route")).toBe("↑ decision → workhorse · route");
 	});
 
 	it("aliases Frontier consult to Planning when no third id is bound", () => {

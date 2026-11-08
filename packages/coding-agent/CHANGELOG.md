@@ -4,6 +4,14 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.18.2] - 2026-11-08
+
+### Fixed
+
+- API stacks: after a Decision park (`↓ workhorse → decision · task changed`), bind emits `↑ decision → workhorse · route` and the footer follows the actor. Named Planning still climbs; “create a plan” stays Workhorse.
+- Long tasks stay on Workhorse. Keep-going prompts (`continue`, `start building`, `until you complete`) skip the Decision park and pin an unlimited resume until the task is done or blocked. Live Decision `new-topic` no longer resets the ladder. The parent workflow tag no longer says “answer only this step”.
+- Long-task resume still climbs, descalates, and delegates. Model `new_topic` does not park while pinned. Archon consult is held; after restore the same task continues. Layer continue prompts keep subtasks on the handoff floor.
+
 ## [0.18.1] - 2026-11-08
 
 ### Fixed

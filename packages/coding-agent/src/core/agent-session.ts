@@ -241,6 +241,7 @@ import {
 	parseEscalateAsk,
 	parseEscalateSignal,
 	prevLadderRole,
+	shouldAnnounceDecisionClimb,
 	shouldRebindSessionRole,
 	startLadderRole,
 	stripEscalateSignal,
@@ -276,6 +277,13 @@ import {
 import { localLlamaChatModel } from "./runtime/local-llama-model.ts";
 import { LMSTUDIO_PROVIDER, LOCAL_LLAMA_PROVIDER, lmStudioChatModel } from "./runtime/local-model.ts";
 import { LOCAL_SUITE_WORK_SECTION } from "./runtime/local-work.ts";
+import {
+	classifyLongTaskResume,
+	isLongTaskPrompt,
+	longTaskContinuePrompt,
+	looksLikeLongTaskDone,
+	shouldResumeLongTask,
+} from "./runtime/long-task.ts";
 import { detectTopicReset, parseNewTopicSignal, stripNewTopicSignal, type TopicReset } from "./runtime/new-topic.ts";
 import {
 	applyPlanBlock,
@@ -2076,7 +2084,7 @@ export class AgentSession {
 				this._lastAssistantMessage = event.message;
 
 				const assistantMsg = event.message as AssistantMessage;
-				void this._noteWorkhorseElevation(assistantMsg);
+				this._elevationNote = this._noteWorkhorseElevation(assistantMsg);
 				this._appendAuditStep(assistantMsg);
 				if (assistantMsg.stopReason !== "error") {
 					this._overflowRecoveryAttempted = false;
@@ -2910,6 +2918,11 @@ export class AgentSession {
 	private _verifierDeniedThisTurn = false;
 	/** Idle on Decision until the first prompt routes to Workhorse. */
 	private _parkedOnDecision = false;
+	/** User asked to finish the current work without pausing at milestones. */
+	private _longTask?: { goal: string; continues: number };
+	/** Mute Archon / Frontier consult: do not auto-continue over a subtask. */
+	private _longTaskHold = 0;
+	private _elevationNote?: Promise<void>;
 	/** Tools since the last Planning brief; drives optional mid-turn replan. */
 	private _toolsSincePlan = 0;
 	/** True when this turn attached a Planning brief (replan is allowed). */
@@ -2992,17 +3005,42 @@ export class AgentSession {
 					this.sessionManager.appendModelChange(mapped.provider, mapped.id);
 					await this._emitModelSelect(mapped, previous, "set");
 				}
-				if (!(options?.keepDecisionDisplay && this._parkedOnDecision)) {
-					this._emitHierarchyModel(selection.role, mapped.provider, mapped.id);
+				if (options?.keepDecisionDisplay && this._parkedOnDecision) {
+					return;
 				}
+				if (shouldAnnounceDecisionClimb(this._parkedOnDecision, options?.keepDecisionDisplay)) {
+					const to = asClimbRole(selection.role, resolved);
+					this._emit({
+						type: "hierarchy_escalate",
+						text: formatEscalateCard("decision", to, "route"),
+						from: "decision",
+						to,
+					});
+				}
+				this._parkedOnDecision = false;
+				this._emitHierarchyModel(selection.role, mapped.provider, mapped.id);
 				return;
 			}
 			this._restoreApiSessionModel();
 			const api = this.model;
-			if (api && !(options?.keepDecisionDisplay && this._parkedOnDecision)) {
+			if (options?.keepDecisionDisplay && this._parkedOnDecision) {
+				return;
+			}
+			if (api) {
 				const shown =
 					sessionRoleForModel(resolved, api) ?? (resolved.roles.workhorse ? "frontier" : selection.role);
+				if (shouldAnnounceDecisionClimb(this._parkedOnDecision, options?.keepDecisionDisplay)) {
+					this._emit({
+						type: "hierarchy_escalate",
+						text: formatEscalateCard("decision", shown, "route"),
+						from: "decision",
+						to: shown,
+					});
+				}
+				this._parkedOnDecision = false;
 				this._emitHierarchyModel(shown, api.provider, api.id);
+			} else {
+				this._parkedOnDecision = false;
 			}
 			return;
 		}
@@ -3740,6 +3778,10 @@ export class AgentSession {
 				);
 				this._replaceMessageInPlace(message, { ...message, content: nextContent } as AgentMessage);
 			}
+			if (this._longTask) {
+				debugLog("runtime", "long task ignores model new_topic", { from, why: topicSignal.why });
+				return;
+			}
 			// Model saw a topic switch: clear sticky task and park Decision.
 			this._previousTask = "";
 			await this._dropToDecision(topicSignal.why);
@@ -3756,6 +3798,10 @@ export class AgentSession {
 						: part,
 				);
 				this._replaceMessageInPlace(message, { ...message, content: nextContent } as AgentMessage);
+			}
+			if (down.tier === "decision" && this._longTask) {
+				debugLog("runtime", "long task ignores drop to decision", { from, why: down.why });
+				return;
 			}
 			const dropped = await this._dropLadder(down.why, down.tier);
 			if (!dropped) {
@@ -4585,6 +4631,7 @@ export class AgentSession {
 					userTask: this._lastPromptTask,
 					joinOutput: executed.result.output,
 					handoff: executed.result.handoff,
+					longTask: Boolean(this._longTask),
 				});
 				if (continueTo === "planning" && executed.result.handoff) {
 					this._pendingElevate = {
@@ -4627,11 +4674,19 @@ export class AgentSession {
 					await this._climbLadder("consult", "frontier");
 				}
 				await this._bindHierarchyRole("frontier");
-				await this._runAgentPrompt(continuePrompt);
+				this._longTaskHold += 1;
+				try {
+					await this._runAgentPrompt(continuePrompt);
+				} finally {
+					this._longTaskHold -= 1;
+				}
 				const restoreRole = previousLadder && previousLadder !== "frontier" ? previousLadder : "workhorse";
 				await this._dropLadder("consult complete", restoreRole);
 				await this._bindHierarchyRole(restoreRole);
 				keepLadder = true;
+				if (this._longTask && !looksLikeLongTaskDone(this._lastAssistantText())) {
+					await this._runAgentPrompt(longTaskContinuePrompt(this._longTask.goal));
+				}
 			} else if (continuePrompt && (continueTo === "planning" || continueTo === "workhorse")) {
 				keepLadder = true;
 				this.setActiveToolsByName(previousTools);
@@ -4912,9 +4967,84 @@ export class AgentSession {
 			return true;
 		}
 
+		if (this._elevationNote) {
+			await this._elevationNote;
+			this._elevationNote = undefined;
+		}
+
+		if (await this._maybeContinueLongTask(msg.stopReason)) {
+			return true;
+		}
+
 		// The agent loop drains both queues before emitting agent_end. Any messages
 		// here were queued by agent_end extension handlers and need a continuation.
 		return this.agent.hasQueuedMessages();
+	}
+
+	/** After a milestone yield, keep the same task going on the current (or switched) floor. */
+	private async _maybeContinueLongTask(stopReason?: string): Promise<boolean> {
+		const pin = this._longTask;
+		const assistantText = this._lastAssistantText();
+		if (
+			!shouldResumeLongTask({
+				pinned: Boolean(pin),
+				assistantText,
+				queued: this.agent.hasQueuedMessages(),
+				stopReason,
+				hold: this._longTaskHold > 0 || this._muteThinking,
+			})
+		) {
+			if (pin && looksLikeLongTaskDone(assistantText)) {
+				this._longTask = undefined;
+			}
+			return false;
+		}
+		if (!pin) {
+			return false;
+		}
+		await this._applyLongTaskResume(assistantText);
+		const floor = this._hierarchyDisplayRole ?? this._ladderRole ?? "workhorse";
+		pin.continues += 1;
+		this._emit({
+			type: "hierarchy_escalate",
+			text: `· ${floor} · continue ${pin.continues}`,
+			from: floor,
+			to: floor,
+		});
+		await this._queueFollowUp(longTaskContinuePrompt(pin.goal));
+		return true;
+	}
+
+	/** Climb, delegate, or drop before the next long-task slice. Never park Decision. */
+	private async _applyLongTaskResume(assistantText: string): Promise<void> {
+		const route = classifyLongTaskResume(assistantText);
+		const floor = this._ladderRole ?? this._lastHierarchyRole;
+		if (route.kind === "climb") {
+			if (route.requested !== "next" && floor === route.requested) {
+				return;
+			}
+			const climbed = await this._climbLadder(route.why, route.requested);
+			if (climbed) {
+				await this._bindLocalCompletion(this._longTask?.goal ?? this._lastPromptTask);
+			}
+			return;
+		}
+		if (route.kind === "delegate") {
+			if (this._hierarchyDisplayRole === "tooling" || this._turnLayerAction === "delegate") {
+				return;
+			}
+			await this._delegateToTooling(route.why);
+			return;
+		}
+		if (route.kind === "drop") {
+			if (floor === "workhorse" || !floor) {
+				return;
+			}
+			const dropped = await this._dropLadder(route.why, "workhorse");
+			if (dropped && dropped !== "decision") {
+				await this._bindLocalCompletion(this._longTask?.goal ?? this._lastPromptTask);
+			}
+		}
 	}
 
 	/**
@@ -5046,11 +5176,14 @@ export class AgentSession {
 			if (!control) {
 				const intent = await this._maybeClassifyLayerIntent(previousTask, expandedText);
 				this._layerIntent = intent;
-				if (intent === "new-topic") {
-					topicReset = { reset: true, reason: "intent-shift", label: "task changed" };
-				} else if (intent === "planning") {
+				if (intent === "planning") {
 					this._pendingElevate = { tier: "planning", why: "decision intent" };
 				}
+			}
+			if (isLongTaskPrompt(expandedText)) {
+				this._longTask = { goal: expandedText, continues: 0 };
+			} else if (topicReset.reset) {
+				this._longTask = undefined;
 			}
 			const holdFloor = Boolean(control) || Boolean(this._pendingElevate);
 			const runDecision = !holdFloor && (topicReset.reset || this._parkedOnDecision || !this._lastHierarchyRole);
@@ -5228,7 +5361,7 @@ export class AgentSession {
 						? toolingWorkflowView(selection)
 						: { domain: selection.domain, workflow: selection.workflow };
 					const layerId = tooling ? "none" : (selection.layer_workflow ?? "none");
-					this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n<workflow domain="${view.domain}" name="${view.workflow}" layer_workflow="${layerId}">\nAnswer only the step you are given. Do not call a tool unless this step allows it. If a fact is not in the user turn or an earlier reply, say it is not in the turn.\n</workflow>`;
+					this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n<workflow domain="${view.domain}" name="${view.workflow}" layer_workflow="${layerId}" />`;
 					this._emitWorkflowCard(selection);
 				},
 				phaseAllowed: (phase) => phaseIsOpen(this._operatorMode, phase, this._openPhases),

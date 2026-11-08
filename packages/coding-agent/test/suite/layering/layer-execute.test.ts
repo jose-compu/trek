@@ -311,6 +311,14 @@ describe("layer execute", () => {
 			}),
 		).toMatch(/Consult only/);
 		expect(layerContinueTarget("layer-descalate")).toBe("workhorse");
+		expect(
+			layerContinuePrompt({
+				workflow: "layer-escalate",
+				userTask: "complete the whole v6",
+				joinOutput: "handoff",
+				longTask: true,
+			}),
+		).toMatch(/Same long task/);
 	});
 
 	it("pins escalate/descalate/consult/hypotheses roles and maps them to Grok SKUs", () => {

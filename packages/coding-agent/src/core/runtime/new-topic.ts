@@ -5,7 +5,7 @@ import { parseControlAsk } from "./layer-control.ts";
  * back to Decision (lowest), then route Tooling for the new generative turn.
  *
  * Stickiness: same-topic follow-ups keep the climbed floor. A reset must be
- * explicit, signaled, done→new, or a live Decision `new-topic` intent.
+ * explicit, signaled, or done→new. Live Decision `new-topic` does not park.
  */
 
 export type TopicResetReason = "first" | "explicit" | "signal" | "done-then-new" | "intent-shift";
@@ -26,7 +26,10 @@ const EXPLICIT_NEW =
 	/^(?:\/(?:new-topic|reset-topic|topic|reset)\b|new(?:\s+(?:task|topic|thread))?(?:\s*[(:–—-]|\b)|different (?:topic|task|subject)|unrelated(?:\s+task)?|start over|forget (?:that|the last|previous)|switching (?:to|topics?|tasks?)|another (?:task|topic)|by the way[,:]?\s+(?!also)|never ?mind (?:that|the)|scrap (?:that|it)|abandon (?:that|it)|cancel (?:that|the) task|instead[,:]?\s+let(?:'| u)?s|ok(?:ay)?[,.]?\s+new (?:task|topic)|change of (?:topic|task|subject))\b/i;
 
 const CONTINUATION =
-	/^(?:also|and then|then |now (?:please |just )?(?:fix|add|update|change|make|do)|ok[,.]|okay[,.]|yes|yep|no|nope|continue|retry|try again|fix (?:that|it)|do it|same |go ahead|please (?:do|fix|continue)|make it|change it|update it|the (?:file|bug|error|typo|same))\b/i;
+	/^(?:also|and then|then |now (?:please |just )?(?:fix|add|update|change|make|do)|ok[,.]|okay[,.]|yes|yep|no|nope|continue|retry|try again|fix (?:that|it)|do it|same |go ahead|please (?:do|fix|continue)|make it|change it|update it|the (?:file|bug|error|typo|same)|start building|keep building|keep going|proceed|resume)\b/i;
+
+const KEEP_GOING =
+	/\b(?:continue|keep (?:going|building|working)|start building|start working|read (?:the )?plan|follow (?:the )?plan|build it|proceed|resume|pick up where|don'?t stop|do not stop|until you (?:complete|finish)|complete the whole|remaining milestones?|autopilot|ok read plan)\b/i;
 
 /** Capability questions about this session, not a new coding task. */
 const CAPABILITY =
@@ -129,7 +132,7 @@ export function detectTopicReset(previous: string, next: string): TopicReset {
 	if (control) {
 		return { reset: false };
 	}
-	if (CONTINUATION.test(curr) || CAPABILITY.test(curr)) {
+	if (isKeepGoingPrompt(curr) || CAPABILITY.test(curr)) {
 		return { reset: false };
 	}
 
@@ -161,4 +164,13 @@ export function detectTopicReset(previous: string, next: string): TopicReset {
  */
 export function isNewTopic(previous: string, next: string): boolean {
 	return detectTopicReset(previous, next).reset;
+}
+
+/** Same-task follow-up: skip Decision park and keep Workhorse. */
+export function isKeepGoingPrompt(text: string): boolean {
+	const curr = text.trim();
+	if (!curr || EXPLICIT_NEW.test(curr) || parseNewTopicSignal(curr)) {
+		return false;
+	}
+	return CONTINUATION.test(curr) || KEEP_GOING.test(curr);
 }

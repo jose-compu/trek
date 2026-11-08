@@ -28,7 +28,7 @@ export function isHonestyProtocolEnabled(): boolean {
 /** System prompt section instructing the model to emit the honesty footer. */
 export const HONESTY_PROMPT_SECTION = `## Honesty
 
-End the final message with exactly this block. No emoji. No other tag. Do not write confidence, assumptions, or task status in the answer.
+End the final message with exactly this block. No emoji. No other tag. Do not write confidence, assumptions, or task status in the answer. If the user asked to finish the whole task, keep using tools first and write this block only when that work is done or blocked.
 
 <honesty>
 confidence: medium

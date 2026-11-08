@@ -79,6 +79,7 @@ export function layerContinuePrompt(input: {
 	userTask: string;
 	joinOutput: string;
 	handoff?: HandoffBrief;
+	longTask?: boolean;
 }): string | undefined {
 	const target = layerContinueTarget(input.workflow);
 	if (!target || target === "restore") {
@@ -100,6 +101,12 @@ export function layerContinuePrompt(input: {
 		lines.push("", "Finish the named mechanical steps. Use tools. Do not stop after naming next steps.");
 	} else {
 		lines.push("", "Finish the remaining work. Use tools. Do not stop after naming next steps.");
+	}
+	if (input.longTask) {
+		lines.push(
+			"",
+			"Same long task. After this subtask, keep going on this floor unless you escalate, descalate, or delegate.",
+		);
 	}
 	return lines.join("\n");
 }

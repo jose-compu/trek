@@ -14,7 +14,7 @@ export const LAYERING_DELEGATE_SECTION = `When Tooling is bound, send search, lo
 {"action":"delegate","target":"tooling","reason":"live fetch"}
 Do not escalate for a web lookup. Tooling is a runner, not a climb.`;
 
-export const LAYERING_NAV_SECTION = `The chat ladder is Workhorse ⇄ Planning ⇄ Frontier. A prompt that names a tier already switched this session there. Continue the current task on this model. Do not say you cannot change models.`;
+export const LAYERING_NAV_SECTION = `The chat ladder is Workhorse ⇄ Planning ⇄ Frontier. A prompt that names a tier already switched this session there. Continue the current task on this model. A later milestone, plan, or "start building" is the same task. Do not say you cannot change models.`;
 
 const LIVE_NETWORK =
 	/\b(?:https?:\/\/|weather|forecast|temperature in|internet access|are you online|web search|search the web|browse the web|fetch (?:the |a )?url|latest news|stock price)\b/i;
