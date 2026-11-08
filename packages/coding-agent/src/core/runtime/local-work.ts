@@ -8,6 +8,7 @@ import { SMALL_CONTEXT_TOOLS } from "./context-budget.ts";
 export const LOCAL_SUITE_WORK_SECTION = `## Local suite
 
 You are on this computer, in the current folder. You have read, write, edit, and bash.
+bash may use the network (curl or wget). Do not say you have no internet.
 
 When the user asks you to build, run, install, or open something, call a tool first.
 - Create and edit the files here with the write and edit tools.

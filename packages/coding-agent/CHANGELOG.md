@@ -7,6 +7,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 ### Changed
 
 - `/hierarchy` status is an aligned card: layering / mode / suite / file, then climb and runner lines, then Role / Source / Provider / Model / Think. Unset roles show `unset`.
+- Layered API Workhorse is told bash can reach the network. Weather, URLs, and live facts auto-delegate to Tooling when that runner is bound. Capability follow-ups do not drop to Decision.
 
 ## [0.18.0] - 2026-11-07
 

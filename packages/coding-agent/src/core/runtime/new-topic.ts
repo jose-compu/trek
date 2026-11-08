@@ -26,6 +26,10 @@ const EXPLICIT_NEW =
 const CONTINUATION =
 	/^(?:also|and then|then |now (?:please |just )?(?:fix|add|update|change|make|do)|ok[,.]|okay[,.]|yes|yep|no|nope|continue|retry|try again|fix (?:that|it)|do it|same |go ahead|please (?:do|fix|continue)|make it|change it|update it|the (?:file|bug|error|typo|same))\b/i;
 
+/** Capability questions about this session, not a new coding task. */
+const CAPABILITY =
+	/^(?:do you (?:have|get|support)|are you (?:able|online|connected)|can you (?:access|search|fetch|browse|go online|use the (?:web|internet|network)))\b/i;
+
 const SHORT_REF = /\b(?:it|that|this|those|same|again|instead)\b/i;
 
 const DONE_CLOSE =
@@ -117,7 +121,7 @@ export function detectTopicReset(previous: string, next: string): TopicReset {
 	if (EXPLICIT_NEW.test(curr)) {
 		return hit("explicit");
 	}
-	if (CONTINUATION.test(curr)) {
+	if (CONTINUATION.test(curr) || CAPABILITY.test(curr)) {
 		return { reset: false };
 	}
 

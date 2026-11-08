@@ -68,6 +68,7 @@ export {
 	type EscalateSignal,
 	type EscalateTier,
 	escalateComplexity,
+	formatDelegateCard,
 	formatDescalateCard,
 	formatEscalateCard,
 	frontierBound,
@@ -142,6 +143,14 @@ export {
 	type RunLayerWorkflowInput,
 	runLayerWorkflow,
 } from "./layer-execute.ts";
+export {
+	LAYERING_DELEGATE_SECTION,
+	LAYERING_NETWORK_SECTION,
+	layeringNetworkSection,
+	needsLiveNetwork,
+	shouldAutoDelegateLiveNetwork,
+	shouldInjectLayerNetwork,
+} from "./layer-network.ts";
 export {
 	formatLayerRoute,
 	isLayerRouteEntry,

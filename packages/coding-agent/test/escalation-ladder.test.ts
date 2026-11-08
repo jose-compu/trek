@@ -8,6 +8,7 @@ import {
 	asClimbRole,
 	climbHandoffBrief,
 	defaultRuntimeConfig,
+	formatDelegateCard,
 	formatDescalateCard,
 	formatEscalateCard,
 	frontierConsultRole,
@@ -210,6 +211,7 @@ Received arguments:
 		});
 		expect(parseDelegateAsk("hand off to tooling")?.target).toBe("tooling");
 		expect(parseEscalateAsk("hand off to tooling")).toBeUndefined();
+		expect(formatDelegateCard("workhorse", "live fetch")).toBe("→ workhorse ⇄ tooling · live fetch");
 	});
 
 	it("aliases Frontier consult to Planning when no third id is bound", () => {

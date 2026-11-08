@@ -416,6 +416,12 @@ export function formatDescalateCard(from: HierarchyRole, to: HierarchyRole, why?
 	return `↓ ${from} → ${to}${reason}`;
 }
 
+/** One-line status when Workhorse/Planning send a runner job to Tooling. */
+export function formatDelegateCard(from: HierarchyRole, why?: string): string {
+	const reason = why?.trim() ? ` · ${why.trim().slice(0, 48)}` : "";
+	return `→ ${from} ⇄ tooling${reason}`;
+}
+
 function layerEscalateAsk(text: string): EscalateAsk | undefined {
 	if (!/"action"\s*:\s*"escalate"/i.test(text)) {
 		return undefined;

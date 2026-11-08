@@ -226,12 +226,14 @@ import { formatDecisionSolveCard, runDecisionIndex } from "./runtime/decision-in
 import { decisionTemplateInventPrompt } from "./runtime/decision-templates.ts";
 import {
 	asClimbRole,
+	formatDelegateCard,
 	formatDescalateCard,
 	formatEscalateCard,
 	type HierarchyRole,
 	isToolArgumentValidationError,
 	type LadderRole,
 	nextLadderRole,
+	parseDelegateAsk,
 	parseDescalateSignal,
 	parseEscalateSignal,
 	prevLadderRole,
@@ -246,6 +248,11 @@ import {
 	tryParseLayerDecision,
 } from "./runtime/layer-decision.ts";
 import { runLayerWorkflow } from "./runtime/layer-execute.ts";
+import {
+	layeringNetworkSection,
+	shouldAutoDelegateLiveNetwork,
+	shouldInjectLayerNetwork,
+} from "./runtime/layer-network.ts";
 import { LAYER_ROUTE_CUSTOM_TYPE, layerRouteTrace } from "./runtime/layer-telemetry.ts";
 import {
 	consumeVerifierGrant,
@@ -2773,6 +2780,15 @@ export class AgentSession {
 		if (this._localSuiteShouldBuildHere()) {
 			return `${LOCAL_SUITE_WORK_SECTION}\n\n${built}`;
 		}
+		try {
+			const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+			if (shouldInjectLayerNetwork(resolved)) {
+				const toolingBound = resolved.layering !== "single" && Boolean(resolved.roles.tooling);
+				return `${layeringNetworkSection(toolingBound)}\n\n${built}`;
+			}
+		} catch {
+			// Registry may be missing during tests; keep the coding prompt.
+		}
 		return built;
 	}
 
@@ -3442,6 +3458,62 @@ export class AgentSession {
 		);
 	}
 
+	private async _maybeDelegateLiveNetwork(task: string): Promise<void> {
+		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			return;
+		}
+		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		if (!shouldAutoDelegateLiveNetwork(task, resolved)) {
+			return;
+		}
+		await this._delegateToTooling("live fetch");
+	}
+
+	/** Bind Tooling as a runner. The climb floor stays Workhorse/Planning/Frontier. */
+	private async _delegateToTooling(why: string): Promise<boolean> {
+		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const tooling = resolved.roles.tooling;
+		if (!tooling) {
+			return false;
+		}
+		const from: HierarchyRole =
+			this._hierarchyDisplayRole ?? this._ladderRole ?? this._lastHierarchyRole ?? "workhorse";
+		this._turnLayerAction = "delegate";
+		this._emit({
+			type: "hierarchy_escalate",
+			text: formatDelegateCard(from, why),
+			from,
+			to: "tooling",
+		});
+		this.sessionManager.appendCustomEntry(
+			LAYER_ROUTE_CUSTOM_TYPE,
+			layerRouteTrace(from, "tooling", "delegate", tooling, why),
+		);
+		const previous = this.model;
+		let mapped = previous;
+		if (tooling.source === "api") {
+			mapped = this._apiRoleModel(tooling.provider, tooling.id) ?? previous;
+		} else if (tooling.source === "lmstudio") {
+			mapped = this._lmStudioRoleModel(tooling.id, tooling.baseUrl);
+		} else {
+			mapped = this._localRoleModel("tooling", tooling.id, resolved);
+		}
+		if (!mapped) {
+			return false;
+		}
+		this.agent.state.model = mapped;
+		if (tooling.thinking === "off") {
+			this.agent.state.thinkingLevel = "off";
+		}
+		this._honorThinkingPin();
+		if (previous && !modelsAreEqual(previous, mapped)) {
+			this.sessionManager.appendModelChange(mapped.provider, mapped.id);
+			await this._emitModelSelect(mapped, previous, "set");
+		}
+		this._emitHierarchyModel("tooling", mapped.provider, mapped.id);
+		return true;
+	}
+
 	private async _noteWorkhorseElevation(message: AssistantMessage): Promise<void> {
 		const text = message.content
 			.filter((part): part is TextContent => part.type === "text" && typeof part.text === "string")
@@ -3500,6 +3572,21 @@ export class AgentSession {
 				why: down.why,
 				explicit: down.explicit,
 			});
+			return;
+		}
+		const delegate = parseDelegateAsk(text);
+		if (delegate && resolved.roles.tooling) {
+			const cleanedDelegate = stripEscalateSignal(text);
+			if (cleanedDelegate !== text.trim()) {
+				const nextContent = message.content.map((part) =>
+					part.type === "text" && typeof part.text === "string"
+						? { ...part, text: stripEscalateSignal(part.text) }
+						: part,
+				);
+				this._replaceMessageInPlace(message, { ...message, content: nextContent } as AgentMessage);
+			}
+			await this._delegateToTooling(delegate.why);
+			debugLog("runtime", "ladder delegated to tooling", { from, why: delegate.why });
 			return;
 		}
 		const signal = parseEscalateSignal(text, from, resolved);
@@ -4814,6 +4901,7 @@ export class AgentSession {
 			await this._maybeUserDescalate(expandedText);
 			await this._attachPlanningBrief(expandedText);
 			await this._bindLocalCompletion(expandedText);
+			await this._maybeDelegateLiveNetwork(expandedText);
 			await this._injectMemory(expandedText);
 		} catch (error) {
 			preflightResult?.(false);

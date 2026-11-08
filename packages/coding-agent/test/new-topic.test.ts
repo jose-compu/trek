@@ -21,6 +21,11 @@ describe("isNewTopic / detectTopicReset", () => {
 		expect(isNewTopic("Build a chess game in index.html", "try again")).toBe(false);
 	});
 
+	it("keeps capability questions about internet on the same topic", () => {
+		expect(isNewTopic("what is the weather in paris?", "do you have internet access?")).toBe(false);
+		expect(isNewTopic("fetch https://example.com", "are you online")).toBe(false);
+	});
+
 	it("detects an explicit new task", () => {
 		expect(isNewTopic("Fix README.md typo", "new task: write a poem about mountains")).toBe(true);
 		expect(detectTopicReset("Fix README.md typo", "/new-topic").reason).toBe("explicit");
