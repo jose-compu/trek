@@ -131,7 +131,7 @@ roles:
 ## Related commands
 
 - `trek models list|set-mode|set-suite|set-layering|set-role|set-lmstudio|benchmark`
-- `/hierarchy` — in-session layering / mode / suite / role picker (0.16, layering in 0.18)
+- `/hierarchy` — in-session layering / mode / suite / role picker (0.16, layering in 0.18). Status is a labeled card: climb, runner, then Role / Source / Provider / Model / Think.
 - `/thinking briefly|deep|off` — pin short-think or restore deep thinking (0.18)
 
 ## Related tests

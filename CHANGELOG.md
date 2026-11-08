@@ -6,6 +6,10 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Changed
+
+- `/hierarchy` prints an aligned layering card (climb, runner, role table) instead of a flat dump.
+
 ## [0.18.0] - 2026-11-07
 
 ### Added

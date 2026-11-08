@@ -25,21 +25,23 @@ describe("/hierarchy", () => {
 	it("defaults to layering single", () => {
 		const { agentDir, cwd } = isolated();
 		const status = runHierarchyCommand(agentDir, cwd, "");
-		expect(status).toContain("layering single");
+		expect(status).toMatch(/^layering\s+single$/m);
+		expect(status).toMatch(/^climb\s+Decision → Workhorse ⇄ Planning ⇄ Frontier$/m);
+		expect(status).toMatch(/^runner\s+Tooling$/m);
 		expect(loadRuntimeConfig({ agentDir, cwd }).hierarchy.layering).toBe("single");
 	});
 
 	it("writes mode, suite, and one role, and the next load reads them", () => {
 		const { agentDir, cwd } = isolated();
-		expect(runHierarchyCommand(agentDir, cwd, "mode hybrid")).toContain("mode hybrid");
-		expect(runHierarchyCommand(agentDir, cwd, "suite qwen")).toContain("suite qwen");
+		expect(runHierarchyCommand(agentDir, cwd, "mode hybrid")).toMatch(/^mode\s+hybrid$/m);
+		expect(runHierarchyCommand(agentDir, cwd, "suite qwen")).toMatch(/^suite\s+qwen$/m);
 		const written = runHierarchyCommand(
 			agentDir,
 			cwd,
 			"role workhorse --id Qwen3.5-4B --source local --thinking off",
 		);
-		expect(written).toContain("workhorse local Qwen3.5-4B thinking off");
-		expect(written).toContain("layering manual");
+		expect(written).toMatch(/^workhorse\s+local\s+\S+\s+Qwen3\.5-4B\s+off\s*$/m);
+		expect(written).toMatch(/^layering\s+manual$/m);
 		expect(written).toContain("The next session reads this file.");
 		const loaded = loadRuntimeConfig({ agentDir, cwd });
 		expect(loaded.hierarchy.mode).toBe("hybrid");
@@ -56,7 +58,7 @@ describe("/hierarchy", () => {
 			cwd,
 			"role decision --id LiquidAI/d1-omni-600M --source local --thinking off",
 		);
-		expect(written).toContain("decision local LiquidAI/d1-omni-600M");
+		expect(written).toMatch(/^decision\s+local\s+\S+\s+LiquidAI\/d1-omni-600M\s+off\s*$/m);
 		expect(loadRuntimeConfig({ agentDir, cwd }).roles.decision).toEqual({
 			source: "local",
 			id: "LiquidAI/d1-omni-600M",
@@ -67,14 +69,14 @@ describe("/hierarchy", () => {
 	it("allows a local frontier and verifier, and --thinking brief", () => {
 		const { agentDir, cwd } = isolated();
 		const frontier = runHierarchyCommand(agentDir, cwd, "role frontier --id grok-4 --source local --thinking brief");
-		expect(frontier).toContain("frontier local grok-4 thinking brief");
+		expect(frontier).toMatch(/^frontier\s+local\s+\S+\s+grok-4\s+brief\s*$/m);
 		expect(frontier).not.toContain("Frontier stays on the API.");
 		const verifier = runHierarchyCommand(
 			agentDir,
 			cwd,
 			"role verifier --id mistral-small --source api --thinking off",
 		);
-		expect(verifier).toContain("verifier api mistral-small thinking off");
+		expect(verifier).toMatch(/^verifier\s+api\s+\S+\s+mistral-small\s+off\s*$/m);
 		const loaded = loadRuntimeConfig({ agentDir, cwd });
 		expect(loaded.roles.frontier).toEqual({ source: "local", id: "grok-4", thinking: "brief" });
 		expect(loaded.roles.verifier).toEqual({ source: "api", id: "mistral-small", thinking: "off" });
@@ -88,7 +90,7 @@ describe("/hierarchy", () => {
 		runHierarchyCommand(agentDir, cwd, "role verifier --id other --source api --thinking off");
 		runHierarchyCommand(agentDir, cwd, "role workhorse --id Qwen3.5-4B --source local --thinking off");
 		const flattened = runHierarchyCommand(agentDir, cwd, "single");
-		expect(flattened).toContain("layering single");
+		expect(flattened).toMatch(/^layering\s+single$/m);
 		const after = loadRuntimeConfig({ agentDir, cwd });
 		expect(after.hierarchy.layering).toBe("single");
 		expect(after.roles.tooling).toBeUndefined();
@@ -96,7 +98,7 @@ describe("/hierarchy", () => {
 		expect(after.roles.frontier).toBeUndefined();
 		expect(after.roles.verifier).toBeUndefined();
 		expect(after.roles.workhorse?.id).toBe("Qwen3.5-4B");
-		expect(runHierarchyCommand(agentDir, cwd, "auto")).toContain("layering auto");
+		expect(runHierarchyCommand(agentDir, cwd, "auto")).toMatch(/^layering\s+auto$/m);
 		expect(loadRuntimeConfig({ agentDir, cwd }).hierarchy.layering).toBe("auto");
 		runHierarchyCommand(agentDir, cwd, "mode local");
 		expect(resolveRuntime(loadRuntimeConfig({ agentDir, cwd }), { frontier: null }).roles.planning).toBeUndefined();
@@ -106,10 +108,10 @@ describe("/hierarchy", () => {
 		const { agentDir, cwd } = isolated();
 		const catalog = join(dirname(fileURLToPath(import.meta.url)), "suite/layering/fixtures/catalogs/openai.json");
 		const written = runHierarchyCommand(agentDir, cwd, `auto --catalog ${catalog}`);
-		expect(written).toContain("layering auto");
-		expect(written).toContain("workhorse api gpt-6.1-terra");
-		expect(written).toContain("planning api gpt-6.1-sol");
-		expect(written).toContain("verifier unset");
+		expect(written).toMatch(/^layering\s+auto$/m);
+		expect(written).toMatch(/^workhorse\s+api\s+openai\s+gpt-6\.1-terra\s+brief\s*$/m);
+		expect(written).toMatch(/^planning\s+api\s+openai\s+gpt-6\.1-sol\s+deep\s*$/m);
+		expect(written).toMatch(/^verifier\s+-\s+-\s+unset\s+-\s*$/m);
 		const loaded = loadRuntimeConfig({ agentDir, cwd });
 		expect(loaded.roles.frontier?.id).toBe("gpt-6-astra");
 		expect(loaded.roles.verifier).toBeUndefined();
@@ -117,6 +119,25 @@ describe("/hierarchy", () => {
 		expect(loadRuntimeConfig({ agentDir, cwd }).roles.planning).toBeUndefined();
 		runHierarchyCommand(agentDir, cwd, `auto --catalog ${catalog}`);
 		expect(loadRuntimeConfig({ agentDir, cwd }).roles.planning?.id).toBe("gpt-6.1-sol");
+	});
+
+	it("prints an aligned xAI layering card", () => {
+		const { agentDir, cwd } = isolated();
+		const catalog = join(dirname(fileURLToPath(import.meta.url)), "suite/layering/fixtures/catalogs/xai.json");
+		runHierarchyCommand(agentDir, cwd, "mode api");
+		const written = runHierarchyCommand(agentDir, cwd, `auto --catalog ${catalog}`);
+		expect(written).toMatch(/^layering\s+auto$/m);
+		expect(written).toMatch(/^mode\s+api$/m);
+		expect(written).toContain("Role");
+		expect(written).toContain("Source");
+		expect(written).toContain("Provider");
+		expect(written).toContain("Model");
+		expect(written).toContain("Think");
+		expect(written).toMatch(/^tooling\s+api\s+xai\s+grok-4\.1-fast\s+off\s*$/m);
+		expect(written).toMatch(/^workhorse\s+api\s+xai\s+grok-4\.3\s+brief\s*$/m);
+		expect(written).toMatch(/^planning\s+api\s+xai\s+grok-4\.5\s+deep\s*$/m);
+		expect(written).toMatch(/^frontier\s+api\s+xai\s+grok-4\.20-multi-agent\s+deep\s*$/m);
+		expect(written).toMatch(/^verifier\s+-\s+-\s+unset\s+-\s*$/m);
 	});
 
 	it("auto --catalog overwrites stale project role pins", () => {
@@ -160,7 +181,7 @@ describe("/hierarchy", () => {
 			].join("\n"),
 		);
 		const written = runHierarchyCommand(agentDir, cwd, "single");
-		expect(written).toContain("layering single");
+		expect(written).toMatch(/^layering\s+single$/m);
 		const loaded = loadRuntimeConfig({ agentDir, cwd });
 		expect(loaded.hierarchy.layering).toBe("single");
 		expect(loaded.roles.planning).toBeUndefined();

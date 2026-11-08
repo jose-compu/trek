@@ -4,6 +4,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Changed
+
+- `/hierarchy` status is an aligned card: layering / mode / suite / file, then climb and runner lines, then Role / Source / Provider / Model / Think. Unset roles show `unset`.
+
 ## [0.18.0] - 2026-11-07
 
 ### Added

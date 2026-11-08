@@ -173,19 +173,70 @@ function setRole(path: string, agentDir: string, cwd: string, rest: string[]): s
 function status(agentDir: string, cwd: string, path: string): string {
 	const config = loadRuntimeConfig({ agentDir, cwd });
 	const resolved = resolveRuntime(config);
-	const lines = [
-		`layering ${config.hierarchy.layering}`,
-		`mode ${config.hierarchy.mode}`,
-		`suite ${config.hierarchy.suite}`,
-		`file ${path}`,
-	];
-	for (const role of ROLE_ORDER) {
+	const rows: HierarchyRow[] = ROLE_ORDER.map((role) => {
 		const assignment = skipExtraRole(config, role) ? undefined : (config.roles[role] ?? resolved.roles[role]);
-		lines.push(
-			assignment ? `${role} ${assignment.source} ${assignment.id} thinking ${assignment.thinking}` : `${role} unset`,
-		);
+		if (!assignment) {
+			return { role, source: "-", provider: "-", model: "unset", think: "-" };
+		}
+		return {
+			role,
+			source: assignment.source,
+			provider: assignment.provider ?? "-",
+			model: assignment.id,
+			think: assignment.thinking,
+		};
+	});
+	const header: HierarchyRow = {
+		role: "Role",
+		source: "Source",
+		provider: "Provider",
+		model: "Model",
+		think: "Think",
+	};
+	const widths = columnWidths([header, ...rows]);
+	return [
+		meta("layering", config.hierarchy.layering),
+		meta("mode", config.hierarchy.mode),
+		meta("suite", config.hierarchy.suite),
+		meta("file", path),
+		"",
+		meta("climb", "Decision → Workhorse ⇄ Planning ⇄ Frontier"),
+		meta("runner", "Tooling"),
+		"",
+		formatRow(header, widths),
+		...rows.map((row) => formatRow(row, widths)),
+	].join("\n");
+}
+
+interface HierarchyRow {
+	role: string;
+	source: string;
+	provider: string;
+	model: string;
+	think: string;
+}
+
+function meta(label: string, value: string): string {
+	return `${label.padEnd(9)}${value}`;
+}
+
+function columnWidths(rows: HierarchyRow[]): Record<keyof HierarchyRow, number> {
+	const keys: (keyof HierarchyRow)[] = ["role", "source", "provider", "model", "think"];
+	const widths = { role: 0, source: 0, provider: 0, model: 0, think: 0 };
+	for (const key of keys) {
+		widths[key] = Math.max(...rows.map((row) => row[key].length));
 	}
-	return lines.join("\n");
+	return widths;
+}
+
+function formatRow(row: HierarchyRow, widths: Record<keyof HierarchyRow, number>): string {
+	return [
+		row.role.padEnd(widths.role),
+		row.source.padEnd(widths.source),
+		row.provider.padEnd(widths.provider),
+		row.model.padEnd(widths.model),
+		row.think,
+	].join("  ");
 }
 
 function nextSession(body: string): string {
