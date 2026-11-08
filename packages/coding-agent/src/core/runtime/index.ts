@@ -91,6 +91,7 @@ export {
 	resolveDescalateTarget,
 	resolveEscalateTarget,
 	roleAvailable,
+	shouldAnnounceDecisionClimb,
 	shouldRebindSessionRole,
 	startLadderRole,
 	stripEscalateSignal,
@@ -215,7 +216,18 @@ export {
 	useMlx,
 } from "./mlx-backend.ts";
 export {
+	classifyLongTaskResume,
+	isLongTaskPrompt,
+	LONG_TASK_MAX_CONTINUES,
+	longTaskContinuePrompt,
+	looksLikeLongTaskDone,
+	looksLikePartialMilestone,
+	type LongTaskResume,
+	shouldResumeLongTask,
+} from "./long-task.ts";
+export {
 	detectTopicReset,
+	isKeepGoingPrompt,
 	isNewTopic,
 	parseNewTopicSignal,
 	stripNewTopicSignal,

@@ -260,6 +260,11 @@ export function shouldRebindSessionRole(turnLayerAction: string | undefined): bo
 	return turnLayerAction !== "delegate";
 }
 
+/** API stacks skip the Decision Index. After a park, bind must announce the climb. */
+export function shouldAnnounceDecisionClimb(parkedOnDecision: boolean, keepDecisionDisplay?: boolean): boolean {
+	return parkedOnDecision && !keepDecisionDisplay;
+}
+
 export function parseDelegateAsk(text: string): DelegateAsk | undefined {
 	const trimmed = text.trim();
 	if (!trimmed) {

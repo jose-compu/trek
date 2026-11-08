@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 import {
 	classifyLayerIntentHeuristic,
 	isControlPrompt,
+	isKeepGoingPrompt,
+	isLongTaskPrompt,
 	parseControlAsk,
 	parseLayerIntentReply,
 	shouldAskDecisionIntent,
@@ -66,5 +68,27 @@ describe("layer intent", () => {
 		expect(
 			shouldAskDecisionIntent("grep the log", "swith to planning model to plan a trip to eiffel tower pls"),
 		).toBe(false);
+		expect(
+			shouldAskDecisionIntent(
+				"start building pls v6 of lacan-scan on the release branch",
+				"create a plan to complete the release and start working on the plan",
+			),
+		).toBe(false);
+		expect(
+			shouldAskDecisionIntent(
+				"ok read plan and build it for the remaining v6 detectors",
+				"load autopilot skill and continue until you complete the whole v6",
+			),
+		).toBe(false);
+	});
+
+	it("treats build continuations as keep-going, not a Decision park", () => {
+		expect(isKeepGoingPrompt("continue")).toBe(true);
+		expect(isKeepGoingPrompt("start building")).toBe(true);
+		expect(isKeepGoingPrompt("create a plan to complete the release and start working on the plan")).toBe(true);
+		expect(isKeepGoingPrompt("ok read plan and build it")).toBe(true);
+		expect(isKeepGoingPrompt("new task: write a haiku about rain")).toBe(false);
+		expect(isLongTaskPrompt("load autopilot skill and continue until you complete the whole v6")).toBe(true);
+		expect(isLongTaskPrompt("continue")).toBe(false);
 	});
 });

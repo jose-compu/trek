@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	detectTopicReset,
+	isKeepGoingPrompt,
 	isNewTopic,
 	parseNewTopicSignal,
 	stripNewTopicSignal,
@@ -54,7 +55,23 @@ describe("isNewTopic / detectTopicReset", () => {
 		expect(stripNewTopicSignal(text)).toBe("ok");
 	});
 
-	it("keeps unrelated follow-ups sticky until Decision or an explicit reset", () => {
+	it("keeps a later milestone on the same long task", () => {
+		expect(
+			isNewTopic(
+				"start building pls v6",
+				"create a plan to complete the release and start working on the plan",
+			),
+		).toBe(false);
+		expect(isNewTopic("ok read plan and build it", "load autopilot skill and continue until you complete the whole v6")).toBe(
+			false,
+		);
+		expect(isKeepGoingPrompt("build a plan in a local .txt file for full v6 version")).toBe(false);
+		expect(
+			detectTopicReset("start building pls v6", "build a plan in a local .txt file for full v6 version").reset,
+		).toBe(false);
+	});
+
+	it("keeps unrelated follow-ups sticky until an explicit reset", () => {
 		expect(
 			isNewTopic(
 				"Fix the typo in the title of README.md on disk",

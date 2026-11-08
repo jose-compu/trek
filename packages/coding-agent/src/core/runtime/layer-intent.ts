@@ -5,6 +5,8 @@
 
 import { parseControlAsk } from "./layer-control.ts";
 import { needsLiveNetwork } from "./layer-network.ts";
+import { isKeepGoingPrompt } from "./new-topic.ts";
+import { isLongTaskPrompt } from "./long-task.ts";
 
 export const LAYER_INTENTS = ["planning", "tooling", "workhorse", "same-topic", "new-topic"] as const;
 export type LayerIntent = (typeof LAYER_INTENTS)[number];
@@ -67,12 +69,13 @@ Reply with JSON only:
 {"intent":"planning"|"tooling"|"workhorse"|"same-topic"|"new-topic"}
 
 Rules:
-- same-topic: follow-up on the previous task
-- new-topic: unrelated new task
+- same-topic: same repo, same feature, a later milestone, a plan, or keep building
+- new-topic: a clearly unrelated task the user marked as new
 - tooling: search, logs, fetch, weather, live facts
 - workhorse: act or edit on this turn; do not climb
 - planning: architecture or multi-step design that needs the Planning SKU
-- do not pick planning only because the word "plan" appears`;
+- do not pick planning only because the word "plan" appears
+- do not pick new-topic for continue, start building, or the next milestone`;
 }
 
 /**
@@ -107,6 +110,9 @@ export function shouldAskDecisionIntent(previous: string, next: string): boolean
 		return false;
 	}
 	if (parseControlAsk(curr)) {
+		return false;
+	}
+	if (isKeepGoingPrompt(curr) || isLongTaskPrompt(curr)) {
 		return false;
 	}
 	if (curr.length < 24 || prev.length < 24) {
