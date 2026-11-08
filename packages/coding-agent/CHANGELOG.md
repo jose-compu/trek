@@ -4,6 +4,8 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.18.2] - 2026-11-08
+
 ### Fixed
 
 - API stacks: after a Decision park (`↓ workhorse → decision · task changed`), bind emits `↑ decision → workhorse · route` and the footer follows the actor. Named Planning still climbs; “create a plan” stays Workhorse.
