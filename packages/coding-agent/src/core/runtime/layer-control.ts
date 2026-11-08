@@ -19,7 +19,7 @@ const PHRASE = new RegExp(
 );
 
 const BACK = /\bgo back to (workhorse|decision)\b/i;
-const CONSULT_ONLY = /\bconsult(?:\s+only)\b/i;
+const CONSULT_ONLY = /(?:^|\s)consult\s+only(?:\s+(?:frontier|planning))?(?:\s*[.!?]?\s*$)/i;
 const BARE_DESCALATE = /(?:^|\s)\/?descalate\b/i;
 const SIMPLER = /\bsimpler model\b/i;
 

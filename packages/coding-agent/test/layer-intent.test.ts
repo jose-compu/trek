@@ -36,6 +36,8 @@ describe("layer control grammar", () => {
 		expect(isControlPrompt("/escalate")).toBe(true);
 		expect(parseControlAsk("/escalate")).toBeUndefined();
 		expect(parseControlAsk("build a tetris game in js")).toBeUndefined();
+		expect(parseControlAsk("consult only")).toMatchObject({ kind: "climb", role: "frontier" });
+		expect(parseControlAsk("Please consult only the README")).toBeUndefined();
 	});
 });
 
