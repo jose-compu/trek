@@ -15,6 +15,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 - Explicit `Escalate to planning` stays on Planning. Deep keywords (debug, root cause) no longer skip to Frontier after the first bind.
 - `layer-consult` continues on Frontier with a real consult, then restores the prior floor. Mute handoff JSON that echoes “Consult only” does not climb again.
 - `descalate to tooling` binds the Tooling runner. It does not drop Workhorse to Decision. The word “descalate” in a handoff is not a soft ladder drop.
+- Mute internal steps do not climb or drop the ladder. A parsed handoff brief survives the Planning climb.
 
 ### Added
 

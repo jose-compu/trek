@@ -3314,7 +3314,11 @@ export class AgentSession {
 		}
 		this._parkedOnDecision = false;
 		this._emitEscalateCard(from, signal.tier, signal.why);
-		this._pendingElevate = { tier: signal.tier, why: signal.why, handoff: climbHandoffBrief(signal.why) };
+		this._pendingElevate = {
+			tier: signal.tier,
+			why: signal.why,
+			handoff: this._pendingElevate?.handoff ?? climbHandoffBrief(signal.why),
+		};
 		this._ladderRole = signal.tier;
 		this._lastHierarchyRole = signal.tier;
 		this._retagLessonRecall(signal.tier);
@@ -3642,6 +3646,9 @@ export class AgentSession {
 	}
 
 	private async _noteWorkhorseElevation(message: AssistantMessage): Promise<void> {
+		if (this._muteThinking) {
+			return;
+		}
 		const text = message.content
 			.filter((part): part is TextContent => part.type === "text" && typeof part.text === "string")
 			.map((part) => part.text)
@@ -4546,9 +4553,7 @@ export class AgentSession {
 				if (part && part.type === "text") part.text = `${part.text}\n\n${this._workflowCheck}`;
 				this._emit({ type: "workflow_check", text: this._workflowCheck });
 			}
-			if (continueTo === "restore") {
-				keepLadder = false;
-			} else if (continuePrompt && continueTo === "consult") {
+			if (continuePrompt && continueTo === "consult") {
 				this.setActiveToolsByName(previousTools);
 				const floor = this._ladderRole ?? this._lastHierarchyRole;
 				if (floor !== "frontier") {
