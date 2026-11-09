@@ -6849,10 +6849,31 @@ export class AgentSession {
 		const err = message.errorMessage;
 		if (this._isNonRetryableProviderLimitError(err)) return false;
 		if (/repetitive thinking loop/i.test(err)) return false;
+		if (/token parsing/i.test(err)) return true;
 		// Match: overloaded_error, provider returned error, rate limit, 429, 500, 502, 503, 504, service unavailable, network/connection errors (including connection lost), WebSocket transport closes/errors, fetch failed, premature stream endings, HTTP/2 closed before response, terminated, retry delay exceeded
 		return /overloaded|provider.?returned.?error|rate.?limit|too many requests|429|500|502|503|504|service.?unavailable|server.?error|internal.?error|network.?error|connection.?error|connection.?refused|connection.?lost|websocket.?closed|websocket.?error|other side closed|fetch failed|upstream.?connect|reset before headers|socket hang up|ended without|stream ended before message_stop|http2 request did not get a response|timed? out|timeout|terminated|retry delay/i.test(
 			err,
 		);
+	}
+
+	private _stripThinkingFromAssistantMessages(): void {
+		const messages = this.agent.state.messages;
+		let changed = false;
+		const next = messages.map((msg) => {
+			if (msg.role !== "assistant") {
+				return msg;
+			}
+			const assistant = msg as AssistantMessage;
+			const content = assistant.content.filter((block) => block.type !== "thinking");
+			if (content.length === assistant.content.length) {
+				return msg;
+			}
+			changed = true;
+			return { ...assistant, content };
+		});
+		if (changed) {
+			this.agent.state.messages = next;
+		}
 	}
 
 	/**
@@ -6887,6 +6908,13 @@ export class AgentSession {
 		const messages = this.agent.state.messages;
 		if (messages.length > 0 && messages[messages.length - 1].role === "assistant") {
 			this.agent.state.messages = messages.slice(0, -1);
+		}
+
+		// xAI Grok "Internal error during token parsing" is usually poisoned
+		// reasoning_content on a prior tool-call turn. Drop thinking so retry
+		// does not resend the same payload.
+		if (/token parsing/i.test(message.errorMessage || "")) {
+			this._stripThinkingFromAssistantMessages();
 		}
 
 		// Wait with exponential backoff (abortable)

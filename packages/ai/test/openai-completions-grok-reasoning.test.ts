@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getModel } from "../src/models.ts";
-import { grokModelSupportsReasoningEffort } from "../src/providers/openai-completions.ts";
+import { convertMessages, grokModelSupportsReasoningEffort } from "../src/providers/openai-completions.ts";
 import { streamSimple } from "../src/stream.ts";
+import type { AssistantMessage, Context, OpenAICompletionsCompat, Usage } from "../src/types.ts";
 import { REPETITIVE_STREAM_ERROR } from "../src/utils/stream-repetition.ts";
 
 const mockState = vi.hoisted(() => ({
@@ -139,5 +140,116 @@ describe("xAI Grok reasoning_effort and stream loop", () => {
 
 		expect(response.stopReason).toBe("error");
 		expect(response.errorMessage).toBe(REPETITIVE_STREAM_ERROR);
+	});
+});
+
+const emptyUsage: Usage = {
+	input: 0,
+	output: 0,
+	cacheRead: 0,
+	cacheWrite: 0,
+	totalTokens: 0,
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+};
+
+const replayCompat: Required<OpenAICompletionsCompat> = {
+	supportsStore: false,
+	supportsDeveloperRole: false,
+	supportsReasoningEffort: true,
+	supportsUsageInStreaming: true,
+	maxTokensField: "max_completion_tokens",
+	requiresToolResultName: false,
+	requiresAssistantAfterToolResult: false,
+	requiresThinkingAsText: false,
+	requiresReasoningContentOnAssistantMessages: false,
+	thinkingFormat: "openai",
+	openRouterRouting: {},
+	vercelGatewayRouting: {},
+	zaiToolStream: false,
+	supportsStrictMode: true,
+	cacheControlFormat: "anthropic",
+	sendSessionAffinityHeaders: false,
+	supportsLongCacheRetention: true,
+};
+
+describe("xAI Grok reasoning_content replay", () => {
+	it("omits reasoning_content when a Grok turn also has tool calls", () => {
+		const model = getModel("xai", "grok-4.6")!;
+		const assistant: AssistantMessage = {
+			role: "assistant",
+			content: [
+				{
+					type: "thinking",
+					thinking: "Need to patch facade.ts",
+					thinkingSignature: "reasoning_content",
+				},
+				{
+					type: "toolCall",
+					id: "call-edit",
+					name: "edit",
+					arguments: { path: "src/facade.ts", edits: [{ oldText: "a", newText: "b" }] },
+				},
+			],
+			api: model.api,
+			provider: model.provider,
+			model: model.id,
+			usage: emptyUsage,
+			stopReason: "toolUse",
+			timestamp: 2,
+		};
+		const context: Context = {
+			messages: [
+				{ role: "user", content: "edit the vdf", timestamp: 1 },
+				assistant,
+				{
+					role: "toolResult",
+					toolCallId: "call-edit",
+					toolName: "edit",
+					content: [{ type: "text", text: "ok" }],
+					isError: false,
+					timestamp: 3,
+				},
+			],
+		};
+
+		const messages = convertMessages(model, context, replayCompat);
+		const replayed = messages.find((message) => message.role === "assistant") as {
+			reasoning_content?: string;
+			tool_calls?: unknown[];
+		};
+		expect(replayed.tool_calls).toHaveLength(1);
+		expect(replayed.reasoning_content).toBeUndefined();
+	});
+
+	it("still replays sanitized reasoning_content for a Grok turn without tools", () => {
+		const model = getModel("xai", "grok-4.6")!;
+		const assistant: AssistantMessage = {
+			role: "assistant",
+			content: [
+				{
+					type: "thinking",
+					thinking: `plan\u0000 with ${String.fromCharCode(0xd83d)} junk`,
+					thinkingSignature: "reasoning_content",
+				},
+				{ type: "text", text: "done" },
+			],
+			api: model.api,
+			provider: model.provider,
+			model: model.id,
+			usage: emptyUsage,
+			stopReason: "stop",
+			timestamp: 2,
+		};
+		const context: Context = {
+			messages: [{ role: "user", content: "hi", timestamp: 1 }, assistant],
+		};
+
+		const messages = convertMessages(model, context, replayCompat);
+		const replayed = messages.find((message) => message.role === "assistant") as {
+			reasoning_content?: string;
+			content?: string;
+		};
+		expect(replayed.content).toBe("done");
+		expect(replayed.reasoning_content).toBe("plan with  junk");
 	});
 });

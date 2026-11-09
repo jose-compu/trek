@@ -32,7 +32,7 @@ import type {
 import { AssistantMessageEventStream } from "../utils/event-stream.ts";
 import { headersToRecord } from "../utils/headers.ts";
 import { parseStreamingJson } from "../utils/json-parse.ts";
-import { sanitizeSurrogates } from "../utils/sanitize-unicode.ts";
+import { sanitizeJsonValue, sanitizeProviderText } from "../utils/sanitize-unicode.ts";
 import { REPETITIVE_STREAM_ERROR, StreamRepetitionGuard } from "../utils/stream-repetition.ts";
 import { trekEnv } from "../utils/trek-env.ts";
 import { isCloudflareProvider, resolveCloudflareBaseUrl } from "./cloudflare.ts";
@@ -188,6 +188,7 @@ export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenA
 					return;
 				}
 				if (block.type === "text") {
+					block.text = sanitizeProviderText(block.text);
 					stream.push({
 						type: "text_end",
 						contentIndex,
@@ -195,6 +196,7 @@ export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenA
 						partial: output,
 					});
 				} else if (block.type === "thinking") {
+					block.thinking = sanitizeProviderText(block.thinking);
 					stream.push({
 						type: "thinking_end",
 						contentIndex,
@@ -202,7 +204,7 @@ export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenA
 						partial: output,
 					});
 				} else if (block.type === "toolCall") {
-					block.arguments = parseStreamingJson(block.partialArgs);
+					block.arguments = sanitizeJsonValue(parseStreamingJson(block.partialArgs)) as Record<string, unknown>;
 					// Finalize in-place and strip the scratch buffers so replay only
 					// carries parsed arguments.
 					delete block.partialArgs;
@@ -803,7 +805,7 @@ export function convertMessages(
 	if (context.systemPrompt) {
 		const useDeveloperRole = model.reasoning && compat.supportsDeveloperRole;
 		const role = useDeveloperRole ? "developer" : "system";
-		params.push({ role: role, content: sanitizeSurrogates(context.systemPrompt) });
+		params.push({ role: role, content: sanitizeProviderText(context.systemPrompt) });
 	}
 
 	let lastRole: string | null = null;
@@ -823,14 +825,14 @@ export function convertMessages(
 			if (typeof msg.content === "string") {
 				params.push({
 					role: "user",
-					content: sanitizeSurrogates(msg.content),
+					content: sanitizeProviderText(msg.content),
 				});
 			} else {
 				const content: ChatCompletionContentPart[] = msg.content.map((item): ChatCompletionContentPart => {
 					if (item.type === "text") {
 						return {
 							type: "text",
-							text: sanitizeSurrogates(item.text),
+							text: sanitizeProviderText(item.text),
 						} satisfies ChatCompletionContentPartText;
 					} else {
 						return {
@@ -861,10 +863,11 @@ export function convertMessages(
 					(block) =>
 						({
 							type: "text",
-							text: sanitizeSurrogates(block.text),
+							text: sanitizeProviderText(block.text),
 						}) satisfies ChatCompletionContentPartText,
 				);
 			const assistantText = assistantTextParts.map((part) => part.text).join("");
+			const toolCalls = msg.content.filter(isToolCallBlock);
 
 			const nonEmptyThinkingBlocks = msg.content
 				.filter(isThinkingContentBlock)
@@ -873,7 +876,7 @@ export function convertMessages(
 				if (compat.requiresThinkingAsText) {
 					// Convert thinking blocks to plain text (no tags to avoid model mimicking them)
 					const thinkingText = nonEmptyThinkingBlocks
-						.map((block) => sanitizeSurrogates(block.thinking))
+						.map((block) => sanitizeProviderText(block.thinking))
 						.join("\n\n");
 					assistantMsg.content = [{ type: "text", text: thinkingText }, ...assistantTextParts];
 				} else {
@@ -891,8 +894,14 @@ export function convertMessages(
 					if (model.provider === "opencode-go" && signature === "reasoning") {
 						signature = "reasoning_content";
 					}
-					if (signature && signature.length > 0) {
-						(assistantMsg as any)[signature] = nonEmptyThinkingBlocks.map((block) => block.thinking).join("\n");
+					// xAI Grok tokenizes reasoning_content + tool_calls together and can 500
+					// with "Internal error during token parsing". Keep thinking local; omit it
+					// on replay when the turn also has tool calls.
+					const replayReasoning = !(isGrokCompletionsModel(model) && toolCalls.length > 0);
+					if (signature && signature.length > 0 && replayReasoning) {
+						(assistantMsg as any)[signature] = nonEmptyThinkingBlocks
+							.map((block) => sanitizeProviderText(block.thinking))
+							.join("\n");
 					}
 				}
 			} else if (assistantText.length > 0) {
@@ -904,14 +913,13 @@ export function convertMessages(
 				assistantMsg.content = assistantText;
 			}
 
-			const toolCalls = msg.content.filter(isToolCallBlock);
 			if (toolCalls.length > 0) {
 				assistantMsg.tool_calls = toolCalls.map((tc) => ({
 					id: tc.id,
 					type: "function" as const,
 					function: {
 						name: tc.name,
-						arguments: JSON.stringify(tc.arguments),
+						arguments: stringifyToolCallArguments(tc.arguments),
 					},
 				}));
 				const reasoningDetails = toolCalls
@@ -967,7 +975,7 @@ export function convertMessages(
 				// Some providers require the 'name' field in tool results
 				const toolResultMsg: ChatCompletionToolMessageParam = {
 					role: "tool",
-					content: sanitizeSurrogates(hasText ? textResult : "(see attached image)"),
+					content: sanitizeProviderText(hasText ? textResult : "(see attached image)"),
 					tool_call_id: toolMsg.toolCallId,
 				};
 				if (compat.requiresToolResultName && toolMsg.toolName) {
@@ -1106,6 +1114,25 @@ function mapStopReason(reason: ChatCompletionChunk.Choice["finish_reason"] | str
  */
 export function grokModelSupportsReasoningEffort(modelId: string): boolean {
 	return /(?:^|[/.])grok-4\.(5|6)(?:$|[.-])/.test(modelId.toLowerCase());
+}
+
+export function isGrokCompletionsModel(model: Model<"openai-completions">): boolean {
+	if (model.provider === "xai") {
+		return true;
+	}
+	const baseUrl = model.baseUrl ?? "";
+	if (baseUrl.includes("api.x.ai")) {
+		return true;
+	}
+	return /(?:^|[/.])grok/i.test(model.id);
+}
+
+function stringifyToolCallArguments(args: unknown): string {
+	try {
+		return JSON.stringify(sanitizeJsonValue(args ?? {}));
+	} catch {
+		return "{}";
+	}
 }
 
 /**

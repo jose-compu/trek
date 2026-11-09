@@ -52,6 +52,47 @@ describe("AgentSession retry and event characterization", () => {
 		expect(harness.session.isRetrying).toBe(false);
 	});
 
+	it("retries token-parsing errors and drops thinking from replay", async () => {
+		const harness = await createHarness({ settings: { retry: { enabled: true, maxRetries: 3, baseDelayMs: 1 } } });
+		harnesses.push(harness);
+		const now = Date.now();
+		harness.session.agent.state.messages = [
+			{ role: "user", content: "edit the vdf", timestamp: now - 3 },
+			fauxAssistantMessage(
+				[fauxThinking("patch facade"), fauxToolCall("edit", { path: "src/facade.ts" }, { id: "c1" })],
+				{
+					stopReason: "toolUse",
+					timestamp: now - 2,
+				},
+			),
+			{
+				role: "toolResult",
+				toolCallId: "c1",
+				toolName: "edit",
+				content: [{ type: "text", text: "ok" }],
+				isError: false,
+				timestamp: now - 1,
+			},
+		];
+		let retryThinking = -1;
+		harness.setResponses([
+			fauxAssistantMessage("", { stopReason: "error", errorMessage: "Internal error during token parsing" }),
+			(context) => {
+				retryThinking = context.messages
+					.filter((message) => message.role === "assistant")
+					.flatMap((message) => message.content)
+					.filter((block) => block.type === "thinking").length;
+				return fauxAssistantMessage("recovered");
+			},
+		]);
+
+		await harness.session.prompt("continue");
+
+		expect(retryThinking).toBe(0);
+		expect(harness.eventsOfType("auto_retry_start")).toHaveLength(1);
+		expect(harness.faux.state.callCount).toBeGreaterThanOrEqual(2);
+	});
+
 	it("retries multiple transient failures and succeeds on the final attempt", async () => {
 		const harness = await createHarness({ settings: { retry: { enabled: true, maxRetries: 3, baseDelayMs: 1 } } });
 		harnesses.push(harness);
