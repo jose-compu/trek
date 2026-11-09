@@ -5,8 +5,8 @@
 
 import { parseControlAsk } from "./layer-control.ts";
 import { needsLiveNetwork } from "./layer-network.ts";
-import { isKeepGoingPrompt } from "./new-topic.ts";
 import { isLongTaskPrompt } from "./long-task.ts";
+import { isKeepGoingPrompt } from "./new-topic.ts";
 
 export const LAYER_INTENTS = ["planning", "tooling", "workhorse", "same-topic", "new-topic"] as const;
 export type LayerIntent = (typeof LAYER_INTENTS)[number];

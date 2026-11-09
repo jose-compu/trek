@@ -6,7 +6,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { chunk } from "logosdb-mcp-server/dist/chunker.js";
 import {
 	buildGitignoreContext,
 	findGitRoot,
@@ -15,6 +14,7 @@ import {
 	maybePushLocalGitignore,
 } from "logosdb-mcp-server/dist/gitignore-walker.js";
 import { annotateFile } from "./annotate.ts";
+import { chunkByStructure } from "./structure-chunker.ts";
 
 const MARKERS = [".git", "package.json", "pyproject.toml", "Cargo.toml", "go.mod", "CMakeLists.txt", "Makefile", ".hg"];
 const SKIP_DIRS = new Set([".git", "node_modules", "dist", ".trek", "coverage", ".next", "target"]);
@@ -72,9 +72,16 @@ export function chunksForFile(absPath: string, cwd: string): IndexedChunk[] {
 	} catch {
 		return [];
 	}
-	const parts = chunk(raw, { mode: "auto", filePath: relPath });
+	const parts = chunkByStructure(raw, { filePath: relPath });
 	return parts.map((part, index) => {
-		const row = annotateFile(relPath, part, index, parts.length);
+		const legacyChunk = {
+			text: part.text,
+			offset: 0,
+			lineStart: part.lineStart,
+			lineEnd: part.lineEnd,
+			heading: part.signature,
+		};
+		const row = annotateFile(relPath, legacyChunk, index, parts.length);
 		return { embed: row.embed, stored: row.stored, relPath };
 	});
 }

@@ -48,6 +48,12 @@ export function lessonKeyOf(stored: string): string | undefined {
 
 export function annotateFile(relPath: string, chunk: Chunk, index: number, count: number): AnnotatedRow {
 	const resolvedMode = resolveChunkMode({ mode: "auto", filePath: relPath });
+
+	let embedText = chunk.text;
+	if (chunk.heading && chunk.heading !== chunk.text.slice(0, chunk.heading.length)) {
+		embedText = `${chunk.heading}\n${chunk.text}`;
+	}
+
 	const embed = embedTextForChunk(
 		"header",
 		{
@@ -59,7 +65,7 @@ export function annotateFile(relPath: string, chunk: Chunk, index: number, count
 			namespace: "project",
 			tags: { layer: "project", kind: "file" },
 		},
-		chunk.text,
+		embedText,
 	);
 	const loc =
 		chunk.lineStart != null && chunk.lineEnd != null
