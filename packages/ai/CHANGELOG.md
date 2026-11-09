@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.19.5] - 2026-11-09
+
+### Fixed
+
+- xAI Grok Chat Completions omit `reasoning_content` when replaying a turn that also has `tool_calls`. Outbound text, thinking, and tool arguments are sanitized (NUL, C0, unpaired surrogates).
+
 ## [0.19.4] - 2026-11-09
 
 ## [0.19.3] - 2026-11-09

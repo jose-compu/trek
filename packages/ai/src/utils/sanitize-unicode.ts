@@ -23,3 +23,31 @@ export function sanitizeSurrogates(text: string): string {
 	// Replace unpaired low surrogates (0xDC00-0xDFFF not preceded by high surrogate)
 	return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
 }
+
+/**
+ * Strip characters that break provider JSON / tokenizers (NUL, other C0 besides tab/LF/CR).
+ * Keeps valid emoji. Use this on complete strings, not streaming deltas.
+ */
+export function sanitizeProviderText(text: string): string {
+	return sanitizeSurrogates(text)
+		.replace(/\u0000/g, "")
+		.replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+}
+
+export function sanitizeJsonValue(value: unknown): unknown {
+	if (typeof value === "string") {
+		return sanitizeProviderText(value);
+	}
+	if (Array.isArray(value)) {
+		return value.map(sanitizeJsonValue);
+	}
+	if (value && typeof value === "object") {
+		const record = value as Record<string, unknown>;
+		const out: Record<string, unknown> = {};
+		for (const [key, nested] of Object.entries(record)) {
+			out[sanitizeProviderText(key)] = sanitizeJsonValue(nested);
+		}
+		return out;
+	}
+	return value;
+}

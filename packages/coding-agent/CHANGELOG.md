@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.19.5] - 2026-11-09
+
+### Fixed
+
+- Grok `Internal error during token parsing` after an edit: omit replayed `reasoning_content` on tool-call turns, sanitize outbound text, and drop thinking before retrying that error.
+
 ## [0.19.4] - 2026-11-09
 
 ### Fixed
