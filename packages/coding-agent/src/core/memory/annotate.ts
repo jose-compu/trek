@@ -46,11 +46,20 @@ export function lessonKeyOf(stored: string): string | undefined {
 	return /\[key:([^\]]+)\]/.exec(stored)?.[1];
 }
 
-export function annotateFile(relPath: string, chunk: Chunk, index: number, count: number): AnnotatedRow {
+export function annotateFile(
+	relPath: string,
+	chunk: Chunk,
+	index: number,
+	count: number,
+	caption?: string,
+): AnnotatedRow {
 	const resolvedMode = resolveChunkMode({ mode: "auto", filePath: relPath });
 
+	// Dual-channel embed: caption prepended to body, or heading if no caption
 	let embedText = chunk.text;
-	if (chunk.heading && chunk.heading !== chunk.text.slice(0, chunk.heading.length)) {
+	if (caption) {
+		embedText = `${caption}\n\n${chunk.text}`;
+	} else if (chunk.heading && chunk.heading !== chunk.text.slice(0, chunk.heading.length)) {
 		embedText = `${chunk.heading}\n${chunk.text}`;
 	}
 
