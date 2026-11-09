@@ -1,4 +1,11 @@
-export { annotateFile, annotateLesson, annotateThinking, kindOf, type MemoryKind } from "./annotate.ts";
+export {
+	annotateFile,
+	annotateLesson,
+	annotateThinking,
+	kindOf,
+	lessonKeyOf,
+	type MemoryKind,
+} from "./annotate.ts";
 export {
 	createEmbedder,
 	type Embedder,
@@ -10,6 +17,7 @@ export {
 } from "./embedder.ts";
 export { isIndexableProject, listProjectFiles } from "./index-files.ts";
 export {
+	collapseLessonHits,
 	type MemoryHit,
 	type MemoryInjection,
 	type MemoryLayer,

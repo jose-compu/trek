@@ -149,6 +149,57 @@ export function parseLesson(text: string): Lesson | undefined {
 	};
 }
 
+export type LessonLayer = "session" | "project" | "global";
+
+const HOST_CLI = /\b(gh|git|npm|npx|pnpm|yarn|cargo|docker|hub|trek)\b/i;
+
+/** Host CLI / unknown-subcommand facts belong in global memory, not one repo. */
+export function classifyLessonLayer(lesson: Lesson, evidence?: LessonEvidence): LessonLayer {
+	const blob = [lesson.trigger, lesson.mistake, lesson.rule, ...(evidence?.failures ?? [])].join("\n");
+	if (isHostCliLesson(blob)) return "global";
+	if (evidence?.kind === "correction" && /\bthis (?:turn|session|prompt)\b/i.test(blob)) return "session";
+	return "project";
+}
+
+export function isHostCliLesson(text: string): boolean {
+	const blob = text.toLowerCase();
+	if (/\bgh\s+milestone\b/.test(blob)) return true;
+	if (/\bunknown command\b/.test(blob) && HOST_CLI.test(blob)) return true;
+	if (/\b(command not found|is not a gh command|no such (?:command|subcommand))\b/.test(blob) && HOST_CLI.test(blob)) {
+		return true;
+	}
+	if (/\bdoes not exist\b/.test(blob) && /\bgh\b/.test(blob)) return true;
+	return false;
+}
+
+/** Deterministic lesson so `gh milestone` is not re-learned by a side call. */
+export function lessonFromHostCliFailure(failures: readonly string[]): Lesson | undefined {
+	const text = failures.join("\n");
+	if (!isHostCliLesson(text)) return undefined;
+	const ghCmd = /\bunknown command ['"`]?([a-z][\w-]*)['"`]?(?: for ['"`]?gh['"`]?)?/i.exec(text)?.[1];
+	if (/\bmilestone\b/i.test(text) && /\bgh\b/i.test(text)) {
+		return {
+			trigger: "listing or creating GitHub milestones",
+			mistake: "ran `gh milestone`, which is not a gh command",
+			rule: "Use `gh api repos/{owner}/{repo}/milestones` to list or POST a milestone. Do not run `gh milestone`.",
+			domain: "engineering",
+			count: 1,
+			recurrence_key: "engineering|cli|gh|milestone",
+		};
+	}
+	if (ghCmd && /\bgh\b/i.test(text)) {
+		return {
+			trigger: `a GitHub CLI ${ghCmd} task`,
+			mistake: `ran \`gh ${ghCmd}\`, which is not a gh command`,
+			rule: `gh has no \`${ghCmd}\` subcommand. Use \`gh api\` or \`gh help\`. Do not retry \`gh ${ghCmd}\`.`,
+			domain: "engineering",
+			count: 1,
+			recurrence_key: `engineering|cli|gh|${ghCmd.toLowerCase()}`,
+		};
+	}
+	return undefined;
+}
+
 export function formatLesson(lesson: Lesson): string {
 	const parts = [`Rule: ${lesson.rule}`];
 	if (lesson.trigger) parts.push(`When: ${lesson.trigger}`);
@@ -161,7 +212,7 @@ export function formatLesson(lesson: Lesson): string {
 
 /** A stored lesson row without its `[kind:lesson][tag:...]` header. */
 export function lessonBody(stored: string): string {
-	return stored.replace(/^\[kind:lesson\](?:\[tag:[^\]]*\])?\s*/, "");
+	return stored.replace(/^\[kind:lesson\](?:\[[^\]]+\])*\s*/, "");
 }
 
 export function promotionPrompt(query: string, candidates: readonly LessonCandidate[]): string {

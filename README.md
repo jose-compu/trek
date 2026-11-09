@@ -79,7 +79,7 @@ Three stores. A row cannot cross a boundary.
 |---|---|---|
 | Session | on | Question and answer, one thinking excerpt, compaction handoff. Dropped by `/new`. |
 | Project | on | Lessons and file chunks in `.trek/memory/`. Kept for the next session in that directory. |
-| Global | off | `~/.trek/memory/` only when `memory.global` is true. |
+| Global | on | Host CLI lessons and notes in `~/.trek/memory/`. Same fact is not also stored in project or session. |
 
 ```bash
 /memory                         # layers, topK, chunk counts, include and exclude

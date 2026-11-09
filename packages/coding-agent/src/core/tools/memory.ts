@@ -71,8 +71,9 @@ function colorCitation(text: string, theme: Theme): string {
 }
 
 const rememberSchema = Type.Object({
-	text: Type.String({ description: "Project lesson to keep for later sessions in this repo" }),
+	text: Type.String({ description: "Lesson to keep. Host CLI facts belong in global; repo facts in project." }),
 	tag: Type.Optional(Type.String({ description: "Optional lesson tag, for example billing" })),
+	layer: Type.Optional(Type.String({ description: "session, project, or global. Default: project" })),
 });
 
 const recallSchema = Type.Object({
@@ -94,14 +95,15 @@ export function createMemoryToolDefinitions(getMemory: () => MemoryManager): Too
 	const remember: ToolDefinition = {
 		name: "remember",
 		label: "remember",
-		description: "Store a project lesson in local memory. Later sessions in this repo can recall it.",
-		promptSnippet: "Store a project lesson",
+		description: "Store a lesson in local memory. Use global for host CLI facts, project for this repo.",
+		promptSnippet: "Store a lesson",
 		parameters: rememberSchema,
 		execute: async (_id, params) => {
 			const text = String((params as { text?: string }).text ?? "");
 			const tag = (params as { tag?: string }).tag;
+			const layer = asLayer((params as { layer?: string }).layer) ?? "project";
 			try {
-				const result = await getMemory().remember(text, tag);
+				const result = await getMemory().remember(text, tag, layer);
 				return { content: [{ type: "text", text: result }], details: undefined };
 			} catch (error) {
 				return { content: [{ type: "text", text: `store failed: ${String(error)}` }], details: undefined };

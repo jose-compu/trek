@@ -27,9 +27,11 @@ export {
 	markLessonPromoted,
 	parseCrystallize,
 	recurLesson,
+	recurLessonAcross,
 	removeCrystallizedSkill,
 	type StoredLesson,
 	saveLessonRecord,
+	saveLessonRecordAt,
 	skillIsLive,
 	skillNameForLesson,
 	withLessonIds,
@@ -55,12 +57,16 @@ export {
 } from "./effort-regulator.ts";
 export { isReflectiveLoopEnabled } from "./enabled.ts";
 export {
+	classifyLessonLayer,
 	formatLesson,
 	isCorrection,
+	isHostCliLesson,
 	type Lesson,
 	type LessonCandidate,
 	type LessonEvidence,
+	type LessonLayer,
 	lessonBody,
+	lessonFromHostCliFailure,
 	lessonPromotionEnabled,
 	lessonPrompt,
 	lessonsEnabled,

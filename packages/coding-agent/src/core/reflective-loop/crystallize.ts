@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { Type } from "typebox";
 import { lessonIsOffered, lessonPatternFor } from "../domains/lesson-pattern.ts";
 import type { ToolDefinition } from "../extensions/types.ts";
-import type { Lesson } from "./lesson.ts";
+import type { Lesson, LessonLayer } from "./lesson.ts";
 
 export const CRYSTALLIZE_TOOL_NAME = "crystallize";
 
@@ -79,23 +79,22 @@ export function skillNameForLesson(id: string): string {
 	return name;
 }
 
-function indexPath(cwd: string): string {
-	return join(cwd, ".trek", "lessons", "index.json");
+export function projectLessonRoot(cwd: string): string {
+	return join(cwd, ".trek", "lessons");
 }
 
 function writeIndex(cwd: string, index: LessonIndex): void {
-	const path = indexPath(cwd);
-	mkdirSync(join(cwd, ".trek", "lessons"), { recursive: true });
-	writeFileSync(path, `${JSON.stringify(index, null, "\t")}\n`);
+	writeIndexAt(projectLessonRoot(cwd), index);
 }
 
-function emptyIndex(): LessonIndex {
-	return { order: [], lessons: {} };
+function writeIndexAt(root: string, index: LessonIndex): void {
+	mkdirSync(root, { recursive: true });
+	writeFileSync(join(root, "index.json"), `${JSON.stringify(index, null, "\t")}\n`);
 }
 
-function readIndex(cwd: string): LessonIndex {
+function readIndexAt(root: string): LessonIndex {
 	try {
-		const raw = JSON.parse(readFileSync(indexPath(cwd), "utf8")) as Partial<LessonIndex>;
+		const raw = JSON.parse(readFileSync(join(root, "index.json"), "utf8")) as Partial<LessonIndex>;
 		const lessons = raw.lessons && typeof raw.lessons === "object" ? raw.lessons : {};
 		const order = Array.isArray(raw.order) ? raw.order.filter((id) => typeof id === "string") : Object.keys(lessons);
 		return { order, lessons };
@@ -104,18 +103,34 @@ function readIndex(cwd: string): LessonIndex {
 	}
 }
 
+function emptyIndex(): LessonIndex {
+	return { order: [], lessons: {} };
+}
+
+function readIndex(cwd: string): LessonIndex {
+	return readIndexAt(projectLessonRoot(cwd));
+}
+
 export function saveLessonRecord(cwd: string, id: string, lesson: Lesson): void {
-	const index = readIndex(cwd);
+	saveLessonRecordAt(projectLessonRoot(cwd), id, lesson);
+}
+
+export function saveLessonRecordAt(root: string, id: string, lesson: Lesson): void {
+	const index = readIndexAt(root);
 	index.lessons[id] = lesson;
 	if (!index.order.includes(id)) index.order.push(id);
-	writeIndex(cwd, index);
+	writeIndexAt(root, index);
 }
 
 /** Same recurrence key increments count. No second row. */
 export function recurLesson(cwd: string, lesson: Lesson): StoredLesson | undefined {
+	return recurLessonAt(projectLessonRoot(cwd), lesson);
+}
+
+export function recurLessonAt(root: string, lesson: Lesson): StoredLesson | undefined {
 	const key = lesson.recurrence_key;
 	if (!key) return undefined;
-	const index = readIndex(cwd);
+	const index = readIndexAt(root);
 	const id = index.order.find((item) => index.lessons[item]?.recurrence_key === key);
 	if (!id) return undefined;
 	const current = index.lessons[id];
@@ -124,8 +139,27 @@ export function recurLesson(cwd: string, lesson: Lesson): StoredLesson | undefin
 	const note = lesson.source_turn?.replace(/\s+/g, " ").trim().slice(0, 80);
 	if (note) current.see_also = [...(current.see_also ?? []), note].slice(-8);
 	index.lessons[id] = current;
-	writeIndex(cwd, index);
+	writeIndexAt(root, index);
 	return { id, ...current };
+}
+
+const LAYER_RANK: Record<LessonLayer, number> = { global: 0, project: 1, session: 2 };
+
+/** Recur on the broadest store that already has this key, down to the intended layer. */
+export function recurLessonAcross(
+	stores: Partial<Record<LessonLayer, string>>,
+	lesson: Lesson,
+	intended: LessonLayer,
+): StoredLesson | undefined {
+	const layers: LessonLayer[] = ["global", "project", "session"];
+	for (const layer of layers) {
+		if (LAYER_RANK[layer] > LAYER_RANK[intended]) break;
+		const root = stores[layer];
+		if (!root) continue;
+		const found = recurLessonAt(root, lesson);
+		if (found) return found;
+	}
+	return undefined;
 }
 
 export function dismissLesson(cwd: string, id: string): string {

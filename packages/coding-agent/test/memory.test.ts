@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { type Embedder, fakeEmbedder } from "../src/core/memory/embedder.ts";
 import { isIndexableProject } from "../src/core/memory/index-files.ts";
-import { type MemoryHit, MemoryManager, selectInjection } from "../src/core/memory/manager.ts";
+import { collapseLessonHits, type MemoryHit, MemoryManager, selectInjection } from "../src/core/memory/manager.ts";
 import { shouldConstructCrossEncoder } from "../src/core/memory/rerank.ts";
 import { captureTurn } from "../src/core/memory/turns.ts";
 import type { MemorySettings } from "../src/core/settings-manager.ts";
@@ -277,6 +277,35 @@ describe("index paths", () => {
 		expect((await mem.recall("HIDDENPHRASE")).some((hit) => hit.text.includes("HIDDENPHRASE"))).toBe(true);
 		expect(await mem.addIndexedPath("../outside")).toBe("path must stay inside the project");
 		expect(await mem.removeIndexedPath(".trek/memory")).toBe("that path is not indexed");
+		mem.close();
+	});
+});
+
+describe("lesson layer collapse", () => {
+	it("keeps the global copy when session and project repeat the same key", () => {
+		const hits: MemoryHit[] = [
+			{ id: "session:1", layer: "session", kind: "lesson", score: 0.9, text: "[kind:lesson][key:k]\nRule: A" },
+			{ id: "global:2", layer: "global", kind: "lesson", score: 0.5, text: "[kind:lesson][key:k]\nRule: A" },
+			{ id: "project:3", layer: "project", kind: "lesson", score: 0.8, text: "[kind:lesson][key:k]\nRule: A" },
+			{ id: "project:4", layer: "project", kind: "file", score: 0.4, text: "src/a.ts" },
+		];
+		const collapsed = collapseLessonHits(hits);
+		expect(collapsed.filter((hit) => hit.kind === "lesson")).toEqual([hits[1]]);
+		expect(collapsed.some((hit) => hit.kind === "file")).toBe(true);
+	});
+
+	it("stores a global lesson and does not create the store on a search miss", async () => {
+		const cwd = project("global-lesson");
+		const mem = manager(cwd, "s", fakeEmbedder(), { global: true });
+		expect(existsSync(join(cwd, "global-memory"))).toBe(false);
+		expect(await mem.recall("gh milestone")).toEqual([]);
+		expect(existsSync(join(cwd, "global-memory"))).toBe(false);
+		expect(
+			await mem.remember("Use gh api for milestones", "engineering", "global", "engineering|cli|gh|milestone"),
+		).toMatch(/^stored global:/);
+		expect(existsSync(join(cwd, "global-memory"))).toBe(true);
+		const hits = await mem.recall("milestones", "global");
+		expect(hits.some((hit) => hit.layer === "global" && hit.text.includes("gh api"))).toBe(true);
 		mem.close();
 	});
 });
