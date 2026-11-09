@@ -296,9 +296,26 @@ Received arguments:
 			looksLikeLayeringControlEcho('echo \'{"action":"delegate","target":"tooling","reason":"live fetch"}\''),
 		).toBe(true);
 		expect(looksLikeLayeringControlEcho('echo \'{"escalate":"planning","why":"stuck"}\'')).toBe(true);
+		expect(
+			looksLikeLayeringControlEcho(
+				`export PATH=/usr/bin\necho '{"action":"delegate","target":"tooling","reason":"live fetch"}'`,
+			),
+		).toBe(true);
+		expect(
+			looksLikeLayeringControlEcho(`bash -c "echo '{\\"escalate\\":\\"planning\\",\\"why\\":\\"stuck\\"}'"`),
+		).toBe(true);
+		expect(
+			looksLikeLayeringControlEcho(`sh -c "echo '{\\"action\\":\\"delegate\\",\\"target\\":\\"tooling\\"}'"`),
+		).toBe(true);
+		expect(looksLikeLayeringControlEcho(`printf '%s\\n' '{"escalate":"planning","why":"stuck"}'`)).toBe(true);
 		expect(looksLikeLayeringControlEcho("echo hello")).toBe(false);
 		expect(looksLikeLayeringControlEcho("echo '{\"hits\": 3}'")).toBe(false);
 		expect(looksLikeLayeringControlEcho("curl -s https://api.github.com")).toBe(false);
+		expect(
+			looksLikeLayeringControlEcho(
+				`echo '{"action":"delegate","target":"tooling"}' && curl -s https://api.github.com`,
+			),
+		).toBe(false);
 		expect(shouldRebindSessionRole("delegate")).toBe(false);
 		expect(shouldRebindSessionRole("escalate")).toBe(true);
 		expect(shouldRebindSessionRole(undefined)).toBe(true);

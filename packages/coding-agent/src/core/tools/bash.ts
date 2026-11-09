@@ -426,7 +426,7 @@ export function createBashToolDefinition(
 			}
 			const guardedCommand = guard.action === "rewrite" ? guard.command : resolvedCommand;
 
-			if (looksLikeLayeringControlEcho(guardedCommand)) {
+			if (looksLikeLayeringControlEcho(command) || looksLikeLayeringControlEcho(guardedCommand)) {
 				return { content: [{ type: "text", text: "" }], details: undefined };
 			}
 

@@ -173,6 +173,24 @@ describe("bash background", () => {
 		expect(result.details?.backgrounded).toBeUndefined();
 	});
 
+	it("does not run a layering-control echo behind a command prefix", async () => {
+		const bash = createBashTool(process.cwd(), { commandPrefix: "export TREK_PREFIX=1" });
+		const result = await bash.execute("quiet-prefixed", {
+			command: `echo '{"escalate":"planning","why":"stuck"}'`,
+		});
+		expect(getText(result)).toBe("");
+		expect(getText(result)).not.toContain("escalate");
+	});
+
+	it("does not run a wrapped printf of layering-control JSON", async () => {
+		const bash = createBashTool(process.cwd());
+		const result = await bash.execute("quiet-printf", {
+			command: `sh -c "printf '%s\\n' '{\\"action\\":\\"delegate\\",\\"target\\":\\"tooling\\"}'"`,
+		});
+		expect(getText(result)).toBe("");
+		expect(getText(result)).not.toContain("delegate");
+	});
+
 	it("still waits for a short command to exit", async () => {
 		const bash = createBashTool(process.cwd());
 		const result = await bash.execute("fg-1", { command: "echo ready" });
