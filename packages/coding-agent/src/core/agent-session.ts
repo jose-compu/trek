@@ -4245,7 +4245,8 @@ export class AgentSession {
 		if (!lessonsEnabled() || !this.memoryActive() || !this.model) return;
 		try {
 			const pattern = domain ? lessonPatternFor(this._cwd, domain) : undefined;
-			const lesson = lessonFromHostCliFailure(evidence.failures) ?? (await this._draftLesson(evidence, pattern));
+			const lesson =
+				lessonFromHostCliFailure(evidence.failures, evidence.task) ?? (await this._draftLesson(evidence, pattern));
 			if (!lesson) return;
 			lesson.source_turn = evidence.task.slice(0, 80);
 			if (!lesson.layer_role) {
@@ -4283,7 +4284,10 @@ export class AgentSession {
 			this.startMemory();
 			const stored = await this.memory().remember(formatLesson(lesson), lesson.domain, layer, lesson.recurrence_key);
 			const id = new RegExp(`^stored (${layer}:\\d+)$`).exec(stored)?.[1];
-			if (!id) return;
+			if (!id) {
+				debugLog("memory", "lesson store failed", { stored, layer, key: lesson.recurrence_key });
+				return;
+			}
 			saveLessonRecordAt(root, id, lesson);
 			this._lessonNotices.push({ id, title: lessonNoticeTitle(lesson) });
 			this.sessionManager.appendCustomEntry("trek:lesson", {

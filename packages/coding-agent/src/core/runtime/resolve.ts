@@ -81,7 +81,7 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 		if (config.roles.verifier) {
 			roles.verifier = config.roles.verifier;
 		}
-		// Registry still lists embed/rerank ids. API mode does not load MiniLM unless TREK_MEMORY_LOCAL=1.
+		// Registry still lists embed/rerank ids. MiniLM loads lazily unless TREK_MEMORY_LOCAL=0.
 		roles.embedding = overlay(preset.roles.embedding, config.roles.embedding);
 		roles.reranker = overlay(preset.roles.reranker, config.roles.reranker);
 	} else {

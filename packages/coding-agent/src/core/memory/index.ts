@@ -10,6 +10,7 @@ export {
 	createEmbedder,
 	type Embedder,
 	fakeEmbedder,
+	lexicalEmbedder,
 	type MemoryModelOptions,
 	noopEmbedder,
 	shouldLoadMemoryOnnx,

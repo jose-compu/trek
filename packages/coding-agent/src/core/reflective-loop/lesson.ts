@@ -173,9 +173,11 @@ export function isHostCliLesson(text: string): boolean {
 }
 
 /** Deterministic lesson so `gh milestone` is not re-learned by a side call. */
-export function lessonFromHostCliFailure(failures: readonly string[]): Lesson | undefined {
-	const text = failures.join("\n");
-	if (!isHostCliLesson(text)) return undefined;
+export function lessonFromHostCliFailure(failures: readonly string[], task = ""): Lesson | undefined {
+	const text = [...failures, task].join("\n");
+	if (!isHostCliLesson(text) && !(/\bgh\s+milestone\b/i.test(task) && failures.length > 0)) {
+		return undefined;
+	}
 	const ghCmd = /\bunknown command ['"`]?([a-z][\w-]*)['"`]?(?: for ['"`]?gh['"`]?)?/i.exec(text)?.[1];
 	if (/\bmilestone\b/i.test(text) && /\bgh\b/i.test(text)) {
 		return {

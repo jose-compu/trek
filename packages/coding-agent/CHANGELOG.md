@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.20.2] - 2026-11-09
+
+### Fixed
+
+- Semantic memory stays on by default. MiniLM is preferred in API and local modes; bag-of-words is the fallback when ONNX is off or missing. A failed `gh milestone` stores the canned global host-CLI lesson without a draft call.
+
 ## [0.20.1] - 2026-11-09
 
 ### Fixed

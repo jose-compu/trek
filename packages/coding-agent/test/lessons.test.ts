@@ -9,6 +9,7 @@ import { join } from "node:path";
 import type { Context } from "@trek/ai";
 import { fauxAssistantMessage, fauxToolCall } from "@trek/ai";
 import { afterEach, describe, expect, it } from "vitest";
+import { shouldLoadMemoryOnnx } from "../src/core/memory/embedder.ts";
 import { recurLessonAcross, saveLessonRecordAt } from "../src/core/reflective-loop/crystallize.ts";
 import {
 	classifyLessonLayer,
@@ -209,6 +210,146 @@ describe("lessons in a session", () => {
 		return { harness, id: String(entry?.id) };
 	}
 
+	it("a failed gh milestone stores the canned global lesson without a side call", async () => {
+		const home = mkdtempSync(join(tmpdir(), "trek-home-gh-"));
+		const previousHome = process.env.HOME;
+		process.env.HOME = home;
+		try {
+			const harness = await createHarness({
+				enableLessons: true,
+				settings: { memory: { global: true } },
+				tools: [
+					{
+						name: "bash",
+						label: "bash",
+						description: "run a shell command",
+						parameters: { type: "object", properties: { command: { type: "string" } } },
+						async execute() {
+							throw new Error(
+								'unknown command "milestone" for "gh"\n\nUsage:  gh <command> <subcommand> [flags]\n\nCommand exited with code 1',
+							);
+						},
+					} as never,
+				],
+				initialActiveToolNames: ["bash"],
+			});
+			harnesses.push(harness);
+			project(harness);
+			const calls: string[] = [];
+			harness.setResponses(
+				script(
+					2,
+					{
+						main: (context) => {
+							const last = context.messages[context.messages.length - 1];
+							if (last?.role === "toolResult") {
+								return fauxAssistantMessage("Use gh api. Milestone v1.0.0.");
+							}
+							return fauxAssistantMessage([fauxToolCall("bash", { command: "gh milestone list" })], {
+								stopReason: "toolUse",
+							});
+						},
+					},
+					calls,
+				),
+			);
+			await harness.session.prompt("Run gh milestone and list the milestones for this repo.");
+			expect(calls).toEqual(["main", "main"]);
+			expect(customEntries(harness, "trek:lesson_dropped")).toEqual([]);
+			const [entry] = customEntries(harness, "trek:lesson");
+			expect(entry).toMatchObject({
+				kind: "error",
+				layer: "global",
+				lesson: {
+					recurrence_key: "engineering|cli|gh|milestone",
+					rule: "Use `gh api repos/{owner}/{repo}/milestones` to list or POST a milestone. Do not run `gh milestone`.",
+				},
+			});
+			const notices = harness.eventsOfType("lesson_stored").map((event) => event.text);
+			expect(notices).toHaveLength(1);
+			expect(notices[0]).toMatch(new RegExp(`^lesson ${String(entry?.id).replace(":", "\\:")} `));
+			expect(notices[0]).toMatch(/Gh Api|Milestone/i);
+		} finally {
+			if (previousHome === undefined) delete process.env.HOME;
+			else process.env.HOME = previousHome;
+			rmSync(home, { recursive: true, force: true });
+		}
+	});
+
+	it("a later prompt recalls the gh milestone lesson through the promotion model", async () => {
+		const home = mkdtempSync(join(tmpdir(), "trek-home-gh-recall-"));
+		const previousHome = process.env.HOME;
+		process.env.HOME = home;
+		try {
+			const first = await createHarness({
+				enableLessons: true,
+				settings: { memory: { global: true } },
+				tools: [
+					{
+						name: "bash",
+						label: "bash",
+						description: "run a shell command",
+						parameters: { type: "object", properties: { command: { type: "string" } } },
+						async execute() {
+							throw new Error('unknown command "milestone" for "gh"\nCommand exited with code 1');
+						},
+					} as never,
+				],
+				initialActiveToolNames: ["bash"],
+			});
+			harnesses.push(first);
+			project(first);
+			first.setResponses(
+				script(
+					2,
+					{
+						main: (context) => {
+							const last = context.messages[context.messages.length - 1];
+							if (last?.role === "toolResult") return fauxAssistantMessage("listed via api");
+							return fauxAssistantMessage([fauxToolCall("bash", { command: "gh milestone list" })], {
+								stopReason: "toolUse",
+							});
+						},
+					},
+					[],
+				),
+			);
+			await first.session.prompt("Run gh milestone and list the milestones for this repo.");
+			const id = String(customEntries(first, "trek:lesson")[0]?.id);
+			expect(id).toMatch(/^global:\d+$/);
+
+			const second = await createHarness({
+				enableLessons: true,
+				cwd: first.tempDir,
+				settings: { memory: { global: true } },
+			});
+			harnesses.push(second);
+			const calls: string[] = [];
+			let promptSeen = "";
+			second.setResponses(
+				script(
+					2,
+					{
+						promote: (context) => {
+							promptSeen = firstUserText(context);
+							return fauxAssistantMessage(JSON.stringify({ ids: [id] }));
+						},
+						main: () => fauxAssistantMessage("Using gh api for milestones."),
+					},
+					calls,
+				),
+			);
+			await second.session.prompt("List the GitHub milestones again.");
+			expect(calls).toEqual(["promote", "main"]);
+			expect(promptSeen).toContain(id);
+			expect(customEntries(second, "trek:lesson_promotion")[0]).toMatchObject({ picked: [id] });
+		} finally {
+			if (previousHome === undefined) delete process.env.HOME;
+			else process.env.HOME = previousHome;
+			rmSync(home, { recursive: true, force: true });
+		}
+	});
+
 	it("a failed task stores a lesson that a new session recalls through the promotion model", async () => {
 		const { harness: first, id } = await storeLesson();
 		expect(id).toMatch(/^project:\d+$/);
@@ -374,13 +515,16 @@ describe("lessons in a session", () => {
 });
 
 describe("lesson layers", () => {
-	it("defaults session, project, and global memory on", () => {
+	it("defaults session, project, and global memory on with MiniLM preferred in api and local", () => {
 		expect(SettingsManager.inMemory({}).getMemorySettings()).toMatchObject({
 			enabled: true,
 			session: true,
 			project: true,
 			global: true,
 		});
+		expect(shouldLoadMemoryOnnx({}, "api")).toBe(true);
+		expect(shouldLoadMemoryOnnx({}, "local")).toBe(true);
+		expect(shouldLoadMemoryOnnx({}, "hybrid")).toBe(true);
 	});
 
 	it("routes gh milestone to a global canned lesson and does not duplicate across stores", () => {

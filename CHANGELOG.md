@@ -1,10 +1,16 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.20.1`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.20.2`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.20.2] - 2026-11-09
+
+### Fixed
+
+- Semantic memory stays on by default. MiniLM is preferred in API and local modes; bag-of-words is the fallback when ONNX is off or missing. A failed `gh milestone` stores the canned global host-CLI lesson without a draft call.
 
 ## [0.20.1] - 2026-11-09
 

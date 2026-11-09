@@ -94,7 +94,7 @@ See [Memory](memory.md).
 
 `--memory off` overrides this for one process and does not write the file. Paths added or removed with `/memory` are stored in `.trek/memory/paths.json`, not in settings.
 
-API mode does not load MiniLM unless `TREK_MEMORY_LOCAL=1`. Downloads need `TREK_MEMORY_DOWNLOAD=1`. Several TUI sessions: `TREK_LLAMA_PORT_START` if local llama ports collide. See [Performance](performance.md#concurrent-sessions).
+Memory prefers MiniLM in every mode, including API chat. `TREK_MEMORY_LOCAL=0` skips ONNX (bag-of-words). Downloads need `TREK_MEMORY_DOWNLOAD=1`. Several TUI sessions: `TREK_LLAMA_PORT_START` if local llama ports collide. See [Performance](performance.md#concurrent-sessions).
 
 ### Safety
 

@@ -344,7 +344,7 @@ pi --exclude-tools ask_question
 | `PI_TELEMETRY` | Override install/update telemetry and provider attribution headers: `1`/`true`/`yes` or `0`/`false`/`no`. This does not disable update checks |
 | `PI_CACHE_RETENTION` | Set to `long` for extended prompt cache where supported |
 | `TREK_NO_LOCAL_LLM` | `1` keeps the session on the API model. `PI_NO_LOCAL_LLM` is still accepted |
-| `TREK_MEMORY_LOCAL` | `1` loads MiniLM/ONNX in API mode. `0` skips it even in `local` / `hybrid` |
+| `TREK_MEMORY_LOCAL` | unset/`1` prefers MiniLM/ONNX in every mode (including API). `0` skips ONNX (bag-of-words) |
 | `TREK_MEMORY_DOWNLOAD` | `1` allows MiniLM download. Default is on-disk only (`local_files_only`) |
 | `TREK_LLAMA_PORT_START` | First port to probe for `llama-server` (default `18080`). Needed when several local TUIs share a machine |
 | `VISUAL`, `EDITOR` | External editor for Ctrl+G |

@@ -44,7 +44,7 @@ cd packages/coding-agent && npx vitest --run test/performance-budgets.test.ts te
 
 To accept a slower machine or a real regression: raise the metric in `performance-budgets.json`, note why in the PR, keep `recorded_ms` as the last local snapshot.
 
-**2× exception:** live model tokens and network RTT are not in the faux e2e number. Startup that waits on a MiniLM download is not in the budget either; API mode does not download MiniLM (see [Concurrent sessions](#concurrent-sessions)).
+**2× exception:** live model tokens and network RTT are not in the faux e2e number. Startup that waits on a MiniLM download is not in the budget either; downloads stay opt-in via `TREK_MEMORY_DOWNLOAD` (see [Concurrent sessions](#concurrent-sessions)).
 
 ## Modules
 
@@ -66,12 +66,12 @@ Several `trek` TUI processes may run on one machine.
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `TREK_NO_LOCAL_LLM` | unset | `1` keeps chat on the API model (`PI_NO_LOCAL_LLM` still accepted) |
-| `TREK_MEMORY_LOCAL` | off in API | `1` loads MiniLM/ONNX in API mode; `0` skips it in local/hybrid |
+| `TREK_MEMORY_LOCAL` | on | `0` skips MiniLM/ONNX (bag-of-words); unset or `1` prefers MiniLM in every mode |
 | `TREK_MEMORY_DOWNLOAD` | off | `1` may download MiniLM; otherwise `local_files_only` |
 | `TREK_LLAMA_PORT_START` | `18080` | First port to probe for `llama-server` |
 
-- **API mode** does not start `llama-server` and does not load MiniLM / ONNX. Recall stays empty until `TREK_MEMORY_LOCAL=1`.
-- **local / hybrid** MiniLM uses `local_files_only` unless `TREK_MEMORY_DOWNLOAD=1`.
+- **API mode** does not start `llama-server`. Memory still prefers MiniLM for lessons; missing weights fall back to bag-of-words. Use `TREK_MEMORY_LOCAL=0` to skip ONNX.
+- MiniLM uses `local_files_only` unless `TREK_MEMORY_DOWNLOAD=1`.
 - Each process probes upward from `TREK_LLAMA_PORT_START` for a free `llama-server` port.
 
 ```bash

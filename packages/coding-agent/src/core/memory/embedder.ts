@@ -1,8 +1,9 @@
 /**
  * Embeddings for local memory.
- * Tests and CI use the bag-of-words embedder. Production loads MiniLM on first use
- * only when local weights are requested (`local` / `hybrid`, or `TREK_MEMORY_LOCAL=1`).
- * API mode does not load ONNX. Downloads are opt-in (`TREK_MEMORY_DOWNLOAD=1`).
+ * Tests and CI use the bag-of-words embedder. Production prefers ONNX MiniLM in every
+ * hierarchy mode (including API chat) so lessons stay semantic. Weights load lazily;
+ * if MiniLM is missing or fails, bag-of-words at 384-d stores and recalls. Opt out with
+ * `TREK_MEMORY_LOCAL=0`. Downloads are opt-in (`TREK_MEMORY_DOWNLOAD=1`).
  */
 
 import type { HierarchyMode } from "../runtime/types.ts";
@@ -65,33 +66,45 @@ export function noopEmbedder(dim = MINILM_DIM): Embedder {
 	};
 }
 
-/** ONNX MiniLM: local/hybrid, or API when `TREK_MEMORY_LOCAL=1`. */
-export function shouldLoadMemoryOnnx(env: NodeJS.ProcessEnv = process.env, mode?: HierarchyMode): boolean {
+/** Lexical 384-d vectors. Used when ONNX MiniLM is off or failed to load. */
+export function lexicalEmbedder(dim = MINILM_DIM): Embedder {
+	return fakeEmbedder(dim);
+}
+
+/**
+ * Prefer ONNX MiniLM in every mode (API chat included).
+ * `TREK_MEMORY_LOCAL=0` skips ONNX. `TREK_MEMORY_LOCAL=1` keeps the explicit opt-in.
+ */
+export function shouldLoadMemoryOnnx(env: NodeJS.ProcessEnv = process.env, _mode?: HierarchyMode): boolean {
 	if (env.TREK_MEMORY_LOCAL === "0") return false;
-	if (env.TREK_MEMORY_LOCAL === "1") return true;
-	return mode === "local" || mode === "hybrid";
+	return true;
 }
 
 function allowMemoryDownload(env: NodeJS.ProcessEnv = process.env): boolean {
 	return env.TREK_MEMORY_DOWNLOAD === "1";
 }
 
-/** Lazy MiniLM. A failed load embeds nothing and recall stays empty. */
+/**
+ * Prefer MiniLM when ONNX is allowed. Otherwise bag-of-words.
+ * `TREK_MEMORY_EMBEDDER=off` keeps the empty no-op for operators who want indexing off.
+ */
 export function createEmbedder(env: NodeJS.ProcessEnv = process.env, options: MemoryModelOptions = {}): Embedder {
 	if (useFakeEmbedder(env)) return fakeEmbedder();
-	if (!shouldLoadMemoryOnnx(env, options.mode)) return noopEmbedder();
+	if (env.TREK_MEMORY_EMBEDDER === "off") return noopEmbedder();
+	if (!shouldLoadMemoryOnnx(env, options.mode)) return lexicalEmbedder();
 	return lazyMiniLm(allowMemoryDownload(env));
 }
 
 function lazyMiniLm(allowDownload: boolean): Embedder {
 	let failed = false;
+	const fallback = lexicalEmbedder();
 	let extractor:
 		| ((text: string, opts: { pooling: string; normalize: boolean }) => Promise<{ data: ArrayLike<number> }>)
 		| undefined;
 	return {
 		dim: MINILM_DIM,
 		async embed(text: string) {
-			if (failed) return [];
+			if (failed) return fallback.embed(text);
 			try {
 				if (!extractor) {
 					const transformers = (await import("@xenova/transformers")) as {
@@ -114,7 +127,7 @@ function lazyMiniLm(allowDownload: boolean): Embedder {
 				return Array.from(output.data);
 			} catch {
 				failed = true;
-				return [];
+				return fallback.embed(text);
 			}
 		},
 	};

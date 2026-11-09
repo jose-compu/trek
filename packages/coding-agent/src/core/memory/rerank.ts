@@ -13,7 +13,7 @@ export interface Reranker {
 	rerank(query: string, documents: string[]): Promise<number[]>;
 }
 
-/** MiniLM CE: local/hybrid, or API when `TREK_MEMORY_LOCAL=1`. */
+/** MiniLM CE in every mode unless `TREK_MEMORY_LOCAL=0`. */
 export function shouldConstructCrossEncoder(input?: {
 	effectiveMode: HierarchyMode;
 	suite: SuiteId;
