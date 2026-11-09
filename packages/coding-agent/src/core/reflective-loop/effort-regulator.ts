@@ -3,8 +3,11 @@
 /** Stop when spent cost exceeds this fraction of the prompt budget. */
 export const EFFORT_BUDGET_RATIO = 0.9;
 
-/** Tool-call budget for one prompt. The live loop spends 1 per tool. */
+/** Tool-call budget for one subtask or costly spawn. The main turn does not spend this. */
 export const EFFORT_COST_BUDGET = 48;
+
+/** Main-turn tools that still spend the cost budget. Cheap reads and edits do not. */
+export const EFFORT_COSTLY_TOOLS = ["spawn_subtask", "spawn_branches"] as const;
 
 /** Stop after this many tool calls in a row that return an error. */
 export const EFFORT_NO_PROGRESS_LIMIT = 8;
@@ -64,6 +67,13 @@ export function appendEffortReason<T extends { type: string; text?: string }>(co
 		return [...content.slice(0, -1), { ...last, text: `${last.text}\n${reason}` }];
 	}
 	return [...content, { type: "text", text: reason } as T];
+}
+
+export function effortToolSpendsBudget(name: string, inSubtask: boolean): boolean {
+	if (inSubtask) {
+		return true;
+	}
+	return (EFFORT_COSTLY_TOOLS as readonly string[]).includes(name);
 }
 
 export function effortActionKey(name: string, args: unknown): string {
@@ -132,7 +142,7 @@ export class EffortRegulator {
 		}
 	}
 
-	stopReason(): string | undefined {
+	stopReason(options: { applyCostBudget?: boolean } = {}): string | undefined {
 		if (!this.enabled) {
 			return undefined;
 		}
@@ -143,6 +153,7 @@ export class EffortRegulator {
 			return "EffortRegulator stopped: repeated action.";
 		}
 		if (
+			options.applyCostBudget === true &&
 			this.costBudget !== undefined &&
 			this.costBudget > 0 &&
 			this.costUsed / this.costBudget > EFFORT_BUDGET_RATIO

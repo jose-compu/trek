@@ -39,6 +39,7 @@ export {
 	appendEffortReason,
 	EFFORT_BUDGET_RATIO,
 	EFFORT_COST_BUDGET,
+	EFFORT_COSTLY_TOOLS,
 	EFFORT_LOOSE_FACTOR,
 	EFFORT_NO_CHANGE_LIMIT,
 	EFFORT_NO_PROGRESS_LIMIT,
@@ -49,6 +50,7 @@ export {
 	EffortRegulator,
 	effortActionKey,
 	effortLimitsFor,
+	effortToolSpendsBudget,
 	parseEffortMode,
 } from "./effort-regulator.ts";
 export { isReflectiveLoopEnabled } from "./enabled.ts";

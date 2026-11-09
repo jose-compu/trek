@@ -403,7 +403,7 @@ ${chalk.bold("Options:")}
   --operator-mode <mode>         supervised, delegated, checkpoint, diagnostic, or ask
   --tone <off|plain>             Wording only. Off is the default. Law text stays as written.
   --operator-grant <tools>       Comma-separated gated tools for delegated mode
-  --effort <off|normal|loose>    Effort stop for this run. loose is 10x normal. off disables it
+  --effort <off|normal|loose>    Loop/repeat stops. Spent-budget is for spawn subtasks, not the main turn
   --memory <off|on>              Memory for this run. off skips indexing and embeddings
   --git-commit                   After mutations, create a labeled git commit (0.5.0)
   --sandbox                      Run agent bash inside OS sandbox when available (#10)

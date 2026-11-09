@@ -1,10 +1,16 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.19.0`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.19.1`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.19.1] - 2026-11-09
+
+### Fixed
+
+- EffortRegulator spent-budget no longer stops the main turn. The 48-call cap applies to `spawn_branches` / `spawn_subtask` and nested branch work. Loop, repeat, and same-error stops stay.
 
 ## [0.19.0] - 2026-11-09
 

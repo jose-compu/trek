@@ -6,9 +6,11 @@
 import { fauxAssistantMessage, fauxToolCall } from "@trek/ai";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+	EFFORT_COST_BUDGET,
 	EFFORT_NO_PROGRESS_LIMIT,
 	EFFORT_REPEAT_LIMIT,
 	EffortRegulator,
+	effortToolSpendsBudget,
 } from "../src/core/reflective-loop/effort-regulator.ts";
 import { createHarness, type Harness } from "./suite/harness.ts";
 
@@ -135,7 +137,43 @@ describe("effort regulator", () => {
 		const regulator = new EffortRegulator();
 		regulator.setCostBudget(1);
 		regulator.recordCost(1);
-		expect(regulator.stopReason()).toBe("EffortRegulator stopped: spent budget.");
+		expect(regulator.stopReason()).toBeUndefined();
+		expect(regulator.stopReason({ applyCostBudget: true })).toBe("EffortRegulator stopped: spent budget.");
+	});
+
+	it("does not spend the main-turn budget on ordinary tools", () => {
+		expect(effortToolSpendsBudget("bash", false)).toBe(false);
+		expect(effortToolSpendsBudget("read", false)).toBe(false);
+		expect(effortToolSpendsBudget("edit", false)).toBe(false);
+		expect(effortToolSpendsBudget("spawn_branches", false)).toBe(true);
+		expect(effortToolSpendsBudget("bash", true)).toBe(true);
+	});
+
+	it("keeps a long main turn going past the old 48-call budget", async () => {
+		const harness = await createHarness();
+		harnesses.push(harness);
+		const over = EFFORT_COST_BUDGET + 4;
+		const steps = Array.from({ length: over }, (_, index) =>
+			fauxAssistantMessage([fauxToolCall("bash", { command: `echo effort-long-${index}` })], {
+				stopReason: "toolUse",
+			}),
+		);
+		harness.setResponses([...steps, fauxAssistantMessage("done past budget")]);
+
+		await harness.session.prompt("keep going until you complete the work");
+
+		const texts = harness.session.messages
+			.filter((message) => message.role === "toolResult")
+			.flatMap((message) => message.content.filter((part) => part.type === "text").map((part) => part.text));
+		expect(texts.some((text) => text.includes("EffortRegulator stopped: spent budget."))).toBe(false);
+		expect(
+			harness.session.messages.some(
+				(message) =>
+					message.role === "assistant" &&
+					message.content.some((part) => part.type === "text" && part.text.includes("done past budget")),
+			),
+		).toBe(true);
+		expect(harness.getPendingResponseCount()).toBe(0);
 	});
 
 	it("continues the same repeats when effort is loose", async () => {

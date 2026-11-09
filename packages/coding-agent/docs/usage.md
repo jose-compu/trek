@@ -206,7 +206,7 @@ Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`, `remember
 |--------|-------------|
 | `--memory off` | Skip indexing, the watcher, embeddings, injection, and the memory tools for this process |
 | `--memory on` | Turn memory on for this process. Does not write settings. Layer flags still apply |
-| `--effort <off\|normal\|loose>` | Effort stop for this run. `loose` is 10× `normal`. `off` does not stop the turn for effort |
+| `--effort <off\|normal\|loose>` | Loop/repeat stops for this run. Spent-budget applies to `spawn_branches` / `spawn_subtask`, not the main long turn. `loose` is 10× `normal`. `off` does not stop the turn for effort |
 
 See [Memory](memory.md). Lessons and skills are in [Learning](learning.md).
 

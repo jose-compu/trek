@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-11-09
+
+### Fixed
+
+- EffortRegulator spent-budget no longer stops a long main turn after 48 tools. Ordinary `read` / `bash` / `edit` / `write` do not spend that budget. Nested `spawn_branches` work and the spawn tools themselves still do. Repeat, same-error, and no-progress stops are unchanged.
+
 ## [0.19.0] - 2026-11-09
 
 ### Added
