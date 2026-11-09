@@ -1,0 +1,10 @@
+pack: edit
+recipes:
+  - id: ex-substitute
+    tool: ex
+    template: "ex -s {path} <<'EOF'\n%s/{from}/{to}/g\nwq\nEOF"
+    mutates: true
+  - id: sed-substitute
+    tool: sed
+    template: "script_edit engine=sed path={path} script=s/{from}/{to}/g"
+    mutates: true

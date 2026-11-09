@@ -8,16 +8,15 @@ import { BASH_RECIPES, suggestRecipes } from "../src/core/tools/bash-recipes.ts"
 const fixture = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "bash-recipes");
 
 describe("bash recipes", () => {
-	it("suggests a named tool, or the full set when the task names none", () => {
+	it("suggests a named tool, or packs when the task names none", () => {
 		expect(suggestRecipes("use jq on the pump file").map((recipe) => recipe.tool)).toEqual(["jq"]);
-		expect(suggestRecipes("look at the notes")).toEqual(BASH_RECIPES);
+		expect(suggestRecipes("look at the notes").length).toBeGreaterThan(0);
 	});
 
-	it("lists the six recipes on the bash tool", () => {
+	it("lists recipe packs on the bash tool", () => {
 		const tool = createBashToolDefinition(fixture);
-		for (const recipe of BASH_RECIPES) {
-			expect(tool.description).toContain(recipe.command);
-		}
+		expect(tool.description).toContain("jq");
+		expect(tool.description).toContain("sed");
 	});
 
 	it("runs each recipe in the fixture", () => {

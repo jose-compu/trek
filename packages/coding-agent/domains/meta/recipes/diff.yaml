@@ -1,0 +1,10 @@
+pack: diff
+recipes:
+  - id: diff-unified
+    tool: diff
+    template: diff -u {from} {to}
+    mutates: false
+  - id: patch-apply
+    tool: patch
+    template: patch -p1 < {path}
+    mutates: true

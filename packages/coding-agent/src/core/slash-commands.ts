@@ -47,6 +47,7 @@ export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
 	{ name: "processes", description: "Show this prompt's parallel, sequence, guarded choice, and inversion tree" },
 	{ name: "memory", description: "Show memory, /memory index, /memory add <path>, or /memory remove <path>" },
 	{ name: "tools", description: "Show Unix kit PATH probe: /tools unix. Never downloads a missing tool." },
+	{ name: "recipes", description: "List Unix recipes: /recipes or /recipes <tool>. Optional tools skip." },
 	{
 		name: "domains",
 		description:

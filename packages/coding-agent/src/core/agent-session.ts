@@ -4516,6 +4516,9 @@ export class AgentSession {
 			await this._runAgentPrompt(messages);
 			return;
 		}
+		if (await this._tryScriptsRoute()) {
+			return;
+		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const kimiSwarm = process.env.TREK_KIMI_SWARM === "1";
 		const layerName =
@@ -4786,6 +4789,25 @@ export class AgentSession {
 
 	private _recordCuriosity(task: string, question: string): void {
 		this._recordLocalTurn(task, question, "curiosity");
+	}
+
+	private async _tryScriptsRoute(): Promise<boolean> {
+		const { parseScriptsIntent, runScriptsIntent } = await import("./scripts-route.ts");
+		const intent = parseScriptsIntent(this._lastPromptTask);
+		if (!intent) {
+			return false;
+		}
+		try {
+			const args = { path: intent.path };
+			await this._captureEditCheckpoint("script_edit", args);
+			const output = await runScriptsIntent(this._cwd, intent);
+			await this._recordTrekVersion("script_edit", args);
+			this._recordLocalTurn(this._lastPromptTask, output, "script");
+			return true;
+		} catch (error) {
+			debugLog("scripts", "scripts route fell through to Workhorse", { error: String(error) });
+			return false;
+		}
 	}
 
 	private _recordLocalTurn(task: string, reply: string, modelId: string): void {

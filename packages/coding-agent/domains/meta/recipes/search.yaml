@@ -1,0 +1,15 @@
+pack: search
+recipes:
+  - id: rg-literal
+    tool: rg
+    template: rg -F {pattern} {path}
+    mutates: false
+  - id: grep-literal
+    tool: grep
+    template: grep -F {pattern} {path}
+    mutates: false
+  - id: sg-rename
+    tool: sg
+    template: sg -p {pattern} {path}
+    mutates: false
+    optional: true

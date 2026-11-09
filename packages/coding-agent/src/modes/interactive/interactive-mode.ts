@@ -87,6 +87,7 @@ import { type SessionContext, SessionManager } from "../../core/session-manager.
 import { BUILTIN_SLASH_COMMANDS } from "../../core/slash-commands.ts";
 import type { SourceInfo } from "../../core/source-info.ts";
 import { isInstallTelemetryEnabled } from "../../core/telemetry.ts";
+import { formatRecipeList, listRecipes } from "../../core/tools/recipe-packs.ts";
 import type { TruncationResult } from "../../core/tools/truncate.ts";
 import { UnixToolCache } from "../../core/tools/unix-tools.ts";
 import { runUnixToolsCommand } from "../../core/unix-tools-command.ts";
@@ -2862,6 +2863,12 @@ export class InteractiveMode {
 				this.showUnixToolsCommand(arg);
 				return;
 			}
+			if (text === "/recipes" || text.startsWith("/recipes ")) {
+				const arg = text === "/recipes" ? "" : text.slice("/recipes ".length).trim();
+				this.editor.setText("");
+				this.showRecipesCommand(arg);
+				return;
+			}
 			if (text === "/confirm" || text.startsWith("/confirm ")) {
 				const tool = text.slice("/confirm".length).trim();
 				this.editor.setText("");
@@ -4094,6 +4101,14 @@ export class InteractiveMode {
 
 	showUnixToolsCommand(arg: string): void {
 		const text = runUnixToolsCommand(arg, this.unixTools);
+		this.chatContainer.addChild(new Spacer(1));
+		this.chatContainer.addChild(new Text(theme.fg("muted", text), 1, 0));
+		this.ui.requestRender();
+	}
+
+	showRecipesCommand(arg: string): void {
+		const tool = arg.trim() || undefined;
+		const text = formatRecipeList(listRecipes({ tool }));
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new Text(theme.fg("muted", text), 1, 0));
 		this.ui.requestRender();

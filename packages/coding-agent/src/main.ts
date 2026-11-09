@@ -107,6 +107,10 @@ async function handleSubcommands(args: string[]): Promise<boolean> {
 			const { handleWorkflowsCommand } = await import("./domains-cli.ts");
 			return handleWorkflowsCommand(args);
 		}
+		case "recipes": {
+			const { handleRecipesCommand } = await import("./recipes-cli.ts");
+			return handleRecipesCommand(args);
+		}
 		default:
 			return false;
 	}
