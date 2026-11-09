@@ -206,8 +206,8 @@ describe("write/edit enqueue without blocking", () => {
 		await writeTool.execute("call-3", { path: file, content: "// version 3\n" });
 		const elapsed = Date.now() - startTime;
 
-		// All writes should complete quickly
-		expect(elapsed).toBeLessThan(50);
+		// Wall clock for three writes. The slow-embed cases above are the non-blocking proof.
+		expect(elapsed).toBeLessThan(250);
 
 		// Callback should be invoked for each write
 		expect(callbackCount).toBe(3);

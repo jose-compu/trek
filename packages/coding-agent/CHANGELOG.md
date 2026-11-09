@@ -4,10 +4,18 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-09
+
 ### Changed
 
-- Recall of an indexed file also returns one-hop import, test, and doc neighbors via LogosDB get-by-id.
+- Recall of an indexed file also returns one-hop import, test, and doc neighbors via LogosDB get-by-id. Index writes batch and yield between files.
 - `open-pr` and `address-review` include `commit-on-branch`. Split-epic and split-release DAGs fan out through `open-issue`.
+- Semantic memory: structure-aware chunks, parent-child chunks, content-hash ids, quality filters, intent captions, cross-file links, and async indexing on write and edit.
+- Coding catalog: issue, PR, and release DAGs, host adapters, and a Belay pass on the PR workflow.
+
+### Note
+
+Retrieval ranking (0.20-B) and injection routing (0.20-C) are not in this release. The composed DAGs are not executed by the Archon runner yet.
 
 ## [0.19.9] - 2026-11-09
 
