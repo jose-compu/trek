@@ -29,7 +29,7 @@ describe("host adapter", () => {
 			expect(workflow, `workflow ${workflowName} not found`).toBeDefined();
 			expect(workflow?.workflow.nodes.length).toBeGreaterThan(0);
 			for (const node of workflow?.workflow.nodes ?? []) {
-				expect(node.kind).toBe("prompt");
+				expect(["prompt", "include"]).toContain(node.kind);
 			}
 		}
 	});
@@ -38,13 +38,14 @@ describe("host adapter", () => {
 		const cwd = mkdtempSync(join(tmpdir(), "trek-detect-host-"));
 		const catalog = loadDomainCatalog(cwd);
 		const coding = catalog.domains.find((domain) => domain.id === "coding");
-		const openIssue = coding?.workflows?.find((w) => w.name === "open-issue");
-		const detectHost = openIssue?.workflow.nodes.find((node) => node.id === "detect-host");
+		const detectHost = coding?.workflows?.find((w) => w.name === "_detect-host");
 		expect(detectHost).toBeDefined();
-		expect(detectHost?.body).toContain("gh");
-		expect(detectHost?.body).toContain("glab");
-		expect(detectHost?.body).toContain("tea");
-		expect(detectHost?.body.toLowerCase()).toContain("none are present");
+		const checkNode = detectHost?.workflow.nodes.find((node) => node.id === "check");
+		expect(checkNode).toBeDefined();
+		expect(checkNode?.body).toContain("gh");
+		expect(checkNode?.body).toContain("glab");
+		expect(checkNode?.body).toContain("tea");
+		expect(checkNode?.body.toLowerCase()).toContain("none are present");
 	});
 
 	test("file-issue node handles missing CLI", () => {
@@ -70,11 +71,13 @@ describe("host adapter", () => {
 			expect(yaml).not.toContain("import");
 			expect(yaml).not.toContain("require");
 			for (const node of workflow.workflow.nodes) {
-				expect(node.kind).toBe("prompt");
-				expect(node.allowedTools).toEqual([]);
-				expect(node.body.toLowerCase()).not.toContain("octokit");
-				expect(node.body.toLowerCase()).not.toContain("api.github.com");
-				expect(node.body.toLowerCase()).not.toContain("gitlab.com/api");
+				expect(["prompt", "include"]).toContain(node.kind);
+				if (node.kind === "prompt") {
+					expect(node.allowedTools).toEqual([]);
+					expect(node.body.toLowerCase()).not.toContain("octokit");
+					expect(node.body.toLowerCase()).not.toContain("api.github.com");
+					expect(node.body.toLowerCase()).not.toContain("gitlab.com/api");
+				}
 			}
 		}
 	});
@@ -105,19 +108,19 @@ describe("host adapter", () => {
 		const cwd = mkdtempSync(join(tmpdir(), "trek-missing-binary-"));
 		const catalog = loadDomainCatalog(cwd);
 		const coding = catalog.domains.find((domain) => domain.id === "coding");
+		const detectHost = coding?.workflows?.find((w) => w.name === "_detect-host");
+		const detectYaml = detectHost?.yaml.toLowerCase() ?? "";
+		expect(
+			detectYaml.includes("none are present") || detectYaml.includes("not available"),
+			"_detect-host should mention missing CLI",
+		).toBe(true);
 		for (const workflowName of workflows) {
 			const workflow = coding?.workflows?.find((w) => w.name === workflowName);
 			expect(workflow, `workflow ${workflowName} not found`).toBeDefined();
-			const yaml = workflow?.yaml.toLowerCase() ?? "";
-			const hasMissingCheck =
-				yaml.includes("no host cli") ||
-				yaml.includes("none are present") ||
-				yaml.includes("not detected") ||
-				yaml.includes("missing") ||
-				yaml.includes("not available") ||
-				yaml.includes("cannot be") ||
-				yaml.includes("without it");
-			expect(hasMissingCheck, `${workflowName} should handle missing CLI`).toBe(true);
+			const hasInclude = workflow?.workflow.nodes.some(
+				(node) => node.kind === "include" && node.include?.workflow === "_detect-host",
+			);
+			expect(hasInclude, `${workflowName} should include _detect-host`).toBe(true);
 		}
 	});
 });
