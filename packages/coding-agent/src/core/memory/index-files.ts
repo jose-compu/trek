@@ -14,6 +14,7 @@ import {
 	maybePushLocalGitignore,
 } from "logosdb-mcp-server/dist/gitignore-walker.js";
 import { annotateFile } from "./annotate.ts";
+import { generateHierarchy } from "./hierarchy.ts";
 import { chunkByStructure } from "./structure-chunker.ts";
 
 const MARKERS = [".git", "package.json", "pyproject.toml", "Cargo.toml", "go.mod", "CMakeLists.txt", "Makefile", ".hg"];
@@ -73,16 +74,21 @@ export function chunksForFile(absPath: string, cwd: string): IndexedChunk[] {
 		return [];
 	}
 	const parts = chunkByStructure(raw, { filePath: relPath });
-	return parts.map((part, index) => {
+	const hierarchical = generateHierarchy(parts, relPath);
+	return hierarchical.map((part, index) => {
 		const legacyChunk = {
 			text: part.text,
 			offset: 0,
 			lineStart: part.lineStart,
 			lineEnd: part.lineEnd,
-			heading: part.signature,
+			heading: part.signature || part.parentContext,
 		};
-		const row = annotateFile(relPath, legacyChunk, index, parts.length);
-		return { embed: row.embed, stored: row.stored, relPath };
+		const row = annotateFile(relPath, legacyChunk, index, hierarchical.length);
+		return {
+			embed: row.embed,
+			stored: `${row.stored}\n[chunk-id:${part.chunkId}]${part.parentId ? `[parent-id:${part.parentId}]` : ""}${part.isParent ? "[is-parent:true]" : ""}`,
+			relPath,
+		};
 	});
 }
 
