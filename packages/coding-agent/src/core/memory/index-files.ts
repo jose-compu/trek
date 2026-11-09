@@ -16,8 +16,10 @@ import {
 import { annotateFile } from "./annotate.ts";
 import { generateCaption } from "./caption-generator.ts";
 import { generateCrossFileLinks } from "./cross-file-links.ts";
-import { generateHierarchy } from "./hierarchy.ts";
+import { getEmbedder } from "./fake-embedder.ts";
+import { generateHierarchy, type HierarchicalChunk } from "./hierarchy.ts";
 import { filterChunks } from "./quality-filters.ts";
+import { mergeOrphans, semanticSplit } from "./semantic-split-merge.ts";
 import { chunkByStructure } from "./structure-chunker.ts";
 
 const MARKERS = [".git", "package.json", "pyproject.toml", "Cargo.toml", "go.mod", "CMakeLists.txt", "Makefile", ".hg"];
@@ -79,7 +81,37 @@ export function chunksForFile(absPath: string, cwd: string): IndexedChunk[] {
 	const parts = chunkByStructure(raw, { filePath: relPath });
 	const hierarchical = generateHierarchy(parts, relPath);
 	const filtered = filterChunks(hierarchical, relPath);
-	return filtered.map((part, index) => {
+
+	// Apply semantic split/merge if embedder is available
+	let refined: HierarchicalChunk[] = filtered;
+	const embedder = getEmbedder();
+	if (embedder) {
+		// Only apply to chunks without explicit structure (kind=unknown or section)
+		const toRefine = filtered.filter((c) => c.kind === "unknown" || c.kind === "section");
+		const toKeep = filtered.filter((c) => c.kind !== "unknown" && c.kind !== "section");
+
+		const refinedChunks: HierarchicalChunk[] = [];
+		for (const chunk of toRefine) {
+			const split = semanticSplit(
+				{ text: chunk.text, lineStart: chunk.lineStart, lineEnd: chunk.lineEnd },
+				embedder,
+				0.5,
+			);
+			const merged = mergeOrphans(split, 40);
+			for (const refined of merged) {
+				refinedChunks.push({
+					...chunk,
+					text: refined.text,
+					lineStart: refined.lineStart ?? chunk.lineStart,
+					lineEnd: refined.lineEnd ?? chunk.lineEnd,
+				});
+			}
+		}
+
+		refined = [...toKeep, ...refinedChunks];
+	}
+
+	return refined.map((part, index) => {
 		const caption = generateCaption(
 			{
 				text: part.text,
@@ -98,7 +130,7 @@ export function chunksForFile(absPath: string, cwd: string): IndexedChunk[] {
 			lineEnd: part.lineEnd,
 			heading: part.signature || part.parentContext,
 		};
-		const row = annotateFile(relPath, legacyChunk, index, filtered.length, caption);
+		const row = annotateFile(relPath, legacyChunk, index, refined.length, caption);
 		const linksStr = links.length > 0 ? `[links:${JSON.stringify(links)}]` : "";
 		return {
 			embed: row.embed,
