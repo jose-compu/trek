@@ -51,6 +51,17 @@ export {
 	type ReadToolOptions,
 } from "./read.ts";
 export {
+	createScriptEditTool,
+	createScriptEditToolDefinition,
+	formatScriptEditCard,
+	pickScriptEngine,
+	type RunScriptEditResult,
+	runScriptEdit,
+	type ScriptEditOptions,
+	type ScriptEditToolDetails,
+	type ScriptEditToolInput,
+} from "./script-edit.ts";
+export {
 	DEFAULT_MAX_BYTES,
 	DEFAULT_MAX_LINES,
 	formatSize,
@@ -77,12 +88,22 @@ import { createFindTool, createFindToolDefinition, type FindToolOptions } from "
 import { createGrepTool, createGrepToolDefinition, type GrepToolOptions } from "./grep.ts";
 import { createLsTool, createLsToolDefinition, type LsToolOptions } from "./ls.ts";
 import { createReadTool, createReadToolDefinition, type ReadToolOptions } from "./read.ts";
+import { createScriptEditTool, createScriptEditToolDefinition, type ScriptEditOptions } from "./script-edit.ts";
 import { createWriteTool, createWriteToolDefinition, type WriteToolOptions } from "./write.ts";
 
 export type Tool = AgentTool<any>;
 export type ToolDef = ToolDefinition<any, any>;
-export type ToolName = "read" | "bash" | "edit" | "write" | "grep" | "find" | "ls";
-export const allToolNames: Set<ToolName> = new Set(["read", "bash", "edit", "write", "grep", "find", "ls"]);
+export type ToolName = "read" | "bash" | "edit" | "write" | "grep" | "find" | "ls" | "script_edit";
+export const allToolNames: Set<ToolName> = new Set([
+	"read",
+	"bash",
+	"edit",
+	"write",
+	"grep",
+	"find",
+	"ls",
+	"script_edit",
+]);
 
 export interface ToolsOptions {
 	read?: ReadToolOptions;
@@ -92,6 +113,7 @@ export interface ToolsOptions {
 	grep?: GrepToolOptions;
 	find?: FindToolOptions;
 	ls?: LsToolOptions;
+	script_edit?: ScriptEditOptions;
 }
 
 export function createToolDefinition(toolName: ToolName, cwd: string, options?: ToolsOptions): ToolDef {
@@ -110,6 +132,8 @@ export function createToolDefinition(toolName: ToolName, cwd: string, options?: 
 			return createFindToolDefinition(cwd, options?.find);
 		case "ls":
 			return createLsToolDefinition(cwd, options?.ls);
+		case "script_edit":
+			return createScriptEditToolDefinition(cwd, options?.script_edit);
 		default:
 			throw new Error(`Unknown tool name: ${toolName}`);
 	}
@@ -131,6 +155,8 @@ export function createTool(toolName: ToolName, cwd: string, options?: ToolsOptio
 			return createFindTool(cwd, options?.find);
 		case "ls":
 			return createLsTool(cwd, options?.ls);
+		case "script_edit":
+			return createScriptEditTool(cwd, options?.script_edit);
 		default:
 			throw new Error(`Unknown tool name: ${toolName}`);
 	}
@@ -142,6 +168,7 @@ export function createCodingToolDefinitions(cwd: string, options?: ToolsOptions)
 		createBashToolDefinition(cwd, options?.bash),
 		createEditToolDefinition(cwd, options?.edit),
 		createWriteToolDefinition(cwd, options?.write),
+		createScriptEditToolDefinition(cwd, options?.script_edit),
 	];
 }
 
@@ -163,6 +190,7 @@ export function createAllToolDefinitions(cwd: string, options?: ToolsOptions): R
 		grep: createGrepToolDefinition(cwd, options?.grep),
 		find: createFindToolDefinition(cwd, options?.find),
 		ls: createLsToolDefinition(cwd, options?.ls),
+		script_edit: createScriptEditToolDefinition(cwd, options?.script_edit),
 	};
 }
 
@@ -172,6 +200,7 @@ export function createCodingTools(cwd: string, options?: ToolsOptions): Tool[] {
 		createBashTool(cwd, options?.bash),
 		createEditTool(cwd, options?.edit),
 		createWriteTool(cwd, options?.write),
+		createScriptEditTool(cwd, options?.script_edit),
 	];
 }
 
@@ -193,5 +222,6 @@ export function createAllTools(cwd: string, options?: ToolsOptions): Record<Tool
 		grep: createGrepTool(cwd, options?.grep),
 		find: createFindTool(cwd, options?.find),
 		ls: createLsTool(cwd, options?.ls),
+		script_edit: createScriptEditTool(cwd, options?.script_edit),
 	};
 }

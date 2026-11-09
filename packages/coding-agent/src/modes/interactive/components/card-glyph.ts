@@ -15,6 +15,7 @@ export const CARD_GLYPH = {
 	remember: "☆",
 	recall: "☰",
 	forget: "✕",
+	script_edit: "⬡",
 } as const;
 
 export type CardKind = keyof typeof CARD_GLYPH;

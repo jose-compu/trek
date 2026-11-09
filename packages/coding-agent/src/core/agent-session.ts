@@ -1089,7 +1089,7 @@ export class AgentSession {
 	}
 
 	private _pathsToCapture(toolName: string, args: unknown): string[] {
-		if (toolName === "write" || toolName === "edit") {
+		if (toolName === "write" || toolName === "edit" || toolName === "script_edit") {
 			const filePath = this._toolFilePath(args);
 			return filePath ? [filePath] : [];
 		}
@@ -1195,7 +1195,7 @@ export class AgentSession {
 
 	private async _recordTrekVersion(toolName: string, args: unknown): Promise<void> {
 		try {
-			if (toolName === "write" || toolName === "edit") {
+			if (toolName === "write" || toolName === "edit" || toolName === "script_edit") {
 				const filePath = this._toolFilePath(args);
 				if (!filePath) {
 					return;
@@ -5164,7 +5164,7 @@ export class AgentSession {
 
 			// Topic/task reset before any bind so sticky Planning/Frontier cannot stick.
 			const previousTask = this._previousTask;
-			let topicReset: TopicReset = detectTopicReset(previousTask, expandedText);
+			const topicReset: TopicReset = detectTopicReset(previousTask, expandedText);
 			expandedText = stripNewTopicSignal(expandedText);
 			this._previousTask = expandedText;
 			this._toolsSincePlan = 0;
@@ -6666,6 +6666,7 @@ export class AgentSession {
 					},
 					write: { dryRun: () => this._dryRunEnabled },
 					edit: { dryRun: () => this._dryRunEnabled },
+					script_edit: { dryRun: () => this._dryRunEnabled },
 				});
 
 		this._baseToolDefinitions = new Map(

@@ -32,6 +32,7 @@ import {
 	createLsTool,
 	createReadOnlyTools,
 	createReadTool,
+	createScriptEditTool,
 	createWriteTool,
 	withFileMutationQueue,
 } from "./tools/index.ts";
@@ -124,6 +125,7 @@ export {
 	createGrepTool,
 	createFindTool,
 	createLsTool,
+	createScriptEditTool,
 };
 
 // Helper Functions
