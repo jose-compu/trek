@@ -59,6 +59,8 @@ Type `/` in the editor to open command completion. Extensions can register custo
 | `/memory index` | Reindex the project |
 | `/memory add <path>` | Index a file or folder and keep it |
 | `/memory remove <path>` | Drop that path from the index |
+| `/tools unix` | PATH probe for the Unix kit. Missing optional tools skip; nothing is downloaded |
+| `/recipes [tool]` | List checked-in Unix recipes. Optional sg/mlr skip when missing |
 | `/quit` | Quit pi |
 
 ## Message Queue

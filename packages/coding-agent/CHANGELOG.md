@@ -4,6 +4,16 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-09
+
+### Added
+
+- Unix kit PATH probe and `/tools unix`. Optional misses print skip. Never download.
+- `script_edit` (ex / `vim -Es` / ed / sed). No TTY. Snapshot first. Auto fallback. BSD/GNU `sed -i`. Compact 1–4 line card.
+- Bash refuses interactive vim/nano/emacs/pagers, `dd`, and `find -delete`. Redirects `sed -i` / `ex` / `vim -Es` to `script_edit`. Caps `xargs -P` at 4.
+- Recipe YAML packs (`trek recipes [--tool X]`, `/recipes`). Optional sg/mlr skip when missing.
+- Decision/Scripts route runs `replace X with Y in F` through `script_edit` with zero chat-model calls. Dry-run, diagnostic, operator gates, and Law 1 read-before-write still apply.
+
 ## [0.18.2] - 2026-11-08
 
 ### Fixed

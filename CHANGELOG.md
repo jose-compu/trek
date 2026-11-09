@@ -1,10 +1,19 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.18.2`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.19.0`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.19.0] - 2026-11-09
+
+### Added
+
+- Unix kit PATH probe (`/tools unix`). Missing optional tools skip; nothing is downloaded.
+- `script_edit` (ex / `vim -Es` / ed / sed). No TTY. Snapshot before mutate. Compact 1–4 line card.
+- Recipe packs (`trek recipes`, `/recipes`). Optional sg/mlr skip when missing.
+- Decision/Scripts route: `replace X with Y in F` with no chat model. Dry-run, diagnostic, operator gates, and Law 1 still apply.
 
 ## [0.18.2] - 2026-11-08
 
