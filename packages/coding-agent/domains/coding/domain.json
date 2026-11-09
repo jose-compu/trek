@@ -5,7 +5,117 @@
 	"terms": [
 		"lint error",
 		"type mismatch",
-		"anti-pattern"
+		"anti-pattern",
+		"pull request",
+		"branch",
+		"commit",
+		"issue",
+		"review",
+		"merge",
+		"epic",
+		"release"
 	],
-	"workflow": "defect-fix.yaml"
+	"workflows": [
+		{
+			"file": "_detect-host.yaml",
+			"terms": []
+		},
+		{
+			"file": "defect-fix.yaml",
+			"terms": [
+				"lint error",
+				"type mismatch",
+				"anti-pattern",
+				"fix the bug"
+			]
+		},
+		{
+			"file": "belay-pr.yaml",
+			"terms": [
+				"belay",
+				"belay this pr",
+				"review the branch diff",
+				"findings table"
+			]
+		},
+		{
+			"file": "open-issue.yaml",
+			"terms": [
+				"open an issue",
+				"file an issue",
+				"create an issue",
+				"report a bug"
+			]
+		},
+		{
+			"file": "branch-from-issue.yaml",
+			"terms": [
+				"create a branch",
+				"branch from issue",
+				"checkout branch"
+			]
+		},
+		{
+			"file": "commit-on-branch.yaml",
+			"terms": [
+				"commit",
+				"stage files",
+				"commit message"
+			]
+		},
+		{
+			"file": "open-pr.yaml",
+			"terms": [
+				"open a pr",
+				"create a pull request",
+				"open pull request",
+				"push and pr"
+			]
+		},
+		{
+			"file": "review-pr.yaml",
+			"terms": [
+				"review pr",
+				"review pull request",
+				"approve pr",
+				"approve the pr",
+				"request changes"
+			]
+		},
+		{
+			"file": "address-review.yaml",
+			"terms": [
+				"address review",
+				"reply to review",
+				"fix review comments"
+			]
+		},
+		{
+			"file": "merge-pr.yaml",
+			"terms": [
+				"merge pr",
+				"merge pull request",
+				"merge the pr"
+			]
+		},
+		{
+			"file": "split-release-epics.yaml",
+			"terms": [
+				"split release",
+				"release epics",
+				"break down release",
+				"milestone",
+				"parent epic"
+			]
+		},
+		{
+			"file": "split-epic-issues.yaml",
+			"terms": [
+				"split epic",
+				"epic issues",
+				"break down epic",
+				"child issues"
+			]
+		}
+	]
 }
