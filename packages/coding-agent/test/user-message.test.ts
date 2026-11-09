@@ -99,6 +99,23 @@ describe("UserMessageComponent", () => {
 		expect(rendered).not.toContain(theme.bg("userMessageBg", "test").slice(0, 8));
 	});
 
+	test("hides a remaining-subtask continue prompt", () => {
+		initTheme("dark");
+		const remaining = [
+			'Continue the same task until it is done. The last reply finished a subtask, not the original request. Do the next remaining work with tools now. A short "Task done." or one commit, PR, milestone, or issue is only a subtask. Keep implementing remaining subtasks with tools. Do not wait for the user. When every remaining part of the original request is finished, say the original request is complete and stop. Do not re-verify a finished request.',
+			"",
+			"Original request:",
+			'"""',
+			"create milestone 1.8 and start working",
+			'"""',
+		].join("\n");
+		expect(isQuietContinuePrompt(remaining)).toBe(true);
+		const rendered = new UserMessageComponent(remaining).render(80).join("\n");
+		expect(rendered).toContain(theme.fg("dim", "· continue"));
+		expect(rendered).not.toContain("Original request");
+		expect(rendered).not.toContain("create milestone 1.8");
+	});
+
 	test("does not treat a real user continue as an internal prompt", () => {
 		expect(isQuietContinuePrompt("continue")).toBe(false);
 		expect(isQuietContinuePrompt("continue with tasks pls")).toBe(false);

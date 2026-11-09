@@ -12,6 +12,7 @@ import {
 	looksLikeLongTaskControlNoise,
 	looksLikeLongTaskDone,
 	looksLikePartialMilestone,
+	looksLikeSubtaskWrapUp,
 	pinLongTaskGoal,
 	shouldResumeLongTask,
 } from "../src/core/runtime/index.ts";
@@ -99,19 +100,61 @@ describe("long task pin", () => {
 			}),
 		).toBe(true);
 		const follow = longTaskContinuePrompt("complete the whole v6");
-		expect(follow).toMatch(/Do not stop after one commit/);
-		expect(follow).toMatch(/When the original request is fully done/);
+		expect(follow).toMatch(/only a subtask/);
+		expect(follow).toMatch(/remaining subtasks/);
+		expect(follow).toMatch(/original request is complete/);
 		expect(follow).toMatch(/Do not re-verify a finished request/);
 		expect(follow).toMatch(/Original request/);
+		expect(follow).not.toMatch(/The last reply finished a subtask/);
 		expect(follow).not.toMatch(/"escalate"/);
 		expect(follow).not.toMatch(/"descalate"/);
 		expect(follow).not.toMatch(/"delegate"/);
+		const remaining = longTaskContinuePrompt("complete the whole v6", { remaining: true });
+		expect(remaining).toMatch(/The last reply finished a subtask/);
+		expect(remaining).toMatch(/Do the next remaining work with tools now/);
 		expect(
 			shouldResumeLongTask({
 				pinned: true,
 				assistantText: partial,
 				queued: false,
 				hold: true,
+			}),
+		).toBe(false);
+	});
+
+	it("keeps remaining subtasks going after a short Task done wrap-up", () => {
+		expect(looksLikeLongTaskDone("Task done.")).toBe(false);
+		expect(looksLikeSubtaskWrapUp("Task done.")).toBe(true);
+		expect(looksLikeSubtaskWrapUp("Task done.\n<honesty>\nconfidence: medium\n</honesty>")).toBe(true);
+		expect(
+			looksLikeSubtaskWrapUp("The 1.8 milestone setup is complete. The branch and pull request are ready for work."),
+		).toBe(true);
+		expect(looksLikeLongTaskDone("The original request is complete. No remaining steps.")).toBe(true);
+		expect(looksLikeSubtaskWrapUp("The original request is complete. No remaining steps.")).toBe(false);
+		expect(
+			shouldResumeLongTask({
+				pinned: true,
+				assistantText: "Task done.",
+				queued: false,
+				usedTools: true,
+			}),
+		).toBe(true);
+		expect(
+			shouldResumeLongTask({
+				pinned: true,
+				assistantText: "Task done.",
+				queued: false,
+				usedTools: false,
+				idleWrapUps: 0,
+			}),
+		).toBe(true);
+		expect(
+			shouldResumeLongTask({
+				pinned: true,
+				assistantText: "Task done.",
+				queued: false,
+				usedTools: false,
+				idleWrapUps: 1,
 			}),
 		).toBe(false);
 	});

@@ -3260,14 +3260,17 @@ export class InteractiveMode {
 				break;
 			}
 
-			case "agent_end":
-				if (this.settingsManager.getShowTerminalProgress()) {
-					this.ui.terminal.setProgress(false);
-				}
-				if (this.loadingAnimation) {
-					this.loadingAnimation.stop();
-					this.loadingAnimation = undefined;
-					this.statusContainer.clear();
+			case "agent_end": {
+				const keepWorking = event.willRetry || event.willContinue;
+				if (!keepWorking) {
+					if (this.settingsManager.getShowTerminalProgress()) {
+						this.ui.terminal.setProgress(false);
+					}
+					if (this.loadingAnimation) {
+						this.loadingAnimation.stop();
+						this.loadingAnimation = undefined;
+						this.statusContainer.clear();
+					}
 				}
 				if (this.streamingComponent) {
 					this.chatContainer.removeChild(this.streamingComponent);
@@ -3280,6 +3283,7 @@ export class InteractiveMode {
 
 				this.ui.requestRender();
 				break;
+			}
 
 			case "compaction_start": {
 				if (this.settingsManager.getShowTerminalProgress()) {
