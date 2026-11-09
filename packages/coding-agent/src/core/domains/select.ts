@@ -55,6 +55,14 @@ export function selectDomain(catalog: DomainCatalog, input: SelectDomainInput): 
 	return NONE;
 }
 
+/** Whole-term match so "branch" does not fire on "branches". */
+function termHits(haystack: string, term: string): boolean {
+	const trimmed = term.trim().toLowerCase();
+	if (!trimmed) return false;
+	const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`, "i").test(haystack);
+}
+
 function namedFiles(task: string): string[] {
 	return task.match(/[A-Za-z0-9_./-]+\.[A-Za-z0-9]{1,8}/g) ?? [];
 }
@@ -70,7 +78,7 @@ function scoreDomains(
 		let weight = 0;
 		const matched: string[] = [];
 		for (const term of domain.terms) {
-			if (term.length > 0 && haystack.includes(term)) {
+			if (termHits(haystack, term)) {
 				score += 1;
 				weight += term.length;
 				matched.push(term);
@@ -145,7 +153,7 @@ function selectWorkflowFromDomain(
 		let score = 0;
 		let weight = 0;
 		for (const term of workflow.terms) {
-			if (term.length > 0 && haystack.includes(term)) {
+			if (termHits(haystack, term)) {
 				score += 1;
 				weight += term.length;
 			}

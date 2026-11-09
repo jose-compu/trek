@@ -7,6 +7,7 @@
 		"type mismatch",
 		"anti-pattern",
 		"pull request",
+		"pr",
 		"branch",
 		"commit",
 		"issue",
@@ -16,10 +17,6 @@
 		"release"
 	],
 	"workflows": [
-		{
-			"file": "_detect-host.yaml",
-			"terms": []
-		},
 		{
 			"file": "defect-fix.yaml",
 			"terms": [
@@ -116,6 +113,10 @@
 				"break down epic",
 				"child issues"
 			]
+		},
+		{
+			"file": "_detect-host.yaml",
+			"terms": []
 		}
 	]
 }

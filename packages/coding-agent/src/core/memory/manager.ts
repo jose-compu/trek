@@ -1,13 +1,14 @@
 /**
  * Three LogosDB roots. A row in one root is not visible from another.
- * Native logosdb 1.1.0 stores the vector and one text column.
- * Annotations are the 1.3.0 situating header on the embedded string.
+ * Native logosdb 1.2.0 stores the vector and one text column. Rows are read with DB.get.
+ * Annotations are the situating header on the embedded string.
  */
 
 import { existsSync, type FSWatcher, mkdirSync, statSync, watch } from "node:fs";
 import { homedir } from "node:os";
 import { join, relative, sep } from "node:path";
 import type { AgentMessage } from "@trek/agent-core";
+import { DB, type Row } from "logosdb";
 import { loadManifest, manifestPath, saveManifest } from "logosdb-mcp-server/dist/file-index-manifest.js";
 import { hybridRerank } from "logosdb-mcp-server/dist/hybrid.js";
 import { NamespaceStore } from "logosdb-mcp-server/dist/store.js";
@@ -23,6 +24,7 @@ import {
 	lessonKeyOf,
 	type MemoryKind,
 } from "./annotate.ts";
+import { parseCrossFileLinks } from "./cross-file-links.ts";
 import type { Embedder } from "./embedder.ts";
 import {
 	chunksForFile,
@@ -38,6 +40,11 @@ import {
 } from "./index-files.ts";
 import type { Reranker } from "./rerank.ts";
 import { captureTurn, handoffNote } from "./turns.ts";
+
+/** Neighbor score factor for one-hop cross-file links (#221). */
+const LINK_SCORE_FACTOR = 0.6;
+/** Cap primary hits inspected for link expansion. */
+const LINK_EXPAND_PRIMARY = 8;
 
 export type MemoryLayer = "session" | "project" | "global";
 
@@ -166,9 +173,93 @@ export class MemoryManager {
 				const hit = hits[index];
 				if (hit) next.push(hit);
 			}
-			if (next.length === hits.length) return next.slice(0, topK);
+			if (next.length === hits.length) hits.splice(0, hits.length, ...next);
 		}
-		return hits.slice(0, topK);
+		const expanded = this.expandLinkedHits(hits, topK);
+		return expanded.slice(0, topK);
+	}
+
+	/**
+	 * One-hop neighbors from `[links:…]` via LogosDB DB.get (no second kNN).
+	 * Manifest maps target paths → chunk ids.
+	 */
+	private expandLinkedHits(hits: MemoryHit[], topK: number): MemoryHit[] {
+		if (!this.projectEnabled() || hits.length === 0) return hits;
+		const opened = this.open("project", false);
+		if (!(opened instanceof DB)) return hits;
+		const db: DB = opened;
+		const manifestFile = manifestPath(this.layerRoot("project"), NS);
+		let files: Record<string, { ids?: number[] }>;
+		try {
+			files = loadManifest(manifestFile).files as Record<string, { ids?: number[] }>;
+		} catch {
+			return hits;
+		}
+		const seen = new Set(hits.map((hit) => hit.id));
+		const neighbors: MemoryHit[] = [];
+		for (const hit of hits.slice(0, LINK_EXPAND_PRIMARY)) {
+			if (hit.layer !== "project") continue;
+			if (hit.kind !== "file" && hit.kind !== "note") continue;
+			const links = this.linksForHit(hit, files, db);
+			if (links.length === 0) continue;
+			for (const link of links) {
+				const entry = files[link.targetPath];
+				const ids = entry?.ids;
+				if (!ids || ids.length === 0) continue;
+				for (const rowId of ids.slice(0, 2)) {
+					const neighborId = `project:${rowId}`;
+					if (seen.has(neighborId)) continue;
+					let row: Row | undefined;
+					try {
+						row = db.get(rowId);
+					} catch {
+						continue;
+					}
+					const text = row?.text ?? "";
+					if (!text) continue;
+					seen.add(neighborId);
+					neighbors.push({
+						id: neighborId,
+						layer: "project",
+						kind: kindOf(text),
+						score: hit.score * LINK_SCORE_FACTOR,
+						text,
+					});
+					if (hits.length + neighbors.length >= topK * 2) break;
+				}
+			}
+		}
+		if (neighbors.length === 0) return hits;
+		return [...hits, ...neighbors].sort((a, b) => b.score - a.score);
+	}
+
+	/** Links on this row, plus links stored on sibling chunks of the same file. */
+	private linksForHit(
+		hit: MemoryHit,
+		files: Record<string, { ids?: number[] }>,
+		db: DB,
+	): ReturnType<typeof parseCrossFileLinks> {
+		const links = parseCrossFileLinks(hit.text);
+		const file = /\[file:([^\]]+)\]/.exec(hit.text)?.[1];
+		if (!file) return links;
+		const ids = files[file]?.ids ?? [];
+		const seen = new Set(links.map((link) => `${link.linkType}:${link.targetPath}`));
+		for (const rowId of ids.slice(0, 6)) {
+			if (`project:${rowId}` === hit.id) continue;
+			let row: Row | undefined;
+			try {
+				row = db.get(rowId);
+			} catch {
+				continue;
+			}
+			for (const link of parseCrossFileLinks(row?.text ?? "")) {
+				const key = `${link.linkType}:${link.targetPath}`;
+				if (seen.has(key)) continue;
+				seen.add(key);
+				links.push(link);
+			}
+		}
+		return links;
 	}
 
 	async forget(query: string, layer: MemoryLayer): Promise<string> {
@@ -274,20 +365,23 @@ export class MemoryManager {
 
 	async indexProject(): Promise<void> {
 		if (!this.live() || !this.projectEnabled() || !isIndexableProject(this.options.cwd)) return;
-		await this.enqueue(async () => {
-			const lists = loadIndexPaths(this.options.cwd);
-			for (const file of listProjectFiles(this.options.cwd)) {
-				await this.indexOne(file, false);
-			}
-			for (const extra of lists.include) {
-				const resolved = resolveProjectPath(this.options.cwd, extra);
-				if ("error" in resolved) continue;
-				for (const file of filesAt(this.options.cwd, resolved.abs)) {
-					await this.indexOne(file, false);
-				}
-			}
-			await this.deleteCovered(lists);
-		});
+		const lists = loadIndexPaths(this.options.cwd);
+		const files = new Set(listProjectFiles(this.options.cwd));
+		for (const extra of lists.include) {
+			const resolved = resolveProjectPath(this.options.cwd, extra);
+			if ("error" in resolved) continue;
+			for (const file of filesAt(this.options.cwd, resolved.abs)) files.add(file);
+		}
+		// One queued file at a time, then yield, so a write can index before the rest of the tree.
+		for (const file of files) {
+			await this.enqueue(() => this.indexOne(file, false));
+			await this.yieldLoop();
+		}
+		await this.enqueue(() => this.deleteCovered(lists));
+	}
+
+	private yieldLoop(): Promise<void> {
+		return new Promise((resolve) => setImmediate(resolve));
 	}
 
 	async indexFile(absPath: string): Promise<void> {
@@ -419,11 +513,10 @@ export class MemoryManager {
 			}
 		}
 		const chunks = chunksForFile(absPath, this.options.cwd);
-		const ids: number[] = [];
-		for (const part of chunks) {
-			const id = await this.put("project", part.embed, part.stored);
-			if (id != null) ids.push(id);
-		}
+		const ids = await this.putChunks(
+			"project",
+			chunks.map((part) => ({ embed: part.embed, stored: part.stored })),
+		);
 		manifest.files[key] = {
 			mtimeMs,
 			size,
@@ -436,14 +529,62 @@ export class MemoryManager {
 	}
 
 	private async put(layer: MemoryLayer, embed: string, stored: string): Promise<number | undefined> {
+		const ids = await this.putChunks(layer, [{ embed, stored }]);
+		return ids[0];
+	}
+
+	/**
+	 * Embed rows, then one LogosDB putBatch (one WAL fsync). A single row uses put.
+	 * Hybrid rank and the namespace store stay the MCP helpers.
+	 */
+	private async putChunks(layer: MemoryLayer, rows: { embed: string; stored: string }[]): Promise<number[]> {
+		if (rows.length === 0) return [];
 		const db = this.open(layer);
-		if (!db) return undefined;
-		const vector = await this.embed(embed);
-		if (vector.length !== this.options.embedder.dim) return undefined;
+		if (!db) return [];
+		const vectors: number[][] = [];
+		const texts: string[] = [];
+		for (const row of rows) {
+			const vector = await this.embed(row.embed);
+			if (vector.length !== this.options.embedder.dim) continue;
+			vectors.push(vector);
+			texts.push(row.stored);
+		}
+		if (vectors.length === 0) return [];
+		const dim = this.options.embedder.dim;
+		const stamp = new Date().toISOString();
+		if (vectors.length === 1 || !(db instanceof DB)) {
+			const ids: number[] = [];
+			for (let i = 0; i < vectors.length; i++) {
+				try {
+					ids.push(db.put(vectors[i] ?? [], texts[i] ?? "", stamp));
+				} catch {
+					// row skipped
+				}
+			}
+			return ids;
+		}
+		const flat = new Array<number>(vectors.length * dim);
+		for (let i = 0; i < vectors.length; i++) {
+			const vector = vectors[i] ?? [];
+			for (let j = 0; j < dim; j++) flat[i * dim + j] = vector[j] ?? 0;
+		}
 		try {
-			return db.put(vector, stored, new Date().toISOString());
+			return db.putBatch(
+				flat,
+				vectors.length,
+				texts,
+				vectors.map(() => stamp),
+			);
 		} catch {
-			return undefined;
+			const ids: number[] = [];
+			for (let i = 0; i < vectors.length; i++) {
+				try {
+					ids.push(db.put(vectors[i] ?? [], texts[i] ?? "", stamp));
+				} catch {
+					// row skipped
+				}
+			}
+			return ids;
 		}
 	}
 

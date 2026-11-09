@@ -281,6 +281,30 @@ describe("index paths", () => {
 	});
 });
 
+describe("cross-file link recall", () => {
+	it("surfaces an imported neighbor at a lower score without a second kNN", async () => {
+		const cwd = project("links");
+		mkdirSync(join(cwd, "src"));
+		writeFileSync(join(cwd, "src", "b.ts"), "export function secretNeighborPhrase() {\n  return 1;\n}\n");
+		writeFileSync(
+			join(cwd, "src", "a.ts"),
+			'import { secretNeighborPhrase } from "./b";\nexport function primaryAnchor() {\n  return secretNeighborPhrase();\n}\n',
+		);
+		const mem = manager(cwd, "s", fakeEmbedder(), { topK: 3 });
+		await mem.indexFile(join(cwd, "src", "b.ts"));
+		await mem.indexFile(join(cwd, "src", "a.ts"));
+		const hits = await mem.recall("primaryAnchor");
+		const primary = hits.find((hit) => hit.text.includes("function primaryAnchor"));
+		const neighbor = hits.find((hit) => hit.text.includes("function secretNeighborPhrase"));
+		expect(primary).toBeTruthy();
+		expect(neighbor).toBeTruthy();
+		if (primary && neighbor) {
+			expect(neighbor.score).toBeLessThan(primary.score);
+		}
+		mem.close();
+	});
+});
+
 describe("lesson layer collapse", () => {
 	it("keeps the global copy when session and project repeat the same key", () => {
 		const hits: MemoryHit[] = [

@@ -29,7 +29,8 @@ describe("hierarchical chunks", () => {
 
 		const classParent = hierarchical.find((c) => c.isParent && c.kind === "class");
 		expect(classParent).toBeTruthy();
-		expect(classParent?.chunkId).toContain("AuthService");
+		expect(classParent?.chunkId).toMatch(/^src\/auth\.ts:/);
+		expect(classParent?.signature ?? classParent?.text).toContain("AuthService");
 
 		const loginLeaf = hierarchical.find((c) => !c.isParent && c.text.includes("login"));
 		expect(loginLeaf).toBeTruthy();

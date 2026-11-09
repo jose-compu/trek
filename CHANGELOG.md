@@ -6,6 +6,11 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Changed
+
+- Recall of an indexed file also returns one-hop import, test, and doc neighbors via LogosDB get-by-id (`logosdb-mcp-server` 1.4.0).
+- `open-pr` and `address-review` include `commit-on-branch`. Split-epic and split-release DAGs fan out through `open-issue`.
+
 ## [0.20.0-rc.1] - 2026-11-09
 
 ### Changed

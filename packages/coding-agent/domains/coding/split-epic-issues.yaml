@@ -1,7 +1,7 @@
 name: split-epic-issues
 description: |
-  Split one epic into child issues with Done when acceptance criteria. Use the
-  detected host CLI.
+  Split one epic into child issues with Done when acceptance criteria. Fan out
+  each drafted issue through open-issue. Use the detected host CLI.
 nodes:
   - id: detect-host
     include: _detect-host
@@ -17,9 +17,8 @@ nodes:
     allowed_tools: []
     output_type: findings
     prompt: |
-      List the child issues under this epic. Each issue has a title, body, and
-      Done when section with acceptance criteria. One issue per discrete task. Do
-      not file yet.
+      List the child issues under this epic as a JSON array. Each item has title,
+      body, and done_when. One issue per discrete task. Do not file yet.
     depends_on: [identify-epic]
   - id: select-labels
     trigger_rule: all_success
@@ -29,12 +28,10 @@ nodes:
       Suggest labels for each issue from $draft-issues.output. Common labels: bug,
       enhancement, documentation, good-first-issue. One line per issue.
     depends_on: [draft-issues]
-  - id: file-issues-command
-    trigger_rule: all_success
-    allowed_tools: []
-    output_type: findings
-    prompt: |
-      State the commands to file the issues from $draft-issues.output with labels
-      from $select-labels.output, linked to the epic from $identify-epic.output,
-      using the host CLI from $detect-host.output. Do not run them.
+  - id: file-issues
+    fan_out:
+      items: $draft-issues.output
+      workflow: open-issue
+      max_parallel: 3
+      join: all_success
     depends_on: [select-labels]

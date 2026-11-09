@@ -1,5 +1,5 @@
 /**
- * Situating headers from logosdb-mcp-server 1.3.0.
+ * Situating headers from logosdb-mcp-server 1.4.0.
  * The embedder sees the header. The stored row keeps the raw body.
  */
 

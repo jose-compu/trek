@@ -1,7 +1,7 @@
 name: open-pr
 description: |
   Push the branch upstream and open a pull request or merge request. Include a
-  summary and test plan. Do not merge.
+  summary and test plan. Compose commit-on-branch and Belay. Do not merge.
 nodes:
   - id: verify-branch
     allowed_tools: []
@@ -9,6 +9,10 @@ nodes:
     prompt: |
       State the current branch name. Verify it is not main or master. If it is,
       state that PRs cannot be opened from the main branch.
+  - id: commit
+    include: commit-on-branch
+    returns: $commit.stage-and-commit.output
+    depends_on: [verify-branch]
   - id: push-upstream
     trigger_rule: all_success
     allowed_tools: []
@@ -16,7 +20,7 @@ nodes:
     prompt: |
       State the command to push the branch upstream with tracking. Do not run it.
       The command is `git push -u origin <branch-name>`.
-    depends_on: [verify-branch]
+    depends_on: [commit]
   - id: draft-pr-body
     trigger_rule: all_success
     allowed_tools: []

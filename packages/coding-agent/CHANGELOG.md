@@ -4,6 +4,11 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Changed
+
+- Recall of an indexed file also returns one-hop import, test, and doc neighbors via LogosDB get-by-id.
+- `open-pr` and `address-review` include `commit-on-branch`. Split-epic and split-release DAGs fan out through `open-issue`.
+
 ## [0.19.9] - 2026-11-09
 
 ### Changed

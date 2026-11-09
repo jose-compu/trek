@@ -110,13 +110,59 @@ describe("multi-workflow catalog", () => {
 			expect(workflow.workflow.name).toBe(workflow.name);
 			expect(workflow.workflow.nodes.length).toBeGreaterThan(0);
 			for (const node of workflow.workflow.nodes) {
-				expect(["prompt", "include"]).toContain(node.kind);
+				expect(["prompt", "include", "fan_out", "loop", "loop_group", "command", "bash", "script"]).toContain(
+					node.kind,
+				);
 				if (node.kind === "prompt") {
 					expect(node.allowedTools).toEqual([]);
 					expect(node.outputType).toBe("findings");
 				}
 			}
 		}
+	});
+
+	test("open-pr includes commit-on-branch and belay-pr", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-open-pr-compose-"));
+		const catalog = loadDomainCatalog(cwd);
+		const coding = catalog.domains.find((domain) => domain.id === "coding");
+		const openPr = coding?.workflows?.find((workflow) => workflow.name === "open-pr");
+		const includes = openPr?.workflow.nodes
+			.filter((node) => node.kind === "include")
+			.map((node) => node.include?.workflow);
+		expect(includes).toContain("commit-on-branch");
+		expect(includes).toContain("belay-pr");
+		expect(includes).toContain("_detect-host");
+	});
+
+	test("address-review includes commit-on-branch", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-address-compose-"));
+		const catalog = loadDomainCatalog(cwd);
+		const coding = catalog.domains.find((domain) => domain.id === "coding");
+		const address = coding?.workflows?.find((workflow) => workflow.name === "address-review");
+		const commit = address?.workflow.nodes.find((node) => node.id === "commit");
+		expect(commit?.kind).toBe("include");
+		expect(commit?.include?.workflow).toBe("commit-on-branch");
+	});
+
+	test("split workflows fan_out through open-issue", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-split-fanout-"));
+		const catalog = loadDomainCatalog(cwd);
+		const coding = catalog.domains.find((domain) => domain.id === "coding");
+		const splitIssues = coding?.workflows?.find((workflow) => workflow.name === "split-epic-issues");
+		const splitRelease = coding?.workflows?.find((workflow) => workflow.name === "split-release-epics");
+		const issueFan = splitIssues?.workflow.nodes.find((node) => node.kind === "fan_out");
+		const releaseFan = splitRelease?.workflow.nodes.find((node) => node.kind === "fan_out");
+		expect(issueFan?.fanOut).toMatchObject({
+			items: "$draft-issues.output",
+			workflow: "open-issue",
+			join: "all_success",
+		});
+		expect(releaseFan?.fanOut).toMatchObject({
+			items: "$draft-child-epics.output",
+			workflow: "open-issue",
+			join: "all_success",
+		});
+		expect(splitRelease?.workflow.nodes.some((node) => node.include?.workflow === "open-issue")).toBe(true);
 	});
 
 	test("commit-on-branch workflow refuses AI co-author trailers", () => {
