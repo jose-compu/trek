@@ -75,6 +75,8 @@ describe("long task pin", () => {
 		expect(looksLikeLongTaskDone("There is nothing left to create, attach, branch, or open for that ask.")).toBe(
 			true,
 		);
+		expect(looksLikeLongTaskDone("Verifying nothing remains for the original request.")).toBe(true);
+		expect(looksLikeLongTaskDone("CI is not blocked on the adapter.")).toBe(false);
 		expect(
 			shouldResumeLongTask({
 				pinned: true,

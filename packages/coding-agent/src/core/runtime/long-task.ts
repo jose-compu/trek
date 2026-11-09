@@ -17,7 +17,7 @@ const PARTIAL =
 	/\b(?:next:|will keep|remaining|milestone|progress is ongoing|started v\d|bumped versions|preparing the release|next milestone|pushed\.?$)\b/i;
 
 const DONE =
-	/\b(?:all (?:requested |remaining )?work is (?:done|complete)|the (?:task|release|original request) is (?:already |fully )?(?:done|complete|shipped|satisfied)|original request is (?:already |fully )?(?:done|complete|satisfied)|v\d+(?:\.\d+)* is (?:complete|released|shipped)|release published|nothing left to (?:do|run|create|attach|open)|there is nothing left|no (?:further|remaining) (?:work|steps)|no further work applies|fully satisfied|blocked(?:\s+on|\s*:)|need you to|waiting for (?:you|input|(?:the )?maintainer)|ready for (?:the )?maintainer|cannot continue|operation aborted)\b/i;
+	/\b(?:all (?:requested |remaining )?work is (?:done|complete)|the (?:task|release|original request) is (?:already |fully )?(?:done|complete|shipped|satisfied)|original request is (?:already |fully )?(?:done|complete|satisfied)|v\d+(?:\.\d+)* is (?:complete|released|shipped)|release published|nothing (?:left to (?:do|run|create|attach|open)|remains)|there is nothing left|no (?:further|remaining) (?:work|steps)|no further work applies|fully satisfied|(?<!not )blocked(?:\s+on|\s*:)|need you to|waiting for (?:you|input|(?:the )?maintainer)|ready for (?:the )?maintainer|cannot continue|operation aborted)\b/i;
 
 const CONTROL_ECHO = /\becho\s+['"`]?\{(?:\\.|[^}'"`]){0,240}"(?:escalate|descalate|action)"/i;
 
