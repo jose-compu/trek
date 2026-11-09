@@ -49,17 +49,44 @@ export class UserMessageComponent extends Container {
 	}
 }
 
+function normalizeUserPrompt(text: string): string {
+	return text
+		.replace(/^\uFEFF/, "")
+		.replace(/\r\n/g, "\n")
+		.trim();
+}
+
+/** Long-task / layering resume text. Never paint as a grey user card. */
 export function isQuietContinuePrompt(text: string): boolean {
-	return text.startsWith("Continue the layering task.") || text.startsWith("Continue the same task until it is done.");
+	const body = normalizeUserPrompt(text);
+	if (!body) {
+		return false;
+	}
+	if (body.startsWith("Continue the layering task.") || body.startsWith("Continue the same task until it is done.")) {
+		return true;
+	}
+	if (
+		body.includes("Continue the same task until it is done.") &&
+		(body.includes("Original request:") || body.includes("Do not emit new_topic."))
+	) {
+		return true;
+	}
+	return body.includes("Continue the layering task.") && body.includes("User turn:");
 }
 
 export function quietArchonLabel(text: string): string | undefined {
+	const body = normalizeUserPrompt(text);
 	if (isQuietContinuePrompt(text)) {
 		return "· continue";
 	}
-	if (!text.startsWith("Answer only this Archon node.") && !text.startsWith("Answer this step only.")) {
+	const archon =
+		body.startsWith("Answer only this Archon node.") ||
+		body.startsWith("Answer this step only.") ||
+		body.includes("\nAnswer only this Archon node.") ||
+		body.includes("\nAnswer this step only.");
+	if (!archon) {
 		return undefined;
 	}
-	const id = text.match(STEP_ID)?.[1];
+	const id = body.match(STEP_ID)?.[1];
 	return id ? `· ${id}` : "· step";
 }

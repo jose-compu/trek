@@ -6,6 +6,10 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Changed
+
+- GitHub CI and Lacan Scan run once daily at 05:00 UTC (06:00 CET), and only if `main` moved in the last 24 hours. Husky pre-commit runs check + tests; pre-push runs the build. Daily CI uses `./test.sh` like the local gate.
+
 ## [0.19.5] - 2026-11-09
 
 ### Fixed

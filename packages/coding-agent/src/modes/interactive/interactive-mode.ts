@@ -1894,6 +1894,9 @@ export class InteractiveMode {
 	/** Put the submitted prompt in the transcript before lesson writes and the model call. */
 	private showSubmittedPrompt(text: string): void {
 		this.discardEarlyPrompt();
+		if (isQuietContinuePrompt(text) || quietArchonLabel(text)) {
+			return;
+		}
 		const spacer = this.chatContainer.children.length > 0 ? new Spacer(1) : undefined;
 		if (spacer) this.chatContainer.addChild(spacer);
 		const component = new UserMessageComponent(text, this.getMarkdownThemeWithSettings());
@@ -3109,7 +3112,7 @@ export class InteractiveMode {
 					this.ui.requestRender();
 				} else if (event.message.role === "user") {
 					const userText = this.getUserMessageText(event.message);
-					if (isQuietContinuePrompt(userText)) {
+					if (isQuietContinuePrompt(userText) || quietArchonLabel(userText) === "· continue") {
 						this.updatePendingMessagesDisplay();
 						this.ui.requestRender();
 						break;
@@ -3501,6 +3504,9 @@ export class InteractiveMode {
 			}
 			case "user": {
 				const textContent = this.getUserMessageText(message);
+				if (isQuietContinuePrompt(textContent)) {
+					break;
+				}
 				if (textContent) {
 					if (this.chatContainer.children.length > 0 && !quietArchonLabel(textContent)) {
 						this.chatContainer.addChild(new Spacer(1));
@@ -4233,13 +4239,16 @@ export class InteractiveMode {
 	private updatePendingMessagesDisplay(): void {
 		this.pendingMessagesContainer.clear();
 		const { steering: steeringMessages, followUp: followUpMessages } = this.getAllQueuedMessages();
-		if (steeringMessages.length > 0 || followUpMessages.length > 0) {
+		const hidden = (message: string) => isQuietContinuePrompt(message) || Boolean(quietArchonLabel(message));
+		const steering = steeringMessages.filter((message) => !hidden(message));
+		const followUp = followUpMessages.filter((message) => !hidden(message));
+		if (steering.length > 0 || followUp.length > 0) {
 			this.pendingMessagesContainer.addChild(new Spacer(1));
-			for (const message of steeringMessages) {
+			for (const message of steering) {
 				const text = theme.fg("dim", `Steering: ${message}`);
 				this.pendingMessagesContainer.addChild(new TruncatedText(text, 1, 0));
 			}
-			for (const message of followUpMessages) {
+			for (const message of followUp) {
 				const text = theme.fg("dim", `Follow-up: ${message}`);
 				this.pendingMessagesContainer.addChild(new TruncatedText(text, 1, 0));
 			}

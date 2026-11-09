@@ -26,7 +26,7 @@
 ## Commands
 
 - After code changes (not docs): `npm run check` (full output, no tail). Fix all errors, warnings, and infos before committing. Does not run tests.
-- Before every commit (code or tests, not docs-only): run the **full** test suite from the repo root and wait for it to finish. Do not commit if it fails. Prefer `./test.sh` (same workspace tests as `npm test`, but unsets API keys / auth so live e2e stays skipped). `npm test` is acceptable when matching CI and no provider keys are set. Show the full output; do not tail or hide failures.
+- Before every commit (code or tests, not docs-only): run the **full** test suite from the repo root and wait for it to finish. Do not commit if it fails. Prefer `./test.sh` (same workspace tests as `npm test`, but unsets API keys / auth so live e2e stays skipped). `npm test` is acceptable when matching CI and no provider keys are set. Show the full output; do not tail or hide failures. The Husky pre-commit hook runs check + `./test.sh`; pre-push runs `npm run build`. GitHub `CI` / Lacan Scan run once daily at 05:00 UTC, and only if `main` moved in the last 24 hours. Daily CI uses `./test.sh`.
 - Never run `npm run build` unless requested by the user.
 - Never run a package vitest suite as a substitute for the full root run before commit. During iteration, targeted tests from the package root are fine: `node ../../node_modules/vitest/dist/cli.js --run test/specific.test.ts`.
 - If you create or modify a test file, run it and iterate on test or implementation until it passes. Then still run the full suite before committing.

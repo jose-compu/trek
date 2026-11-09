@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# Local stand-in for the GitHub CI build job (CI itself is daily at 06:00 CET).
+echo "Running build before push..."
+npm run build
+if [ $? -ne 0 ]; then
+  echo "Build failed. Fix it before pushing."
+  exit 1
+fi

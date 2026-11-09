@@ -1,17 +1,50 @@
 name: CI
 
+# Local Husky hooks (check + tests on commit, build on push) replace per-PR CI.
+# This job runs once a day at 05:00 UTC, and only if main moved in the last 24h.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  schedule:
+    - cron: "0 5 * * *" # 05:00 UTC (06:00 CET / 07:00 CEST)
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-daily
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
+  recent-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || 'refs/heads/main' }}
+
+      - name: Run only after commits in the last 24 hours
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git log --since="24 hours ago" --pretty=%H | grep -q .; then
+            echo "Commits in the last 24 hours:"
+            git log --since="24 hours ago" --oneline
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No commits on main in the last 24 hours; skipping CI."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build-check-test:
+    needs: recent-changes
+    if: needs.recent-changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -42,4 +75,4 @@ jobs:
         run: npm run check
 
       - name: Test
-        run: npm test
+        run: ./test.sh
