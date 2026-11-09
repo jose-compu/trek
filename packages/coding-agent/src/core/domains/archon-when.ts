@@ -2,14 +2,21 @@
  * Archon `when:` and `trigger_rule` (subset of https://archon.diy/reference/workflow-language/).
  */
 
-export type ArchonTriggerRule = "all_success" | "any_success" | "all_done" | "none_failed_min_one_success";
+export type ArchonTriggerRule = "all_success" | "any_success" | "all_done" | "none_failed_min_one_success" | "one_success";
 
 export type NodeRunStatus = "ok" | "skipped" | "failed";
 
-export const ARCHON_TRIGGER_RULES = ["all_success", "any_success", "all_done", "none_failed_min_one_success"] as const;
+export const ARCHON_TRIGGER_RULES = ["all_success", "any_success", "all_done", "none_failed_min_one_success", "one_success"] as const;
 
 export function isArchonTriggerRule(value: string): value is ArchonTriggerRule {
 	return (ARCHON_TRIGGER_RULES as readonly string[]).includes(value);
+}
+
+export function normalizeTriggerRule(rule: ArchonTriggerRule | undefined): ArchonTriggerRule {
+	if (rule === "one_success") {
+		return "any_success";
+	}
+	return rule ?? "all_success";
 }
 
 export function shouldRunByTrigger(
@@ -21,11 +28,14 @@ export function shouldRunByTrigger(
 		return true;
 	}
 	const states = deps.map((id) => statuses.get(id) ?? "failed");
-	const resolved = rule ?? "all_success";
+	const resolved = normalizeTriggerRule(rule);
 	if (resolved === "all_done") {
 		return true;
 	}
-	if (resolved === "any_success" || resolved === "none_failed_min_one_success") {
+	if (resolved === "any_success") {
+		return states.some((state) => state === "ok");
+	}
+	if (resolved === "none_failed_min_one_success") {
 		return states.some((state) => state === "ok") && !states.some((state) => state === "failed");
 	}
 	return states.every((state) => state === "ok");
