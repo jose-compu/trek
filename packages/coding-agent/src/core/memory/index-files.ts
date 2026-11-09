@@ -14,6 +14,7 @@ import {
 	maybePushLocalGitignore,
 } from "logosdb-mcp-server/dist/gitignore-walker.js";
 import { annotateFile } from "./annotate.ts";
+import { generateCaption } from "./caption-generator.ts";
 import { generateHierarchy } from "./hierarchy.ts";
 import { filterChunks } from "./quality-filters.ts";
 import { chunkByStructure } from "./structure-chunker.ts";
@@ -78,6 +79,16 @@ export function chunksForFile(absPath: string, cwd: string): IndexedChunk[] {
 	const hierarchical = generateHierarchy(parts, relPath);
 	const filtered = filterChunks(hierarchical, relPath);
 	return filtered.map((part, index) => {
+		const caption = generateCaption(
+			{
+				text: part.text,
+				lineStart: part.lineStart,
+				lineEnd: part.lineEnd,
+				signature: part.signature,
+				kind: part.kind,
+			},
+			relPath,
+		);
 		const legacyChunk = {
 			text: part.text,
 			offset: 0,
@@ -85,7 +96,7 @@ export function chunksForFile(absPath: string, cwd: string): IndexedChunk[] {
 			lineEnd: part.lineEnd,
 			heading: part.signature || part.parentContext,
 		};
-		const row = annotateFile(relPath, legacyChunk, index, filtered.length);
+		const row = annotateFile(relPath, legacyChunk, index, filtered.length, caption);
 		return {
 			embed: row.embed,
 			stored: `${row.stored}\n[chunk-id:${part.chunkId}]${part.parentId ? `[parent-id:${part.parentId}]` : ""}${part.isParent ? "[is-parent:true]" : ""}`,
