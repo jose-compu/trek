@@ -2190,6 +2190,26 @@ export class AgentSession {
 		return Boolean(message?.content.some((part) => part.type === "toolCall"));
 	}
 
+	/** True when a control-noise resume would not change floor or display. */
+	private _longTaskResumeWouldNoop(assistantText: string): boolean {
+		const route = classifyLongTaskResume(assistantText);
+		const floor = this._ladderRole ?? this._lastHierarchyRole;
+		const display = this._hierarchyDisplayRole;
+		if (route.kind === "stay") {
+			return true;
+		}
+		if (route.kind === "climb") {
+			return route.requested !== "next" && floor === route.requested;
+		}
+		if (route.kind === "delegate") {
+			return display === "tooling" || this._turnLayerAction === "delegate";
+		}
+		if (route.kind === "drop") {
+			return floor === "workhorse" || !floor;
+		}
+		return true;
+	}
+
 	/** Keep Working... until the long-task pin will not inject another slice. */
 	private _willContinueLongTaskAfterAgentEnd(event: Extract<AgentEvent, { type: "agent_end" }>): boolean {
 		const pin = this._longTask;
@@ -2197,15 +2217,24 @@ export class AgentSession {
 			return false;
 		}
 		const assistant = this._assistantFromAgentEnd(event);
-		return shouldResumeLongTask({
-			pinned: true,
-			assistantText: this._assistantText(assistant),
-			queued: this.agent.hasQueuedMessages(),
-			stopReason: assistant?.stopReason,
-			hold: this._longTaskHold > 0 || this._muteThinking,
-			usedTools: this._assistantUsedTools(assistant),
-			idleWrapUps: pin.idleWrapUps,
-		});
+		const assistantText = this._assistantText(assistant);
+		if (
+			!shouldResumeLongTask({
+				pinned: true,
+				assistantText,
+				queued: this.agent.hasQueuedMessages(),
+				stopReason: assistant?.stopReason,
+				hold: this._longTaskHold > 0 || this._muteThinking,
+				usedTools: this._assistantUsedTools(assistant),
+				idleWrapUps: pin.idleWrapUps,
+			})
+		) {
+			return false;
+		}
+		if (!looksLikeLongTaskControlNoise(assistantText)) {
+			return true;
+		}
+		return !this._longTaskResumeWouldNoop(assistantText);
 	}
 
 	/** Extract text content from a message */
@@ -5119,17 +5148,11 @@ export class AgentSession {
 		if (!pin) {
 			return false;
 		}
-		const floorBefore = this._ladderRole ?? this._lastHierarchyRole;
-		const displayBefore = this._hierarchyDisplayRole;
 		const noise = looksLikeLongTaskControlNoise(assistantText);
-		await this._applyLongTaskResume(assistantText);
-		if (noise) {
-			const floorAfter = this._ladderRole ?? this._lastHierarchyRole;
-			const displayAfter = this._hierarchyDisplayRole;
-			if (floorBefore === floorAfter && displayBefore === displayAfter) {
-				return false;
-			}
+		if (noise && this._longTaskResumeWouldNoop(assistantText)) {
+			return false;
 		}
+		await this._applyLongTaskResume(assistantText);
 		if (looksLikeSubtaskWrapUp(assistantText) && !usedTools) {
 			pin.idleWrapUps += 1;
 		} else {
