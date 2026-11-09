@@ -365,20 +365,23 @@ export class MemoryManager {
 
 	async indexProject(): Promise<void> {
 		if (!this.live() || !this.projectEnabled() || !isIndexableProject(this.options.cwd)) return;
-		await this.enqueue(async () => {
-			const lists = loadIndexPaths(this.options.cwd);
-			for (const file of listProjectFiles(this.options.cwd)) {
-				await this.indexOne(file, false);
-			}
-			for (const extra of lists.include) {
-				const resolved = resolveProjectPath(this.options.cwd, extra);
-				if ("error" in resolved) continue;
-				for (const file of filesAt(this.options.cwd, resolved.abs)) {
-					await this.indexOne(file, false);
-				}
-			}
-			await this.deleteCovered(lists);
-		});
+		const lists = loadIndexPaths(this.options.cwd);
+		const files = new Set(listProjectFiles(this.options.cwd));
+		for (const extra of lists.include) {
+			const resolved = resolveProjectPath(this.options.cwd, extra);
+			if ("error" in resolved) continue;
+			for (const file of filesAt(this.options.cwd, resolved.abs)) files.add(file);
+		}
+		// One queued file at a time, then yield, so a write can index before the rest of the tree.
+		for (const file of files) {
+			await this.enqueue(() => this.indexOne(file, false));
+			await this.yieldLoop();
+		}
+		await this.enqueue(() => this.deleteCovered(lists));
+	}
+
+	private yieldLoop(): Promise<void> {
+		return new Promise((resolve) => setImmediate(resolve));
 	}
 
 	async indexFile(absPath: string): Promise<void> {
@@ -510,11 +513,10 @@ export class MemoryManager {
 			}
 		}
 		const chunks = chunksForFile(absPath, this.options.cwd);
-		const ids: number[] = [];
-		for (const part of chunks) {
-			const id = await this.put("project", part.embed, part.stored);
-			if (id != null) ids.push(id);
-		}
+		const ids = await this.putChunks(
+			"project",
+			chunks.map((part) => ({ embed: part.embed, stored: part.stored })),
+		);
 		manifest.files[key] = {
 			mtimeMs,
 			size,
@@ -527,14 +529,62 @@ export class MemoryManager {
 	}
 
 	private async put(layer: MemoryLayer, embed: string, stored: string): Promise<number | undefined> {
+		const ids = await this.putChunks(layer, [{ embed, stored }]);
+		return ids[0];
+	}
+
+	/**
+	 * Embed rows, then one LogosDB putBatch (one WAL fsync). A single row uses put.
+	 * Hybrid rank and the namespace store stay the MCP helpers.
+	 */
+	private async putChunks(layer: MemoryLayer, rows: { embed: string; stored: string }[]): Promise<number[]> {
+		if (rows.length === 0) return [];
 		const db = this.open(layer);
-		if (!db) return undefined;
-		const vector = await this.embed(embed);
-		if (vector.length !== this.options.embedder.dim) return undefined;
+		if (!db) return [];
+		const vectors: number[][] = [];
+		const texts: string[] = [];
+		for (const row of rows) {
+			const vector = await this.embed(row.embed);
+			if (vector.length !== this.options.embedder.dim) continue;
+			vectors.push(vector);
+			texts.push(row.stored);
+		}
+		if (vectors.length === 0) return [];
+		const dim = this.options.embedder.dim;
+		const stamp = new Date().toISOString();
+		if (vectors.length === 1 || !(db instanceof DB)) {
+			const ids: number[] = [];
+			for (let i = 0; i < vectors.length; i++) {
+				try {
+					ids.push(db.put(vectors[i] ?? [], texts[i] ?? "", stamp));
+				} catch {
+					// row skipped
+				}
+			}
+			return ids;
+		}
+		const flat = new Array<number>(vectors.length * dim);
+		for (let i = 0; i < vectors.length; i++) {
+			const vector = vectors[i] ?? [];
+			for (let j = 0; j < dim; j++) flat[i * dim + j] = vector[j] ?? 0;
+		}
 		try {
-			return db.put(vector, stored, new Date().toISOString());
+			return db.putBatch(
+				flat,
+				vectors.length,
+				texts,
+				vectors.map(() => stamp),
+			);
 		} catch {
-			return undefined;
+			const ids: number[] = [];
+			for (let i = 0; i < vectors.length; i++) {
+				try {
+					ids.push(db.put(vectors[i] ?? [], texts[i] ?? "", stamp));
+				} catch {
+					// row skipped
+				}
+			}
+			return ids;
 		}
 	}
 
