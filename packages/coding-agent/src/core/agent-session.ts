@@ -176,6 +176,7 @@ import {
 	EffortRegulator,
 	effortActionKey,
 	effortLimitsFor,
+	effortToolSpendsBudget,
 	FileClaims,
 	formatLesson,
 	formatLessonNotice,
@@ -645,6 +646,9 @@ export class AgentSession {
 	private _effort = new EffortRegulator();
 	private _effortMode: EffortMode = "normal";
 	private _effortLimits: EffortLimits | undefined = effortLimitsFor("normal");
+	/** Nested spawn_branches / spawn_subtask. Spent budget applies only here (and costly spawn tools). */
+	private _effortSubtaskDepth = 0;
+	private _effortBudgetArmed = false;
 	/** Last tool error text. A new message is information, not a stall. */
 	private _lastEffortError: string | undefined;
 	/** Successful replacements in this prompt, so a later edit cannot put that text back. */
@@ -849,7 +853,8 @@ export class AgentSession {
 	 */
 	private _installAgentToolHooks(): void {
 		this.agent.shouldStopAfterTurn = () =>
-			this._effortLimits !== undefined && this._effort.stopReason() !== undefined;
+			this._effortLimits !== undefined &&
+			this._effort.stopReason({ applyCostBudget: this._effortBudgetArmed }) !== undefined;
 		this.agent.recordToolCalls = (toolCalls) => {
 			const calls = toolCalls.map((toolCall) => ({
 				id: toolCall.id,
@@ -1035,7 +1040,10 @@ export class AgentSession {
 		if (!this._effortLimits) {
 			return undefined;
 		}
-		this._effort.recordCost(1);
+		if (effortToolSpendsBudget(name, this._effortSubtaskDepth > 0)) {
+			this._effortBudgetArmed = true;
+			this._effort.recordCost(1);
+		}
 		const text = result.content
 			.filter((part) => part.type === "text" && typeof part.text === "string")
 			.map((part) => part.text)
@@ -1072,7 +1080,7 @@ export class AgentSession {
 		if (repeatedCommand) {
 			return "EffortRegulator stopped: same command failed.";
 		}
-		return this._effort.stopReason();
+		return this._effort.stopReason({ applyCostBudget: this._effortBudgetArmed });
 	}
 
 	// =========================================================================
@@ -1932,6 +1940,7 @@ export class AgentSession {
 		const onAbort = () => child.abort();
 		signal?.addEventListener("abort", onAbort);
 		this._branchAgents.add(child);
+		this._effortSubtaskDepth += 1;
 		try {
 			await child.prompt(branchPrompt(task, count));
 			const last = [...child.state.messages].reverse().find((message) => message.role === "assistant") as
@@ -1950,6 +1959,7 @@ export class AgentSession {
 			const message = error instanceof Error ? error.message : String(error);
 			return { id: task.id, description: task.description, summary: message, isError: true };
 		} finally {
+			this._effortSubtaskDepth = Math.max(0, this._effortSubtaskDepth - 1);
 			this._branchAgents.delete(child);
 			signal?.removeEventListener("abort", onAbort);
 		}
@@ -4281,7 +4291,10 @@ export class AgentSession {
 			thinking: correction ? undefined : (this._decisionThinking ?? this._thinkingPin),
 			action: correction ? undefined : this._turnLayerAction,
 			verifierDenied: correction ? false : this._verifierDeniedThisTurn,
-			budgetStopped: correction ? false : this._effort.stopReason()?.includes("spent budget") === true,
+			budgetStopped:
+				correction || !this._effortBudgetArmed
+					? false
+					: this._effort.stopReason({ applyCostBudget: true })?.includes("spent budget") === true,
 		});
 		return meta ? "meta" : fallback;
 	}
@@ -4871,6 +4884,7 @@ export class AgentSession {
 			this._bashFailCounts = new Map();
 			this._noChangeCount = 0;
 			this._sameErrorStreak = 0;
+			this._effortBudgetArmed = false;
 			if (this._effortLimits) {
 				this._effort.applyLimits(this._effortLimits);
 				this._effort.beginPrompt(this._effortLimits.costBudget);
