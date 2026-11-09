@@ -3,12 +3,22 @@
  * Each leaf has a parent summary chunk for contextual recall.
  */
 
+import { createHash } from "node:crypto";
 import type { StructureChunk } from "./structure-chunker.ts";
 
 export interface HierarchicalChunk extends StructureChunk {
 	chunkId: string;
 	parentId?: string;
 	isParent: boolean;
+}
+
+/**
+ * Generate stable content-hash based chunk ID (#222).
+ * Hash includes path and chunk text, so ID only changes when content changes.
+ */
+function generateChunkId(filePath: string, text: string): string {
+	const hash = createHash("sha256").update(`${filePath}:${text}`).digest("hex");
+	return `${filePath}:${hash.slice(0, 16)}`;
 }
 
 /**
@@ -27,9 +37,9 @@ export function generateHierarchy(chunks: StructureChunk[], filePath: string): H
 	}
 
 	// Fallback: each chunk is both leaf and parent
-	return chunks.map((chunk, index) => ({
+	return chunks.map((chunk) => ({
 		...chunk,
-		chunkId: `${filePath}:${index}`,
+		chunkId: generateChunkId(filePath, chunk.text),
 		isParent: false,
 	}));
 }
@@ -56,10 +66,10 @@ function generateCodeHierarchy(chunks: StructureChunk[], filePath: string): Hier
 
 		if (chunk.kind === "class") {
 			// Create parent summary for the class
-			const classId = `${filePath}:class:${chunk.signature || i}`;
+			const classId = generateChunkId(filePath, `class:${chunk.signature || ""}:${chunk.text}`);
 			const classParent: HierarchicalChunk = {
 				...chunk,
-				chunkId: `${classId}:parent`,
+				chunkId: classId,
 				isParent: true,
 			};
 			result.push(classParent);
@@ -76,8 +86,8 @@ function generateCodeHierarchy(chunks: StructureChunk[], filePath: string): Hier
 					lineEnd: chunk.lineStart + method.endOffset,
 					signature: method.signature,
 					kind: "function",
-					chunkId: `${classId}:method:${method.signature}:leaf`,
-					parentId: `${classId}:parent`,
+					chunkId: generateChunkId(filePath, method.text),
+					parentId: classId,
 					parentContext: `class ${chunk.signature}`,
 					isParent: false,
 				};
@@ -85,12 +95,13 @@ function generateCodeHierarchy(chunks: StructureChunk[], filePath: string): Hier
 			}
 		} else if (chunk.kind === "function") {
 			// File-level function
-			const fileParentId = `${filePath}:file:parent`;
+			const fileParentText = `// File: ${filePath.split("/").pop() || filePath}\n// Contains utility functions and exports`;
+			const fileParentId = generateChunkId(filePath, fileParentText);
 
 			// Create file-level parent if it doesn't exist
 			if (!result.some((r) => r.chunkId === fileParentId)) {
 				const fileParent: HierarchicalChunk = {
-					text: `// File: ${filePath.split("/").pop() || filePath}\n// Contains utility functions and exports`,
+					text: fileParentText,
 					lineStart: 1,
 					lineEnd: 1,
 					kind: "unknown",
@@ -103,7 +114,7 @@ function generateCodeHierarchy(chunks: StructureChunk[], filePath: string): Hier
 			// Create leaf chunk for function
 			const leaf: HierarchicalChunk = {
 				...chunk,
-				chunkId: `${filePath}:fn:${chunk.signature || i}:leaf`,
+				chunkId: generateChunkId(filePath, chunk.text),
 				parentId: fileParentId,
 				parentContext: `file ${filePath.split("/").pop() || filePath}`,
 				isParent: false,
@@ -113,7 +124,7 @@ function generateCodeHierarchy(chunks: StructureChunk[], filePath: string): Hier
 			// Other structures (types, etc.) are standalone
 			result.push({
 				...chunk,
-				chunkId: `${filePath}:${chunk.kind}:${i}`,
+				chunkId: generateChunkId(filePath, chunk.text),
 				isParent: false,
 			});
 		}
@@ -206,17 +217,18 @@ function generateMarkdownHierarchy(chunks: StructureChunk[], filePath: string): 
 
 			// Build breadcrumb from stack
 			const breadcrumb = headingStack.map((h) => h.text).join(" > ");
+			const parentText = breadcrumb.length > 0 ? `${breadcrumb} > ${text}` : text;
 
-			const headingId = `${filePath}:heading:${text}:${level}`;
+			const headingId = generateChunkId(filePath, `heading:${parentText}`);
 			headingStack.push({ level, text, id: headingId });
 
 			// Create parent chunk (the heading itself)
 			const parent: HierarchicalChunk = {
-				text: breadcrumb.length > 0 ? `${breadcrumb} > ${text}` : text,
+				text: parentText,
 				lineStart: chunk.lineStart,
 				lineEnd: chunk.lineStart,
 				kind: "heading",
-				chunkId: `${headingId}:parent`,
+				chunkId: headingId,
 				isParent: true,
 			};
 			result.push(parent);
@@ -229,32 +241,32 @@ function generateMarkdownHierarchy(chunks: StructureChunk[], filePath: string): 
 					lineStart: chunk.lineStart + 1,
 					lineEnd: chunk.lineEnd,
 					kind: "section",
-					chunkId: `${headingId}:leaf`,
-					parentId: `${headingId}:parent`,
-					parentContext: breadcrumb.length > 0 ? `${breadcrumb} > ${text}` : text,
+					chunkId: generateChunkId(filePath, contentLines),
+					parentId: headingId,
+					parentContext: parentText,
 					isParent: false,
 				};
 				result.push(leaf);
 			}
 		} else if (chunk.kind === "fence") {
 			// Fenced blocks are children of current heading
-			const parentId = headingStack.length > 0 ? `${headingStack[headingStack.length - 1]!.id}:parent` : undefined;
+			const parentId = headingStack.length > 0 ? headingStack[headingStack.length - 1]!.id : undefined;
 			const breadcrumb = headingStack.map((h) => h.text).join(" > ");
 
 			result.push({
 				...chunk,
-				chunkId: `${filePath}:fence:${i}`,
+				chunkId: generateChunkId(filePath, chunk.text),
 				parentId,
 				parentContext: breadcrumb,
 				isParent: false,
 			});
 		} else {
 			// Other content
-			const parentId = headingStack.length > 0 ? `${headingStack[headingStack.length - 1]!.id}:parent` : undefined;
+			const parentId = headingStack.length > 0 ? headingStack[headingStack.length - 1]!.id : undefined;
 
 			result.push({
 				...chunk,
-				chunkId: `${filePath}:section:${i}`,
+				chunkId: generateChunkId(filePath, chunk.text),
 				parentId,
 				isParent: false,
 			});
