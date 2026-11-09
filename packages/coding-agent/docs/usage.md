@@ -353,6 +353,6 @@ pi --exclude-tools ask_question
 
 Pi keeps the core small and pushes workflow-specific behavior into extensions, skills, prompt templates, and packages.
 
-It intentionally does not include built-in MCP, sub-agents, permission popups, plan mode, or to-dos. You can build or install those workflows as extensions or packages, or use external tools such as containers and tmux. Server-like bash (`python -m http.server`, vite, `npm start`) is left running after 8s so the agent is not blocked.
+It intentionally does not include built-in MCP, sub-agents, permission popups, plan mode, or to-dos. You can build or install those workflows as extensions or packages, or use external tools such as containers and tmux. Server-like bash (`python -m http.server`, vite, `npm start`) is left running after 8s so the agent is not blocked. Wait/poll bash (`sleep`, `gh pr checks --watch`, `gh run watch`) waits for exit up to 300s. An explicit `timeout` on any other non-server command also waits for exit.
 
 For the full rationale, read the [blog post](https://mariozechner.at/posts/2025-11-30-trek-coding-agent/).

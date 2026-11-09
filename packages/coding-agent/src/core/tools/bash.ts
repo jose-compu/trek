@@ -32,11 +32,16 @@ import { inspectBashCommand } from "./unix-guards.ts";
 
 const bashSchema = Type.Object({
 	command: Type.String({ description: "Bash command to execute" }),
-	timeout: Type.Optional(Type.Number({ description: "Timeout in seconds. Kills the process. Optional, no default." })),
+	timeout: Type.Optional(
+		Type.Number({
+			description:
+				"Timeout in seconds. Kills the process. Wait/poll commands (sleep, gh pr checks --watch, gh run watch) wait for exit up to this cap (default 300s) and are not backgrounded. Other commands cap at 120s. Optional.",
+		}),
+	),
 	block_until_ms: Type.Optional(
 		Type.Number({
 			description:
-				"Wait this many milliseconds then leave the process running and return. 0 waits for exit. Server-like commands (python -m http.server, vite, npm start, …) return after 1.5s and ignore timeout. Unlike timeout, the process is not killed.",
+				"Wait this many milliseconds then leave the process running and return. 0 waits for exit. An explicit timeout also waits for exit. Wait/poll commands wait for exit. Server-like commands (python -m http.server, vite, npm start, …) return after 1.5s and ignore timeout. Unlike timeout, the process is not killed.",
 		}),
 	),
 });
@@ -400,7 +405,7 @@ export function createBashToolDefinition(
 		name: "bash",
 		label: "bash",
 		reversibilityTier: "gated",
-		description: `Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). If truncated, full output is saved to a temp file. A still-running command returns after 8s and keeps running. Server-like commands (python -m http.server, vite, npm start) return after 1.5s, ignore timeout, and ignore block_until_ms: 0. They also return as soon as they print a listen/bind line. timeout kills other processes. Recipes: ${bashRecipeSuggestion()}.`,
+		description: `Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). If truncated, full output is saved to a temp file. A still-running command returns after 8s and keeps running unless it is a wait/poll (sleep, gh pr checks --watch, gh run watch) or timeout is set — those wait for exit until timeout kills them. Server-like commands (python -m http.server, vite, npm start) return after 1.5s, ignore timeout, and ignore block_until_ms: 0. They also return as soon as they print a listen/bind line. Prefer gh --watch over sleep loops. Recipes: ${bashRecipeSuggestion()}.`,
 		promptSnippet: "Execute bash commands (ls, grep, find, etc.)",
 		parameters: bashSchema,
 		async execute(
@@ -519,7 +524,7 @@ export function createBashToolDefinition(
 						onData: handleData,
 						signal,
 						timeout: resolveTimeoutSeconds(command, timeout),
-						blockUntilMs: resolveBlockUntilMs(command, block_until_ms),
+						blockUntilMs: resolveBlockUntilMs(command, block_until_ms, timeout),
 						env: spawnContext.env,
 					});
 					exitCode = result.exitCode;
