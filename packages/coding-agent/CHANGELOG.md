@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.19.4] - 2026-11-09
+
+### Fixed
+
+- A bash `echo` of layering control JSON is not executed or painted. The dim `→ workhorse ⇄ tooling` / climb line remains. Assistant text still strips that JSON.
+
 ## [0.19.3] - 2026-11-09
 
 ### Fixed

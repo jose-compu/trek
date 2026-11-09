@@ -412,6 +412,113 @@ export function stripEscalateSignal(text: string): string {
 	return next.replace(/\n{3,}/g, "\n\n").trim();
 }
 
+/**
+ * Weak models `echo` the control JSON instead of writing it in the assistant message.
+ * That bash card must stay off-screen; the dim climb/delegate line is enough.
+ */
+export function looksLikeLayeringControlEcho(command: string): boolean {
+	const statements = peelShellStatements(command);
+	if (statements.length === 0) {
+		return false;
+	}
+	let sawControlEcho = false;
+	for (const statement of statements) {
+		if (isEnvAssignment(statement)) {
+			continue;
+		}
+		if (isControlEchoStatement(statement)) {
+			sawControlEcho = true;
+			continue;
+		}
+		return false;
+	}
+	return sawControlEcho;
+}
+
+function peelShellStatements(command: string): string[] {
+	const out: string[] = [];
+	for (const line of command.split(/\n+/)) {
+		const trimmed = line.trim();
+		if (!trimmed || trimmed.startsWith("#")) {
+			continue;
+		}
+		const unwrapped = unwrapDashC(trimmed);
+		if (unwrapped !== trimmed) {
+			out.push(...peelShellStatements(unwrapped));
+			continue;
+		}
+		out.push(trimmed);
+	}
+	return out;
+}
+
+function unwrapDashC(command: string): string {
+	const match = command.match(/^(?:(?:ba)?sh|zsh|dash)(?:\s+-[abefhlx]+)*\s+(?:-[abefhlx]*c[abefhlx]*|--command)\s+/i);
+	if (!match) {
+		return command;
+	}
+	const rest = command.slice(match[0].length).trim();
+	const quote = rest[0];
+	if ((quote === "'" || quote === '"') && rest.length >= 2 && rest.endsWith(quote)) {
+		return rest.slice(1, -1);
+	}
+	return rest;
+}
+
+function isEnvAssignment(statement: string): boolean {
+	return /^(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=/.test(statement);
+}
+
+function isControlEchoStatement(statement: string): boolean {
+	if (!/^(?:echo|printf)\b/i.test(statement)) {
+		return false;
+	}
+	const payload = unwrapEchoPayload(statement);
+	if (!payload) {
+		return false;
+	}
+	return payloadLooksLikeControl(payload);
+}
+
+function payloadLooksLikeControl(payload: string): boolean {
+	const candidates = payload.includes('\\"') ? [payload, payload.replace(/\\"/g, '"')] : [payload];
+	for (const slice of candidates) {
+		if (isLayeringControl(tryJson(slice))) {
+			return true;
+		}
+		if (stripEscalateSignal(slice).length === 0 && /"(?:escalate|descalate|action|delegate|new_topic)"/.test(slice)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function unwrapEchoPayload(command: string): string | undefined {
+	const isPrintf = /^printf\b/i.test(command);
+	let rest = command.replace(/^(?:echo|printf)\s+(?:-[neE]+\s+)*/i, "").trim();
+	if (!rest) {
+		return undefined;
+	}
+	if (isPrintf) {
+		rest = rest.replace(/^(?:'[^']*'|"[^"]*"|\S+)\s+/, "").trim();
+		if (!rest) {
+			return undefined;
+		}
+	}
+	const quote = rest[0];
+	if (quote === "'" || quote === '"') {
+		if (rest.length < 2 || rest[rest.length - 1] !== quote) {
+			return undefined;
+		}
+		let inner = rest.slice(1, -1);
+		if (quote === '"') {
+			inner = inner.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+		}
+		return inner.trim();
+	}
+	return rest.trim();
+}
+
 function isLayeringControl(value: unknown): boolean {
 	if (!value || typeof value !== "object" || Array.isArray(value)) {
 		return false;

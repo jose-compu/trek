@@ -16,6 +16,7 @@ import {
 	untrackDetachedChildPid,
 } from "../../utils/shell.ts";
 import type { ToolDefinition, ToolRenderResultOptions } from "../extensions/types.ts";
+import { looksLikeLayeringControlEcho } from "../runtime/escalate.ts";
 import {
 	formatBackgroundedBash,
 	isServerReadyOutput,
@@ -425,6 +426,10 @@ export function createBashToolDefinition(
 			}
 			const guardedCommand = guard.action === "rewrite" ? guard.command : resolvedCommand;
 
+			if (looksLikeLayeringControlEcho(command) || looksLikeLayeringControlEcho(guardedCommand)) {
+				return { content: [{ type: "text", text: "" }], details: undefined };
+			}
+
 			// Dry-run: do not execute; report the command that would run.
 			if (isDryRun()) {
 				return {
@@ -573,6 +578,10 @@ export function createBashToolDefinition(
 				state.endedAt = undefined;
 			}
 			const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
+			if (looksLikeLayeringControlEcho(typeof args.command === "string" ? args.command : "")) {
+				text.setText("");
+				return text;
+			}
 			text.setText(formatBashCall(args, !context.expanded));
 			return text;
 		},

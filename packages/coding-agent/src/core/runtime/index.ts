@@ -81,6 +81,7 @@ export {
 	isToolArgumentValidationError,
 	type LadderRole,
 	ladderIndex,
+	looksLikeLayeringControlEcho,
 	nextLadderRole,
 	parseDelegateAsk,
 	parseDescalateAsk,

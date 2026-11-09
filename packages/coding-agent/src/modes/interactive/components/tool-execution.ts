@@ -1,5 +1,6 @@
 import { Box, type Component, Container, getCapabilities, Image, Spacer, Text, type TUI } from "@trek/tui";
 import type { ToolDefinition, ToolRenderContext } from "../../../core/extensions/types.ts";
+import { looksLikeLayeringControlEcho } from "../../../core/runtime/escalate.ts";
 import { createAllToolDefinitions, type ToolName } from "../../../core/tools/index.ts";
 import { getTextOutput as getRenderedTextOutput } from "../../../core/tools/render-utils.ts";
 import { convertToPng } from "../../../utils/image-convert.ts";
@@ -266,6 +267,16 @@ export class ToolExecutionComponent extends Container {
 	}
 
 	private updateDisplay(): void {
+		if (
+			this.toolName === "bash" &&
+			looksLikeLayeringControlEcho(typeof this.args?.command === "string" ? this.args.command : "")
+		) {
+			this.hideComponent = true;
+			this.contentBox.clear();
+			this.selfRenderContainer.clear();
+			this.contentText.setText("");
+			return;
+		}
 		const bgFn = this.isPartial
 			? (text: string) => theme.bg("toolPendingBg", text)
 			: this.result?.isError
