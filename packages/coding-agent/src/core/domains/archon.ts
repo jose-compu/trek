@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { parse } from "yaml";
 import { type ArchonTriggerRule, isArchonTriggerRule } from "./archon-when.ts";
 
-export const ARCHON_NODE_KINDS = ["prompt", "command", "bash", "script", "loop", "include"] as const;
+export const ARCHON_NODE_KINDS = ["prompt", "command", "bash", "script", "loop", "include", "fan_out", "loop_group"] as const;
 export type ArchonNodeKind = (typeof ARCHON_NODE_KINDS)[number];
 
 export const ARCHON_NODE_ROLES = ["workhorse", "planning", "frontier", "tooling"] as const;
@@ -18,6 +18,8 @@ export type ArchonContext = (typeof ARCHON_CONTEXTS)[number] | { resume: string 
 
 export const ARCHON_EFFORTS = ["minimal", "low", "medium", "high"] as const;
 export type ArchonEffort = (typeof ARCHON_EFFORTS)[number];
+
+export type FanOutJoin = "all_done" | "all_success";
 
 export interface ArchonNode {
 	id: string;
@@ -33,10 +35,12 @@ export interface ArchonNode {
 	include?: { workflow: string; namespace?: string };
 	/** Archon `with:` for include nodes. Input parameters for the included workflow. */
 	with?: Record<string, string>;
-	/** Archon `inputs:` declaration for workflows that can be included. */
-	inputs?: string[];
 	/** Archon `returns:` for include nodes. Selects output from included workflow nodes. */
 	returns?: string;
+	/** Present when `kind` is `fan_out`. Reference to node whose output contains items array. */
+	fanOut?: { items: string; maxParallel: number; join: FanOutJoin; workflow?: string };
+	/** Present when `kind` is `loop_group`. Sealed sub-DAG per iteration. */
+	loopGroup?: { until?: string; untilBash?: string; maxIterations: number; nodes: ArchonNode[] };
 	/** Prompt nodes only. Default is the current layer role. */
 	role?: ArchonNodeRole;
 	/** Archon `when:`. Skip the node when false. */
@@ -122,7 +126,7 @@ function parseNode(value: unknown, index: number): ArchonNode {
 	const id = record.id.trim();
 	const present = presentKinds(record);
 	if (present.length !== 1) {
-		throw new Error(`node ${id} needs one of prompt, command, bash, script, loop, or include`);
+		throw new Error(`node ${id} needs one of prompt, command, bash, script, loop, include, fan_out, or loop_group`);
 	}
 	const kind = present[0];
 	const dependsOn = record.depends_on === undefined ? [] : stringList(record.depends_on, id);
@@ -157,6 +161,30 @@ function parseNode(value: unknown, index: number): ArchonNode {
 			include,
 			...(withParams ? { with: withParams } : {}),
 			...(returns ? { returns } : {}),
+			...extras,
+		};
+	}
+	if (kind === "fan_out") {
+		const fanOut = readFanOut(record.fan_out, id);
+		return {
+			id,
+			kind,
+			body: fanOut.workflow ?? "",
+			dependsOn,
+			allowedTools,
+			fanOut,
+			...extras,
+		};
+	}
+	if (kind === "loop_group") {
+		const loopGroup = readLoopGroup(record.loop_group, id);
+		return {
+			id,
+			kind,
+			body: "",
+			dependsOn,
+			allowedTools,
+			loopGroup,
 			...extras,
 		};
 	}
@@ -276,7 +304,7 @@ function presentKinds(record: Record<string, unknown>): ArchonNodeKind[] {
 	for (const kind of ARCHON_NODE_KINDS) {
 		const value = record[kind];
 		if (value === undefined) continue;
-		if (kind === "loop" || kind === "include") {
+		if (kind === "loop" || kind === "include" || kind === "fan_out" || kind === "loop_group") {
 			kinds.push(kind);
 			continue;
 		}
@@ -325,6 +353,36 @@ function readInclude(value: unknown, nodeId: string): { workflow: string; namesp
 	return result;
 }
 
+function readFanOut(
+	value: unknown,
+	nodeId: string,
+): { items: string; maxParallel: number; join: FanOutJoin; workflow?: string } {
+	if (!value || typeof value !== "object" || Array.isArray(value)) {
+		throw new Error(`node ${nodeId} fan_out must be an object with items, max_parallel, and join`);
+	}
+	const fanOut = value as Record<string, unknown>;
+	if (typeof fanOut.items !== "string" || fanOut.items.trim().length === 0) {
+		throw new Error(`node ${nodeId} fan_out.items is required`);
+	}
+	const maxParallel =
+		typeof fanOut.max_parallel === "number" && Number.isInteger(fanOut.max_parallel) && fanOut.max_parallel > 0
+			? fanOut.max_parallel
+			: 5;
+	if (fanOut.join !== undefined && fanOut.join !== "all_done" && fanOut.join !== "all_success") {
+		throw new Error(`node ${nodeId} fan_out.join must be all_done or all_success`);
+	}
+	const join: FanOutJoin = (fanOut.join as FanOutJoin) ?? "all_done";
+	const result: { items: string; maxParallel: number; join: FanOutJoin; workflow?: string } = {
+		items: fanOut.items.trim(),
+		maxParallel,
+		join,
+	};
+	if (typeof fanOut.workflow === "string" && fanOut.workflow.trim().length > 0) {
+		result.workflow = fanOut.workflow.trim();
+	}
+	return result;
+}
+
 function readWith(value: unknown, nodeId: string): Record<string, string> | undefined {
 	if (value === undefined) return undefined;
 	if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -355,6 +413,41 @@ function readWorkflowInputs(value: unknown): string[] | undefined {
 		throw new Error("workflow inputs must be a list of parameter names");
 	}
 	return value.map((item) => (item as string).trim());
+}
+
+function readLoopGroup(
+	value: unknown,
+	nodeId: string,
+): { until?: string; untilBash?: string; maxIterations: number; nodes: ArchonNode[] } {
+	if (!value || typeof value !== "object" || Array.isArray(value)) {
+		throw new Error(`node ${nodeId} loop_group must be an object with max_iterations and nodes`);
+	}
+	const loopGroup = value as Record<string, unknown>;
+	if (
+		typeof loopGroup.max_iterations !== "number" ||
+		!Number.isInteger(loopGroup.max_iterations) ||
+		loopGroup.max_iterations < 1
+	) {
+		throw new Error(`node ${nodeId} loop_group.max_iterations must be a positive integer`);
+	}
+	if (!Array.isArray(loopGroup.nodes) || loopGroup.nodes.length === 0) {
+		throw new Error(`node ${nodeId} loop_group.nodes is required`);
+	}
+	const nodes = loopGroup.nodes.map((node, index) => parseNode(node, index));
+	const result: { until?: string; untilBash?: string; maxIterations: number; nodes: ArchonNode[] } = {
+		maxIterations: loopGroup.max_iterations,
+		nodes,
+	};
+	if (typeof loopGroup.until === "string" && loopGroup.until.trim().length > 0) {
+		result.until = loopGroup.until.trim();
+	}
+	if (typeof loopGroup.until_bash === "string" && loopGroup.until_bash.trim().length > 0) {
+		result.untilBash = loopGroup.until_bash.trim();
+	}
+	if (!result.until && !result.untilBash) {
+		throw new Error(`node ${nodeId} loop_group requires either until or until_bash`);
+	}
+	return result;
 }
 
 function readAllowedTools(value: unknown, nodeId: string): string[] | undefined {
