@@ -105,8 +105,8 @@ export class MemoryManager {
 
 	async start(): Promise<void> {
 		if (!this.live() || !this.projectEnabled() || !isIndexableProject(this.options.cwd)) return;
-		await this.indexProject();
 		this.watch();
+		void this.indexProject();
 	}
 
 	async remember(text: string, tag?: string, layer: MemoryLayer = "project", key?: string): Promise<string> {

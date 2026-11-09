@@ -2778,7 +2778,6 @@ export class AgentSession {
 		if (!this.memoryActive()) return;
 		try {
 			await this.memory().recordTurn(messages, this._cwd);
-			await this.memory().indexProject();
 		} catch {
 			// Memory must not fail the turn.
 		}
