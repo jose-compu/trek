@@ -57,6 +57,7 @@ describe("regression #5109: exclude tools", () => {
 				"forget",
 				"recall",
 				"remember",
+				"script_edit",
 				"write",
 			]);
 			expect(harness.session.systemPrompt).not.toContain("- read:");
