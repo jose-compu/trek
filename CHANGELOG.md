@@ -1,10 +1,17 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.20.0`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.20.1`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.20.1] - 2026-11-09
+
+### Fixed
+
+- A new prompt that only matches the coding domain, such as publishing a GitHub release, runs the model. It no longer falls through to `defect-fix` and stops to ask for lint and type.
+- An empty `oldText` that names one unique property, such as `"version"`, replaces that line.
 
 ## [0.20.0] - 2026-11-09
 

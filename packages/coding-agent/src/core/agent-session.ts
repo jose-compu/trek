@@ -110,6 +110,7 @@ import {
 	workflowEditQuestion,
 	workflowFactQuestion,
 	workflowFactRefusal,
+	workflowNeedsFacts,
 	writeDomainSkill,
 } from "./domains/index.ts";
 import {
@@ -5543,12 +5544,10 @@ export class AgentSession {
 					if (selection.yaml.length === 0) {
 						return;
 					}
-					if (!this._workflowFactsAccepted) {
+					if (!this._workflowFactsAccepted && workflowNeedsFacts(selection.domain, this._lastPromptTask)) {
 						const missing = missingWorkflowFacts(selection.domain, this._lastPromptTask);
-						if (missing.length > 0) {
-							this._workflowHold = { task: this._lastPromptTask, domain: selection.domain, missing };
-							return;
-						}
+						this._workflowHold = { task: this._lastPromptTask, domain: selection.domain, missing };
+						return;
 					}
 					this._workflowFactsAccepted = false;
 					this._calledWorkflow = parseArchonWorkflow(selection.yaml);

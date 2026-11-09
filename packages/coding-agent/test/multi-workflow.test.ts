@@ -93,6 +93,15 @@ describe("multi-workflow catalog", () => {
 		expect(selection.workflow).toBe("split-epic-issues");
 	});
 
+	test("a release publish does not fall through to defect-fix", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-publish-release-"));
+		const catalog = loadDomainCatalog(cwd);
+		const selection = selectDomain(catalog, { task: "pls publish GH release" });
+		expect(selection.domain).toBe("coding");
+		expect(selection.workflow).toBe("none");
+		expect(selection.yaml).toBe("");
+	});
+
 	test("defect-fix workflow is selected for defect prompt", () => {
 		const cwd = mkdtempSync(join(tmpdir(), "trek-defect-fix-"));
 		const catalog = loadDomainCatalog(cwd);

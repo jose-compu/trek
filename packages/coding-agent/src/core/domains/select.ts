@@ -119,6 +119,17 @@ function selectionFrom(
 ): DomainSelection {
 	if (domain.workflows && domain.workflows.length > 0) {
 		const selected = selectWorkflowFromDomain(domain, currentText);
+		if (!selected) {
+			return {
+				domain: domain.id,
+				workflow: "none",
+				layer_workflow: "none",
+				selectionReason,
+				nodeIds: [],
+				yaml: "",
+				parameters: fillWorkflowParameters(domain.id, text, matched),
+			};
+		}
 		return {
 			domain: domain.id,
 			workflow: selected.name,
@@ -143,7 +154,7 @@ function selectionFrom(
 function selectWorkflowFromDomain(
 	domain: DomainDefinition,
 	text: string,
-): { name: string; yaml: string; nodeIds: string[] } {
+): { name: string; yaml: string; nodeIds: string[] } | undefined {
 	if (!domain.workflows || domain.workflows.length === 0) {
 		return { name: domain.workflowName, yaml: domain.yaml, nodeIds: domain.nodeIds };
 	}
@@ -176,7 +187,7 @@ function selectWorkflowFromDomain(
 	if (best) {
 		return { name: best.workflow.name, yaml: best.workflow.yaml, nodeIds: best.workflow.nodeIds };
 	}
-	return { name: domain.workflows[0].name, yaml: domain.workflows[0].yaml, nodeIds: domain.workflows[0].nodeIds };
+	return undefined;
 }
 
 export function formatSelection(selection: DomainSelection): string {

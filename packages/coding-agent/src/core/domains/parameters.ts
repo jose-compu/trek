@@ -71,6 +71,16 @@ const BARE_FACT: Record<string, RegExp> = {
 	split: /^(?:train test split|train\/test split)$/i,
 };
 
+/**
+ * Hold the model only when every slot for this domain is missing or bare.
+ * One specific fact is enough to start. A multi-workflow miss does not call this.
+ */
+export function workflowNeedsFacts(domainId: string, text: string): boolean {
+	const specs = SPECS[domainId];
+	if (!specs || specs.length === 0) return false;
+	return missingWorkflowFacts(domainId, text).length === specs.length;
+}
+
 /** Specs that are absent, or present only as the bare term. A bare term is not enough to start. */
 export function missingWorkflowFacts(domainId: string, text: string): string[] {
 	const specs = SPECS[domainId];

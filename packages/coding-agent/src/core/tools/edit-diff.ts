@@ -455,11 +455,39 @@ function getDuplicateError(path: string, editIndex: number, totalEdits: number, 
 	return new Error(`Found ${occurrences} occurrences of edits[${editIndex}] in ${path}. ${hint}`);
 }
 
-function getEmptyOldTextError(path: string, editIndex: number, totalEdits: number): Error {
-	if (totalEdits === 1) {
-		return new Error(`oldText must not be empty in ${path}.`);
-	}
-	return new Error(`edits[${editIndex}].oldText must not be empty in ${path}.`);
+/** `"version":` or `version:` when that property occurs on exactly one line. */
+function propertyKey(line: string): string | undefined {
+	const json = /^\s*"([^"]+)"\s*:/.exec(line);
+	if (json) return json[1];
+	const plain = /^\s*([A-Za-z_][\w.-]*)\s*:/.exec(line);
+	return plain?.[1];
+}
+
+/**
+ * An empty oldText with a one-line property replacement targets that property
+ * when the file contains it once. The current line becomes oldText.
+ */
+function inferUniquePropertyLine(content: string, newText: string): string | undefined {
+	const line = newText.endsWith("\n") ? newText.slice(0, -1) : newText;
+	if (line.length === 0 || line.includes("\n")) return undefined;
+	const key = propertyKey(line);
+	if (!key) return undefined;
+	const hits = content.split("\n").filter((row) => propertyKey(row) === key);
+	return hits.length === 1 ? hits[0] : undefined;
+}
+
+function getEmptyOldTextError(path: string, editIndex: number, totalEdits: number, content: string): Error {
+	const where =
+		totalEdits === 1 ? `oldText was empty in ${path}.` : `edits[${editIndex}].oldText was empty in ${path}.`;
+	const head = content
+		.split("\n")
+		.slice(0, 4)
+		.map((line, index) => `  ${index + 1}| ${line}`)
+		.join("\n");
+	const hint = head
+		? `${where} Quote a short unique snippet. Do not send an empty string. Do not rewrite the file.\n${head}`
+		: `${where} Quote a short unique snippet. Do not send an empty string. Do not rewrite the file.`;
+	return new Error(hint);
 }
 
 /**
@@ -483,7 +511,11 @@ export function applyEditsToNormalizedContent(
 
 	for (let i = 0; i < normalizedEdits.length; i++) {
 		if (normalizedEdits[i].oldText.length === 0) {
-			throw getEmptyOldTextError(path, i, normalizedEdits.length);
+			const inferred = inferUniquePropertyLine(normalizedContent, normalizedEdits[i].newText);
+			if (!inferred) {
+				throw getEmptyOldTextError(path, i, normalizedEdits.length, normalizedContent);
+			}
+			normalizedEdits[i].oldText = inferred;
 		}
 	}
 

@@ -253,6 +253,32 @@ describe("Coding Agent Tools", () => {
 			expect(applyPatch(originalContent, result.details.patch)).toBe("Hello, testing!");
 		});
 
+		it("should replace a unique property when oldText is empty", async () => {
+			const testFile = join(testDir, "package.json");
+			writeFileSync(testFile, '{\n  "name": "edgeshield",\n  "version": "0.6.0",\n}\n');
+
+			const result = await editTool.execute("test-call-empty-old", {
+				path: testFile,
+				edits: [{ oldText: "", newText: '  "version": "0.7.0",' }],
+			});
+
+			expect(getTextOutput(result)).toContain("Successfully replaced");
+			expect(readFileSync(testFile, "utf-8")).toContain('"version": "0.7.0"');
+			expect(readFileSync(testFile, "utf-8")).toContain('"name": "edgeshield"');
+		});
+
+		it("should refuse an empty oldText that is not a unique property", async () => {
+			const testFile = join(testDir, "notes.txt");
+			writeFileSync(testFile, "alpha\nbeta\n");
+
+			await expect(
+				editTool.execute("test-call-empty-old-plain", {
+					path: testFile,
+					edits: [{ oldText: "", newText: "gamma" }],
+				}),
+			).rejects.toThrow(/oldText was empty[\s\S]*1\| alpha/);
+		});
+
 		it("should fail if text not found", async () => {
 			const testFile = join(testDir, "edit-test.txt");
 			const originalContent = "Hello, world!";

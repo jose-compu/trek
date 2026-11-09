@@ -372,7 +372,7 @@ export function createEditToolDefinition(
 			"Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.",
 			"Do not send several edit calls for the same file in one turn. Put them in one edits array. Parallel edit calls are only for different files.",
 			"Do not restore text already replaced in this prompt. If a command still fails, edit the lines named in its error.",
-			"Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions. Do not JSON-stringify the edits array. Split a large change into several edit calls.",
+			"Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions. Do not JSON-stringify the edits array. Split a large change into several edit calls. Never send an empty oldText.",
 			"If edit cannot find the text, re-read the file and retry edit with the current text. Do not rewrite the entire file.",
 			"If the result says no change is needed, the file already has the replacement. Continue. Do not rewrite the file.",
 			"If the same token appears more than once, set replaceAll true or add more context. Do not rewrite the file.",

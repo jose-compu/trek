@@ -85,6 +85,7 @@ export {
 	missingWorkflowFacts,
 	workflowFactQuestion,
 	workflowFactRefusal,
+	workflowNeedsFacts,
 } from "./parameters.ts";
 export { completePatternCommand, runPatternCommand } from "./pattern-command.ts";
 export {

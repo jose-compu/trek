@@ -4,6 +4,13 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-11-09
+
+### Fixed
+
+- Publishing a release, or any coding prompt that does not name a workflow, runs the model. It does not stop to ask for lint and type.
+- An empty `oldText` that names one unique property replaces that line.
+
 ## [0.20.0] - 2026-11-09
 
 ### Changed
