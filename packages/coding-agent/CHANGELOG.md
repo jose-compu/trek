@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.19.3] - 2026-11-09
+
+### Fixed
+
+- `sleep`, `gh pr checks --watch`, `gh run watch`, and poll loops wait for exit (cap 300s) instead of returning `Started in background` after 8s. Prefer `gh … --watch` over `sleep` loops. An explicit `timeout` on a non-server command also waits for exit. Servers still detach after 1.5s.
+
 ## [0.19.2] - 2026-11-09
 
 ### Fixed

@@ -5,7 +5,9 @@ import {
 	formatBackgroundedBash,
 	isServerReadyOutput,
 	looksLikeServerCommand,
+	looksLikeWaitCommand,
 	MAX_TIMEOUT_SECONDS,
+	MAX_WAIT_TIMEOUT_SECONDS,
 	resolveBlockUntilMs,
 	resolveTimeoutSeconds,
 	SERVER_BLOCK_UNTIL_MS,
@@ -38,6 +40,26 @@ describe("looksLikeServerCommand", () => {
 	});
 });
 
+describe("looksLikeWaitCommand", () => {
+	it("matches sleep, gh --watch, and poll loops", () => {
+		expect(looksLikeWaitCommand("sleep 90")).toBe(true);
+		expect(looksLikeWaitCommand("sleep 90; gh pr checks 36")).toBe(true);
+		expect(looksLikeWaitCommand("python3 -c 'import time; time.sleep(60)'")).toBe(true);
+		expect(looksLikeWaitCommand("gh pr checks 36 --repo jose-compu/crypto-vdf-js --watch")).toBe(true);
+		expect(looksLikeWaitCommand("gh run watch 42627356136 --repo jose-compu/crypto-vdf-js")).toBe(true);
+		expect(looksLikeWaitCommand("gh --repo jose-compu/crypto-vdf-js run watch 42627356136")).toBe(true);
+		expect(looksLikeWaitCommand("gh --repo jose-compu/crypto-vdf-js pr checks 36 --watch")).toBe(true);
+		expect(looksLikeWaitCommand("until gh pr checks 36; do sleep 10; done")).toBe(true);
+	});
+
+	it("does not match a one-shot poll or a server", () => {
+		expect(looksLikeWaitCommand("gh pr checks 36 --repo jose-compu/crypto-vdf-js")).toBe(false);
+		expect(looksLikeWaitCommand("echo hi")).toBe(false);
+		expect(looksLikeWaitCommand("python3 -m http.server 8000")).toBe(false);
+		expect(looksLikeWaitCommand("npm test")).toBe(false);
+	});
+});
+
 describe("resolveBlockUntilMs", () => {
 	it("defaults every command to 8s, servers to 1.5s", () => {
 		expect(resolveBlockUntilMs("python3 -m http.server 8000")).toBe(SERVER_BLOCK_UNTIL_MS);
@@ -49,9 +71,17 @@ describe("resolveBlockUntilMs", () => {
 		expect(resolveBlockUntilMs("sleep 30", 0)).toBeUndefined();
 	});
 
+	it("waits for exit on wait/poll commands and when timeout is set", () => {
+		expect(resolveBlockUntilMs("sleep 90")).toBeUndefined();
+		expect(resolveBlockUntilMs("gh run watch 1")).toBeUndefined();
+		expect(resolveBlockUntilMs("npm test", undefined, 120)).toBeUndefined();
+		expect(resolveBlockUntilMs("echo hi", undefined, 120)).toBeUndefined();
+	});
+
 	it("does not wait for exit on http.server even when the model passes 0 or a huge wait", () => {
 		expect(resolveBlockUntilMs("python3 -m http.server 8000", 0)).toBe(SERVER_BLOCK_UNTIL_MS);
 		expect(resolveBlockUntilMs("python3 -m http.server", 8000000)).toBe(SERVER_BLOCK_UNTIL_MS);
+		expect(resolveBlockUntilMs("python3 -m http.server 8000", undefined, 8000)).toBe(SERVER_BLOCK_UNTIL_MS);
 	});
 });
 
@@ -62,8 +92,14 @@ describe("resolveTimeoutSeconds", () => {
 	});
 
 	it("caps ordinary command timeouts", () => {
+		expect(resolveTimeoutSeconds("npm test", 30)).toBe(30);
+		expect(resolveTimeoutSeconds("npm test", 8000)).toBe(MAX_TIMEOUT_SECONDS);
+	});
+
+	it("gives wait/poll commands a 300s cap and a default", () => {
 		expect(resolveTimeoutSeconds("sleep 30", 30)).toBe(30);
-		expect(resolveTimeoutSeconds("sleep 30", 8000)).toBe(MAX_TIMEOUT_SECONDS);
+		expect(resolveTimeoutSeconds("sleep 90")).toBe(MAX_WAIT_TIMEOUT_SECONDS);
+		expect(resolveTimeoutSeconds("gh pr checks 1 --watch", 8000)).toBe(MAX_WAIT_TIMEOUT_SECONDS);
 	});
 });
 
@@ -132,6 +168,15 @@ describe("bash background", () => {
 		const result = await bash.execute("fg-1", { command: "echo ready" });
 		expect(result.details?.backgrounded).toBeUndefined();
 		expect(getText(result)).toContain("ready");
+		expect(getText(result)).not.toContain("Started in background");
+	});
+
+	it("waits for sleep to finish instead of backgrounding", async () => {
+		const bash = createBashTool(process.cwd());
+		const started = Date.now();
+		const result = await bash.execute("fg-sleep", { command: "sleep 1" });
+		expect(Date.now() - started).toBeGreaterThan(800);
+		expect(result.details?.backgrounded).toBeUndefined();
 		expect(getText(result)).not.toContain("Started in background");
 	});
 
