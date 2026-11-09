@@ -4,12 +4,14 @@
  */
 
 import { createHash } from "node:crypto";
+import type { CrossFileLink } from "./cross-file-links.ts";
 import type { StructureChunk } from "./structure-chunker.ts";
 
 export interface HierarchicalChunk extends StructureChunk {
 	chunkId: string;
 	parentId?: string;
 	isParent: boolean;
+	links?: CrossFileLink[];
 }
 
 /**

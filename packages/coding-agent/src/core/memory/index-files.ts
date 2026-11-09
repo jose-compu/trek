@@ -15,6 +15,7 @@ import {
 } from "logosdb-mcp-server/dist/gitignore-walker.js";
 import { annotateFile } from "./annotate.ts";
 import { generateCaption } from "./caption-generator.ts";
+import { generateCrossFileLinks } from "./cross-file-links.ts";
 import { generateHierarchy } from "./hierarchy.ts";
 import { filterChunks } from "./quality-filters.ts";
 import { chunkByStructure } from "./structure-chunker.ts";
@@ -89,6 +90,7 @@ export function chunksForFile(absPath: string, cwd: string): IndexedChunk[] {
 			},
 			relPath,
 		);
+		const links = generateCrossFileLinks(part.text, relPath, part.kind);
 		const legacyChunk = {
 			text: part.text,
 			offset: 0,
@@ -97,9 +99,10 @@ export function chunksForFile(absPath: string, cwd: string): IndexedChunk[] {
 			heading: part.signature || part.parentContext,
 		};
 		const row = annotateFile(relPath, legacyChunk, index, filtered.length, caption);
+		const linksStr = links.length > 0 ? `[links:${JSON.stringify(links)}]` : "";
 		return {
 			embed: row.embed,
-			stored: `${row.stored}\n[chunk-id:${part.chunkId}]${part.parentId ? `[parent-id:${part.parentId}]` : ""}${part.isParent ? "[is-parent:true]" : ""}`,
+			stored: `${row.stored}\n[chunk-id:${part.chunkId}]${part.parentId ? `[parent-id:${part.parentId}]` : ""}${part.isParent ? "[is-parent:true]" : ""}${linksStr}`,
 			relPath,
 		};
 	});
