@@ -252,6 +252,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		"bash",
 		"edit",
 		"write",
+		"script_edit",
 		"remember",
 		"recall",
 		"forget",

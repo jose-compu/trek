@@ -20,8 +20,11 @@ const SED_INPLACE = /(?:^|[;&|]\s*)sed\b[^;&|\n]*\s-i\b/;
 const EX_EDIT = /(?:^|[;&|]\s*)ex\b/;
 const XARGS_P = /\bxargs\b([^;&|\n]*?)-P\s*(\d+)/g;
 
-function firstCommand(command: string): string {
-	return command.trim().split(/\s*[;&|]\s*/)[0] ?? command;
+function commandParts(command: string): string[] {
+	return command
+		.split(/\s*(?:&&|\|\||[;&|])\s*/)
+		.map((part) => part.trim())
+		.filter((part) => part.length > 0);
 }
 
 export function inspectBashCommand(command: string): UnixGuardResult {
@@ -35,9 +38,11 @@ export function inspectBashCommand(command: string): UnixGuardResult {
 	if (FIND_DELETE.test(trimmed)) {
 		return { action: "refuse", reason: "find -delete is not allowed." };
 	}
-	const head = firstCommand(trimmed);
-	const interactive = INTERACTIVE.exec(head);
-	if (interactive) {
+	for (const head of commandParts(trimmed)) {
+		const interactive = INTERACTIVE.exec(head);
+		if (!interactive) {
+			continue;
+		}
 		const name = interactive[1] ?? "";
 		if ((name === "vim" || name === "vi" || name === "nvim" || name === "view") && BATCH_VIM.test(head)) {
 			return {

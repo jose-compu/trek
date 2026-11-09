@@ -14,6 +14,7 @@ describe("inspectBashCommand", () => {
 		expect(inspectBashCommand("emacs notes.txt")).toMatchObject({ action: "refuse" });
 		expect(inspectBashCommand("less notes.txt")).toMatchObject({ action: "refuse" });
 		expect(inspectBashCommand("more notes.txt")).toMatchObject({ action: "refuse" });
+		expect(inspectBashCommand("echo ok; vim notes.txt")).toMatchObject({ action: "refuse" });
 	});
 
 	it("redirects vim -Es and sed -i / ex to script_edit", () => {

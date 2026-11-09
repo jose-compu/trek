@@ -14,7 +14,7 @@ import { keyHint } from "../../modes/interactive/components/keybinding-hints.ts"
 import { spawnProcess, waitForChildProcess } from "../../utils/child-process.ts";
 import { getShellEnv, killProcessTree } from "../../utils/shell.ts";
 import type { ToolDefinition } from "../extensions/types.ts";
-import { nodeTrekStoreFs, TrekVersionStore } from "../trek-store/index.ts";
+import type { TrekVersionStore } from "../trek-store/index.ts";
 import { generateUnifiedPatch } from "./edit-diff.ts";
 import { withFileMutationQueue } from "./file-mutation-queue.ts";
 import { resolveToCwd } from "./path-utils.ts";
@@ -235,8 +235,11 @@ async function spawnEditor(
 	}
 }
 
-async function snapshotBefore(cwd: string, absPath: string, before: string, options: ScriptEditOptions): Promise<void> {
-	const store = options.store ?? new TrekVersionStore(cwd, nodeTrekStoreFs);
+async function snapshotBefore(absPath: string, before: string, options: ScriptEditOptions): Promise<void> {
+	const store = options.store;
+	if (!store) {
+		return;
+	}
 	const rel = store.toRelPath(absPath);
 	if (!rel) {
 		return;
@@ -278,7 +281,7 @@ export async function runScriptEdit(
 		if (dryRun) {
 			await copyFile(absPath, target);
 		} else {
-			await snapshotBefore(cwd, absPath, before, options);
+			await snapshotBefore(absPath, before, options);
 		}
 		const scriptFile = join(workDir, "script");
 		await writeFile(scriptFile, input.script.endsWith("\n") ? input.script : `${input.script}\n`);
