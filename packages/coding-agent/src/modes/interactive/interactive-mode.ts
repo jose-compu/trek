@@ -88,6 +88,8 @@ import { BUILTIN_SLASH_COMMANDS } from "../../core/slash-commands.ts";
 import type { SourceInfo } from "../../core/source-info.ts";
 import { isInstallTelemetryEnabled } from "../../core/telemetry.ts";
 import type { TruncationResult } from "../../core/tools/truncate.ts";
+import { UnixToolCache } from "../../core/tools/unix-tools.ts";
+import { runUnixToolsCommand } from "../../core/unix-tools-command.ts";
 import { filterEntriesUpToVersion, getChangelogPath, getNewEntries, parseChangelog } from "../../utils/changelog.ts";
 import { copyToClipboard } from "../../utils/clipboard.ts";
 import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipboard-image.ts";
@@ -302,6 +304,7 @@ export class InteractiveMode {
 	private autocompleteProvider: AutocompleteProvider | undefined;
 	private autocompleteProviderWrappers: AutocompleteProviderFactory[] = [];
 	private fdPath: string | undefined;
+	private unixTools = new UnixToolCache();
 	private editorContainer: Container;
 	private footer: FooterComponent;
 	private footerDataProvider: FooterDataProvider;
@@ -2853,6 +2856,12 @@ export class InteractiveMode {
 				await this.showMemory(arg);
 				return;
 			}
+			if (text === "/tools" || text.startsWith("/tools ")) {
+				const arg = text === "/tools" ? "" : text.slice("/tools ".length);
+				this.editor.setText("");
+				this.showUnixToolsCommand(arg);
+				return;
+			}
 			if (text === "/confirm" || text.startsWith("/confirm ")) {
 				const tool = text.slice("/confirm".length).trim();
 				this.editor.setText("");
@@ -4078,6 +4087,13 @@ export class InteractiveMode {
 
 	showHierarchyCommand(arg: string): void {
 		const text = runHierarchyCommand(getAgentDir(), process.cwd(), arg);
+		this.chatContainer.addChild(new Spacer(1));
+		this.chatContainer.addChild(new Text(theme.fg("muted", text), 1, 0));
+		this.ui.requestRender();
+	}
+
+	showUnixToolsCommand(arg: string): void {
+		const text = runUnixToolsCommand(arg, this.unixTools);
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new Text(theme.fg("muted", text), 1, 0));
 		this.ui.requestRender();

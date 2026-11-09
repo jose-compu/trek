@@ -46,6 +46,7 @@ export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
 	{ name: "undo", description: "Undo agent edits back to a specific prompt (opens selector)" },
 	{ name: "processes", description: "Show this prompt's parallel, sequence, guarded choice, and inversion tree" },
 	{ name: "memory", description: "Show memory, /memory index, /memory add <path>, or /memory remove <path>" },
+	{ name: "tools", description: "Show Unix kit PATH probe: /tools unix. Never downloads a missing tool." },
 	{
 		name: "domains",
 		description:
