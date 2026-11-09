@@ -88,7 +88,7 @@ Three stores. A row cannot cross a boundary.
 /memory remove notes            # delete those chunks and leave the path out
 ```
 
-`remember` stores a project lesson. `recall` searches the layers that are on. `forget` deletes the closest row in one layer. A recall card colors the layer, kind, tag, path, and line span.
+`remember` stores a lesson (project by default; host CLI facts go to global). `recall` searches the layers that are on. `forget` deletes the closest row in one layer. A recall card colors the layer, kind, tag, path, and line span.
 
 `--memory off` skips indexing, the watcher, embeddings, injection, and the memory tools for that process. It does not write settings. The same happens when `memory.enabled` is false, or when session, project, and global are all false.
 
@@ -98,7 +98,7 @@ Three stores. A row cannot cross a boundary.
     "enabled": true,
     "session": true,
     "project": true,
-    "global": false,
+    "global": true,
     "topK": 5
   }
 }
