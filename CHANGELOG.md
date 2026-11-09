@@ -1,10 +1,34 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.19.9`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.20.0-rc.1`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.20.0-rc.1] - 2026-11-09
+
+### Changed
+
+- Archon include/with/inputs/returns for workflow composition ([#270](https://github.com/jose-compu/trek/issues/270))
+- Structure-aware chunking for semantic memory ([#271](https://github.com/jose-compu/trek/issues/271))
+- Hierarchical chunks with parent-child relationships ([#277](https://github.com/jose-compu/trek/issues/277))
+- Async memory indexing to avoid blocking agent turns ([#273](https://github.com/jose-compu/trek/issues/273))
+- Write/edit tools enqueue dirty paths for async indexing ([#279](https://github.com/jose-compu/trek/issues/279))
+- Quality filters for semantic memory indexing ([#274](https://github.com/jose-compu/trek/issues/274))
+- Multi-workflow catalog with issue/PR/release DAGs ([#275](https://github.com/jose-compu/trek/issues/275))
+- GitHub/GitLab/Gitea host adapters with graceful degradation ([#278](https://github.com/jose-compu/trek/issues/278))
+- Archon fan_out and loop_group for parallel workflows ([#272](https://github.com/jose-compu/trek/issues/272))
+- Archon wait/cancel/on_timeout/retry/denied_tools/if_skipped ([#276](https://github.com/jose-compu/trek/issues/276))
+- Belay PR review pass integration ([#282](https://github.com/jose-compu/trek/issues/282))
+- Index-time intent captions for semantic memory ([#280](https://github.com/jose-compu/trek/issues/280))
+- Stable content-hash chunk IDs for semantic memory ([#281](https://github.com/jose-compu/trek/issues/281))
+- Cross-file links for semantic memory ([#283](https://github.com/jose-compu/trek/issues/283))
+- Semantic split and merge for chunking ([#284](https://github.com/jose-compu/trek/issues/284))
+
+### Note
+
+Retrieval improvements (0.20-B), injection refinements (0.20-C), and remaining chunking work (0.20-A) are still to come.
 
 ## [0.19.9] - 2026-11-09
 
