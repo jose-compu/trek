@@ -17,7 +17,13 @@ areas:
 severity:
   default: medium
   brand_inconsistency: high
+  attribution_gap: high
 before_after: false
+fields:
+  - name: campaign
+    required: false
+  - name: channel
+    required: false
 promotion_targets:
   - id: brand-guidelines
     title: brand guidelines
@@ -25,6 +31,12 @@ promotion_targets:
     title: channel playbook
   - id: personas
     title: personas
+  - id: content-calendar
+    title: content calendar
+  - id: attribution-model
+    title: attribution model
+  - id: agent-tools
+    title: agent tools
 promotion_threshold:
   count: 3
   severity: critical

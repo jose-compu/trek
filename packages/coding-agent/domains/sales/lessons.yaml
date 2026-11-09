@@ -17,16 +17,31 @@ areas:
 severity:
   default: medium
   pricing_error: high
+  pipeline_leak: high
+  forecast_miss: high
 before_after: false
+fields:
+  - name: stage
+    required: false
+  - name: segment
+    required: false
+  - name: days_in_stage
+    required: false
 promotion_targets:
   - id: objection-scripts
     title: objection scripts
   - id: battle-cards
     title: battle cards
+  - id: qualification-framework
+    title: qualification framework
   - id: pricing-playbook
     title: pricing playbook
+  - id: deal-review-template
+    title: deal review template
+  - id: agent-rules
+    title: agent rules
 promotion_threshold:
   count: 3
   severity: critical
 redact:
-  []
+  - '\b(?:deal|acv|arr)\s*[:=]\s*\$?\d[\d,]*'

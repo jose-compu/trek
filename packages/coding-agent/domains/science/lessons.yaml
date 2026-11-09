@@ -7,16 +7,38 @@ categories:
   - hypothesis_revision
   - experiment_design
 areas:
-  []
+  - data_collection
+  - preprocessing
+  - analysis
+  - modeling
+  - validation
+  - publication
 severity:
   default: medium
+  data_quality: high
   reproducibility_issue: high
+  statistical_error: high
 before_after: false
+fields:
+  - name: experiment_run
+    required: false
+  - name: evidence
+    required: false
+  - name: seed
+    required: false
 promotion_targets:
   - id: experiment-checklist
     title: experiment checklist
+  - id: data-governance
+    title: data governance
   - id: model-card
     title: model card
+  - id: agent-rules
+    title: agent rules
+  - id: agent-tools
+    title: agent tools
+  - id: agent-soul
+    title: agent soul
 promotion_threshold:
   count: 3
   severity: critical

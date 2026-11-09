@@ -209,8 +209,10 @@ export class FooterComponent implements Component {
 		// Active model on the right. In hierarchy mode, include the ladder role so
 		// Decision → Workhorse → … → Frontier switches are visible in the footer.
 		// Prefer hierarchyModelId so Decision (d1) shows even while Tooling is warmed.
+		// After a user model pick, hierarchy fields are cleared and state.model wins.
 		const hierarchyRole = this.session.hierarchyRole;
-		const modelName = this.session.hierarchyModelId || state.model?.id || "no-model";
+		const hierarchyModelId = this.session.hierarchyModelId;
+		const modelName = hierarchyModelId || state.model?.id || "no-model";
 
 		let statsLeftWidth = visibleWidth(statsLeft);
 
@@ -224,9 +226,8 @@ export class FooterComponent implements Component {
 		const minPadding = 2;
 
 		// Add thinking level indicator if model supports reasoning
-		let rightSideWithoutProvider = hierarchyRole
-			? `${quiet(hierarchyRole)}${dim(" · ")}${mark(modelName)}`
-			: mark(modelName);
+		let rightSideWithoutProvider =
+			hierarchyRole && hierarchyModelId ? `${quiet(hierarchyRole)}${dim(" · ")}${mark(modelName)}` : mark(modelName);
 		if (state.model?.reasoning) {
 			const thinkingLevel = state.thinkingLevel || "off";
 			const level = thinkingLevel === "off" ? "thinking off" : thinkingLevel;

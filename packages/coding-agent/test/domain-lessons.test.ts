@@ -68,10 +68,32 @@ describe("lesson patterns", () => {
 			const pattern = patterns.get(id);
 			expect(pattern?.domain, id).toBe(id);
 			expect(pattern?.categories.length, id).toBeGreaterThan(0);
+			expect(pattern?.fields.length, id).toBeGreaterThan(0);
+			expect(pattern?.promotionTargets.length, id).toBeGreaterThan(0);
 		}
-		expect(patterns.get("conversation")?.areas).toEqual([]);
-		expect(patterns.get("science")?.areas).toEqual([]);
+		expect(patterns.get("conversation")?.areas).toEqual([
+			"greeting",
+			"intent_detection",
+			"response_generation",
+			"handoff",
+			"follow_up",
+			"closing",
+		]);
+		expect(patterns.get("science")?.areas).toEqual([
+			"data_collection",
+			"preprocessing",
+			"analysis",
+			"modeling",
+			"validation",
+			"publication",
+		]);
 		expect(patterns.get("finance")?.beforeAfter).toBe(true);
+		expect(patterns.get("security")?.fields.some((field) => field.name === "remediation" && field.required)).toBe(
+			true,
+		);
+		expect(patterns.get("coding")?.fields.map((field) => field.name)).toEqual(
+			expect.arrayContaining(["error_class", "language", "prevention"]),
+		);
 	});
 
 	it("requires a finance category, area, and before/after, and rejects an unknown category", () => {
@@ -217,16 +239,18 @@ describe("typed lessons in a session", () => {
 		expect(created.session.systemPrompt).not.toContain("sk-");
 	});
 
-	it("drops an unknown category after one repair", async () => {
+	it("keeps a loose lesson when the typed category is unknown", async () => {
 		const created = await harness();
 		const bad = JSON.stringify({ ...FINANCE, category: "not_a_category" });
 		created.setResponses(Array.from({ length: 6 }, () => failedFinance(bad)));
 		await created.session.prompt("Examine the reconciliation break.");
-		expect(listLessonRecords(created.tempDir)).toEqual([]);
-		const dropped = created.sessionManager
-			.getEntries()
-			.filter((entry) => entry.type === "custom" && entry.customType === "trek:lesson_dropped");
-		expect(dropped.length).toBeGreaterThan(0);
+		const rows = listLessonRecords(created.tempDir);
+		expect(rows).toHaveLength(1);
+		expect(rows[0]).toMatchObject({
+			domain: "finance",
+			rule: "Name the account and the period before proposing an entry.",
+		});
+		expect(rows[0]?.category).toBeUndefined();
 	});
 
 	it("does not recall a finance lesson on a robotics turn, and does recall security", async () => {
@@ -238,6 +262,7 @@ describe("typed lessons in a session", () => {
 			category: "vulnerability",
 			area: "network",
 			severity: "critical",
+			fields: { remediation: "Close the unused port and re-scan." },
 		};
 		created.setResponses(
 			Array.from({ length: 10 }, () => (context: Context) => {

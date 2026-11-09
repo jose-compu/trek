@@ -23,10 +23,23 @@ areas:
 severity:
   default: medium
   rule_conflict: high
+  hook_failure: high
+  misroute: high
 before_after: false
+fields:
+  - name: prompt_file
+    required: false
+  - name: fix_target
+    required: false
 promotion_targets:
+  - id: agent-soul
+    title: agent soul
   - id: agent-rules
     title: agent rules
+  - id: agent-tools
+    title: agent tools
+  - id: agent-memory
+    title: agent memory
   - id: skill-files
     title: skill files
 promotion_threshold:

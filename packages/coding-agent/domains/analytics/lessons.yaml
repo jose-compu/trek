@@ -17,14 +17,29 @@ areas:
 severity:
   default: medium
   pipeline_failure: high
+  metric_drift: high
+  definition_mismatch: high
 before_after: false
+fields:
+  - name: metric
+    required: false
+  - name: grain
+    required: false
+  - name: owner
+    required: false
 promotion_targets:
   - id: data-dictionary
     title: data dictionary
   - id: pipeline-runbook
     title: pipeline runbook
+  - id: dashboard-style-guide
+    title: dashboard style guide
   - id: data-quality-sla
     title: data quality SLA
+  - id: agent-rules
+    title: agent rules
+  - id: agent-tools
+    title: agent tools
 promotion_threshold:
   count: 3
   severity: critical

@@ -66,6 +66,7 @@ export {
 	type LessonEvidence,
 	type LessonLayer,
 	lessonBody,
+	lessonFromFailureFallback,
 	lessonFromHostCliFailure,
 	lessonPromotionEnabled,
 	lessonPrompt,
@@ -75,6 +76,7 @@ export {
 	parseLesson,
 	parsePromotion,
 	promotionPrompt,
+	repairUntypedLessonPrompt,
 	turnFailures,
 } from "./lesson.ts";
 export { formatLessonNotice, lessonNoticeTitle } from "./lesson-title.ts";

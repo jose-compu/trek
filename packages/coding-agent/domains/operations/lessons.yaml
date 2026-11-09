@@ -16,15 +16,32 @@ areas:
   - on_call
 severity:
   default: medium
+  incident_pattern: high
   sla_breach: high
+  capacity_issue: high
 before_after: false
+fields:
+  - name: blast_radius
+    required: false
+  - name: slo_impact
+    required: false
+  - name: duration
+    required: false
 promotion_targets:
   - id: runbook
     title: runbook
   - id: postmortem
     title: postmortem
+  - id: automation-backlog
+    title: automation backlog
+  - id: capacity-model
+    title: capacity model
+  - id: on-call-handoff
+    title: on-call handoff checklist
   - id: slo-definition
     title: SLO definition
+  - id: agent-rules
+    title: agent rules
 promotion_threshold:
   count: 3
   severity: critical

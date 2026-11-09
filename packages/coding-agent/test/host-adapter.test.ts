@@ -21,6 +21,7 @@ describe("host adapter", () => {
 			"review-pr",
 			"address-review",
 			"merge-pr",
+			"publish-release",
 			"split-release-epics",
 			"split-epic-issues",
 		];
@@ -102,6 +103,7 @@ describe("host adapter", () => {
 			"review-pr",
 			"address-review",
 			"merge-pr",
+			"publish-release",
 			"split-release-epics",
 			"split-epic-issues",
 		];

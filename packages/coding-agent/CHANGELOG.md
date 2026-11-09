@@ -4,6 +4,20 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.20.3] - 2026-11-09
+
+### Changed
+
+- `/domains` and `trek domains` list every workflow name plus features (lesson categories, promotion targets, specialized fields, host adapters, layer DAGs). `/domains coding` (or `trek domains coding`) shows that domain’s terms, lesson pattern, and workflows. `/workflows` lists every coding workflow with its trigger phrases; `/workflows show coding` shows that catalog and `/workflows show <name>` prints one DAG.
+- Each domain `lessons.yaml` is specialized like the ClawHub self-improving skills: domain fields, richer promotion targets, area tags, severity floors, and redact rules. Typed lesson drafts ask for those fields.
+- Coding `publish-release` workflow for tag + host release publish (`publish release`, `gh release`, and related phrases).
+
+### Fixed
+
+- `review pr` / `open-pr` / other coding workflows no longer stop on the lint/type fact gate (that gate is only for `defect-fix`). A repeated workflow phrase after a fact ask no longer counts as a fact answer.
+- Bash and other tool errors draft a new lesson even when a typed domain schema is missed. An empty draft falls back to the error text and records `trek:lesson_dropped` instead of staying silent.
+- Choosing a model in the selector (or cycling) clears the parked Decision footer sticky, so the footer shows the selected chat model instead of the Decision SKU (e.g. Devstral).
+
 ## [0.20.2] - 2026-11-09
 
 ### Fixed

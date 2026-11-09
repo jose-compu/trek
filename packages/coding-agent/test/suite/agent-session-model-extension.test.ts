@@ -44,6 +44,30 @@ describe("AgentSession model and extension characterization", () => {
 		).toEqual([`${nextModel.provider}/${nextModel.id}`]);
 	});
 
+	it("setModel clears a parked Decision footer sticky", async () => {
+		const harness = await createHarness({
+			models: [
+				{ id: "faux-1", name: "One", reasoning: true },
+				{ id: "faux-2", name: "Two", reasoning: true },
+			],
+		});
+		harnesses.push(harness);
+		const session = harness.session as unknown as {
+			_emitHierarchyModel: (role: string, provider: string, modelId: string) => void;
+			_parkedOnDecision: boolean;
+		};
+		session._emitHierarchyModel("decision", "lmstudio", "mistralai/devstral-small-2-2512");
+		session._parkedOnDecision = true;
+		expect(harness.session.hierarchyRole).toBe("decision");
+		expect(harness.session.hierarchyModelId).toBe("mistralai/devstral-small-2-2512");
+
+		await harness.session.setModel(harness.getModel("faux-2")!);
+
+		expect(harness.session.model?.id).toBe("faux-2");
+		expect(harness.session.hierarchyRole).toBeUndefined();
+		expect(harness.session.hierarchyModelId).toBeUndefined();
+	});
+
 	it("cycles through scoped models and preserves the scoped thinking preference", async () => {
 		const harness = await createHarness({
 			models: [

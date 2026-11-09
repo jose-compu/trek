@@ -21,15 +21,30 @@ areas:
   - network
 severity:
   default: medium
-  safety_rule_gap: high
+  safety_rule_gap: critical
+  device_unreachable: high
+  automation_conflict: high
 before_after: false
+fields:
+  - name: device_class
+    required: false
+  - name: safety_impact
+    required: false
 promotion_targets:
-  - id: automation-rule-library
-    title: automation rule library
+  - id: home-automation-playbook
+    title: home automation playbook
   - id: device-matrix
     title: device matrix
+  - id: automation-rule-library
+    title: automation rule library
   - id: safety-automations
     title: safety automations
+  - id: agent-soul
+    title: agent soul
+  - id: agent-rules
+    title: agent rules
+  - id: agent-tools
+    title: agent tools
 promotion_threshold:
   count: 3
   severity: critical

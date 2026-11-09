@@ -15,6 +15,7 @@ import {
 	classifyLessonLayer,
 	formatLesson,
 	isCorrection,
+	lessonFromFailureFallback,
 	lessonFromHostCliFailure,
 	parseLesson,
 	parsePromotion,
@@ -60,7 +61,7 @@ function script(count: number, handlers: Handlers, calls: string[]) {
 	return Array.from({ length: count }, () => (context: Context) => {
 		const side = context.systemPrompt?.includes("Trek learning step") ?? false;
 		const prompt = firstUserText(context);
-		if (side && prompt.startsWith("Write one lesson")) {
+		if (side && (prompt.startsWith("Write one lesson") || prompt.startsWith("Repair this lesson"))) {
 			calls.push("lesson");
 			return handlers.lesson ? handlers.lesson(context) : fauxAssistantMessage("{}");
 		}
@@ -209,6 +210,116 @@ describe("lessons in a session", () => {
 		});
 		return { harness, id: String(entry?.id) };
 	}
+
+	it("a bash GraphQL failure drafts a new project lesson even when the typed schema is missed", async () => {
+		const harness = await createHarness({
+			enableLessons: true,
+			tools: [
+				{
+					name: "bash",
+					label: "bash",
+					description: "run a shell command",
+					parameters: { type: "object", properties: { command: { type: "string" } } },
+					async execute() {
+						throw new Error(
+							"Warning: 3 uncommitted changes\npull request create failed: GraphQL: Head sha can't be blank, Base sha can't be blank, No commits between main and milestone-0.8, Head ref must be a branch (createPullRequest)\n\nCommand exited with code 1",
+						);
+					},
+				} as never,
+			],
+			initialActiveToolNames: ["bash"],
+		});
+		harnesses.push(harness);
+		project(harness);
+		const calls: string[] = [];
+		harness.setResponses(
+			script(
+				4,
+				{
+					lesson: () =>
+						fauxAssistantMessage(
+							JSON.stringify({
+								trigger: "opening a pull request",
+								mistake: "ran gh pr create before the head branch had remote commits",
+								rule: "Commit and push the head branch before gh pr create.",
+								domain: "coding",
+							}),
+						),
+					main: (context) => {
+						const last = context.messages[context.messages.length - 1];
+						if (last?.role === "toolResult") return fauxAssistantMessage("Need to push first.");
+						return fauxAssistantMessage(
+							[fauxToolCall("bash", { command: "gh pr create --title Milestone --body work" })],
+							{ stopReason: "toolUse" },
+						);
+					},
+				},
+				calls,
+			),
+		);
+		await harness.session.prompt(
+			"create a coding PR on branch milestone-0.8 for this repo and keep going until green",
+		);
+		expect(calls.filter((name) => name === "lesson").length).toBeGreaterThanOrEqual(1);
+		const [entry] = customEntries(harness, "trek:lesson");
+		expect(entry).toMatchObject({
+			kind: "error",
+			source: "draft",
+			lesson: {
+				rule: "Commit and push the head branch before gh pr create.",
+			},
+		});
+		expect(String(entry?.id)).toMatch(/^(project|global):\d+$/);
+		expect(harness.eventsOfType("lesson_stored")).toHaveLength(1);
+	});
+
+	it("a bash failure still stores a lesson from the error text when the draft is empty", async () => {
+		const harness = await createHarness({
+			enableLessons: true,
+			tools: [
+				{
+					name: "bash",
+					label: "bash",
+					description: "run a shell command",
+					parameters: { type: "object", properties: { command: { type: "string" } } },
+					async execute() {
+						throw new Error("gh: Authentication failed. Command exited with code 1");
+					},
+				} as never,
+			],
+			initialActiveToolNames: ["bash"],
+		});
+		harnesses.push(harness);
+		project(harness);
+		harness.setResponses(
+			script(
+				8,
+				{
+					lesson: () => fauxAssistantMessage("not json"),
+					main: (context) => {
+						const last = context.messages[context.messages.length - 1];
+						if (last?.role === "toolResult") return fauxAssistantMessage("auth failed");
+						return fauxAssistantMessage([fauxToolCall("bash", { command: "gh auth status" })], {
+							stopReason: "toolUse",
+						});
+					},
+				},
+				[],
+			),
+		);
+		await harness.session.prompt("check github auth for this coding repo");
+		const [entry] = customEntries(harness, "trek:lesson");
+		expect(entry).toMatchObject({
+			kind: "error",
+			source: "fallback",
+			lesson: {
+				mistake: expect.stringMatching(/Authentication failed/i),
+				rule: expect.stringMatching(/Authentication failed/i),
+			},
+		});
+		expect(customEntries(harness, "trek:lesson_dropped").some((row) => row.reason === "draft_unusable")).toBe(true);
+		expect(harness.eventsOfType("lesson_stored")).toHaveLength(1);
+	});
 
 	it("a failed gh milestone stores the canned global lesson without a side call", async () => {
 		const home = mkdtempSync(join(tmpdir(), "trek-home-gh-"));
@@ -525,6 +636,20 @@ describe("lesson layers", () => {
 		expect(shouldLoadMemoryOnnx({}, "api")).toBe(true);
 		expect(shouldLoadMemoryOnnx({}, "local")).toBe(true);
 		expect(shouldLoadMemoryOnnx({}, "hybrid")).toBe(true);
+	});
+
+	it("builds a fallback lesson from bash error text when draft JSON is missing", () => {
+		const lesson = lessonFromFailureFallback({
+			kind: "error",
+			task: "create PR",
+			failures: [
+				"bash: pull request create failed: GraphQL: Head sha can't be blank, No commits between main and milestone-0.8",
+			],
+			reply: "",
+		});
+		expect(lesson?.mistake).toMatch(/Head sha can't be blank/);
+		expect(lesson?.rule).toMatch(/Head sha can't be blank/);
+		expect(lesson?.recurrence_key).toMatch(/^engineering\|tool\|/);
 	});
 
 	it("routes gh milestone to a global canned lesson and does not duplicate across stores", () => {

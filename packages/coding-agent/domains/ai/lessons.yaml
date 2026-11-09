@@ -21,18 +21,39 @@ areas:
 severity:
   default: medium
   hallucination_rate: high
+  fine_tune_regression: high
+  cost_efficiency: medium
 before_after: false
+fields:
+  - name: model
+    required: false
+  - name: latency_ms
+    required: false
+  - name: cost_note
+    required: false
 promotion_targets:
   - id: model-selection-matrix
     title: model selection matrix
   - id: prompt-library
     title: prompt library
+  - id: fine-tune-runbook
+    title: fine-tune runbook
   - id: rag-architecture
     title: RAG architecture
+  - id: perf-tuning-guide
+    title: performance tuning guide
+  - id: benchmark-suite
+    title: benchmark suite
   - id: guardrail-policy
     title: guardrail policy
+  - id: agent-soul
+    title: agent soul
+  - id: agent-rules
+    title: agent rules
+  - id: agent-tools
+    title: agent tools
 promotion_threshold:
   count: 3
   severity: critical
 redact:
-  - "\b(?:user prompt|pii)\b"
+  - '\b(?:user prompt|pii)\b'

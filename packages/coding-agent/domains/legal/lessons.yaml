@@ -16,17 +16,30 @@ areas:
   - corporate_governance
 severity:
   default: medium
-  litigation_exposure: high
-before_after: true
+  litigation_exposure: critical
+  clause_risk: high
+  compliance_gap: high
+before_after: false
+fields:
+  - name: clause_ref
+    required: false
+  - name: exposure
+    required: false
 promotion_targets:
   - id: clause-library
     title: clause library
+  - id: compliance-checklist
+    title: compliance checklist
+  - id: regulatory-tracker
+    title: regulatory tracker
   - id: contract-playbook
     title: contract playbook
   - id: risk-register
     title: risk register
+  - id: agent-rules
+    title: agent rules
 promotion_threshold:
   count: 3
   severity: critical
 redact:
-  []
+  - '\b(?:client|party)\s+[A-Z][a-z]+\s+[A-Z][a-z]+\b'

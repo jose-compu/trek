@@ -17,7 +17,14 @@ areas:
 severity:
   default: medium
   supplier_risk: high
+  quality_deviation: high
+  inventory_mismatch: high
 before_after: false
+fields:
+  - name: supplier_tier
+    required: false
+  - name: corrective_action
+    required: false
 promotion_targets:
   - id: supplier-scorecard
     title: supplier scorecard
@@ -25,6 +32,12 @@ promotion_targets:
     title: safety stock policy
   - id: routing-playbook
     title: routing playbook
+  - id: demand-planning-model
+    title: demand planning model
+  - id: quality-acceptance
+    title: quality acceptance criteria
+  - id: agent-rules
+    title: agent rules
 promotion_threshold:
   count: 3
   severity: critical

@@ -22,7 +22,16 @@ areas:
 severity:
   default: medium
   agreement_risk: high
+  concession_leak: high
+  batna_weakness: high
 before_after: false
+fields:
+  - name: stage
+    required: false
+  - name: counterparty_type
+    required: false
+  - name: cycle_day
+    required: false
 promotion_targets:
   - id: negotiation-playbook
     title: negotiation playbook
@@ -30,4 +39,4 @@ promotion_threshold:
   count: 3
   severity: critical
 redact:
-  []
+  - '\b(?:offer|price|discount)\s*[:=]\s*\$?\d[\d,]*'

@@ -181,6 +181,12 @@ export function lessonIsOffered(lesson: Lesson, pattern: LessonPattern): boolean
 }
 
 export function repairLessonPrompt(pattern: LessonPattern, reason: string): string {
+	const fieldLine =
+		pattern.fields.length > 0
+			? `fields may include ${pattern.fields
+					.map((field) => (field.required ? `${field.name} (required)` : field.name))
+					.join(", ")}.`
+			: "Omit fields.";
 	return [
 		"Repair this lesson. The previous reply was rejected.",
 		`Reason: ${reason}`,
@@ -188,6 +194,7 @@ export function repairLessonPrompt(pattern: LessonPattern, reason: string): stri
 		`category must be one of: ${pattern.categories.join(", ")}.`,
 		pattern.areas.length > 0 ? `area must be one of: ${pattern.areas.join(", ")}.` : "Omit area.",
 		pattern.beforeAfter ? "before and after are required." : "before and after are optional.",
+		fieldLine,
 		"Do not include an account number, a key, or a secret.",
 	].join("\n");
 }

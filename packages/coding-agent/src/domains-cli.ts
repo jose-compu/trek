@@ -16,7 +16,12 @@ import { formatLessonPattern, lessonPatternFor } from "./core/domains/lesson-pat
 import { runPatternCommand } from "./core/domains/pattern-command.ts";
 import { runArchonWorkflow } from "./core/domains/run.ts";
 import { overrideSelection } from "./core/domains/select.ts";
-import { formatDomainList, formatWorkflowList, runDomainSessionCommand } from "./core/domains/session-command.ts";
+import {
+	formatDomainHelp,
+	formatDomainList,
+	formatWorkflowList,
+	runDomainSessionCommand,
+} from "./core/domains/session-command.ts";
 import { dismissLesson, formatLessonsTable, loadLessonRecord } from "./core/reflective-loop/crystallize.ts";
 
 export async function handleDomainsCommand(args: string[]): Promise<boolean> {
@@ -63,6 +68,12 @@ export async function handleDomainsCommand(args: string[]): Promise<boolean> {
 			}
 			const fileName = addDomain(cwd, args[2], resolve(args[3]));
 			console.log(`added ${args[2]} ${fileName} (disabled until enable)`);
+			return true;
+		}
+		if (sub === "show" || /^[a-z][a-z0-9-]{0,40}$/.test(sub)) {
+			const id = sub === "show" ? args[2] : sub;
+			requireId(id, "domains <id>");
+			console.log(formatDomainHelp(cwd, id));
 			return true;
 		}
 	} catch (error) {
@@ -200,6 +211,7 @@ export async function handlePatternsCommand(args: string[]): Promise<boolean> {
 
 function printDomainsHelp(): void {
 	console.log(`${APP_NAME} domains list`);
+	console.log(`${APP_NAME} domains <id>`);
 	console.log(`${APP_NAME} domains enable <id>`);
 	console.log(`${APP_NAME} domains disable <id>`);
 	console.log(`${APP_NAME} domains lessons <id>`);
@@ -207,12 +219,16 @@ function printDomainsHelp(): void {
 	console.log(`${APP_NAME} domains add <id> <file.yaml>`);
 	console.log("  Meta, AI, Security, and Engineering stay on.");
 	console.log("  A domain added later starts disabled.");
+	console.log("  domains <id> shows workflows and lesson categories for that domain.");
+	console.log("  The list shows lesson categories (abstract types) for each domain.");
 	console.log("  patterns edits .trek/domains/<id>/lessons.yaml and leaves the bundled file alone.");
 }
 
 function printWorkflowsHelp(): void {
 	console.log(`${APP_NAME} workflows list`);
-	console.log(`${APP_NAME} workflows show <id>`);
+	console.log(`${APP_NAME} workflows show <domain|workflow>`);
 	console.log(`${APP_NAME} workflows run <id>`);
+	console.log("  list includes each coding workflow and its trigger phrases.");
+	console.log("  show coding lists those workflows; show open-pr prints that DAG.");
 	console.log("  run calls bash nodes. A prompt node is an AI step and is called in the session, one step per node.");
 }

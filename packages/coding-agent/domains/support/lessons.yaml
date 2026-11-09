@@ -16,7 +16,14 @@ areas:
 severity:
   default: medium
   sla_breach: high
+  customer_churn_signal: high
+  escalation_gap: high
 before_after: false
+fields:
+  - name: ticket_class
+    required: false
+  - name: customer_impact
+    required: false
 promotion_targets:
   - id: kb-article
     title: KB article
@@ -24,8 +31,16 @@ promotion_targets:
     title: troubleshooting tree
   - id: escalation-matrix
     title: escalation matrix
+  - id: canned-response
+    title: canned response template
+  - id: agent-soul
+    title: agent soul
+  - id: agent-rules
+    title: agent rules
+  - id: agent-tools
+    title: agent tools
 promotion_threshold:
   count: 3
   severity: critical
 redact:
-  []
+  - '\b(?:email|phone)\s*[:=]\s*\S+'

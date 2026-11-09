@@ -106,6 +106,7 @@ export {
 } from "./select.ts";
 export {
 	completeDomainCommand,
+	formatDomainHelp,
 	formatDomainList,
 	formatWorkflowList,
 	runDomainSessionCommand,

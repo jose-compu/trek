@@ -17,7 +17,19 @@ areas:
 severity:
   default: medium
   vulnerability: critical
+  access_violation: critical
+  incident_response: high
+  misconfiguration: high
 before_after: false
+fields:
+  - name: cvss
+    required: false
+  - name: cwe
+    required: false
+  - name: blast_radius
+    required: false
+  - name: remediation
+    required: true
 promotion_targets:
   - id: hardening-checklist
     title: hardening checklist
@@ -25,8 +37,15 @@ promotion_targets:
     title: playbooks
   - id: compliance-list
     title: compliance list
+  - id: agent-soul
+    title: agent soul
+  - id: agent-rules
+    title: agent rules
+  - id: agent-tools
+    title: agent tools
 promotion_threshold:
   count: 3
   severity: critical
 redact:
-  - '\b(?:exploit|payload)\s*[:=]\s*\S{8,}'
+  - '\b(?:api[_-]?key|secret|token|password)\s*[:=]\s*\S{8,}'
+  - '-----BEGIN [A-Z ]*PRIVATE KEY-----'

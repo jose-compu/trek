@@ -21,8 +21,17 @@ areas:
   - hardware_integration
 severity:
   default: medium
-  safety_boundary_violation: high
+  safety_boundary_violation: critical
+  control_instability: high
+  hardware_interface_issue: high
 before_after: false
+fields:
+  - name: subsystem
+    required: false
+  - name: validation
+    required: false
+  - name: safety_impact
+    required: false
 promotion_targets:
   - id: safety-checklist
     title: safety checklist
@@ -30,6 +39,12 @@ promotion_targets:
     title: calibration playbook
   - id: tuning-runbook
     title: tuning runbook
+  - id: agent-soul
+    title: agent soul
+  - id: agent-rules
+    title: agent rules
+  - id: agent-tools
+    title: agent tools
 promotion_threshold:
   count: 3
   severity: critical

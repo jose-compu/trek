@@ -8,7 +8,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { loadDomainCatalog } from "../src/core/domains/catalog.ts";
+import { workflowNeedsFacts } from "../src/core/domains/parameters.ts";
 import { selectDomain } from "../src/core/domains/select.ts";
+import { runDomainSessionCommand } from "../src/core/domains/session-command.ts";
 
 describe("multi-workflow catalog", () => {
 	test("coding domain loads with multiple workflows", () => {
@@ -28,8 +30,45 @@ describe("multi-workflow catalog", () => {
 		expect(workflowNames).toContain("review-pr");
 		expect(workflowNames).toContain("address-review");
 		expect(workflowNames).toContain("merge-pr");
+		expect(workflowNames).toContain("publish-release");
 		expect(workflowNames).toContain("split-release-epics");
 		expect(workflowNames).toContain("split-epic-issues");
+	});
+
+	test("/domains lists lesson categories and /workflows lists coding DAGs", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-domain-help-"));
+		const domains = runDomainSessionCommand(cwd, "domains", "");
+		expect(domains).toMatch(/│ workflows\s+/);
+		expect(domains).toMatch(/│ features\s+/);
+		expect(domains).toMatch(/coding/);
+		expect(domains).toContain("open-pr");
+		expect(domains).toContain("review-pr");
+		expect(domains).toContain("defect-fix");
+		expect(domains).toMatch(/lessons:.*bug_pattern/);
+		expect(domains).toMatch(/fields:.*error_class/);
+		expect(domains).toContain("host-adapters");
+		expect(domains).toContain("14-layer-DAGs");
+		const codingHelp = runDomainSessionCommand(cwd, "domains", "coding");
+		expect(codingHelp).toContain("coding  Coding");
+		expect(codingHelp).toContain("categories: bug_pattern");
+		expect(codingHelp).toContain("coding workflows");
+		expect(codingHelp).toContain("open-pr");
+		expect(codingHelp).toContain("review pr");
+		expect(runDomainSessionCommand(cwd, "domains", "show finance")).toContain("finance");
+		expect(runDomainSessionCommand(cwd, "domains", "missing")).toMatch(/unknown domain missing/);
+		const workflows = runDomainSessionCommand(cwd, "workflows", "");
+		expect(workflows).toContain("coding workflows");
+		expect(workflows).toContain("open-pr");
+		expect(workflows).toContain("review-pr");
+		expect(workflows).toContain("open a pr");
+		expect(workflows).toContain("layer workflows");
+		const shown = runDomainSessionCommand(cwd, "workflows", "show coding");
+		expect(shown).toContain("coding workflows");
+		expect(shown).toContain("defect-fix");
+		expect(shown).toContain("/workflows show <workflow>");
+		const openPr = runDomainSessionCommand(cwd, "workflows", "show open-pr");
+		expect(openPr).toContain("coding  open-pr");
+		expect(openPr).toMatch(/│ node\s+│/);
 	});
 
 	test("finance and engineering remain single-workflow domains", () => {
@@ -67,6 +106,20 @@ describe("multi-workflow catalog", () => {
 		expect(selection.workflow).toBe("review-pr");
 	});
 
+	test("review pr does not ask for lint and type facts", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-review-pr-facts-"));
+		const catalog = loadDomainCatalog(cwd);
+		const selection = selectDomain(catalog, { task: "review pr" });
+		expect(selection.domain).toBe("coding");
+		expect(selection.workflow).toBe("review-pr");
+		expect(workflowNeedsFacts(selection.domain, selection.workflow ? "review pr" : "", selection.workflow)).toBe(
+			false,
+		);
+		expect(workflowNeedsFacts("coding", "review pr", "review-pr")).toBe(false);
+		expect(workflowNeedsFacts("coding", "fix the bug", "defect-fix")).toBe(true);
+		expect(workflowNeedsFacts("coding", "The lint error in foo.ts", "defect-fix")).toBe(false);
+	});
+
 	test("belay workflow is selected for belay prompt", () => {
 		const cwd = mkdtempSync(join(tmpdir(), "trek-belay-"));
 		const catalog = loadDomainCatalog(cwd);
@@ -93,13 +146,13 @@ describe("multi-workflow catalog", () => {
 		expect(selection.workflow).toBe("split-epic-issues");
 	});
 
-	test("a release publish does not fall through to defect-fix", () => {
+	test("publish release selects publish-release and not defect-fix", () => {
 		const cwd = mkdtempSync(join(tmpdir(), "trek-publish-release-"));
 		const catalog = loadDomainCatalog(cwd);
 		const selection = selectDomain(catalog, { task: "pls publish GH release" });
 		expect(selection.domain).toBe("coding");
-		expect(selection.workflow).toBe("none");
-		expect(selection.yaml).toBe("");
+		expect(selection.workflow).toBe("publish-release");
+		expect(workflowNeedsFacts("coding", "pls publish GH release", "publish-release")).toBe(false);
 	});
 
 	test("defect-fix workflow is selected for defect prompt", () => {

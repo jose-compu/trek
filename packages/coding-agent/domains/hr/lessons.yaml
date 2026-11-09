@@ -16,8 +16,16 @@ areas:
   - dei
 severity:
   default: medium
-  compliance_risk: high
+  compliance_risk: critical
+  policy_gap: high
 before_after: false
+fields:
+  - name: risk_level
+    required: false
+  - name: regulation
+    required: false
+  - name: affected_scope
+    required: false
 promotion_targets:
   - id: onboarding-checklist
     title: onboarding checklist
@@ -25,8 +33,15 @@ promotion_targets:
     title: interview scorecard
   - id: compliance-calendar
     title: compliance calendar
+  - id: policy-documents
+    title: policy documents
+  - id: recruiting-playbook
+    title: recruiting playbook
+  - id: agent-rules
+    title: agent rules
 promotion_threshold:
   count: 3
   severity: critical
 redact:
-  []
+  - '\b\d{3}-\d{2}-\d{4}\b'
+  - '\b(?:ssn|salary|compensation)\s*[:=]\s*\S+'

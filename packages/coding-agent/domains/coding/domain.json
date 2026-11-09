@@ -14,7 +14,9 @@
 		"review",
 		"merge",
 		"epic",
-		"release"
+		"release",
+		"publish",
+		"tag"
 	],
 	"workflows": [
 		{
@@ -93,6 +95,19 @@
 				"merge pr",
 				"merge pull request",
 				"merge the pr"
+			]
+		},
+		{
+			"file": "publish-release.yaml",
+			"terms": [
+				"publish release",
+				"publish gh release",
+				"publish the release",
+				"create a release",
+				"ship the release",
+				"github release",
+				"tag the release",
+				"cut a release"
 			]
 		},
 		{

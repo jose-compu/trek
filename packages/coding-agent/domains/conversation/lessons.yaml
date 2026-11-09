@@ -7,14 +7,31 @@ categories:
   - sentiment_drift
   - hallucination
 areas:
-  []
+  - greeting
+  - intent_detection
+  - response_generation
+  - handoff
+  - follow_up
+  - closing
 severity:
   default: medium
   escalation_failure: high
+  hallucination: high
 before_after: false
+fields:
+  - name: channel
+    required: false
+  - name: turn_role
+    required: false
 promotion_targets:
   - id: conversation-guidelines
     title: conversation guidelines
+  - id: agent-soul
+    title: agent soul
+  - id: agent-rules
+    title: agent rules
+  - id: agent-tools
+    title: agent tools
 promotion_threshold:
   count: 3
   severity: critical

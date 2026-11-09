@@ -191,6 +191,7 @@ import {
 	type Lesson,
 	type LessonEvidence,
 	type LessonLayer,
+	lessonFromFailureFallback,
 	lessonFromHostCliFailure,
 	lessonIdsFromEntries,
 	lessonNoticeTitle,
@@ -208,6 +209,7 @@ import {
 	ReflectiveLoopController,
 	recurLessonAcross,
 	removeCrystallizedSkill,
+	repairUntypedLessonPrompt,
 	SerialQueue,
 	saveLessonRecordAt,
 	turnFailures,
@@ -4245,9 +4247,26 @@ export class AgentSession {
 		if (!lessonsEnabled() || !this.memoryActive() || !this.model) return;
 		try {
 			const pattern = domain ? lessonPatternFor(this._cwd, domain) : undefined;
-			const lesson =
-				lessonFromHostCliFailure(evidence.failures, evidence.task) ?? (await this._draftLesson(evidence, pattern));
-			if (!lesson) return;
+			// Host-CLI unknown-subcommand stays canned. All other bash/tool errors draft a new lesson.
+			const canned = lessonFromHostCliFailure(evidence.failures, evidence.task);
+			let source: "canned" | "draft" | "fallback" = canned ? "canned" : "draft";
+			let lesson = canned ?? (await this._draftLesson(evidence, pattern));
+			if (!lesson) {
+				lesson = lessonFromFailureFallback(evidence);
+				source = "fallback";
+				this.sessionManager.appendCustomEntry("trek:lesson_dropped", {
+					reason: "draft_unusable",
+					domain: domain ?? "none",
+					fallback: Boolean(lesson),
+				});
+			}
+			if (!lesson) {
+				this.sessionManager.appendCustomEntry("trek:lesson_dropped", {
+					reason: "no_evidence",
+					domain: domain ?? "none",
+				});
+				return;
+			}
 			lesson.source_turn = evidence.task.slice(0, 80);
 			if (!lesson.layer_role) {
 				lesson.layer_role = actingLessonRole(this.hierarchyRole);
@@ -4274,17 +4293,38 @@ export class AgentSession {
 					modelId: this.model.id,
 					lesson: again,
 					recurred: true,
+					source,
 				});
 				return;
 			}
 			const layer = this._pickLessonLayer(intended);
-			if (!layer) return;
+			if (!layer) {
+				this.sessionManager.appendCustomEntry("trek:lesson_dropped", {
+					reason: "layer_off",
+					domain: lesson.domain,
+					intended,
+				});
+				return;
+			}
 			const root = stores[layer];
-			if (!root) return;
+			if (!root) {
+				this.sessionManager.appendCustomEntry("trek:lesson_dropped", {
+					reason: "store_missing",
+					domain: lesson.domain,
+					layer,
+				});
+				return;
+			}
 			this.startMemory();
 			const stored = await this.memory().remember(formatLesson(lesson), lesson.domain, layer, lesson.recurrence_key);
 			const id = new RegExp(`^stored (${layer}:\\d+)$`).exec(stored)?.[1];
 			if (!id) {
+				this.sessionManager.appendCustomEntry("trek:lesson_dropped", {
+					reason: "store_failed",
+					domain: lesson.domain,
+					layer,
+					stored,
+				});
 				debugLog("memory", "lesson store failed", { stored, layer, key: lesson.recurrence_key });
 				return;
 			}
@@ -4296,34 +4336,69 @@ export class AgentSession {
 				modelId: this.model.id,
 				lesson,
 				layer,
+				source,
 			});
 		} catch (error) {
+			this.sessionManager.appendCustomEntry("trek:lesson_dropped", {
+				reason: "exception",
+				error: error instanceof Error ? error.message : String(error),
+			});
 			debugLog("memory", "lesson not written", { error: error instanceof Error ? error.message : String(error) });
 		}
 	}
 
-	/** One side call. A typed pattern gets one repair call only when the first reply is invalid. */
+	/**
+	 * Draft a new lesson from the turn failures (bash/tool errors).
+	 * Typed domain patterns are preferred; a plain JSON lesson is kept when the typed schema is missed,
+	 * so coding-domain bash errors still teach.
+	 */
 	private async _draftLesson(
 		evidence: LessonEvidence,
 		pattern: ReturnType<typeof lessonPatternFor>,
 	): Promise<Lesson | undefined> {
 		const writer = this._lessonWriterModel();
-		if (!writer) return undefined;
-		const first = await this._sideCall(writer, lessonPrompt(evidence, pattern));
-		if (!pattern) return parseLesson(first);
-		const accepted = acceptTypedLesson(first, pattern);
-		if (accepted.lesson) return accepted.lesson;
-		const repaired = acceptTypedLesson(
-			await this._sideCall(writer, repairLessonPrompt(pattern, accepted.reason ?? "invalid")),
-			pattern,
-		);
-		if (!repaired.lesson) {
+		if (!writer) {
 			this.sessionManager.appendCustomEntry("trek:lesson_dropped", {
-				reason: repaired.reason ?? "invalid",
-				domain: pattern.domain,
+				reason: "no_writer",
+				domain: pattern?.domain ?? "none",
 			});
+			return undefined;
 		}
-		return repaired.lesson;
+		const asUntyped = (text: string, domain?: string): Lesson | undefined => {
+			const parsed = parseLesson(text);
+			if (!parsed) return undefined;
+			if (domain) parsed.domain = domain;
+			return parsed;
+		};
+		try {
+			const first = await this._sideCall(writer, lessonPrompt(evidence, pattern));
+			if (!pattern) {
+				return (
+					asUntyped(first) ?? asUntyped(await this._sideCall(writer, repairUntypedLessonPrompt("invalid JSON")))
+				);
+			}
+			const accepted = acceptTypedLesson(first, pattern);
+			if (accepted.lesson) return accepted.lesson;
+			const loose = asUntyped(first, pattern.domain);
+			if (loose) return loose;
+			const repairText = await this._sideCall(writer, repairLessonPrompt(pattern, accepted.reason ?? "invalid"));
+			const repaired = acceptTypedLesson(repairText, pattern);
+			if (repaired.lesson) return repaired.lesson;
+			const looseRepair = asUntyped(repairText, pattern.domain);
+			if (looseRepair) return looseRepair;
+			const last = await this._sideCall(
+				writer,
+				repairUntypedLessonPrompt(repaired.reason ?? accepted.reason ?? "invalid"),
+			);
+			return asUntyped(last, pattern.domain);
+		} catch (error) {
+			this.sessionManager.appendCustomEntry("trek:lesson_dropped", {
+				reason: "draft_exception",
+				domain: pattern?.domain ?? "none",
+				error: error instanceof Error ? error.message : String(error),
+			});
+			return undefined;
+		}
 	}
 
 	/**
@@ -5306,9 +5381,10 @@ export class AgentSession {
 				this._workflowFactAsk = undefined;
 				const combined = `${ask.task}\n${expandedText}`;
 				const still = missingWorkflowFacts(ask.domain, combined);
+				// Accept only when the reply fills at least one missing slot. A repeated
+				// workflow phrase like "review pr" must not count as a fact answer.
 				const named = ask.missing.some((name) => !still.includes(name));
-				const added = /[a-z]{4,}/i.test(expandedText);
-				if (workflowFactRefusal(expandedText) || (!named && !added)) {
+				if (workflowFactRefusal(expandedText) || !named) {
 					this._recordLocalTurn(
 						expandedText,
 						`Workflow stopped. ${ask.domain} did not receive ${ask.missing.join(", ")}.`,
@@ -5548,7 +5624,10 @@ export class AgentSession {
 					if (selection.yaml.length === 0) {
 						return;
 					}
-					if (!this._workflowFactsAccepted && workflowNeedsFacts(selection.domain, this._lastPromptTask)) {
+					if (
+						!this._workflowFactsAccepted &&
+						workflowNeedsFacts(selection.domain, this._lastPromptTask, selection.workflow)
+					) {
 						const missing = missingWorkflowFacts(selection.domain, this._lastPromptTask);
 						this._workflowHold = { task: this._lastPromptTask, domain: selection.domain, missing };
 						return;
@@ -5873,6 +5952,26 @@ export class AgentSession {
 	}
 
 	/**
+	 * User picked a model (selector / cycle). Drop Decision/ladder footer sticky so the
+	 * footer shows the chosen chat model, not a parked Decision SKU (e.g. Devstral).
+	 */
+	private _clearHierarchyFooterForUserModel(): void {
+		this._hierarchyDisplayRole = undefined;
+		this._hierarchyModelId = undefined;
+		this._hierarchyModelProvider = undefined;
+		this._parkedOnDecision = false;
+		this._lastHierarchyRole = undefined;
+		this._ladderRole = undefined;
+		this._rememberApiSessionModel();
+		this._emit({
+			type: "hierarchy_model",
+			role: "",
+			provider: this.model?.provider ?? "",
+			modelId: this.model?.id ?? "",
+		});
+	}
+
+	/**
 	 * Set model directly.
 	 * Validates that auth is configured, saves to session and settings.
 	 * @throws Error if no auth is configured for the model
@@ -5887,6 +5986,7 @@ export class AgentSession {
 		this.agent.state.model = model;
 		this.sessionManager.appendModelChange(model.provider, model.id);
 		this.settingsManager.setDefaultModelAndProvider(model.provider, model.id);
+		this._clearHierarchyFooterForUserModel();
 
 		// Re-clamp thinking level for new model's capabilities
 		this.setThinkingLevel(thinkingLevel);
@@ -5930,6 +6030,7 @@ export class AgentSession {
 		// - Undefined scoped model thinking level inherits the current session preference
 		// setThinkingLevel clamps to model capabilities.
 		this.setThinkingLevel(thinkingLevel);
+		this._clearHierarchyFooterForUserModel();
 
 		await this._emitModelSelect(next.model, currentModel, "cycle");
 
@@ -5955,6 +6056,7 @@ export class AgentSession {
 
 		// Re-clamp thinking level for new model's capabilities
 		this.setThinkingLevel(thinkingLevel);
+		this._clearHierarchyFooterForUserModel();
 
 		await this._emitModelSelect(nextModel, currentModel, "cycle");
 

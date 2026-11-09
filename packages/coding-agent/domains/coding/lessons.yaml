@@ -17,7 +17,17 @@ areas:
 severity:
   default: medium
   bug_pattern: high
+  tooling_issue: medium
+  anti_pattern: medium
+  debugging_insight: medium
 before_after: true
+fields:
+  - name: error_class
+    required: false
+  - name: language
+    required: false
+  - name: prevention
+    required: false
 promotion_targets:
   - id: style-guide
     title: style guide
@@ -27,6 +37,10 @@ promotion_targets:
     title: snippet library
   - id: debug-playbook
     title: debug playbook
+  - id: agent-tools
+    title: agent tools
+  - id: agent-rules
+    title: agent rules
 promotion_threshold:
   count: 3
   severity: critical

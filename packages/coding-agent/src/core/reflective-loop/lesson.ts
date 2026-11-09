@@ -97,16 +97,28 @@ export interface LessonPromptPattern {
 	categories: readonly string[];
 	areas: readonly string[];
 	beforeAfter: boolean;
+	fields?: ReadonlyArray<{ name: string; required: boolean }>;
 }
 
 export function lessonPrompt(evidence: LessonEvidence, pattern?: LessonPromptPattern): string {
+	const fieldSpec =
+		pattern?.fields && pattern.fields.length > 0
+			? ` Include "fields":{${pattern.fields.map((field) => `"${field.name}":"..."`).join(",")}}${
+					pattern.fields.some((field) => field.required)
+						? ` (${pattern.fields
+								.filter((field) => field.required)
+								.map((field) => field.name)
+								.join(", ")} required)`
+						: ""
+				}.`
+			: "";
 	const lines = [
 		"Write one lesson from this turn so the next session does not repeat the mistake.",
 		pattern
-			? 'Reply with JSON only: {"trigger":"...","mistake":"...","rule":"...","category":"...","area":"...","severity":"low|medium|high|critical","before":"...","after":"..."}. '
+			? 'Reply with JSON only: {"trigger":"...","mistake":"...","rule":"...","category":"...","area":"...","severity":"low|medium|high|critical","before":"...","after":"...","fields":{...}}. '
 			: 'Reply with JSON only: {"trigger": "...", "mistake": "...", "rule": "...", "domain": "..."}.',
 		pattern
-			? `The domain is ${pattern.domain}. category must be one of: ${pattern.categories.join(", ")}. ${pattern.areas.length > 0 ? `area must be one of: ${pattern.areas.join(", ")}.` : "Omit area."} ${pattern.beforeAfter ? "before and after are required." : ""} severity may be raised above the default, not lowered.`
+			? `The domain is ${pattern.domain}. category must be one of: ${pattern.categories.join(", ")}. ${pattern.areas.length > 0 ? `area must be one of: ${pattern.areas.join(", ")}.` : "Omit area."} ${pattern.beforeAfter ? "before and after are required." : ""} severity may be raised above the default, not lowered.${fieldSpec}`
 			: "trigger: the kind of task where this applies. mistake: what went wrong. rule: one imperative sentence to follow next time. domain: one lowercase word.",
 		"Use only facts from this turn. No preamble.",
 		"",
@@ -200,6 +212,40 @@ export function lessonFromHostCliFailure(failures: readonly string[], task = "")
 		};
 	}
 	return undefined;
+}
+
+/**
+ * When the draft model returns no usable JSON, still learn from the bash/tool error text.
+ * This is turn-specific evidence, not a release canned rule.
+ */
+export function lessonFromFailureFallback(evidence: LessonEvidence): Lesson | undefined {
+	const failure = evidence.failures.map((line) => line.trim()).find((line) => line.length > 0);
+	if (!failure) return undefined;
+	const short = failure.replace(/\s+/g, " ").slice(0, 180);
+	const key = short
+		.toLowerCase()
+		.replace(/[^a-z0-9|]+/g, "-")
+		.replace(/-+/g, "-")
+		.replace(/^-|-$/g, "")
+		.slice(0, 80);
+	return {
+		trigger: (evidence.task || "a tool failure").replace(/\s+/g, " ").trim().slice(0, 120),
+		mistake: short,
+		rule: `Fix or avoid this tool failure before retrying: ${short}`,
+		domain: "engineering",
+		count: 1,
+		recurrence_key: `engineering|tool|${key || "failure"}`,
+	};
+}
+
+/** Untyped repair after a typed coding/domain draft was rejected. */
+export function repairUntypedLessonPrompt(reason: string): string {
+	return [
+		"Repair this lesson. The previous reply was rejected.",
+		`Reason: ${reason}`,
+		'Reply with JSON only: {"trigger":"...","mistake":"...","rule":"...","domain":"..."}.',
+		"rule must be one imperative sentence from the tool failure. No preamble.",
+	].join("\n");
 }
 
 export function formatLesson(lesson: Lesson): string {

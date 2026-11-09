@@ -22,14 +22,29 @@ areas:
 severity:
   default: medium
   compliance_oversight: high
+  policy_gap: high
+  kpi_misalignment: high
 before_after: false
+fields:
+  - name: kpi
+    required: false
+  - name: owner
+    required: false
+  - name: cadence
+    required: false
 promotion_targets:
   - id: process-playbook
     title: process playbook
+  - id: governance-checklist
+    title: governance checklist
   - id: kpi-registry
     title: KPI registry
   - id: raci
     title: RACI
+  - id: operating-cadence
+    title: operating cadence
+  - id: agent-rules
+    title: agent rules
 promotion_threshold:
   count: 3
   severity: critical

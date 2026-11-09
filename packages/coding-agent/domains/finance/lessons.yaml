@@ -19,7 +19,16 @@ severity:
   default: medium
   reconciliation_error: high
   control_weakness: high
+  regulatory_gap: high
+  valuation_error: high
 before_after: true
+fields:
+  - name: impact
+    required: false
+  - name: remediation
+    required: false
+  - name: control_ref
+    required: false
 promotion_targets:
   - id: close-checklist
     title: close checklist
@@ -27,11 +36,18 @@ promotion_targets:
     title: reconciliation procedure
   - id: control-matrix
     title: control matrix
+  - id: tax-calendar
+    title: tax calendar
+  - id: forecast-model
+    title: forecast model
   - id: audit-response
     title: audit response
+  - id: agent-rules
+    title: agent rules
 promotion_threshold:
   count: 3
   severity: critical
 redact:
-  - "\\b\\d{9,17}\\b"
-  - "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+  - '\b\d{9,17}\b'
+  - '\b\d{3}-\d{2}-\d{4}\b'
+  - '\b(?:routing|iban|swift)\s*[:=]\s*\S+'
