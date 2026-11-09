@@ -2,7 +2,11 @@
 
 Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent repo `UPSTREAM.md` / Pi monorepo.
 
-## [Unreleased]
+## [0.19.8] - 2026-11-09
+
+### Fixed
+
+- A short "Task done." is a subtask yield, not the original request. Remaining work continues. Working... stays until the pin will not inject another continue. A second idle wrap-up with no tools stops the loop.
 
 ## [0.19.7] - 2026-11-09
 
