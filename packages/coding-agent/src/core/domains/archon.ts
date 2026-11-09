@@ -20,6 +20,8 @@ export const ARCHON_EFFORTS = ["minimal", "low", "medium", "high"] as const;
 export type ArchonEffort = (typeof ARCHON_EFFORTS)[number];
 
 export type FanOutJoin = "all_done" | "all_success";
+export type WaitType = "duration" | "attention";
+export type OnTimeoutAction = "skip" | "fail";
 
 export interface ArchonNode {
 	id: string;
@@ -29,6 +31,8 @@ export interface ArchonNode {
 	dependsOn: string[];
 	/** Archon `allowed_tools`. An empty list means the node may not call tools. */
 	allowedTools?: string[];
+	/** Archon `denied_tools`. Tools explicitly denied for this node. */
+	deniedTools?: string[];
 	/** Present when `kind` is `loop`. Archon stores this as an object, not a string. */
 	loop?: { until: string; maxIterations: number };
 	/** Present when `kind` is `include`. References another workflow by name. */
@@ -41,6 +45,18 @@ export interface ArchonNode {
 	fanOut?: { items: string; maxParallel: number; join: FanOutJoin; workflow?: string };
 	/** Present when `kind` is `loop_group`. Sealed sub-DAG per iteration. */
 	loopGroup?: { until?: string; untilBash?: string; maxIterations: number; nodes: ArchonNode[] };
+	/** Archon `wait`. Duration in ms or 'attention' for ask_human. */
+	wait?: { type: WaitType; durationMs?: number };
+	/** Archon `cancel`. Fail the workflow and stop in-flight siblings. */
+	cancel?: boolean;
+	/** Archon `on_timeout`. Action when bash/script node times out. */
+	onTimeout?: OnTimeoutAction;
+	/** Archon `retry`. Opt-in retry on failure. */
+	retry?: { maxAttempts: number };
+	/** Archon `if_skipped`. Expression evaluated when dependencies are skipped. */
+	ifSkipped?: string;
+	/** Archon `mutates_checkout`. Parallel hint only. */
+	mutatesCheckout?: boolean;
 	/** Prompt nodes only. Default is the current layer role. */
 	role?: ArchonNodeRole;
 	/** Archon `when:`. Skip the node when false. */
@@ -205,7 +221,21 @@ function readNodeExtras(
 	kind: ArchonNodeKind,
 ): Pick<
 	ArchonNode,
-	"when" | "triggerRule" | "context" | "skills" | "outputType" | "effort" | "outputFormat" | "timeout"
+	| "when"
+	| "triggerRule"
+	| "context"
+	| "skills"
+	| "outputType"
+	| "effort"
+	| "outputFormat"
+	| "timeout"
+	| "deniedTools"
+	| "wait"
+	| "cancel"
+	| "onTimeout"
+	| "retry"
+	| "ifSkipped"
+	| "mutatesCheckout"
 > {
 	const extras: ReturnType<typeof readNodeExtras> = {};
 	if (typeof record.when === "string" && record.when.trim().length > 0) {
@@ -214,7 +244,7 @@ function readNodeExtras(
 	if (record.trigger_rule !== undefined) {
 		if (typeof record.trigger_rule !== "string" || !isArchonTriggerRule(record.trigger_rule)) {
 			throw new Error(
-				`node ${id} trigger_rule must be all_success, any_success, all_done, or none_failed_min_one_success`,
+				`node ${id} trigger_rule must be all_success, any_success, one_success, all_done, or none_failed_min_one_success`,
 			);
 		}
 		extras.triggerRule = record.trigger_rule;
@@ -251,6 +281,39 @@ function readNodeExtras(
 			throw new Error(`node ${id} timeout must be a positive integer (ms)`);
 		}
 		extras.timeout = record.timeout;
+	}
+	if (record.denied_tools !== undefined) {
+		extras.deniedTools = readDeniedTools(record.denied_tools, id);
+	}
+	if (record.wait !== undefined) {
+		extras.wait = readWait(record.wait, id);
+	}
+	if (record.cancel !== undefined) {
+		if (typeof record.cancel !== "boolean") {
+			throw new Error(`node ${id} cancel must be a boolean`);
+		}
+		extras.cancel = record.cancel;
+	}
+	if (record.on_timeout !== undefined) {
+		if (kind !== "bash" && kind !== "script") {
+			throw new Error(`node ${id} on_timeout is only valid on bash or script nodes`);
+		}
+		if (record.on_timeout !== "skip" && record.on_timeout !== "fail") {
+			throw new Error(`node ${id} on_timeout must be skip or fail`);
+		}
+		extras.onTimeout = record.on_timeout as OnTimeoutAction;
+	}
+	if (record.retry !== undefined) {
+		extras.retry = readRetry(record.retry, id);
+	}
+	if (typeof record.if_skipped === "string" && record.if_skipped.trim().length > 0) {
+		extras.ifSkipped = record.if_skipped.trim();
+	}
+	if (record.mutates_checkout !== undefined) {
+		if (typeof record.mutates_checkout !== "boolean") {
+			throw new Error(`node ${id} mutates_checkout must be a boolean`);
+		}
+		extras.mutatesCheckout = record.mutates_checkout;
 	}
 	return extras;
 }
@@ -456,6 +519,46 @@ function readAllowedTools(value: unknown, nodeId: string): string[] | undefined 
 		throw new Error(`node ${nodeId} allowed_tools must be a list of tool names`);
 	}
 	return value;
+}
+
+function readDeniedTools(value: unknown, nodeId: string): string[] | undefined {
+	if (value === undefined) return undefined;
+	if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+		throw new Error(`node ${nodeId} denied_tools must be a list of tool names`);
+	}
+	return value;
+}
+
+function readWait(value: unknown, nodeId: string): { type: WaitType; durationMs?: number } {
+	if (value === "attention") {
+		return { type: "attention" };
+	}
+	if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+		return { type: "duration", durationMs: value };
+	}
+	if (value && typeof value === "object" && !Array.isArray(value)) {
+		const wait = value as Record<string, unknown>;
+		if (wait.type === "attention") {
+			return { type: "attention" };
+		}
+		if (wait.type === "duration" && typeof wait.duration_ms === "number" && wait.duration_ms > 0) {
+			return { type: "duration", durationMs: wait.duration_ms };
+		}
+	}
+	throw new Error(`node ${nodeId} wait must be 'attention', a duration in ms, or {type, duration_ms}`);
+}
+
+function readRetry(value: unknown, nodeId: string): { maxAttempts: number } {
+	if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+		return { maxAttempts: value };
+	}
+	if (value && typeof value === "object" && !Array.isArray(value)) {
+		const retry = value as Record<string, unknown>;
+		if (typeof retry.max_attempts === "number" && Number.isInteger(retry.max_attempts) && retry.max_attempts > 0) {
+			return { maxAttempts: retry.max_attempts };
+		}
+	}
+	throw new Error(`node ${nodeId} retry must be a positive integer or {max_attempts}`);
 }
 
 function stringList(value: unknown, nodeId: string): string[] {
