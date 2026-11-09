@@ -2,11 +2,22 @@
  * Archon `when:` and `trigger_rule` (subset of https://archon.diy/reference/workflow-language/).
  */
 
-export type ArchonTriggerRule = "all_success" | "any_success" | "all_done" | "none_failed_min_one_success" | "one_success";
+export type ArchonTriggerRule =
+	| "all_success"
+	| "any_success"
+	| "all_done"
+	| "none_failed_min_one_success"
+	| "one_success";
 
 export type NodeRunStatus = "ok" | "skipped" | "failed";
 
-export const ARCHON_TRIGGER_RULES = ["all_success", "any_success", "all_done", "none_failed_min_one_success", "one_success"] as const;
+export const ARCHON_TRIGGER_RULES = [
+	"all_success",
+	"any_success",
+	"all_done",
+	"none_failed_min_one_success",
+	"one_success",
+] as const;
 
 export function isArchonTriggerRule(value: string): value is ArchonTriggerRule {
 	return (ARCHON_TRIGGER_RULES as readonly string[]).includes(value);

@@ -125,7 +125,7 @@ function isGeneratedFile(text: string, filePath: string): boolean {
  */
 function isMinified(text: string): boolean {
 	const lines = text.split("\n");
-	
+
 	// Single line file that's very long with no spaces
 	if (lines.length <= 3 && text.length > 100) {
 		const spaces = (text.match(/\s/g) || []).length;
@@ -134,7 +134,7 @@ function isMinified(text: string): boolean {
 			return true;
 		}
 	}
-	
+
 	return false;
 }
 

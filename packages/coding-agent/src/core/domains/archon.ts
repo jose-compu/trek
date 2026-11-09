@@ -7,7 +7,16 @@ import { readFileSync } from "node:fs";
 import { parse } from "yaml";
 import { type ArchonTriggerRule, isArchonTriggerRule } from "./archon-when.ts";
 
-export const ARCHON_NODE_KINDS = ["prompt", "command", "bash", "script", "loop", "include", "fan_out", "loop_group"] as const;
+export const ARCHON_NODE_KINDS = [
+	"prompt",
+	"command",
+	"bash",
+	"script",
+	"loop",
+	"include",
+	"fan_out",
+	"loop_group",
+] as const;
 export type ArchonNodeKind = (typeof ARCHON_NODE_KINDS)[number];
 
 export const ARCHON_NODE_ROLES = ["workhorse", "planning", "frontier", "tooling"] as const;

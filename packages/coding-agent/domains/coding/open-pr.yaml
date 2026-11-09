@@ -25,10 +25,14 @@ nodes:
       Draft the PR summary. Include what changed, why, and the test plan. Use a
       HEREDOC or multi-line format. Do not open the PR yet.
     depends_on: [push-upstream]
+  - id: belay
+    include: belay-pr
+    returns: $belay.verdict.output
+    depends_on: [draft-pr-body]
   - id: detect-host
     include: _detect-host
     returns: $detect-host.check.output
-    depends_on: [draft-pr-body]
+    depends_on: [belay]
   - id: open-pr-command
     trigger_rule: all_success
     allowed_tools: []
@@ -36,6 +40,7 @@ nodes:
     prompt: |
       State the command to open the PR with the detected host CLI from
       $detect-host.output. Use the title from the branch name and the body from
-      $draft-pr-body.output. Do not run it. If no host CLI was detected, state
-      that the PR cannot be opened without a host CLI.
+      $draft-pr-body.output. Include Belay verdict from $belay.output in the PR
+      description. Do not run it. If no host CLI was detected, state that the PR
+      cannot be opened without a host CLI.
     depends_on: [detect-host]
