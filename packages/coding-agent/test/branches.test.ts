@@ -409,7 +409,7 @@ describe("spawn_branches in a session", () => {
 			),
 		);
 
-		await harness.session.prompt("Write fresh.ts in a branch.");
+		await harness.session.prompt("Write fresh.ts from this worktree.");
 
 		expect(existsSync(join(harness.tempDir, "fresh.ts"))).toBe(false);
 		expect(toolResults(harness, "spawn_branches")[0]).toContain(

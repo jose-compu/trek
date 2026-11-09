@@ -23,6 +23,7 @@ import {
 	lessonKeyOf,
 	type MemoryKind,
 } from "./annotate.ts";
+import { parseCrossFileLinks } from "./cross-file-links.ts";
 import type { Embedder } from "./embedder.ts";
 import {
 	chunksForFile,
@@ -38,6 +39,11 @@ import {
 } from "./index-files.ts";
 import type { Reranker } from "./rerank.ts";
 import { captureTurn, handoffNote } from "./turns.ts";
+
+/** Neighbor score factor for one-hop cross-file links (#221). */
+const LINK_SCORE_FACTOR = 0.6;
+/** Cap primary hits inspected for link expansion. */
+const LINK_EXPAND_PRIMARY = 8;
 
 export type MemoryLayer = "session" | "project" | "global";
 
@@ -166,9 +172,94 @@ export class MemoryManager {
 				const hit = hits[index];
 				if (hit) next.push(hit);
 			}
-			if (next.length === hits.length) return next.slice(0, topK);
+			if (next.length === hits.length) hits.splice(0, hits.length, ...next);
 		}
-		return hits.slice(0, topK);
+		const expanded = this.expandLinkedHits(hits, topK);
+		return expanded.slice(0, topK);
+	}
+
+	/**
+	 * One-hop neighbors from `[links:…]` via LogosDB get-by-id (no second kNN).
+	 * Manifest maps target paths → chunk ids; `db.get` loads the stored row.
+	 */
+	private expandLinkedHits(hits: MemoryHit[], topK: number): MemoryHit[] {
+		if (!this.projectEnabled() || hits.length === 0) return hits;
+		const db = this.open("project", false);
+		const rowDb = db as { get?: (id: number) => { text?: string | null } } | undefined;
+		// logosdb 1.2.0 has get-by-id. logosdb-mcp-server 1.4.0 store.d.ts still omits it.
+		if (!rowDb || typeof rowDb.get !== "function") return hits;
+		const manifestFile = manifestPath(this.layerRoot("project"), NS);
+		let files: Record<string, { ids?: number[] }>;
+		try {
+			files = loadManifest(manifestFile).files as Record<string, { ids?: number[] }>;
+		} catch {
+			return hits;
+		}
+		const seen = new Set(hits.map((hit) => hit.id));
+		const neighbors: MemoryHit[] = [];
+		for (const hit of hits.slice(0, LINK_EXPAND_PRIMARY)) {
+			if (hit.layer !== "project") continue;
+			if (hit.kind !== "file" && hit.kind !== "note") continue;
+			const links = this.linksForHit(hit, files, rowDb as { get: (id: number) => { text?: string | null } });
+			if (links.length === 0) continue;
+			for (const link of links) {
+				const entry = files[link.targetPath];
+				const ids = entry?.ids;
+				if (!ids || ids.length === 0) continue;
+				for (const rowId of ids.slice(0, 2)) {
+					const neighborId = `project:${rowId}`;
+					if (seen.has(neighborId)) continue;
+					let row: { text?: string | null } | undefined;
+					try {
+						row = rowDb.get(rowId);
+					} catch {
+						continue;
+					}
+					const text = row?.text ?? "";
+					if (!text) continue;
+					seen.add(neighborId);
+					neighbors.push({
+						id: neighborId,
+						layer: "project",
+						kind: kindOf(text),
+						score: hit.score * LINK_SCORE_FACTOR,
+						text,
+					});
+					if (hits.length + neighbors.length >= topK * 2) break;
+				}
+			}
+		}
+		if (neighbors.length === 0) return hits;
+		return [...hits, ...neighbors].sort((a, b) => b.score - a.score);
+	}
+
+	/** Links on this row, plus links stored on sibling chunks of the same file. */
+	private linksForHit(
+		hit: MemoryHit,
+		files: Record<string, { ids?: number[] }>,
+		db: { get: (id: number) => { text?: string | null } },
+	): ReturnType<typeof parseCrossFileLinks> {
+		const links = parseCrossFileLinks(hit.text);
+		const file = /\[file:([^\]]+)\]/.exec(hit.text)?.[1];
+		if (!file) return links;
+		const ids = files[file]?.ids ?? [];
+		const seen = new Set(links.map((link) => `${link.linkType}:${link.targetPath}`));
+		for (const rowId of ids.slice(0, 6)) {
+			if (`project:${rowId}` === hit.id) continue;
+			let row: { text?: string | null } | undefined;
+			try {
+				row = db.get(rowId);
+			} catch {
+				continue;
+			}
+			for (const link of parseCrossFileLinks(row?.text ?? "")) {
+				const key = `${link.linkType}:${link.targetPath}`;
+				if (seen.has(key)) continue;
+				seen.add(key);
+				links.push(link);
+			}
+		}
+		return links;
 	}
 
 	async forget(query: string, layer: MemoryLayer): Promise<string> {

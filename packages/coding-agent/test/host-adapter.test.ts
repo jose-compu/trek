@@ -29,7 +29,7 @@ describe("host adapter", () => {
 			expect(workflow, `workflow ${workflowName} not found`).toBeDefined();
 			expect(workflow?.workflow.nodes.length).toBeGreaterThan(0);
 			for (const node of workflow?.workflow.nodes ?? []) {
-				expect(["prompt", "include"]).toContain(node.kind);
+				expect(["prompt", "include", "fan_out"]).toContain(node.kind);
 			}
 		}
 	});
@@ -71,7 +71,7 @@ describe("host adapter", () => {
 			expect(yaml).not.toContain("import");
 			expect(yaml).not.toContain("require");
 			for (const node of workflow.workflow.nodes) {
-				expect(["prompt", "include"]).toContain(node.kind);
+				expect(["prompt", "include", "fan_out"]).toContain(node.kind);
 				if (node.kind === "prompt") {
 					expect(node.allowedTools).toEqual([]);
 					expect(node.body.toLowerCase()).not.toContain("octokit");

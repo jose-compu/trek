@@ -1,6 +1,7 @@
 name: address-review
 description: |
   Reply to review threads and make follow-up commits to address feedback.
+  Reuses commit-on-branch for the commit step.
 nodes:
   - id: detect-host
     include: _detect-host
@@ -29,12 +30,16 @@ nodes:
       Plan the code changes to address the review feedback. List files and changes.
       Do not implement yet.
     depends_on: [draft-replies]
-  - id: commit-and-reply
+  - id: commit
+    include: commit-on-branch
+    returns: $commit.stage-and-commit.output
+    depends_on: [plan-changes]
+  - id: post-replies
     trigger_rule: all_success
     allowed_tools: []
     output_type: findings
     prompt: |
-      State the commands to: implement changes from $plan-changes.output, commit
-      them, and post replies from $draft-replies.output with the host CLI from
-      $detect-host.output. Do not run them.
-    depends_on: [plan-changes]
+      State the commands to post replies from $draft-replies.output with the host
+      CLI from $detect-host.output after the commit from $commit.output. Do not
+      run them.
+    depends_on: [commit]
