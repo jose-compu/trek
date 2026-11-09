@@ -23,6 +23,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 - Belay PR review pass integration ([#282](https://github.com/jose-compu/trek/issues/282))
 - Index-time intent captions for semantic memory ([#280](https://github.com/jose-compu/trek/issues/280))
 - Stable content-hash chunk IDs for semantic memory ([#281](https://github.com/jose-compu/trek/issues/281))
+- Cross-file links for semantic memory ([#283](https://github.com/jose-compu/trek/issues/283))
 - Semantic split and merge for chunking ([#284](https://github.com/jose-compu/trek/issues/284))
 
 ### Note
