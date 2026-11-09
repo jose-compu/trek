@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# Local stand-in for GitHub CI (which runs once daily at 06:00 CET).
 # Get list of staged files before running check
 STAGED_FILES=$(git diff --cached --name-only)
 
@@ -12,16 +13,23 @@ fi
 echo "Running formatting, linting, and type checking..."
 npm run check
 if [ $? -ne 0 ]; then
-  echo "❌ Checks failed. Please fix the errors before committing."
+  echo "Checks failed. Fix the errors before committing."
   exit 1
 fi
 
 RUN_BROWSER_SMOKE=0
+CODE_STAGED=0
 for file in $STAGED_FILES; do
   case "$file" in
     packages/ai/*|packages/web-ui/*|package.json|package-lock.json)
       RUN_BROWSER_SMOKE=1
-      break
+      ;;
+  esac
+  case "$file" in
+    *.md|*.mdx)
+      ;;
+    *)
+      CODE_STAGED=1
       ;;
   esac
 done
@@ -30,7 +38,7 @@ if [ $RUN_BROWSER_SMOKE -eq 1 ]; then
   echo "Running browser smoke check..."
   npm run check:browser-smoke
   if [ $? -ne 0 ]; then
-    echo "❌ Browser smoke check failed."
+    echo "Browser smoke check failed."
     exit 1
   fi
 fi
@@ -42,4 +50,13 @@ for file in $STAGED_FILES; do
   fi
 done
 
-echo "✅ All pre-commit checks passed!"
+if [ $CODE_STAGED -eq 1 ]; then
+  echo "Running full test suite (GitHub CI is daily only)..."
+  ./test.sh
+  if [ $? -ne 0 ]; then
+    echo "Tests failed. Fix them before committing."
+    exit 1
+  fi
+fi
+
+echo "All pre-commit checks passed."

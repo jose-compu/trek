@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { UserMessageComponent } from "../src/modes/interactive/components/user-message.ts";
+import { isQuietContinuePrompt, UserMessageComponent } from "../src/modes/interactive/components/user-message.ts";
 import { initTheme, theme } from "../src/modes/interactive/theme/theme.ts";
 
 const OSC133_ZONE_START = "\x1b]133;A\x07";
@@ -73,5 +73,34 @@ describe("UserMessageComponent", () => {
 		expect(rendered).not.toContain("continue with tasks pls");
 		expect(rendered).not.toContain(OSC133_ZONE_START);
 		expect(rendered).not.toContain(theme.bg("userMessageBg", "test").slice(0, 8));
+	});
+
+	test("hides the pre-0.19.2 JSON teaching continue prompt, including leading whitespace", () => {
+		initTheme("dark");
+		const old = [
+			"",
+			"Continue the same task until it is done. Subtasks, handoffs, consults, and tool runners stay in play. If you are stuck, emit",
+			'{"escalate":"planning","why":"stuck"}. If you need live fetch or grep, emit {"action":"delegate","target":"tooling","reason":"live fetch"}. If the remaining',
+			'work is mechanical, emit {"descalate":"workhorse","why":"simple again"}. Do not emit new_topic. Do not stop after one commit, one file, or one milestone. Do not',
+			"wait for the user.",
+			"",
+			"Original request:",
+			'"""',
+			"continue",
+			'"""',
+		].join("\n");
+		expect(isQuietContinuePrompt(old)).toBe(true);
+		expect(isQuietContinuePrompt(`\uFEFF ${old}`)).toBe(true);
+		const rendered = new UserMessageComponent(old).render(80).join("\n");
+		expect(rendered).toContain(theme.fg("dim", "· continue"));
+		expect(rendered).not.toContain("Original request");
+		expect(rendered).not.toContain('"escalate"');
+		expect(rendered).not.toContain(OSC133_ZONE_START);
+		expect(rendered).not.toContain(theme.bg("userMessageBg", "test").slice(0, 8));
+	});
+
+	test("does not treat a real user continue as an internal prompt", () => {
+		expect(isQuietContinuePrompt("continue")).toBe(false);
+		expect(isQuietContinuePrompt("continue with tasks pls")).toBe(false);
 	});
 });

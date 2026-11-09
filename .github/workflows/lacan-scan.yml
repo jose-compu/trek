@@ -1,23 +1,50 @@
 # Static AI-safety scan (Lacan). Findings at/above fail-on fail the job.
 # False positives are skipped in `.lacan.toml` (loaded automatically).
+# Same cadence as CI: daily 06:00 CET, only if main moved in the last 24h.
 name: Lacan Scan
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  schedule:
+    - cron: "0 5 * * *" # 06:00 CET (UTC+1)
+  workflow_dispatch:
 
 concurrency:
-  group: lacan-scan-${{ github.ref }}
-  cancel-in-progress: true
+  group: lacan-scan-daily
+  cancel-in-progress: false
 
 permissions:
   contents: read
   security-events: write
 
 jobs:
+  recent-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || 'refs/heads/main' }}
+
+      - name: Run only after commits in the last 24 hours
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git log --since="24 hours ago" --pretty=%H | grep -q .; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No commits on main in the last 24 hours; skipping scan."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
   scan:
+    needs: recent-changes
+    if: needs.recent-changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

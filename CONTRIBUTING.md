@@ -54,9 +54,10 @@ Before submitting a PR:
 ```bash
 npm run check
 ./test.sh
+npm run build
 ```
 
-Both must pass.
+All three must pass. The Husky pre-commit hook runs `npm run check` and `./test.sh`; pre-push runs `npm run build`. GitHub CI is daily at 06:00 CET on `main` only if it moved in the last 24 hours.
 
 Do not edit `CHANGELOG.md`. Changelog entries are added by maintainers.
 

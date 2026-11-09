@@ -4,6 +4,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Fixed
+
+- Internal long-task and layering continue prompts stay off the transcript. No grey user card, no pending `Follow-up:` dump. The dim `· workhorse · continue N` line remains.
+
 ## [0.19.5] - 2026-11-09
 
 ### Fixed
