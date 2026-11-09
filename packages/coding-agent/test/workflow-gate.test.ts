@@ -6,7 +6,8 @@
 
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { fauxAssistantMessage } from "@trek/ai";
 import { afterEach, describe, expect, test } from "vitest";
 import { orderNodes, parseArchonWorkflow } from "../src/core/domains/archon.ts";
@@ -354,6 +355,24 @@ describe("workflow gate", () => {
 		expect(harness.getPendingResponseCount()).toBe(0);
 		expect(assistantCount(harness)).toBe(5);
 		expect(harness.session.getWorkflowCheck()).toBeUndefined();
+	});
+
+	test("belay-pr is a findings DAG and does not merge", () => {
+		const file = join(dirname(fileURLToPath(import.meta.url)), "../domains/coding/belay-pr.yaml");
+		const workflow = parseArchonWorkflow(readFileSync(file, "utf8"), file);
+		expect(workflow.name).toBe("belay-pr");
+		expect(workflow.description).toMatch(/Belay holds the rope/);
+		expect(`${workflow.description}\n${workflow.nodes.map((node) => node.body).join("\n")}`).not.toMatch(/bugbot/i);
+		expect(orderNodes(workflow).map((node) => node.id)).toEqual(["scope", "findings", "verdict"]);
+		for (const node of workflow.nodes) {
+			expect(node.kind).toBe("prompt");
+			expect(node.allowedTools).toEqual([]);
+			expect(node.outputType).toBe("findings");
+			expect(node.body).not.toMatch(/gh pr merge|merge-pr/);
+		}
+		expect(workflow.description).toMatch(/Do not merge/);
+		expect(workflow.nodes.find((node) => node.id === "findings")?.body).toMatch(/Severity \| Location \| Finding/);
+		expect(workflow.nodes.find((node) => node.id === "verdict")?.body).toMatch(/LGTM or request changes/);
 	});
 });
 

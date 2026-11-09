@@ -64,6 +64,11 @@ export async function checkLaw1(descriptor: ToolCallDescriptor, env: SafetyEnv):
 		return undefined;
 	}
 
+	// script_edit snapshots the file before mutate and invert restores. That is the Law 1 read.
+	if (descriptor.toolName === "script_edit") {
+		return undefined;
+	}
+
 	const filePath = getFilePath(descriptor);
 	if (filePath) {
 		const absPath = env.resolvePath(filePath);

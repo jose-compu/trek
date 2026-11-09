@@ -59,6 +59,30 @@ describe("long task pin", () => {
 		expect(looksLikeLongTaskDone("AIS208 stub is complete. Next: wire Crisp.")).toBe(false);
 		expect(looksLikeLongTaskDone("Patch ready for the maintainer publish step.")).toBe(true);
 		expect(
+			looksLikeLongTaskDone(
+				"Stopped — original request is complete. No further work applies.\n\n- Milestone 1.6: closed (5 issues, 0 open)",
+			),
+		).toBe(true);
+		expect(looksLikeLongTaskDone("Original request is fully done. Nothing left to run.")).toBe(true);
+		expect(
+			looksLikeLongTaskDone(
+				"Done. The original request is fully satisfied; no remaining steps.\n\nNo further commits, issues, or PRs are required for that ask.",
+			),
+		).toBe(true);
+		expect(
+			looksLikeLongTaskDone("Confirming final state once more — the original request is already complete."),
+		).toBe(true);
+		expect(looksLikeLongTaskDone("There is nothing left to create, attach, branch, or open for that ask.")).toBe(
+			true,
+		);
+		expect(
+			shouldResumeLongTask({
+				pinned: true,
+				assistantText: "Stopped — original request is complete. No further work applies.\n- Milestone 1.6: closed",
+				queued: false,
+			}),
+		).toBe(false);
+		expect(
 			shouldResumeLongTask({
 				pinned: true,
 				assistantText: "v6.0.0 is complete. Release published.",
@@ -74,6 +98,8 @@ describe("long task pin", () => {
 		).toBe(true);
 		const follow = longTaskContinuePrompt("complete the whole v6");
 		expect(follow).toMatch(/Do not stop after one commit/);
+		expect(follow).toMatch(/When the original request is fully done/);
+		expect(follow).toMatch(/Do not re-verify a finished request/);
 		expect(follow).toMatch(/Original request/);
 		expect(follow).not.toMatch(/"escalate"/);
 		expect(follow).not.toMatch(/"descalate"/);

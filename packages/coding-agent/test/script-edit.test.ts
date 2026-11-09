@@ -122,9 +122,24 @@ describe("runScriptEdit", () => {
 });
 
 describe("Law 1", () => {
-	it("refuses script_edit on an unread existing path", async () => {
+	it("lets script_edit proceed unread; snapshot is the read", async () => {
 		const reason = await checkLaw1(
 			{ toolName: "script_edit", args: { path: "notes.txt", script: "%s/a/b/g" }, tier: "cheap" },
+			{
+				halted: false,
+				requireDestructiveConfirm: false,
+				enforceReadBeforeWrite: true,
+				hasReadFile: () => false,
+				fileExists: async () => true,
+				resolvePath: (p) => `/repo/${p}`,
+			},
+		);
+		expect(reason).toBeUndefined();
+	});
+
+	it("still refuses write on an unread existing path", async () => {
+		const reason = await checkLaw1(
+			{ toolName: "write", args: { path: "notes.txt", content: "x" }, tier: "cheap" },
 			{
 				halted: false,
 				requireDestructiveConfirm: false,

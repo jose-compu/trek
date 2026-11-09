@@ -1005,7 +1005,7 @@ describe("edit tool fuzzy matching", () => {
 				path: testFile,
 				edits: [{ oldText: "missing", newText: "replacement" }],
 			}),
-		).rejects.toThrow(/Do not rewrite the entire file/);
+		).rejects.toThrow(/Do not rewrite the file/);
 	});
 
 	it("must not claim already applied when oldText is still in the file", async () => {
@@ -1187,6 +1187,65 @@ describe("edit tool fuzzy matching", () => {
 		expect(content).toContain("label: 'D'");
 		expect(content).toContain("const tail = true;");
 		expect(content).not.toContain("156|");
+	});
+
+	it("matches single-quoted oldText against double-quoted file lines", async () => {
+		const testFile = join(testDir, "quotes.ts");
+		writeFileSync(testFile, 'const label = "C";\nconst tail = true;\n');
+
+		const result = await editTool.execute("test-quote-flex", {
+			path: testFile,
+			edits: [{ oldText: "const label = 'C';", newText: "const label = 'D';" }],
+		});
+
+		expect(getTextOutput(result)).toContain("Successfully replaced");
+		expect(readFileSync(testFile, "utf-8")).toBe("const label = 'D';\nconst tail = true;\n");
+	});
+
+	it("names the nearest line instead of dumping a token hit list", async () => {
+		const testFile = join(testDir, "readme-miss.md");
+		writeFileSync(
+			testFile,
+			[
+				"vdf.verify(challenge, 100, proof);",
+				"vdf.verify(challenge, 100, proof, DISCRIMINANT_256);",
+				"",
+				"## FAQ",
+				"After the current section.",
+				"",
+			].join("\n"),
+		);
+
+		await expect(
+			editTool.execute("test-compact-miss", {
+				path: testFile,
+				edits: [
+					{
+						oldText:
+							'After the current section.\nvdf.verify(challenge, 100, proof);\nimport type { SolveOptions } from "crypto-vdf";',
+						newText: "After the current section.\nSee issue 31.",
+					},
+				],
+			}),
+		).rejects.toThrow(/nearest L5[\s\S]*5\| After the current section/);
+
+		try {
+			await editTool.execute("test-compact-miss-2", {
+				path: testFile,
+				edits: [
+					{
+						oldText:
+							'After the current section.\nvdf.verify(challenge, 100, proof);\nimport type { SolveOptions } from "crypto-vdf";',
+						newText: "After the current section.\nSee issue 31.",
+					},
+				],
+			});
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			expect(message).not.toContain("Lines still containing");
+			expect(message).not.toContain("Current text from the first hit");
+			expect(message.split("\n").length).toBeLessThanOrEqual(6);
+		}
 	});
 
 	it("should match tab-indented file against space-indented oldText", async () => {

@@ -345,6 +345,7 @@ import { type BashOperations, createLocalBashOperations } from "./tools/bash.ts"
 import { type Edit, editStillNeeded } from "./tools/edit-diff.ts";
 import { createAllToolDefinitions } from "./tools/index.ts";
 import { createMemoryToolDefinitions } from "./tools/memory.ts";
+import { extractInplacePaths } from "./tools/unix-guards.ts";
 import { workflowToolDefinition } from "./tools/workflow-card.ts";
 
 const MEMORY_TOOL_NAMES = new Set(["remember", "recall", "forget"]);
@@ -1109,6 +1110,10 @@ export class AgentSession {
 			const command = (args as { command?: unknown } | undefined)?.command;
 			if (typeof command !== "string") {
 				return [];
+			}
+			const inplace = extractInplacePaths(command);
+			if (inplace.length > 0) {
+				return inplace;
 			}
 			const ops = parseBashPathOps(command);
 			if (!ops) {

@@ -17,7 +17,7 @@ const PARTIAL =
 	/\b(?:next:|will keep|remaining|milestone|progress is ongoing|started v\d|bumped versions|preparing the release|next milestone|pushed\.?$)\b/i;
 
 const DONE =
-	/\b(?:all (?:requested |remaining )?work is (?:done|complete)|the (?:task|release) is (?:done|complete|shipped)|v\d+(?:\.\d+)* is (?:complete|released|shipped)|release published|nothing left to do|blocked(?:\s+on|\s*:)|need you to|waiting for (?:you|input|(?:the )?maintainer)|ready for (?:the )?maintainer|cannot continue|operation aborted)\b/i;
+	/\b(?:all (?:requested |remaining )?work is (?:done|complete)|the (?:task|release|original request) is (?:already |fully )?(?:done|complete|shipped|satisfied)|original request is (?:already |fully )?(?:done|complete|satisfied)|v\d+(?:\.\d+)* is (?:complete|released|shipped)|release published|nothing left to (?:do|run|create|attach|open)|there is nothing left|no (?:further|remaining) (?:work|steps)|no further work applies|fully satisfied|blocked(?:\s+on|\s*:)|need you to|waiting for (?:you|input|(?:the )?maintainer)|ready for (?:the )?maintainer|cannot continue|operation aborted)\b/i;
 
 const CONTROL_ECHO = /\becho\s+['"`]?\{(?:\\.|[^}'"`]){0,240}"(?:escalate|descalate|action)"/i;
 
@@ -54,7 +54,14 @@ export function looksLikePartialMilestone(text: string): boolean {
 
 /** Last assistant turn looks finished or blocked on the user. */
 export function looksLikeLongTaskDone(text: string): boolean {
-	return DONE.test(stripForMatch(text));
+	const body = stripForMatch(text);
+	if (!DONE.test(body)) {
+		return false;
+	}
+	if (/\bnext:\s*\S/i.test(body) && !/\bnothing left\b|\bno (?:further|remaining) (?:work|steps)\b/i.test(body)) {
+		return false;
+	}
+	return true;
 }
 
 /**
@@ -135,7 +142,7 @@ export function classifyLongTaskResume(text: string): LongTaskResume {
 
 export function longTaskContinuePrompt(goal: string): string {
 	const clipped = goal.trim().slice(0, 800);
-	return `Continue the same task until it is done. Subtasks, handoffs, consults, and tool runners stay in play. Do not stop after one commit, one file, or one milestone. Do not wait for the user.
+	return `Continue the same task until it is done. Subtasks, handoffs, consults, and tool runners stay in play. Do not stop after one commit, one file, or one milestone. Do not wait for the user. When the original request is fully done, say that it is done and stop. Do not re-verify a finished request.
 
 Original request:
 """

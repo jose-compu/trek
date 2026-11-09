@@ -27,6 +27,7 @@ import {
 import { bashRecipeSuggestion } from "./bash-recipes.ts";
 import { OutputAccumulator } from "./output-accumulator.ts";
 import { getTextOutput, invalidArgText, str } from "./render-utils.ts";
+import { formatScriptEditCard, runScriptEdit, type ScriptEditToolDetails } from "./script-edit.ts";
 import { wrapToolDefinition } from "./tool-definition-wrapper.ts";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, type TruncationResult } from "./truncate.ts";
 import { inspectBashCommand } from "./unix-guards.ts";
@@ -54,6 +55,7 @@ export interface BashToolDetails {
 	fullOutputPath?: string;
 	backgrounded?: boolean;
 	pid?: number;
+	scriptEdit?: ScriptEditToolDetails;
 }
 
 /**
@@ -294,6 +296,17 @@ function firstCommandLine(command: string): string {
 
 function formatBashCall(args: { command?: string; timeout?: number } | undefined, compact = false): string {
 	const command = str(args?.command);
+	if (command) {
+		const guard = inspectBashCommand(command);
+		if (guard.action === "script_edit") {
+			return formatScriptEditCard({
+				engine: guard.edit.engine,
+				path: guard.edit.path,
+				script: guard.edit.script,
+				status: "…",
+			});
+		}
+	}
 	const timeout = args?.timeout as number | undefined;
 	const shownTimeout =
 		command && looksLikeServerCommand(command) ? undefined : resolveTimeoutSeconds(command ?? "", timeout);
@@ -421,8 +434,37 @@ export function createBashToolDefinition(
 			if (guard.action === "refuse") {
 				throw new Error(guard.reason);
 			}
-			if (guard.action === "redirect") {
-				throw new Error(guard.hint);
+			if (guard.action === "script_edit" && !isDryRun()) {
+				try {
+					const result = await runScriptEdit(cwd, {
+						path: guard.edit.path,
+						script: guard.edit.script,
+						engine: guard.edit.engine,
+					});
+					const details: ScriptEditToolDetails = {
+						engine: result.engine,
+						path: result.path,
+						script: result.script,
+						diff: result.diff,
+						added: result.added,
+						removed: result.removed,
+						dryRun: result.dryRun,
+						killed: result.killed,
+					};
+					const text = formatScriptEditCard({
+						engine: result.engine,
+						path: result.path,
+						script: result.script,
+						status: result.dryRun ? "dry-run" : "ok",
+						added: result.added,
+						removed: result.removed,
+						expanded: true,
+						diff: result.diff,
+					});
+					return { content: [{ type: "text", text }], details: { scriptEdit: details } };
+				} catch {
+					// Mixed or unparsable in-place edit stays on bash. No error card.
+				}
 			}
 			const guardedCommand = guard.action === "rewrite" ? guard.command : resolvedCommand;
 
