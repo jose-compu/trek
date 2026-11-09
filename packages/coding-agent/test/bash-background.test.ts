@@ -47,6 +47,8 @@ describe("looksLikeWaitCommand", () => {
 		expect(looksLikeWaitCommand("python3 -c 'import time; time.sleep(60)'")).toBe(true);
 		expect(looksLikeWaitCommand("gh pr checks 36 --repo jose-compu/crypto-vdf-js --watch")).toBe(true);
 		expect(looksLikeWaitCommand("gh run watch 42627356136 --repo jose-compu/crypto-vdf-js")).toBe(true);
+		expect(looksLikeWaitCommand("gh --repo jose-compu/crypto-vdf-js run watch 42627356136")).toBe(true);
+		expect(looksLikeWaitCommand("gh --repo jose-compu/crypto-vdf-js pr checks 36 --watch")).toBe(true);
 		expect(looksLikeWaitCommand("until gh pr checks 36; do sleep 10; done")).toBe(true);
 	});
 

@@ -34,11 +34,13 @@ export function looksLikeWaitCommand(command: string): boolean {
 	if (/\bsleep\s+\d/.test(command) || /\btime\.sleep\s*\(/.test(command)) {
 		return true;
 	}
-	if (/\bgh\s+run\s+watch\b/.test(command)) {
-		return true;
-	}
-	if (/\s--watch\b/.test(command) && /\bgh\s+(?:pr\s+checks|run\s+view)\b/.test(command)) {
-		return true;
+	if (/\bgh\b/.test(command)) {
+		if (/\brun\s+watch\b/.test(command)) {
+			return true;
+		}
+		if (/\s--watch\b/.test(command) && /\b(?:pr\s+checks|run\s+view)\b/.test(command)) {
+			return true;
+		}
 	}
 	return /\b(?:until|while)\b/.test(command) && /\bsleep\b/.test(command);
 }
