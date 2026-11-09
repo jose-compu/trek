@@ -23,7 +23,7 @@ export function getCommand(descriptor: ToolCallDescriptor): string | undefined {
 
 /** Extract the file path from write/edit tool args, if present. */
 export function getFilePath(descriptor: ToolCallDescriptor): string | undefined {
-	if (descriptor.toolName !== "write" && descriptor.toolName !== "edit") {
+	if (descriptor.toolName !== "write" && descriptor.toolName !== "edit" && descriptor.toolName !== "script_edit") {
 		return undefined;
 	}
 	return getString(descriptor.args, "path") ?? getString(descriptor.args, "file_path");

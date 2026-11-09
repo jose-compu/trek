@@ -1089,7 +1089,7 @@ export class AgentSession {
 	}
 
 	private _pathsToCapture(toolName: string, args: unknown): string[] {
-		if (toolName === "write" || toolName === "edit") {
+		if (toolName === "write" || toolName === "edit" || toolName === "script_edit") {
 			const filePath = this._toolFilePath(args);
 			return filePath ? [filePath] : [];
 		}
@@ -1195,7 +1195,7 @@ export class AgentSession {
 
 	private async _recordTrekVersion(toolName: string, args: unknown): Promise<void> {
 		try {
-			if (toolName === "write" || toolName === "edit") {
+			if (toolName === "write" || toolName === "edit" || toolName === "script_edit") {
 				const filePath = this._toolFilePath(args);
 				if (!filePath) {
 					return;
@@ -1289,7 +1289,7 @@ export class AgentSession {
 	}
 
 	private _mutationPath(toolName: string, args: unknown): string | undefined {
-		if (toolName !== "edit" && toolName !== "write") {
+		if (toolName !== "edit" && toolName !== "write" && toolName !== "script_edit") {
 			return undefined;
 		}
 		if (!args || typeof args !== "object") {
@@ -1403,7 +1403,7 @@ export class AgentSession {
 				: record && typeof record.file_path === "string"
 					? record.file_path
 					: "that file";
-		if (toolName === "edit") {
+		if (toolName === "edit" || toolName === "script_edit") {
 			return `Another edit of ${raw} is already running in this turn. Parallel edits apply only to different files. Put every change to this file in one edit call, in edits[]. Re-read the file after that call finishes. Do not rewrite the file.`;
 		}
 		return `Another write of ${raw} is already running in this turn. Parallel writes apply only to different files. Wait for this write to finish. Do not rewrite the file.`;
@@ -1618,7 +1618,10 @@ export class AgentSession {
 	 * knowledge of that file's contents.
 	 */
 	private _recordFileAccessForSafety(toolName: string, args: unknown, isError: boolean): void {
-		if (isError || (toolName !== "read" && toolName !== "write" && toolName !== "edit")) {
+		if (
+			isError ||
+			(toolName !== "read" && toolName !== "write" && toolName !== "edit" && toolName !== "script_edit")
+		) {
 			return;
 		}
 		const rawPath = (args as { path?: unknown; file_path?: unknown } | undefined)?.path;
@@ -5164,7 +5167,7 @@ export class AgentSession {
 
 			// Topic/task reset before any bind so sticky Planning/Frontier cannot stick.
 			const previousTask = this._previousTask;
-			let topicReset: TopicReset = detectTopicReset(previousTask, expandedText);
+			const topicReset: TopicReset = detectTopicReset(previousTask, expandedText);
 			expandedText = stripNewTopicSignal(expandedText);
 			this._previousTask = expandedText;
 			this._toolsSincePlan = 0;
@@ -6666,6 +6669,7 @@ export class AgentSession {
 					},
 					write: { dryRun: () => this._dryRunEnabled },
 					edit: { dryRun: () => this._dryRunEnabled },
+					script_edit: { dryRun: () => this._dryRunEnabled },
 				});
 
 		this._baseToolDefinitions = new Map(
@@ -6727,6 +6731,7 @@ export class AgentSession {
 					"bash",
 					"edit",
 					"write",
+					"script_edit",
 					...(this.memoryActive() ? [...MEMORY_TOOL_NAMES] : []),
 					...(lessonsEnabled() ? [CRYSTALLIZE_TOOL_NAME] : []),
 				];

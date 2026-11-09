@@ -28,6 +28,7 @@ import { OutputAccumulator } from "./output-accumulator.ts";
 import { getTextOutput, invalidArgText, str } from "./render-utils.ts";
 import { wrapToolDefinition } from "./tool-definition-wrapper.ts";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, type TruncationResult } from "./truncate.ts";
+import { inspectBashCommand } from "./unix-guards.ts";
 
 const bashSchema = Type.Object({
 	command: Type.String({ description: "Bash command to execute" }),
@@ -410,16 +411,24 @@ export function createBashToolDefinition(
 			_ctx?,
 		) {
 			const resolvedCommand = commandPrefix ? `${commandPrefix}\n${command}` : command;
+			const guard = inspectBashCommand(resolvedCommand);
+			if (guard.action === "refuse") {
+				throw new Error(guard.reason);
+			}
+			if (guard.action === "redirect") {
+				throw new Error(guard.hint);
+			}
+			const guardedCommand = guard.action === "rewrite" ? guard.command : resolvedCommand;
 
 			// Dry-run: do not execute; report the command that would run.
 			if (isDryRun()) {
 				return {
-					content: [{ type: "text", text: `[dry-run] would execute:\n${command}` }],
+					content: [{ type: "text", text: `[dry-run] would execute:\n${guardedCommand}` }],
 					details: undefined,
 				};
 			}
 
-			const spawnContext = resolveSpawnContext(resolvedCommand, cwd, spawnHook);
+			const spawnContext = resolveSpawnContext(guardedCommand, cwd, spawnHook);
 			const output = new OutputAccumulator({ tempFilePrefix: "pi-bash" });
 			let updateTimer: NodeJS.Timeout | undefined;
 			let updateDirty = false;
