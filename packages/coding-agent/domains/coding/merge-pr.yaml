@@ -29,12 +29,26 @@ nodes:
       main or master via the host's merge process, not a force push. State this
       constraint.
     depends_on: [verify-green]
+  - id: belay
+    include: belay-pr
+    returns: $belay.verdict.output
+    depends_on: [verify-not-main]
+  - id: check-belay
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Check if Belay from $belay.output says LGTM. If not LGTM, refuse to merge
+      and state that Belay must pass or be waived by the operator. If LGTM,
+      proceed.
+    depends_on: [belay]
   - id: merge-command
     trigger_rule: all_success
     allowed_tools: []
     output_type: findings
     prompt: |
       State the command to merge the PR with the host CLI, only if
-      $verify-green.output says checks are passing and $verify-not-main.output
-      confirms no force push. Do not run it.
-    depends_on: [verify-not-main]
+      $verify-green.output says checks are passing, $verify-not-main.output
+      confirms no force push, and $check-belay.output confirms Belay LGTM. Do not
+      run it.
+    depends_on: [check-belay]
