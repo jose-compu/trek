@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { parse } from "yaml";
 import { type ArchonTriggerRule, isArchonTriggerRule } from "./archon-when.ts";
 
-export const ARCHON_NODE_KINDS = ["prompt", "command", "bash", "script", "loop"] as const;
+export const ARCHON_NODE_KINDS = ["prompt", "command", "bash", "script", "loop", "include"] as const;
 export type ArchonNodeKind = (typeof ARCHON_NODE_KINDS)[number];
 
 export const ARCHON_NODE_ROLES = ["workhorse", "planning", "frontier", "tooling"] as const;
@@ -29,6 +29,14 @@ export interface ArchonNode {
 	allowedTools?: string[];
 	/** Present when `kind` is `loop`. Archon stores this as an object, not a string. */
 	loop?: { until: string; maxIterations: number };
+	/** Present when `kind` is `include`. References another workflow by name. */
+	include?: { workflow: string; namespace?: string };
+	/** Archon `with:` for include nodes. Input parameters for the included workflow. */
+	with?: Record<string, string>;
+	/** Archon `inputs:` declaration for workflows that can be included. */
+	inputs?: string[];
+	/** Archon `returns:` for include nodes. Selects output from included workflow nodes. */
+	returns?: string;
 	/** Prompt nodes only. Default is the current layer role. */
 	role?: ArchonNodeRole;
 	/** Archon `when:`. Skip the node when false. */
@@ -53,6 +61,8 @@ export interface ArchonWorkflow {
 	name: string;
 	description: string;
 	nodes: ArchonNode[];
+	/** Archon `inputs:` declaration. Parameters this workflow accepts when included. */
+	inputs?: string[];
 }
 
 export function parseArchonWorkflow(text: string, sourcePath?: string): ArchonWorkflow {
@@ -73,6 +83,7 @@ export function parseArchonWorkflow(text: string, sourcePath?: string): ArchonWo
 	if (!Array.isArray(record.nodes) || record.nodes.length === 0) {
 		throw new Error("workflow nodes are required");
 	}
+	const inputs = readWorkflowInputs(record.inputs);
 	const nodes = record.nodes.map((node, index) => parseNode(node, index));
 	const ids = new Set<string>();
 	for (const node of nodes) {
@@ -88,12 +99,9 @@ export function parseArchonWorkflow(text: string, sourcePath?: string): ArchonWo
 			}
 		}
 	}
-	orderNodes({ name: record.name.trim(), description: record.description.trim(), nodes });
-	return {
-		name: record.name.trim(),
-		description: record.description.trim(),
-		nodes,
-	};
+	const workflow = { name: record.name.trim(), description: record.description.trim(), nodes, inputs };
+	orderNodes(workflow);
+	return workflow;
 }
 
 export function loadArchonFile(filePath: string): ArchonWorkflow {
@@ -114,7 +122,7 @@ function parseNode(value: unknown, index: number): ArchonNode {
 	const id = record.id.trim();
 	const present = presentKinds(record);
 	if (present.length !== 1) {
-		throw new Error(`node ${id} needs one of prompt, command, bash, script, or loop`);
+		throw new Error(`node ${id} needs one of prompt, command, bash, script, loop, or include`);
 	}
 	const kind = present[0];
 	const dependsOn = record.depends_on === undefined ? [] : stringList(record.depends_on, id);
@@ -133,6 +141,22 @@ function parseNode(value: unknown, index: number): ArchonNode {
 			dependsOn,
 			allowedTools,
 			loop: { until: loop.until, maxIterations: loop.maxIterations },
+			...extras,
+		};
+	}
+	if (kind === "include") {
+		const include = readInclude(record.include, id);
+		const withParams = readWith(record.with, id);
+		const returns = readReturns(record.returns, id);
+		return {
+			id,
+			kind,
+			body: include.workflow,
+			dependsOn,
+			allowedTools,
+			include,
+			...(withParams ? { with: withParams } : {}),
+			...(returns ? { returns } : {}),
 			...extras,
 		};
 	}
@@ -252,8 +276,8 @@ function presentKinds(record: Record<string, unknown>): ArchonNodeKind[] {
 	for (const kind of ARCHON_NODE_KINDS) {
 		const value = record[kind];
 		if (value === undefined) continue;
-		if (kind === "loop") {
-			kinds.push("loop");
+		if (kind === "loop" || kind === "include") {
+			kinds.push(kind);
 			continue;
 		}
 		if (typeof value === "string" && value.trim().length > 0) {
@@ -281,6 +305,56 @@ function readLoop(value: unknown, nodeId: string): { prompt: string; until: stri
 		throw new Error(`node ${nodeId} loop.max_iterations must be a positive integer`);
 	}
 	return { prompt: loop.prompt.trim(), until: loop.until.trim(), maxIterations: loop.max_iterations };
+}
+
+function readInclude(value: unknown, nodeId: string): { workflow: string; namespace?: string } {
+	if (typeof value === "string" && value.trim().length > 0) {
+		return { workflow: value.trim() };
+	}
+	if (!value || typeof value !== "object" || Array.isArray(value)) {
+		throw new Error(`node ${nodeId} include must be a workflow name or an object with workflow`);
+	}
+	const include = value as Record<string, unknown>;
+	if (typeof include.workflow !== "string" || include.workflow.trim().length === 0) {
+		throw new Error(`node ${nodeId} include.workflow is required`);
+	}
+	const result: { workflow: string; namespace?: string } = { workflow: include.workflow.trim() };
+	if (typeof include.namespace === "string" && include.namespace.trim().length > 0) {
+		result.namespace = include.namespace.trim();
+	}
+	return result;
+}
+
+function readWith(value: unknown, nodeId: string): Record<string, string> | undefined {
+	if (value === undefined) return undefined;
+	if (!value || typeof value !== "object" || Array.isArray(value)) {
+		throw new Error(`node ${nodeId} with must be an object mapping parameter names to values`);
+	}
+	const withObj = value as Record<string, unknown>;
+	const result: Record<string, string> = {};
+	for (const [key, val] of Object.entries(withObj)) {
+		if (typeof val !== "string") {
+			throw new Error(`node ${nodeId} with.${key} must be a string`);
+		}
+		result[key] = val;
+	}
+	return result;
+}
+
+function readReturns(value: unknown, nodeId: string): string | undefined {
+	if (value === undefined) return undefined;
+	if (typeof value !== "string" || value.trim().length === 0) {
+		throw new Error(`node ${nodeId} returns must be a node path like $namespace.node.output`);
+	}
+	return value.trim();
+}
+
+function readWorkflowInputs(value: unknown): string[] | undefined {
+	if (value === undefined) return undefined;
+	if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || item.trim().length === 0)) {
+		throw new Error("workflow inputs must be a list of parameter names");
+	}
+	return value.map((item) => (item as string).trim());
 }
 
 function readAllowedTools(value: unknown, nodeId: string): string[] | undefined {
@@ -363,4 +437,104 @@ export function workflowWaves(workflow: ArchonWorkflow): ArchonNode[][] {
 		}
 	}
 	return waves;
+}
+
+/** Expand include nodes by inlining the included workflow's nodes with namespaced ids. */
+export function expandIncludes(workflow: ArchonWorkflow, resolver: (name: string) => ArchonWorkflow): ArchonWorkflow {
+	const expanded: ArchonNode[] = [];
+	const includeMap = new Map<
+		string,
+		{ namespace: string; nodes: ArchonNode[]; returns: string | undefined; lastNodeId: string }
+	>();
+
+	for (const node of workflow.nodes) {
+		if (node.kind !== "include") {
+			expanded.push(node);
+			continue;
+		}
+
+		const included = resolver(node.include!.workflow);
+		const namespace = node.include!.namespace ?? node.id;
+
+		const paramSubstitutions = new Map<string, string>();
+		if (node.with && included.inputs) {
+			for (const inputName of included.inputs) {
+				const value = node.with[inputName];
+				if (value !== undefined) {
+					paramSubstitutions.set(inputName, value);
+				}
+			}
+		}
+
+		const namespacedNodes: ArchonNode[] = [];
+		for (const includedNode of included.nodes) {
+			const namespacedId = `${namespace}.${includedNode.id}`;
+			const namespacedDeps = includedNode.dependsOn.map((dep) => `${namespace}.${dep}`);
+
+			let body = includedNode.body;
+			for (const [inputName, value] of paramSubstitutions) {
+				body = body.replace(new RegExp(`\\$INPUTS\\.${inputName}\\b`, "g"), value);
+			}
+
+			namespacedNodes.push({
+				...includedNode,
+				id: namespacedId,
+				dependsOn: node.dependsOn.length > 0 ? [...node.dependsOn, ...namespacedDeps] : namespacedDeps,
+				body,
+			});
+		}
+
+		const lastNode = included.nodes[included.nodes.length - 1];
+		const lastNodeId = lastNode ? `${namespace}.${lastNode.id}` : namespace;
+
+		includeMap.set(node.id, { namespace, nodes: namespacedNodes, returns: node.returns, lastNodeId });
+		expanded.push(...namespacedNodes);
+	}
+
+	const finalNodes: ArchonNode[] = [];
+	for (const node of expanded) {
+		if (node.kind === "include") {
+			continue;
+		}
+
+		let updatedNode = { ...node };
+		let updatedDeps = [...node.dependsOn];
+
+		for (const [includeId, includeInfo] of includeMap) {
+			const includeOutputPattern = `$${includeId}.output`;
+			if (updatedNode.body.includes(includeOutputPattern) || updatedDeps.includes(includeId)) {
+				let targetNodeId: string;
+
+				if (includeInfo.returns) {
+					const match = includeInfo.returns.match(/^\$?([^.]+)\.([^.]+)\.output$/);
+					if (match) {
+						targetNodeId = `${match[1]}.${match[2]}`;
+					} else {
+						targetNodeId = includeInfo.lastNodeId;
+					}
+				} else {
+					targetNodeId = includeInfo.lastNodeId;
+				}
+
+				if (updatedNode.body.includes(includeOutputPattern)) {
+					updatedNode = {
+						...updatedNode,
+						body: updatedNode.body.replace(
+							new RegExp(`\\$${includeId}\\.output\\b`, "g"),
+							`$${targetNodeId}.output`,
+						),
+					};
+				}
+
+				if (updatedDeps.includes(includeId)) {
+					updatedDeps = updatedDeps.map((dep) => (dep === includeId ? targetNodeId : dep));
+				}
+			}
+		}
+
+		updatedNode = { ...updatedNode, dependsOn: updatedDeps };
+		finalNodes.push(updatedNode);
+	}
+
+	return { ...workflow, nodes: finalNodes };
 }
