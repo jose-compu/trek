@@ -102,6 +102,8 @@ export interface EditToolOptions {
 	operations?: EditOperations;
 	/** When this returns true, compute a diff preview and do NOT write to disk (SPECS_SAFETY_HARNESS §5.4, §6). */
 	dryRun?: () => boolean;
+	/** Called after a successful edit with the absolute path. Not awaited; failures are silent. */
+	onFileChanged?: (absolutePath: string) => void;
 }
 
 function isEditRecord(value: unknown): value is Edit {
@@ -451,6 +453,9 @@ export function createEditToolDefinition(
 
 				await ops.writeFile(absolutePath, finalContent);
 				throwIfAborted();
+
+				// Notify about file change for async indexing
+				options?.onFileChanged?.(absolutePath);
 
 				return {
 					content: [

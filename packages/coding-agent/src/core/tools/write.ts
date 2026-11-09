@@ -60,6 +60,8 @@ export interface WriteToolOptions {
 	operations?: WriteOperations;
 	/** When this returns true, compute a diff preview and do NOT mutate the filesystem (SPECS_SAFETY_HARNESS §5.4, §6). */
 	dryRun?: () => boolean;
+	/** Called after a successful write with the absolute path. Not awaited; failures are silent. */
+	onFileChanged?: (absolutePath: string) => void;
 }
 
 type WriteHighlightCache = {
@@ -260,6 +262,9 @@ export function createWriteToolDefinition(
 				// Write the file contents.
 				await ops.writeFile(absolutePath, content);
 				throwIfAborted();
+
+				// Notify about file change for async indexing
+				options?.onFileChanged?.(absolutePath);
 
 				return {
 					content: [{ type: "text", text: `Successfully wrote ${content.length} bytes to ${path}` }],

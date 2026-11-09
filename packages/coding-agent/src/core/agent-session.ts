@@ -6864,8 +6864,26 @@ export class AgentSession {
 							return { ...context, command: wrapped.command };
 						},
 					},
-					write: { dryRun: () => this._dryRunEnabled },
-					edit: { dryRun: () => this._dryRunEnabled },
+					write: {
+						dryRun: () => this._dryRunEnabled,
+						onFileChanged: (path) => {
+							if (this.memoryActive()) {
+								void this.memory()
+									.indexFile(path)
+									.catch(() => undefined);
+							}
+						},
+					},
+					edit: {
+						dryRun: () => this._dryRunEnabled,
+						onFileChanged: (path) => {
+							if (this.memoryActive()) {
+								void this.memory()
+									.indexFile(path)
+									.catch(() => undefined);
+							}
+						},
+					},
 					script_edit: { dryRun: () => this._dryRunEnabled },
 				});
 
