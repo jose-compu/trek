@@ -3,7 +3,7 @@
  * A disabled domain scores zero. No hit records workflow none.
  */
 
-import { type DomainCatalog, type DomainDefinition, enabledDomains } from "./catalog.ts";
+import { type DomainCatalog, type DomainDefinition, enabledDomains, type WorkflowEntry } from "./catalog.ts";
 import { type FilledParameter, fillWorkflowParameters } from "./parameters.ts";
 
 export type SelectionReason = "match" | "none" | "operator_override";
@@ -46,11 +46,11 @@ export function selectDomain(catalog: DomainCatalog, input: SelectDomainInput): 
 	const currentText = [input.task, ...files].join("\n");
 	const current = scoreDomains(catalog, currentText);
 	if (current) {
-		return selectionFrom(current.domain, "match", currentText, current.matched);
+		return selectionFrom(current.domain, "match", currentText, current.matched, currentText);
 	}
 	const previous = input.previous ? scoreDomains(catalog, input.previous) : undefined;
 	if (previous && input.previous) {
-		return selectionFrom(previous.domain, "match", input.previous, previous.matched);
+		return selectionFrom(previous.domain, "match", input.previous, previous.matched, currentText);
 	}
 	return NONE;
 }
@@ -99,7 +99,7 @@ export function overrideSelection(catalog: DomainCatalog, id: string): DomainSel
 	if (!domain.alwaysOn && catalog.disabled.has(domain.id)) {
 		throw new Error(`${domain.title} is disabled`);
 	}
-	return selectionFrom(domain, "operator_override", "", []);
+	return selectionFrom(domain, "operator_override", "", [], "");
 }
 
 function selectionFrom(
@@ -107,7 +107,20 @@ function selectionFrom(
 	selectionReason: SelectionReason,
 	text: string,
 	matched: string[],
+	currentText: string,
 ): DomainSelection {
+	if (domain.workflows && domain.workflows.length > 0) {
+		const selected = selectWorkflowFromDomain(domain, currentText);
+		return {
+			domain: domain.id,
+			workflow: selected.name,
+			layer_workflow: "none",
+			selectionReason,
+			nodeIds: selected.nodeIds,
+			yaml: selected.yaml,
+			parameters: fillWorkflowParameters(domain.id, text, matched),
+		};
+	}
 	return {
 		domain: domain.id,
 		workflow: domain.workflowName,
@@ -117,6 +130,45 @@ function selectionFrom(
 		yaml: domain.yaml,
 		parameters: fillWorkflowParameters(domain.id, text, matched),
 	};
+}
+
+function selectWorkflowFromDomain(
+	domain: DomainDefinition,
+	text: string,
+): { name: string; yaml: string; nodeIds: string[] } {
+	if (!domain.workflows || domain.workflows.length === 0) {
+		return { name: domain.workflowName, yaml: domain.yaml, nodeIds: domain.nodeIds };
+	}
+	const haystack = text.toLowerCase();
+	let best: { workflow: WorkflowEntry; score: number; weight: number } | undefined;
+	for (const workflow of domain.workflows) {
+		let score = 0;
+		let weight = 0;
+		for (const term of workflow.terms) {
+			if (term.length > 0 && haystack.includes(term)) {
+				score += 1;
+				weight += term.length;
+			}
+		}
+		if (score === 0 && domain.workflows.length === 1) {
+			return { name: workflow.name, yaml: workflow.yaml, nodeIds: workflow.nodeIds };
+		}
+		if (score === 0) {
+			continue;
+		}
+		if (
+			!best ||
+			score > best.score ||
+			(score === best.score && weight > best.weight) ||
+			(score === best.score && weight === best.weight && workflow.name < best.workflow.name)
+		) {
+			best = { workflow, score, weight };
+		}
+	}
+	if (best) {
+		return { name: best.workflow.name, yaml: best.workflow.yaml, nodeIds: best.workflow.nodeIds };
+	}
+	return { name: domain.workflows[0].name, yaml: domain.workflows[0].yaml, nodeIds: domain.workflows[0].nodeIds };
 }
 
 export function formatSelection(selection: DomainSelection): string {

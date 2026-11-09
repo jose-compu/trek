@@ -1,0 +1,40 @@
+name: merge-pr
+description: |
+  Merge a pull request when checks are green. Do not force-push to main or master.
+nodes:
+  - id: detect-host
+    include: _detect-host
+    returns: $detect-host.check.output
+  - id: check-status
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Name the PR to merge. State the command to check CI status with the host
+      CLI from $detect-host.output. Do not run it yet.
+    depends_on: [detect-host]
+  - id: verify-green
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Check if all CI checks are passing from $check-status.output. If any checks
+      are failing or pending, refuse to merge. If all are green, proceed.
+    depends_on: [check-status]
+  - id: verify-not-main
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Verify the target branch is not being force-pushed. The merge must go into
+      main or master via the host's merge process, not a force push. State this
+      constraint.
+    depends_on: [verify-green]
+  - id: merge-command
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      State the command to merge the PR with the host CLI, only if
+      $verify-green.output says checks are passing and $verify-not-main.output
+      confirms no force push. Do not run it.
+    depends_on: [verify-not-main]

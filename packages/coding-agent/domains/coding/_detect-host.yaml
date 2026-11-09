@@ -1,0 +1,12 @@
+name: _detect-host
+description: |
+  Detect which host CLI is present: gh for GitHub, glab for GitLab, tea for
+  Forgejo. If none are present, state that clearly. Prefixed with _ to indicate
+  this is a utility workflow for inclusion.
+nodes:
+  - id: check
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Name the host CLI present on PATH: gh for GitHub, glab for GitLab, tea for
+      Forgejo. One line. If none are present, state that no host CLI is available.
