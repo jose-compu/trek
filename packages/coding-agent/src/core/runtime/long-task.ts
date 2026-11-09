@@ -19,6 +19,11 @@ const PARTIAL =
 const DONE =
 	/\b(?:all (?:requested |remaining )?work is (?:done|complete)|the (?:task|release|original request) is (?:already |fully )?(?:done|complete|shipped|satisfied)|original request is (?:already |fully )?(?:done|complete|satisfied)|v\d+(?:\.\d+)* is (?:complete|released|shipped)|release published|nothing (?:left to (?:do|run|create|attach|open)|remains)|there is nothing left|no (?:further|remaining) (?:work|steps)|no further work applies|fully satisfied|(?<!not )blocked(?:\s+on|\s*:)|need you to|waiting for (?:you|input|(?:the )?maintainer)|ready for (?:the )?maintainer|cannot continue|operation aborted)\b/i;
 
+const SHORT_DONE = /^(?:(?:the )?(?:task|job|work|it) (?:is )?)?done\.?$/i;
+
+const SUBTASK_WRAP =
+	/\b(?:task done|subtask (?:is )?(?:done|complete)|milestone (?:setup )?is complete|branch (?:and (?:the )?pull request )?are ready|(?:pull request|pr) (?:is )?(?:ready|open(?:ed)?)|placeholder commit)\b/i;
+
 const CONTROL_ECHO = /\becho\s+['"`]?\{(?:\\.|[^}'"`]){0,240}"(?:escalate|descalate|action)"/i;
 
 export type LongTaskResume =
@@ -64,6 +69,22 @@ export function looksLikeLongTaskDone(text: string): boolean {
 	return true;
 }
 
+/** Short wrap-up for one slice. Not the original request. */
+export function looksLikeSubtaskWrapUp(text: string): boolean {
+	const body = stripForMatch(text);
+	if (!body || looksLikeLongTaskDone(body)) {
+		return false;
+	}
+	const compact = body.replace(/\s+/g, " ").trim();
+	if (SHORT_DONE.test(compact)) {
+		return true;
+	}
+	if (SUBTASK_WRAP.test(body) && !/\boriginal request\b/i.test(body)) {
+		return true;
+	}
+	return false;
+}
+
 /**
  * Assistant only echoed layering control JSON (or bash `echo '{...}'`).
  * That is not progress; injecting another continue prompt loops the TUI.
@@ -89,6 +110,8 @@ export function shouldResumeLongTask(input: {
 	queued: boolean;
 	stopReason?: string;
 	hold?: boolean;
+	usedTools?: boolean;
+	idleWrapUps?: number;
 }): boolean {
 	if (!input.pinned || input.queued || input.hold) {
 		return false;
@@ -101,6 +124,9 @@ export function shouldResumeLongTask(input: {
 		return false;
 	}
 	if (looksLikeLongTaskDone(text)) {
+		return false;
+	}
+	if (looksLikeSubtaskWrapUp(text) && input.usedTools === false && (input.idleWrapUps ?? 0) >= 1) {
 		return false;
 	}
 	if (looksLikeLongTaskControlNoise(input.assistantText)) {
@@ -140,9 +166,12 @@ export function classifyLongTaskResume(text: string): LongTaskResume {
 	return { kind: "stay" };
 }
 
-export function longTaskContinuePrompt(goal: string): string {
+export function longTaskContinuePrompt(goal: string, opts?: { remaining?: boolean }): string {
 	const clipped = goal.trim().slice(0, 800);
-	return `Continue the same task until it is done. Subtasks, handoffs, consults, and tool runners stay in play. Do not stop after one commit, one file, or one milestone. Do not wait for the user. When the original request is fully done, say that it is done and stop. Do not re-verify a finished request.
+	const remaining = opts?.remaining
+		? " The last reply finished a subtask, not the original request. Do the next remaining work with tools now."
+		: "";
+	return `Continue the same task until it is done.${remaining} A short "Task done." or one commit, PR, milestone, or issue is only a subtask. Keep implementing remaining subtasks with tools. Do not wait for the user. When every remaining part of the original request is finished, say the original request is complete and stop. Do not re-verify a finished request.
 
 Original request:
 """

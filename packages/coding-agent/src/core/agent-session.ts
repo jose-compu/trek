@@ -285,6 +285,7 @@ import {
 	longTaskContinuePrompt,
 	looksLikeLongTaskControlNoise,
 	looksLikeLongTaskDone,
+	looksLikeSubtaskWrapUp,
 	pinLongTaskGoal,
 	shouldResumeLongTask,
 } from "./runtime/long-task.ts";
@@ -394,6 +395,7 @@ export type AgentSessionEvent =
 			type: "agent_end";
 			messages: AgentMessage[];
 			willRetry: boolean;
+			willContinue: boolean;
 	  }
 	| {
 			type: "queue_update";
@@ -2092,7 +2094,15 @@ export class AgentSession {
 		await this._emitExtensionEvent(event);
 
 		// Notify all listeners
-		this._emit(event.type === "agent_end" ? { ...event, willRetry: this._willRetryAfterAgentEnd(event) } : event);
+		this._emit(
+			event.type === "agent_end"
+				? {
+						...event,
+						willRetry: this._willRetryAfterAgentEnd(event),
+						willContinue: this._willContinueLongTaskAfterAgentEnd(event),
+					}
+				: event,
+		);
 
 		// Handle session persistence
 		if (event.type === "message_end") {
@@ -2153,6 +2163,49 @@ export class AgentSession {
 			}
 		}
 		return false;
+	}
+
+	private _assistantFromAgentEnd(event: Extract<AgentEvent, { type: "agent_end" }>): AssistantMessage | undefined {
+		for (let i = event.messages.length - 1; i >= 0; i--) {
+			const message = event.messages[i];
+			if (message.role === "assistant") {
+				return message as AssistantMessage;
+			}
+		}
+		return this._findLastAssistantMessage();
+	}
+
+	private _assistantText(message: AssistantMessage | undefined): string {
+		if (!message) {
+			return "";
+		}
+		return message.content
+			.filter((part) => part.type === "text")
+			.map((part) => part.text)
+			.join("\n")
+			.trim();
+	}
+
+	private _assistantUsedTools(message: AssistantMessage | undefined): boolean {
+		return Boolean(message?.content.some((part) => part.type === "toolCall"));
+	}
+
+	/** Keep Working... until the long-task pin will not inject another slice. */
+	private _willContinueLongTaskAfterAgentEnd(event: Extract<AgentEvent, { type: "agent_end" }>): boolean {
+		const pin = this._longTask;
+		if (!pin) {
+			return false;
+		}
+		const assistant = this._assistantFromAgentEnd(event);
+		return shouldResumeLongTask({
+			pinned: true,
+			assistantText: this._assistantText(assistant),
+			queued: this.agent.hasQueuedMessages(),
+			stopReason: assistant?.stopReason,
+			hold: this._longTaskHold > 0 || this._muteThinking,
+			usedTools: this._assistantUsedTools(assistant),
+			idleWrapUps: pin.idleWrapUps,
+		});
 	}
 
 	/** Extract text content from a message */
@@ -2955,7 +3008,7 @@ export class AgentSession {
 	/** Idle on Decision until the first prompt routes to Workhorse. */
 	private _parkedOnDecision = false;
 	/** User asked to finish the current work without pausing at milestones. */
-	private _longTask?: { goal: string; continues: number };
+	private _longTask?: { goal: string; continues: number; idleWrapUps: number };
 	/** Mute Archon / Frontier consult: do not auto-continue over a subtask. */
 	private _longTaskHold = 0;
 	private _elevationNote?: Promise<void>;
@@ -5033,7 +5086,7 @@ export class AgentSession {
 			this._elevationNote = undefined;
 		}
 
-		if (await this._maybeContinueLongTask(msg.stopReason)) {
+		if (await this._maybeContinueLongTask(msg)) {
 			return true;
 		}
 
@@ -5043,16 +5096,19 @@ export class AgentSession {
 	}
 
 	/** After a milestone yield, keep the same task going on the current (or switched) floor. */
-	private async _maybeContinueLongTask(stopReason?: string): Promise<boolean> {
+	private async _maybeContinueLongTask(msg: AssistantMessage): Promise<boolean> {
 		const pin = this._longTask;
-		const assistantText = this._lastAssistantText();
+		const assistantText = this._assistantText(msg) || this._lastAssistantText();
+		const usedTools = this._assistantUsedTools(msg);
 		if (
 			!shouldResumeLongTask({
 				pinned: Boolean(pin),
 				assistantText,
 				queued: this.agent.hasQueuedMessages(),
-				stopReason,
+				stopReason: msg.stopReason,
 				hold: this._longTaskHold > 0 || this._muteThinking,
+				usedTools,
+				idleWrapUps: pin?.idleWrapUps,
 			})
 		) {
 			if (pin && looksLikeLongTaskDone(assistantText)) {
@@ -5074,6 +5130,11 @@ export class AgentSession {
 				return false;
 			}
 		}
+		if (looksLikeSubtaskWrapUp(assistantText) && !usedTools) {
+			pin.idleWrapUps += 1;
+		} else {
+			pin.idleWrapUps = 0;
+		}
 		const floor = this._hierarchyDisplayRole ?? this._ladderRole ?? "workhorse";
 		pin.continues += 1;
 		this._emit({
@@ -5082,7 +5143,7 @@ export class AgentSession {
 			from: floor,
 			to: floor,
 		});
-		await this._queueFollowUp(longTaskContinuePrompt(pin.goal));
+		await this._queueFollowUp(longTaskContinuePrompt(pin.goal, { remaining: looksLikeSubtaskWrapUp(assistantText) }));
 		return true;
 	}
 
@@ -5260,6 +5321,7 @@ export class AgentSession {
 						previousTask,
 					}),
 					continues: keep ? (this._longTask?.continues ?? 0) : 0,
+					idleWrapUps: 0,
 				};
 			} else if (topicReset.reset) {
 				this._longTask = undefined;

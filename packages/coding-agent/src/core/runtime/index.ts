@@ -213,6 +213,7 @@ export {
 	looksLikeLongTaskControlNoise,
 	looksLikeLongTaskDone,
 	looksLikePartialMilestone,
+	looksLikeSubtaskWrapUp,
 	pinLongTaskGoal,
 	shouldResumeLongTask,
 } from "./long-task.ts";
