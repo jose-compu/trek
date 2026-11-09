@@ -337,6 +337,7 @@ ${chalk.bold("Commands:")}
   ${APP_NAME} telegram                  Long-poll Telegram (allowlisted DMs/groups)
   ${APP_NAME} config                    Open TUI to enable/disable package resources
   ${APP_NAME} config reproducibility    Show or set audit seed and mode (#74)
+  ${APP_NAME} recipes [--tool X]        List Unix recipes. Optional tools skip when missing
   ${APP_NAME} domains                   List work domains and whether each is on
   ${APP_NAME} domains enable <id>       Enable a domain that is not always on
   ${APP_NAME} domains disable <id>      Disable a domain. Meta, AI, Security, and Engineering stay on

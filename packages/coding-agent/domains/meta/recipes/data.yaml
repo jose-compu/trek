@@ -1,0 +1,15 @@
+pack: data
+recipes:
+  - id: jq-pretty
+    tool: jq
+    template: jq . {path}
+    mutates: false
+  - id: awk-field
+    tool: awk
+    template: "awk '{print $1}' {path}"
+    mutates: false
+  - id: mlr-cat
+    tool: mlr
+    template: mlr --csv cat {path}
+    mutates: false
+    optional: true

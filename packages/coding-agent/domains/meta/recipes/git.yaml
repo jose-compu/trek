@@ -1,0 +1,10 @@
+pack: git
+recipes:
+  - id: git-pickaxe
+    tool: git
+    template: git log -S {pattern} -- {path}
+    mutates: false
+  - id: git-grep
+    tool: git
+    template: git grep -n {pattern} -- {path}
+    mutates: false

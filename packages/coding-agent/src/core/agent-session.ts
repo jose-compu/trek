@@ -329,6 +329,7 @@ import {
 	validateToolResultShape,
 	wrapCommandWithSandbox,
 } from "./safety/index.ts";
+import { parseScriptsIntent, type ScriptsIntent } from "./scripts-intent.ts";
 import type { BranchSummaryEntry, CompactionEntry, SessionManager } from "./session-manager.ts";
 import { CURRENT_SESSION_VERSION, getLatestCompactionEntry, type SessionHeader } from "./session-manager.ts";
 import type { SettingsManager } from "./settings-manager.ts";
@@ -4516,6 +4517,10 @@ export class AgentSession {
 			await this._runAgentPrompt(messages);
 			return;
 		}
+		const scriptsIntent = parseScriptsIntent(this._lastPromptTask);
+		if (scriptsIntent && (await this._runScriptsIntent(scriptsIntent))) {
+			return;
+		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
 		const kimiSwarm = process.env.TREK_KIMI_SWARM === "1";
 		const layerName =
@@ -4786,6 +4791,26 @@ export class AgentSession {
 
 	private _recordCuriosity(task: string, question: string): void {
 		this._recordLocalTurn(task, question, "curiosity");
+	}
+
+	private async _runScriptsIntent(intent: ScriptsIntent): Promise<boolean> {
+		const { runScriptsIntent } = await import("./scripts-route.ts");
+		try {
+			const args = { path: intent.path };
+			const verdict = await this._checkToolSafety("script_edit", args);
+			if (!verdict.allowed) {
+				this._recordLocalTurn(this._lastPromptTask, verdict.reason ?? "blocked", "script");
+				return true;
+			}
+			await this._captureEditCheckpoint("script_edit", args);
+			const output = await runScriptsIntent(this._cwd, intent, { dryRun: () => this._dryRunEnabled });
+			await this._recordTrekVersion("script_edit", args);
+			this._recordLocalTurn(this._lastPromptTask, output, "script");
+			return true;
+		} catch (error) {
+			debugLog("scripts", "scripts route fell through to Workhorse", { error: String(error) });
+			return false;
+		}
 	}
 
 	private _recordLocalTurn(task: string, reply: string, modelId: string): void {
