@@ -12,7 +12,7 @@ A row in one store is not visible from another.
 |---|---|---|---|
 | Session | on | the session directory, under `memory/<session id>` | The question and answer for a turn, one thinking excerpt, and the compaction handoff |
 | Project | on | `.trek/memory/` in the project (gitignored) | Lessons from `remember`, and indexed file chunks |
-| Global | off | `~/.trek/memory/` | Nothing, until `memory.global` is true |
+| Global | on | `~/.trek/memory/` | Host CLI lessons (`gh` has no `milestone` subcommand). Shared across repos. |
 
 `/new` starts a session id, so session rows from the previous chat are not searched. Project lessons and file chunks remain.
 
@@ -67,7 +67,7 @@ Project `.trek/settings.json` overrides the global settings file.
 | `memory.enabled` | `true` | `false` skips indexing, the watcher, embeddings, injection, and the memory tools |
 | `memory.session` | `true` | Session store |
 | `memory.project` | `true` | Project store |
-| `memory.global` | `false` | Global store |
+| `memory.global` | `true` | Global store |
 | `memory.topK` | `5` | Hits kept. Integer from 1 to 50 |
 
 ```json
@@ -76,7 +76,7 @@ Project `.trek/settings.json` overrides the global settings file.
     "enabled": true,
     "session": true,
     "project": true,
-    "global": false,
+    "global": true,
     "topK": 5
   }
 }
@@ -104,9 +104,9 @@ Several TUI sessions may run at once. API sessions do not contend on MiniLM. `ll
 
 A stored lesson is L3. A lesson placed in the prompt is L2.
 
-**Writing (L3).** After a turn with a tool error, a law block, or an EffortRegulator stop, the session model writes one lesson: when it applies, the mistake, and a rule for next time. A prompt that starts with a correction (`no`, `that is wrong`, `not what I asked`, `/undo`) writes a lesson about the previous turn before the answer. The lesson is stored in project memory, tagged with its domain, and recorded as a `trek:lesson` session entry. The call is outside the transcript and has no tools. A clean turn writes nothing.
+**Writing (L3).** After a turn with a tool error, a law block, or an EffortRegulator stop, the session model writes one lesson: when it applies, the mistake, and a rule for next time. A prompt that starts with a correction (`no`, `that is wrong`, `not what I asked`, `/undo`) writes a lesson about the previous turn before the answer. Host CLI misses (`gh milestone` is not a command) go to **global**. Repo facts go to **project**. A same-turn correction can stay in **session**. If a broader layer already has that recurrence key, the count is incremented and nothing is duplicated. Injection keeps one copy (global, then project, then session). The call is outside the transcript and has no tools. A clean turn writes nothing.
 
-**Promotion (L3 to L2).** Each prompt looks up the 20 nearest lessons in project and global memory, reranked where the suite allows it. The Frontier model, or Planning when Frontier is not assigned, picks up to five that apply. Only those lessons enter the prompt. An id it invents is dropped. The choice, the model, and the reason are recorded as a `trek:lesson_promotion` entry. When no lesson is found, no call is made. When the reply is not usable or no Planning or Frontier model is assigned, the lessons keep score order.
+**Promotion (L3 to L2).** Each prompt looks up the 20 nearest lessons in global, project, and session memory, reranked where the suite allows it. Duplicate keys collapse to the broadest layer. The Frontier model, or Planning when Frontier is not assigned, picks up to five that apply. Only those lessons enter the prompt. An id it invents is dropped. The choice, the model, and the reason are recorded as a `trek:lesson_promotion` entry. When no lesson is found, no call is made. When the reply is not usable or no Planning or Frontier model is assigned, the lessons keep score order.
 
 `TREK_LESSONS=0` stops writing lessons. `TREK_LESSON_PROMOTION=0` uses score order and makes no promotion call. `TREK_PROMOTION_MODEL=0` leaves L2 on score order and refuses L1. Memory that is off writes and promotes nothing.
 

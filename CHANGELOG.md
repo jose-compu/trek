@@ -6,6 +6,10 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Changed
+
+- Session, project, and global memory are on by default. Host CLI lessons are stored once globally and are not copied into project or session.
+
 ## [0.19.8] - 2026-11-09
 
 ### Fixed

@@ -16,6 +16,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import {
 	Agent,
@@ -90,6 +91,7 @@ import {
 	parseArchonWorkflow,
 	parseWorkflowEdit,
 	readDomainSkills,
+	recurrenceKey,
 	repairLessonPrompt,
 	restoreDomainWorkflow,
 	retagRecallForRole,
@@ -168,6 +170,7 @@ import {
 	branchPrompt,
 	CRYSTALLIZE_NEEDS_YES,
 	CRYSTALLIZE_TOOL_NAME,
+	classifyLessonLayer,
 	createCrystallizeTool,
 	createReflectiveMetaToolDefinitions,
 	crystallizePrompt,
@@ -186,6 +189,8 @@ import {
 	isReflectiveLoopEnabled,
 	type Lesson,
 	type LessonEvidence,
+	type LessonLayer,
+	lessonFromHostCliFailure,
 	lessonIdsFromEntries,
 	lessonNoticeTitle,
 	lessonPromotionEnabled,
@@ -200,10 +205,10 @@ import {
 	planBranches,
 	promotionPrompt,
 	ReflectiveLoopController,
-	recurLesson,
+	recurLessonAcross,
 	removeCrystallizedSkill,
 	SerialQueue,
-	saveLessonRecord,
+	saveLessonRecordAt,
 	turnFailures,
 	withLessonIds,
 	writeCrystallizedSkill,
@@ -4214,16 +4219,40 @@ export class AgentSession {
 		return stripHonestyFooter(text).trim();
 	}
 
-	/** The work-horse writes one lesson into project memory (L3). */
+	private _lessonStores(): Partial<Record<LessonLayer, string>> {
+		const settings = this.settingsManager.getMemorySettings();
+		const stores: Partial<Record<LessonLayer, string>> = {};
+		if (settings.global) stores.global = join(homedir(), ".trek", "lessons");
+		if (settings.project) stores.project = join(this._cwd, ".trek", "lessons");
+		if (settings.session) {
+			const base = this.sessionManager.getSessionDir() || join(this._cwd, ".trek", "sessions");
+			stores.session = join(base, "lessons", this.sessionManager.getSessionId());
+		}
+		return stores;
+	}
+
+	private _pickLessonLayer(intended: LessonLayer): LessonLayer | undefined {
+		const settings = this.settingsManager.getMemorySettings();
+		if (settings[intended]) return intended;
+		if (intended !== "project" && settings.project) return "project";
+		if (intended !== "session" && settings.session) return "session";
+		if (settings.global) return "global";
+		return undefined;
+	}
+
+	/** The work-horse writes one lesson into the highest layer that applies (L3). */
 	private async _writeLesson(evidence: LessonEvidence, domain?: string): Promise<void> {
 		if (!lessonsEnabled() || !this.memoryActive() || !this.model) return;
 		try {
 			const pattern = domain ? lessonPatternFor(this._cwd, domain) : undefined;
-			const lesson = await this._draftLesson(evidence, pattern);
+			const lesson = lessonFromHostCliFailure(evidence.failures) ?? (await this._draftLesson(evidence, pattern));
 			if (!lesson) return;
 			lesson.source_turn = evidence.task.slice(0, 80);
 			if (!lesson.layer_role) {
 				lesson.layer_role = actingLessonRole(this.hierarchyRole);
+			}
+			if (!lesson.recurrence_key) {
+				lesson.recurrence_key = recurrenceKey(lesson);
 			}
 			if (lessonIsBlocked(lesson, pattern)) {
 				this.sessionManager.appendCustomEntry("trek:lesson_dropped", {
@@ -4233,7 +4262,9 @@ export class AgentSession {
 				debugLog("memory", "lesson redacted", { domain: lesson.domain });
 				return;
 			}
-			const again = recurLesson(this._cwd, lesson);
+			const intended = classifyLessonLayer(lesson, evidence);
+			const stores = this._lessonStores();
+			const again = recurLessonAcross(stores, lesson, intended);
 			if (again) {
 				this._lessonNotices.push({ id: again.id, title: lessonNoticeTitle(again) });
 				this.sessionManager.appendCustomEntry("trek:lesson", {
@@ -4245,17 +4276,22 @@ export class AgentSession {
 				});
 				return;
 			}
+			const layer = this._pickLessonLayer(intended);
+			if (!layer) return;
+			const root = stores[layer];
+			if (!root) return;
 			this.startMemory();
-			const stored = await this.memory().remember(formatLesson(lesson), lesson.domain);
-			const id = /^stored (project:\d+)$/.exec(stored)?.[1];
+			const stored = await this.memory().remember(formatLesson(lesson), lesson.domain, layer, lesson.recurrence_key);
+			const id = new RegExp(`^stored (${layer}:\\d+)$`).exec(stored)?.[1];
 			if (!id) return;
-			saveLessonRecord(this._cwd, id, lesson);
+			saveLessonRecordAt(root, id, lesson);
 			this._lessonNotices.push({ id, title: lessonNoticeTitle(lesson) });
 			this.sessionManager.appendCustomEntry("trek:lesson", {
 				id,
 				kind: evidence.kind,
 				modelId: this.model.id,
 				lesson,
+				layer,
 			});
 		} catch (error) {
 			debugLog("memory", "lesson not written", { error: error instanceof Error ? error.message : String(error) });

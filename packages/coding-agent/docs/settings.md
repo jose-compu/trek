@@ -77,7 +77,7 @@ See [Memory](memory.md).
 | `memory.enabled` | boolean | `true` | `false` skips indexing, the watcher, embeddings, injection, and the memory tools |
 | `memory.session` | boolean | `true` | Session scratch: turns, thinking, compaction handoff |
 | `memory.project` | boolean | `true` | Project lessons and file chunks in `.trek/memory/` |
-| `memory.global` | boolean | `false` | Global store at `~/.trek/memory/` |
+| `memory.global` | boolean | `true` | Global store at `~/.trek/memory/` |
 | `memory.topK` | number | `5` | Hits injected and returned by `recall`. Integer from 1 to 50 |
 
 ```json
@@ -86,7 +86,7 @@ See [Memory](memory.md).
     "enabled": true,
     "session": true,
     "project": true,
-    "global": false,
+    "global": true,
     "topK": 5
   }
 }

@@ -4,6 +4,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Changed
+
+- Session, project, and global memory are on by default. A host CLI miss (`gh milestone`) is one global lesson; a later session or repo increments that row instead of writing a duplicate.
+
 ## [0.19.8] - 2026-11-09
 
 ### Fixed

@@ -143,7 +143,7 @@ export interface Settings {
 	diagnostic?: boolean;
 	/** Live effort stop. `loose` is ten times the normal limits. `off` does not stop. */
 	effort?: "off" | "normal" | "loose";
-	/** Local semantic memory. Global is off unless set. */
+	/** Local semantic memory. Session, project, and global are on by default. */
 	memory?: MemorySettings;
 	/** Audit / reproducibility policy (#70). */
 	reproducibility?: ReproducibilitySettings;
@@ -918,7 +918,7 @@ export class SettingsManager {
 			enabled: raw.enabled !== false,
 			session: raw.session !== false,
 			project: raw.project !== false,
-			global: raw.global === true,
+			global: raw.global !== false,
 			topK: clampMemoryTopK(raw.topK),
 		};
 	}

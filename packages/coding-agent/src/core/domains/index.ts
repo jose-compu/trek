@@ -64,6 +64,7 @@ export {
 	lessonTag,
 	readDomainSkills,
 	readLessonPatternYaml,
+	recurrenceKey,
 	repairLessonPrompt,
 	restoreLessonOverlay,
 	saveLessonOverlay,

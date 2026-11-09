@@ -14,9 +14,15 @@ export interface AnnotatedRow {
 	kind: MemoryKind;
 }
 
-export function annotateLesson(text: string, tag: string | undefined): AnnotatedRow {
-	const tags: Record<string, string> = { layer: "project", kind: "lesson" };
+export function annotateLesson(
+	text: string,
+	tag: string | undefined,
+	layer: "session" | "project" | "global" = "project",
+	key?: string,
+): AnnotatedRow {
+	const tags: Record<string, string> = { layer, kind: "lesson" };
 	if (tag) tags.tag = tag;
+	if (key) tags.key = key;
 	const chunk: Chunk = { text, offset: 0 };
 	const embed = embedTextForChunk(
 		"header",
@@ -26,13 +32,18 @@ export function annotateLesson(text: string, tag: string | undefined): Annotated
 			chunkCount: 1,
 			chunk,
 			resolvedMode: "legacy",
-			namespace: "project",
+			namespace: layer,
 			tags,
 		},
 		text,
 	);
 	const tagLine = tag ? `[tag:${tag}]` : "";
-	return { embed, stored: `[kind:lesson]${tagLine}\n${text}`, kind: "lesson" };
+	const keyLine = key ? `[key:${key}]` : "";
+	return { embed, stored: `[kind:lesson]${tagLine}${keyLine}\n${text}`, kind: "lesson" };
+}
+
+export function lessonKeyOf(stored: string): string | undefined {
+	return /\[key:([^\]]+)\]/.exec(stored)?.[1];
 }
 
 export function annotateFile(relPath: string, chunk: Chunk, index: number, count: number): AnnotatedRow {

@@ -3,14 +3,18 @@
  * Run: npx vitest run test/lessons.test.ts --reporter=verbose
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Context } from "@trek/ai";
 import { fauxAssistantMessage, fauxToolCall } from "@trek/ai";
 import { afterEach, describe, expect, it } from "vitest";
+import { recurLessonAcross, saveLessonRecordAt } from "../src/core/reflective-loop/crystallize.ts";
 import {
+	classifyLessonLayer,
 	formatLesson,
 	isCorrection,
+	lessonFromHostCliFailure,
 	parseLesson,
 	parsePromotion,
 	turnFailures,
@@ -18,6 +22,7 @@ import {
 import type { AuditStepRecord } from "../src/core/reproducibility/types.ts";
 import { promotionRole } from "../src/core/runtime/promotion-model.ts";
 import type { ResolvedRuntime } from "../src/core/runtime/resolve.ts";
+import { SettingsManager } from "../src/core/settings-manager.ts";
 import { createHarness, type Harness } from "./suite/harness.ts";
 
 type Reply = ReturnType<typeof fauxAssistantMessage>;
@@ -365,5 +370,50 @@ describe("lessons in a session", () => {
 		expect(harness.eventsOfType("lesson_stored").map((event) => event.text)).toEqual([
 			`lesson ${customEntries(harness, "trek:lesson")[0]?.id} Deploy To Staging First`,
 		]);
+	});
+});
+
+describe("lesson layers", () => {
+	it("defaults session, project, and global memory on", () => {
+		expect(SettingsManager.inMemory({}).getMemorySettings()).toMatchObject({
+			enabled: true,
+			session: true,
+			project: true,
+			global: true,
+		});
+	});
+
+	it("routes gh milestone to a global canned lesson and does not duplicate across stores", () => {
+		const lesson = lessonFromHostCliFailure([
+			'bash: unknown command "milestone" for "gh"\nRun \'gh --help\' for usage.',
+		]);
+		expect(lesson?.rule).toMatch(/gh api repos\/\{owner\}\/\{repo\}\/milestones/);
+		expect(classifyLessonLayer(lesson!, { kind: "error", task: "make a milestone", failures: [], reply: "" })).toBe(
+			"global",
+		);
+		expect(
+			classifyLessonLayer(
+				{
+					trigger: "deploy",
+					mistake: "read config.yaml at the root",
+					rule: "Read deploy/config.yaml.",
+					domain: "engineering",
+				},
+				{ kind: "error", task: "deploy", failures: ["read: missing"], reply: "" },
+			),
+		).toBe("project");
+
+		const root = mkdtempSync(join(tmpdir(), "trek-lesson-layers-"));
+		const stores = {
+			global: join(root, "global"),
+			project: join(root, "project"),
+			session: join(root, "session"),
+		};
+		saveLessonRecordAt(stores.global, "global:1", lesson!);
+		const again = recurLessonAcross(stores, lesson!, "project");
+		expect(again?.id).toBe("global:1");
+		expect(again?.count).toBe(2);
+		expect(recurLessonAcross(stores, { ...lesson!, recurrence_key: "other" }, "project")).toBeUndefined();
+		rmSync(root, { recursive: true, force: true });
 	});
 });

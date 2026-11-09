@@ -20,6 +20,7 @@ import {
 	annotateThinking,
 	annotateTurn,
 	kindOf,
+	lessonKeyOf,
 	type MemoryKind,
 } from "./annotate.ts";
 import type { Embedder } from "./embedder.ts";
@@ -108,15 +109,15 @@ export class MemoryManager {
 		this.watch();
 	}
 
-	async remember(text: string, tag?: string): Promise<string> {
+	async remember(text: string, tag?: string, layer: MemoryLayer = "project", key?: string): Promise<string> {
 		if (!this.live()) return "memory is off";
 		const body = text.trim();
 		if (!body) return "nothing to store";
-		if (!this.options.getSettings().project) return "project memory is off";
-		const row = annotateLesson(body, tag?.trim() || undefined);
-		const id = await this.put("project", row.embed, row.stored);
+		if (!this.options.getSettings()[layer]) return `${layer} memory is off`;
+		const row = annotateLesson(body, tag?.trim() || undefined, layer, key);
+		const id = await this.put(layer, row.embed, row.stored);
 		if (id == null) return "store failed";
-		return `stored project:${id}`;
+		return `stored ${layer}:${id}`;
 	}
 
 	async recall(query: string, layer?: MemoryLayer, hybrid = true, limit?: number): Promise<MemoryHit[]> {
@@ -130,7 +131,7 @@ export class MemoryManager {
 		const topK = limit ?? settings.topK;
 		const hits: MemoryHit[] = [];
 		for (const name of layers) {
-			const db = this.open(name);
+			const db = this.open(name, false);
 			if (!db) continue;
 			let found: ReturnType<typeof db.search>;
 			try {
@@ -177,7 +178,7 @@ export class MemoryManager {
 		const hit = hits[0];
 		if (!hit) return "no match";
 		const id = Number(hit.id.slice(layer.length + 1));
-		const db = this.open(layer);
+		const db = this.open(layer, false);
 		if (!db || !Number.isInteger(id)) return "no match";
 		try {
 			db.delete(id);
@@ -191,7 +192,7 @@ export class MemoryManager {
 	async lessonCandidates(query: string, limit = 20, scope?: LessonScope): Promise<MemoryHit[]> {
 		const settings = this.options.getSettings();
 		const found: MemoryHit[] = [];
-		for (const layer of ["project", "global"] as const) {
+		for (const layer of ["global", "project", "session"] as const) {
 			if (!settings[layer]) continue;
 			found.push(...(await this.recall(query, layer, true, limit * 2)).filter((hit) => hit.kind === "lesson"));
 		}
@@ -203,7 +204,7 @@ export class MemoryManager {
 						lessonAllowed(lessonTag(hit.text), scope.selected, scope.catalogIds, scope.alwaysOn),
 				)
 			: found;
-		return eligible.sort((a, b) => b.score - a.score).slice(0, limit);
+		return collapseLessonHits(eligible.sort((a, b) => b.score - a.score)).slice(0, limit);
 	}
 
 	/**
@@ -243,6 +244,7 @@ export class MemoryManager {
 				picked = [...lessons, ...rest];
 			}
 		}
+		picked = collapseLessonHits(picked);
 		if (picked.length === 0) return { text: "", lessonIds: [] };
 		const lines = picked.map((hit) => `[${hit.layer} ${hit.kind}] ${hit.text.slice(0, 400)}`);
 		return {
@@ -482,13 +484,14 @@ export class MemoryManager {
 		}
 	}
 
-	private open(layer: MemoryLayer): OpenDb["db"] | undefined {
+	private open(layer: MemoryLayer, create = true): OpenDb["db"] | undefined {
 		if (this.closed || !this.options.getSettings()[layer]) return undefined;
 		const existing = this.dbs.get(layer);
 		if (existing) return existing.db;
 		const root = this.layerRoot(layer);
+		if (!create && !existsSync(root)) return undefined;
 		try {
-			mkdirSync(root, { recursive: true });
+			if (create) mkdirSync(root, { recursive: true });
 			const store = new NamespaceStore(root);
 			const db = store.open(NS, this.options.embedder.dim);
 			this.dbs.set(layer, { store, db });
@@ -545,6 +548,32 @@ export class MemoryManager {
 		);
 		return run;
 	}
+}
+
+const LAYER_RANK: Record<MemoryLayer, number> = { global: 0, project: 1, session: 2 };
+
+/** One lesson per recurrence key. Broader layer wins. */
+export function collapseLessonHits(hits: readonly MemoryHit[]): MemoryHit[] {
+	const lessons: MemoryHit[] = [];
+	const rest: MemoryHit[] = [];
+	const seen = new Map<string, MemoryHit>();
+	for (const hit of hits) {
+		if (hit.kind !== "lesson") {
+			rest.push(hit);
+			continue;
+		}
+		const key = lessonKeyOf(hit.text) ?? `id:${hit.id}`;
+		const prev = seen.get(key);
+		if (!prev || LAYER_RANK[hit.layer] < LAYER_RANK[prev.layer]) {
+			seen.set(key, hit);
+		}
+	}
+	for (const hit of hits) {
+		if (hit.kind !== "lesson") continue;
+		const key = lessonKeyOf(hit.text) ?? `id:${hit.id}`;
+		if (seen.get(key) === hit) lessons.push(hit);
+	}
+	return [...lessons, ...rest];
 }
 
 export function selectInjection(hits: readonly MemoryHit[], topK: number): MemoryHit[] {
