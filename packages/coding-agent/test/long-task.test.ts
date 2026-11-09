@@ -6,10 +6,13 @@
 import { describe, expect, it } from "vitest";
 import {
 	classifyLongTaskResume,
+	isLongTaskKeepAlive,
 	isLongTaskPrompt,
 	longTaskContinuePrompt,
+	looksLikeLongTaskControlNoise,
 	looksLikeLongTaskDone,
 	looksLikePartialMilestone,
+	pinLongTaskGoal,
 	shouldResumeLongTask,
 } from "../src/core/runtime/index.ts";
 
@@ -20,6 +23,25 @@ describe("long task pin", () => {
 		expect(isLongTaskPrompt("continue")).toBe(true);
 		expect(isLongTaskPrompt("start building pls v6")).toBe(true);
 		expect(isLongTaskPrompt("what is 2+2")).toBe(false);
+	});
+
+	it("keeps the prior goal when the user only says continue", () => {
+		expect(isLongTaskKeepAlive("continue")).toBe(true);
+		expect(isLongTaskKeepAlive("continue with tasks pls")).toBe(true);
+		expect(isLongTaskKeepAlive("keep going")).toBe(true);
+		expect(isLongTaskKeepAlive("load autopilot skill and continue until you complete the whole v6")).toBe(false);
+		expect(isLongTaskKeepAlive("start building pls v6")).toBe(false);
+		expect(
+			pinLongTaskGoal({
+				prompt: "continue with tasks pls",
+				previousGoal: "ship the vdf patch",
+				previousTask: "continue with tasks pls",
+			}),
+		).toBe("ship the vdf patch");
+		expect(pinLongTaskGoal({ prompt: "continue", previousTask: "fix the webpack plugin" })).toBe(
+			"fix the webpack plugin",
+		);
+		expect(pinLongTaskGoal({ prompt: "ship v1.3.1 on the patch branch" })).toBe("ship v1.3.1 on the patch branch");
 	});
 
 	it("resumes after a milestone yield and stops when the task is done", () => {
@@ -35,6 +57,7 @@ describe("long task pin", () => {
 		).toBe(true);
 		expect(looksLikeLongTaskDone("v6.0.0 is complete. Release published.")).toBe(true);
 		expect(looksLikeLongTaskDone("AIS208 stub is complete. Next: wire Crisp.")).toBe(false);
+		expect(looksLikeLongTaskDone("Patch ready for the maintainer publish step.")).toBe(true);
 		expect(
 			shouldResumeLongTask({
 				pinned: true,
@@ -49,8 +72,12 @@ describe("long task pin", () => {
 				queued: false,
 			}),
 		).toBe(true);
-		expect(longTaskContinuePrompt("complete the whole v6")).toMatch(/Do not stop after one commit/);
-		expect(longTaskContinuePrompt("complete the whole v6")).toMatch(/escalate/);
+		const follow = longTaskContinuePrompt("complete the whole v6");
+		expect(follow).toMatch(/Do not stop after one commit/);
+		expect(follow).toMatch(/Original request/);
+		expect(follow).not.toMatch(/"escalate"/);
+		expect(follow).not.toMatch(/"descalate"/);
+		expect(follow).not.toMatch(/"delegate"/);
 		expect(
 			shouldResumeLongTask({
 				pinned: true,
@@ -59,6 +86,29 @@ describe("long task pin", () => {
 				hold: true,
 			}),
 		).toBe(false);
+	});
+
+	it("does not resume a control-JSON echo loop", () => {
+		const echo =
+			'Escalation noted.\n$ echo \'{"descalate":"workhorse","why":"simple again"}\'\n{"descalate":"workhorse","why":"simple again"}';
+		expect(looksLikeLongTaskControlNoise(echo)).toBe(true);
+		expect(classifyLongTaskResume(echo).kind).toBe("drop");
+		expect(
+			shouldResumeLongTask({
+				pinned: true,
+				assistantText: "Escalation noted for the publish step.\n<honesty>\nconfidence: medium\n</honesty>",
+				queued: false,
+			}),
+		).toBe(false);
+		expect(looksLikeLongTaskControlNoise('{"escalate":"planning","why":"stuck"}')).toBe(true);
+		expect(
+			shouldResumeLongTask({
+				pinned: true,
+				assistantText: '{"escalate":"planning","why":"stuck"}',
+				queued: false,
+			}),
+		).toBe(true);
+		expect(looksLikeLongTaskControlNoise("Bumped versions to 1.3.1 and updated CHANGELOG.")).toBe(false);
 	});
 
 	it("switches models mid-task and ignores a Decision park", () => {

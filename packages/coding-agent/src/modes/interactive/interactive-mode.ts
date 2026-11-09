@@ -135,7 +135,7 @@ import { SkillInvocationMessageComponent } from "./components/skill-invocation-m
 import { ToolExecutionComponent } from "./components/tool-execution.ts";
 import { TreeSelectorComponent } from "./components/tree-selector.ts";
 import { UndoSelectorComponent } from "./components/undo-selector.ts";
-import { quietArchonLabel, UserMessageComponent } from "./components/user-message.ts";
+import { isQuietContinuePrompt, quietArchonLabel, UserMessageComponent } from "./components/user-message.ts";
 import { UserMessageSelectorComponent } from "./components/user-message-selector.ts";
 import {
 	getAvailableThemes,
@@ -3108,7 +3108,13 @@ export class InteractiveMode {
 					this.addMessageToChat(event.message);
 					this.ui.requestRender();
 				} else if (event.message.role === "user") {
-					if (!this.consumeEarlyPrompt(this.getUserMessageText(event.message))) {
+					const userText = this.getUserMessageText(event.message);
+					if (isQuietContinuePrompt(userText)) {
+						this.updatePendingMessagesDisplay();
+						this.ui.requestRender();
+						break;
+					}
+					if (!this.consumeEarlyPrompt(userText)) {
 						this.addMessageToChat(event.message);
 					}
 					this.updatePendingMessagesDisplay();
@@ -3496,7 +3502,7 @@ export class InteractiveMode {
 			case "user": {
 				const textContent = this.getUserMessageText(message);
 				if (textContent) {
-					if (this.chatContainer.children.length > 0) {
+					if (this.chatContainer.children.length > 0 && !quietArchonLabel(textContent)) {
 						this.chatContainer.addChild(new Spacer(1));
 					}
 					const skillBlock = parseSkillBlock(textContent);

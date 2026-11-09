@@ -4,17 +4,22 @@
  * Explicit new-topic still resets. Model `new_topic` does not park while pinned.
  */
 
-import { parseDelegateAsk, parseDescalateAsk, parseEscalateAsk } from "./escalate.ts";
+import { parseDelegateAsk, parseDescalateAsk, parseEscalateAsk, stripEscalateSignal } from "./escalate.ts";
 import { parseNewTopicSignal } from "./new-topic.ts";
 
 const LONG_TASK =
 	/\b(?:until you (?:complete|finish|done)|complete the whole|finish the whole|finish all|don'?t stop|do not stop|keep going(?: until)?|keep building(?: until)?|start building|start working|without stopping|run until done|autopilot|continue)\b/i;
 
+const KEEP_ALIVE =
+	/^(?:(?:ok(?:ay)?|please|pls)[,.]?\s+)*(?:continue(?:\s+with(?:\s+(?:the\s+)?(?:tasks?|work|it))?)?|keep going|keep (?:building|working)|proceed|resume|don'?t stop|do not stop)(?:\s+(?:pls|please|now))?[.!]?\s*$/i;
+
 const PARTIAL =
 	/\b(?:next:|will keep|remaining|milestone|progress is ongoing|started v\d|bumped versions|preparing the release|next milestone|pushed\.?$)\b/i;
 
 const DONE =
-	/\b(?:all (?:requested |remaining )?work is (?:done|complete)|the (?:task|release) is (?:done|complete|shipped)|v\d+(?:\.\d+)* is (?:complete|released|shipped)|release published|nothing left to do|blocked(?:\s+on|\s*:)|need you to|waiting for (?:you|input)|cannot continue)\b/i;
+	/\b(?:all (?:requested |remaining )?work is (?:done|complete)|the (?:task|release) is (?:done|complete|shipped)|v\d+(?:\.\d+)* is (?:complete|released|shipped)|release published|nothing left to do|blocked(?:\s+on|\s*:)|need you to|waiting for (?:you|input|(?:the )?maintainer)|ready for (?:the )?maintainer|cannot continue|operation aborted)\b/i;
+
+const CONTROL_ECHO = /\becho\s+['"`]?\{(?:\\.|[^}'"`]){0,240}"(?:escalate|descalate|action)"/i;
 
 export type LongTaskResume =
 	| { kind: "climb"; requested: "planning" | "frontier" | "next"; why: string }
@@ -27,6 +32,21 @@ export function isLongTaskPrompt(text: string): boolean {
 	return LONG_TASK.test(text.trim());
 }
 
+/** Bare keep-going ("continue", "continue with tasks pls") — keep the pinned goal. */
+export function isLongTaskKeepAlive(text: string): boolean {
+	return KEEP_ALIVE.test(text.trim());
+}
+
+/** Pin the real task, not a later "continue" follow-up. */
+export function pinLongTaskGoal(input: { prompt: string; previousGoal?: string; previousTask?: string }): string {
+	const prompt = input.prompt.trim();
+	if (!isLongTaskKeepAlive(prompt)) {
+		return prompt;
+	}
+	const prior = (input.previousGoal ?? input.previousTask ?? "").trim();
+	return prior || prompt;
+}
+
 /** Last assistant turn looks like a slice, not the finished task. */
 export function looksLikePartialMilestone(text: string): boolean {
 	return PARTIAL.test(stripForMatch(text));
@@ -35,6 +55,25 @@ export function looksLikePartialMilestone(text: string): boolean {
 /** Last assistant turn looks finished or blocked on the user. */
 export function looksLikeLongTaskDone(text: string): boolean {
 	return DONE.test(stripForMatch(text));
+}
+
+/**
+ * Assistant only echoed layering control JSON (or bash `echo '{...}'`).
+ * That is not progress; injecting another continue prompt loops the TUI.
+ */
+export function looksLikeLongTaskControlNoise(text: string): boolean {
+	const stripped = stripEscalateSignal(stripForMatch(text)).trim();
+	if (!stripped) {
+		return true;
+	}
+	const compact = stripped.replace(/^(?:\$\s*)+/gm, "").trim();
+	if (/^echo\s+['"`]?\{/i.test(compact)) {
+		return true;
+	}
+	if (CONTROL_ECHO.test(compact) && compact.length < 400) {
+		return true;
+	}
+	return /^(?:escalation noted|continue the same task until it is done)\b/i.test(compact);
 }
 
 export function shouldResumeLongTask(input: {
@@ -56,6 +95,12 @@ export function shouldResumeLongTask(input: {
 	}
 	if (looksLikeLongTaskDone(text)) {
 		return false;
+	}
+	if (looksLikeLongTaskControlNoise(input.assistantText)) {
+		const route = classifyLongTaskResume(input.assistantText);
+		if (route.kind === "stay") {
+			return false;
+		}
 	}
 	return true;
 }
@@ -90,7 +135,7 @@ export function classifyLongTaskResume(text: string): LongTaskResume {
 
 export function longTaskContinuePrompt(goal: string): string {
 	const clipped = goal.trim().slice(0, 800);
-	return `Continue the same task until it is done. Subtasks, handoffs, consults, and tool runners stay in play. If you are stuck, emit {"escalate":"planning","why":"stuck"}. If you need live fetch or grep, emit {"action":"delegate","target":"tooling","reason":"live fetch"}. If the remaining work is mechanical, emit {"descalate":"workhorse","why":"simple again"}. Do not emit new_topic. Do not stop after one commit, one file, or one milestone. Do not wait for the user.
+	return `Continue the same task until it is done. Subtasks, handoffs, consults, and tool runners stay in play. Do not stop after one commit, one file, or one milestone. Do not wait for the user.
 
 Original request:
 """
