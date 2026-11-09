@@ -57,14 +57,11 @@ describe("isNewTopic / detectTopicReset", () => {
 
 	it("keeps a later milestone on the same long task", () => {
 		expect(
-			isNewTopic(
-				"start building pls v6",
-				"create a plan to complete the release and start working on the plan",
-			),
+			isNewTopic("start building pls v6", "create a plan to complete the release and start working on the plan"),
 		).toBe(false);
-		expect(isNewTopic("ok read plan and build it", "load autopilot skill and continue until you complete the whole v6")).toBe(
-			false,
-		);
+		expect(
+			isNewTopic("ok read plan and build it", "load autopilot skill and continue until you complete the whole v6"),
+		).toBe(false);
 		expect(isKeepGoingPrompt("build a plan in a local .txt file for full v6 version")).toBe(false);
 		expect(
 			detectTopicReset("start building pls v6", "build a plan in a local .txt file for full v6 version").reset,
