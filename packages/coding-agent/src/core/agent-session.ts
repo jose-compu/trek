@@ -4708,9 +4708,6 @@ export class AgentSession {
 				await this._dropLadder("consult complete", restoreRole);
 				await this._bindHierarchyRole(restoreRole);
 				keepLadder = true;
-				if (this._longTask && !looksLikeLongTaskDone(this._lastAssistantText())) {
-					await this._runAgentPrompt(longTaskContinuePrompt(this._longTask.goal));
-				}
 			} else if (continuePrompt && (continueTo === "planning" || continueTo === "workhorse")) {
 				keepLadder = true;
 				this.setActiveToolsByName(previousTools);
