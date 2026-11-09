@@ -329,6 +329,7 @@ import {
 	validateToolResultShape,
 	wrapCommandWithSandbox,
 } from "./safety/index.ts";
+import { parseScriptsIntent, type ScriptsIntent } from "./scripts-intent.ts";
 import type { BranchSummaryEntry, CompactionEntry, SessionManager } from "./session-manager.ts";
 import { CURRENT_SESSION_VERSION, getLatestCompactionEntry, type SessionHeader } from "./session-manager.ts";
 import type { SettingsManager } from "./settings-manager.ts";
@@ -4516,7 +4517,8 @@ export class AgentSession {
 			await this._runAgentPrompt(messages);
 			return;
 		}
-		if (await this._tryScriptsRoute()) {
+		const scriptsIntent = parseScriptsIntent(this._lastPromptTask);
+		if (scriptsIntent && (await this._runScriptsIntent(scriptsIntent))) {
 			return;
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
@@ -4791,12 +4793,8 @@ export class AgentSession {
 		this._recordLocalTurn(task, question, "curiosity");
 	}
 
-	private async _tryScriptsRoute(): Promise<boolean> {
-		const { parseScriptsIntent, runScriptsIntent } = await import("./scripts-route.ts");
-		const intent = parseScriptsIntent(this._lastPromptTask);
-		if (!intent) {
-			return false;
-		}
+	private async _runScriptsIntent(intent: ScriptsIntent): Promise<boolean> {
+		const { runScriptsIntent } = await import("./scripts-route.ts");
 		try {
 			const args = { path: intent.path };
 			const verdict = await this._checkToolSafety("script_edit", args);
