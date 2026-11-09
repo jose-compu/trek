@@ -4,6 +4,7 @@ import { type Component, Container, Markdown, type MarkdownTheme, Spacer, Text }
 import { honestyDisplay, stripHonestyFooter } from "../../../core/honesty/index.ts";
 import { stripEscalateSignal } from "../../../core/runtime/escalate.ts";
 import { formatHandoffBrief, parseHandoffBriefFromText } from "../../../core/runtime/layer-decision.ts";
+import { looksLikeLongTaskControlNoise } from "../../../core/runtime/long-task.ts";
 import { thinkingCardTitle, thinkingCardViewport } from "../../../core/runtime/thinking-brief.ts";
 import { getMarkdownTheme, theme } from "../theme/theme.ts";
 import { cardGlyph } from "./card-glyph.ts";
@@ -199,7 +200,10 @@ export class AssistantMessageComponent extends Container {
 					continue;
 				}
 				this.contentContainer.addChild(new Markdown(visible, 1, 0, this.markdownTheme));
-				const status = this.omitThinking ? undefined : honestyDisplay(content.text);
+				const status =
+					this.omitThinking || looksLikeLongTaskControlNoise(content.text)
+						? undefined
+						: honestyDisplay(content.text);
 				if (status) {
 					for (const line of honestyCardLines(status)) {
 						this.contentContainer.addChild(new Text(line, 1, 0));

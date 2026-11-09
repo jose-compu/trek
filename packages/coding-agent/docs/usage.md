@@ -208,6 +208,8 @@ Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`, `remember
 | `--memory on` | Turn memory on for this process. Does not write settings. Layer flags still apply |
 | `--effort <off\|normal\|loose>` | Loop/repeat stops for this run. Spent-budget applies to `spawn_branches` / `spawn_subtask`, not the main long turn. `loose` is 10× `normal`. `off` does not stop the turn for effort |
 
+Keep-going prompts (`continue`, `until you complete`) pin the current task. Resume slices stay off-screen (`· workhorse · continue N`). They do not re-teach escalate/descalate JSON. A later `continue` keeps the original goal.
+
 See [Memory](memory.md). Lessons and skills are in [Learning](learning.md).
 
 ### Learning

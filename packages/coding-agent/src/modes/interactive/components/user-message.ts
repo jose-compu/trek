@@ -49,8 +49,12 @@ export class UserMessageComponent extends Container {
 	}
 }
 
+export function isQuietContinuePrompt(text: string): boolean {
+	return text.startsWith("Continue the layering task.") || text.startsWith("Continue the same task until it is done.");
+}
+
 export function quietArchonLabel(text: string): string | undefined {
-	if (text.startsWith("Continue the layering task.")) {
+	if (isQuietContinuePrompt(text)) {
 		return "· continue";
 	}
 	if (!text.startsWith("Answer only this Archon node.") && !text.startsWith("Answer this step only.")) {

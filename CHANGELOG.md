@@ -1,10 +1,16 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.19.1`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.19.2`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.19.2] - 2026-11-09
+
+### Fixed
+
+- Long-task continue slices no longer paint a grey internal prompt or teach escalate/descalate JSON. A later `continue` keeps the original goal. Control-JSON echo loops stop. Honesty stays off those noise slices so the TUI does not hop.
 
 ## [0.19.1] - 2026-11-09
 

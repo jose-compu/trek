@@ -280,9 +280,12 @@ import { LMSTUDIO_PROVIDER, LOCAL_LLAMA_PROVIDER, lmStudioChatModel } from "./ru
 import { LOCAL_SUITE_WORK_SECTION } from "./runtime/local-work.ts";
 import {
 	classifyLongTaskResume,
+	isLongTaskKeepAlive,
 	isLongTaskPrompt,
 	longTaskContinuePrompt,
+	looksLikeLongTaskControlNoise,
 	looksLikeLongTaskDone,
+	pinLongTaskGoal,
 	shouldResumeLongTask,
 } from "./runtime/long-task.ts";
 import { detectTopicReset, parseNewTopicSignal, stripNewTopicSignal, type TopicReset } from "./runtime/new-topic.ts";
@@ -4705,9 +4708,6 @@ export class AgentSession {
 				await this._dropLadder("consult complete", restoreRole);
 				await this._bindHierarchyRole(restoreRole);
 				keepLadder = true;
-				if (this._longTask && !looksLikeLongTaskDone(this._lastAssistantText())) {
-					await this._runAgentPrompt(longTaskContinuePrompt(this._longTask.goal));
-				}
 			} else if (continuePrompt && (continueTo === "planning" || continueTo === "workhorse")) {
 				keepLadder = true;
 				this.setActiveToolsByName(previousTools);
@@ -5044,7 +5044,17 @@ export class AgentSession {
 		if (!pin) {
 			return false;
 		}
+		const floorBefore = this._ladderRole ?? this._lastHierarchyRole;
+		const displayBefore = this._hierarchyDisplayRole;
+		const noise = looksLikeLongTaskControlNoise(assistantText);
 		await this._applyLongTaskResume(assistantText);
+		if (noise) {
+			const floorAfter = this._ladderRole ?? this._lastHierarchyRole;
+			const displayAfter = this._hierarchyDisplayRole;
+			if (floorBefore === floorAfter && displayBefore === displayAfter) {
+				return false;
+			}
+		}
 		const floor = this._hierarchyDisplayRole ?? this._ladderRole ?? "workhorse";
 		pin.continues += 1;
 		this._emit({
@@ -5223,7 +5233,15 @@ export class AgentSession {
 				}
 			}
 			if (isLongTaskPrompt(expandedText)) {
-				this._longTask = { goal: expandedText, continues: 0 };
+				const keep = isLongTaskKeepAlive(expandedText);
+				this._longTask = {
+					goal: pinLongTaskGoal({
+						prompt: expandedText,
+						previousGoal: this._longTask?.goal,
+						previousTask,
+					}),
+					continues: keep ? (this._longTask?.continues ?? 0) : 0,
+				};
 			} else if (topicReset.reset) {
 				this._longTask = undefined;
 			}

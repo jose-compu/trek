@@ -109,6 +109,21 @@ describe("AssistantMessageComponent", () => {
 		expect(expanded).toContain("five");
 	});
 
+	test("hides honesty on a layering-control echo", () => {
+		initTheme("dark");
+		const component = new AssistantMessageComponent(
+			createAssistantMessage([
+				{
+					type: "text",
+					text: 'Escalation noted.\n$ echo \'{"descalate":"workhorse","why":"simple again"}\'\n<honesty>\nconfidence: medium\nassumption: none\nunverified: none\n</honesty>',
+				},
+			]),
+		);
+		const rendered = component.render(80).join("\n");
+		expect(rendered).not.toContain("honesty");
+		expect(rendered).not.toContain("confidence");
+	});
+
 	test("omitThinking hides step-prompt reasoning", () => {
 		initTheme("dark");
 		const component = new AssistantMessageComponent(

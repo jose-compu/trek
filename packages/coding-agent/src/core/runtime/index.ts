@@ -204,6 +204,18 @@ export {
 	nudgeLocalWorkMessages,
 } from "./local-work.ts";
 export {
+	classifyLongTaskResume,
+	isLongTaskKeepAlive,
+	isLongTaskPrompt,
+	type LongTaskResume,
+	longTaskContinuePrompt,
+	looksLikeLongTaskControlNoise,
+	looksLikeLongTaskDone,
+	looksLikePartialMilestone,
+	pinLongTaskGoal,
+	shouldResumeLongTask,
+} from "./long-task.ts";
+export {
 	downloadMlxWeight,
 	type MissingMlxWeight,
 	MLX_SOURCES,
@@ -215,15 +227,6 @@ export {
 	preferMlx,
 	useMlx,
 } from "./mlx-backend.ts";
-export {
-	classifyLongTaskResume,
-	isLongTaskPrompt,
-	longTaskContinuePrompt,
-	looksLikeLongTaskDone,
-	looksLikePartialMilestone,
-	type LongTaskResume,
-	shouldResumeLongTask,
-} from "./long-task.ts";
 export {
 	detectTopicReset,
 	isKeepGoingPrompt,

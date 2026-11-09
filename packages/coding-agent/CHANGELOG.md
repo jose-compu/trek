@@ -4,6 +4,15 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.19.2] - 2026-11-09
+
+### Fixed
+
+- Long-task resume no longer shows the continue prompt as a grey user card (OSC 133 hop). Live slices stay on the dim `· workhorse · continue N` line.
+- Continue prompts no longer include escalate/descalate/delegate JSON, so the model does not `echo` that control and loop.
+- A keep-alive `continue` / `continue with tasks pls` keeps the pinned goal instead of replacing it.
+- Control-JSON-only or bash-echo slices do not auto-resume when the floor did not move. Honesty cards stay off those slices.
+
 ## [0.19.1] - 2026-11-09
 
 ### Fixed

@@ -53,4 +53,25 @@ describe("UserMessageComponent", () => {
 		expect(rendered).toContain(theme.fg("dim", "· continue"));
 		expect(rendered).not.toContain("User turn:");
 	});
+
+	test("collapses a long-task continue prompt to one dim line without a grey bar", () => {
+		initTheme("dark");
+		const rendered = new UserMessageComponent(
+			[
+				"Continue the same task until it is done. Subtasks, handoffs, consults, and tool runners stay in play. Do not stop after one commit, one file, or one milestone. Do not wait for the user.",
+				"",
+				"Original request:",
+				'"""',
+				"continue with tasks pls",
+				'"""',
+			].join("\n"),
+		)
+			.render(80)
+			.join("\n");
+		expect(rendered).toContain(theme.fg("dim", "· continue"));
+		expect(rendered).not.toContain("Original request");
+		expect(rendered).not.toContain("continue with tasks pls");
+		expect(rendered).not.toContain(OSC133_ZONE_START);
+		expect(rendered).not.toContain(theme.bg("userMessageBg", "test").slice(0, 8));
+	});
 });
