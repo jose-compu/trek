@@ -32,6 +32,7 @@ nodes:
     output_type: findings
     prompt: |
       State the commands to file the parent epic from $draft-parent-epic.output
-      and the child epics from $draft-child-epics.output with the host CLI. Link
-      child epics to the parent. Do not run them.
+      and the child epics from $draft-child-epics.output with the host CLI (gh,
+      glab, or tea). Link child epics to the parent. Do not run them. If no host
+      CLI is available, state that epics cannot be filed without it.
     depends_on: [draft-child-epics]

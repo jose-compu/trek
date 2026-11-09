@@ -7,7 +7,8 @@ nodes:
     output_type: findings
     prompt: |
       Name the PR to merge. State the command to check CI status with the host
-      CLI. Do not run it yet.
+      CLI (gh, glab, or tea). Do not run it yet. If no host CLI is available,
+      state that the PR cannot be merged without it.
   - id: verify-green
     trigger_rule: all_success
     allowed_tools: []

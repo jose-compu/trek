@@ -32,5 +32,6 @@ nodes:
     prompt: |
       State the commands to file the issues from $draft-issues.output with labels
       from $select-labels.output, linked to the epic from $identify-epic.output,
-      using the host CLI. Do not run them.
+      using the host CLI (gh, glab, or tea). Do not run them. If no host CLI is
+      available, state that issues cannot be filed without it.
     depends_on: [select-labels]
