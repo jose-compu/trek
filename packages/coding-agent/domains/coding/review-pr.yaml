@@ -2,13 +2,16 @@ name: review-pr
 description: |
   Review a pull request diff. Approve or request changes. Do not merge.
 nodes:
+  - id: detect-host
+    include: _detect-host
+    returns: $detect-host.check.output
   - id: fetch-diff
     allowed_tools: []
     output_type: findings
     prompt: |
       Name the PR to review. State the command to fetch the diff with the host
-      CLI (gh, glab, or tea). Do not run it yet. If no host CLI is available,
-      state that the PR cannot be reviewed without it.
+      CLI from $detect-host.output. Do not run it yet.
+    depends_on: [detect-host]
   - id: read-diff
     trigger_rule: all_success
     allowed_tools: []

@@ -110,9 +110,11 @@ describe("multi-workflow catalog", () => {
 			expect(workflow.workflow.name).toBe(workflow.name);
 			expect(workflow.workflow.nodes.length).toBeGreaterThan(0);
 			for (const node of workflow.workflow.nodes) {
-				expect(node.kind).toBe("prompt");
-				expect(node.allowedTools).toEqual([]);
-				expect(node.outputType).toBe("findings");
+				expect(["prompt", "include"]).toContain(node.kind);
+				if (node.kind === "prompt") {
+					expect(node.allowedTools).toEqual([]);
+					expect(node.outputType).toBe("findings");
+				}
 			}
 		}
 	});

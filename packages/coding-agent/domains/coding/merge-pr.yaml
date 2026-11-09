@@ -2,13 +2,16 @@ name: merge-pr
 description: |
   Merge a pull request when checks are green. Do not force-push to main or master.
 nodes:
+  - id: detect-host
+    include: _detect-host
+    returns: $detect-host.check.output
   - id: check-status
     allowed_tools: []
     output_type: findings
     prompt: |
       Name the PR to merge. State the command to check CI status with the host
-      CLI (gh, glab, or tea). Do not run it yet. If no host CLI is available,
-      state that the PR cannot be merged without it.
+      CLI from $detect-host.output. Do not run it yet.
+    depends_on: [detect-host]
   - id: verify-green
     trigger_rule: all_success
     allowed_tools: []

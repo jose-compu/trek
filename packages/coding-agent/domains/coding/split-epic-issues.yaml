@@ -3,11 +3,15 @@ description: |
   Split one epic into child issues with Done when acceptance criteria. Use the
   detected host CLI.
 nodes:
+  - id: detect-host
+    include: _detect-host
+    returns: $detect-host.check.output
   - id: identify-epic
     allowed_tools: []
     output_type: findings
     prompt: |
       Name the epic to split. State its title and scope. Do not create issues yet.
+    depends_on: [detect-host]
   - id: draft-issues
     trigger_rule: all_success
     allowed_tools: []
@@ -32,6 +36,5 @@ nodes:
     prompt: |
       State the commands to file the issues from $draft-issues.output with labels
       from $select-labels.output, linked to the epic from $identify-epic.output,
-      using the host CLI (gh, glab, or tea). Do not run them. If no host CLI is
-      available, state that issues cannot be filed without it.
+      using the host CLI from $detect-host.output. Do not run them.
     depends_on: [select-labels]

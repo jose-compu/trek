@@ -26,12 +26,8 @@ nodes:
       HEREDOC or multi-line format. Do not open the PR yet.
     depends_on: [push-upstream]
   - id: detect-host
-    trigger_rule: all_success
-    allowed_tools: []
-    output_type: findings
-    prompt: |
-      Name the host CLI present on PATH: gh for GitHub, glab for GitLab, tea for
-      Forgejo. One line. If none are present, state that no host CLI is available.
+    include: _detect-host
+    returns: $detect-host.check.output
     depends_on: [draft-pr-body]
   - id: open-pr-command
     trigger_rule: all_success

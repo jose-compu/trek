@@ -17,6 +17,10 @@
 	],
 	"workflows": [
 		{
+			"file": "_detect-host.yaml",
+			"terms": []
+		},
+		{
 			"file": "defect-fix.yaml",
 			"terms": [
 				"lint error",

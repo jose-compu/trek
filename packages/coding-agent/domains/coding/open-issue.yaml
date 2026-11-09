@@ -4,11 +4,8 @@ description: |
   body, and labels. Do not download missing host CLIs.
 nodes:
   - id: detect-host
-    allowed_tools: []
-    output_type: findings
-    prompt: |
-      Name the host CLI present on PATH: gh for GitHub, glab for GitLab, tea for
-      Forgejo. One line. If none are present, state that clearly.
+    include: _detect-host
+    returns: $detect-host.check.output
   - id: draft-issue
     trigger_rule: all_success
     allowed_tools: []
