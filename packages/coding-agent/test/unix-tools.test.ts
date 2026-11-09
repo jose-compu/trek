@@ -3,10 +3,11 @@
  * Run: npx vitest --run test/unix-tools.test.ts --reporter=verbose
  */
 
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { getBinDir } from "../src/config.ts";
 import {
 	detectSedFlavor,
 	findOnPath,
@@ -14,6 +15,7 @@ import {
 	probeUnixTools,
 	UNIX_TOOLS,
 	UnixToolCache,
+	unixKitPath,
 } from "../src/core/tools/unix-tools.ts";
 import { runUnixToolsCommand, UNIX_TOOLS_COMMAND_USAGE } from "../src/core/unix-tools-command.ts";
 
@@ -45,6 +47,32 @@ describe("findOnPath", () => {
 
 	it("returns undefined for an empty PATH", () => {
 		expect(findOnPath("ex", "")).toBeUndefined();
+	});
+
+	it("skips directories and non-executables", () => {
+		const dir = mkdtempSync(join(tmpdir(), "trek-unix-skip-"));
+		dirs.push(dir);
+		mkdirSync(join(dir, "ex"));
+		writeFileSync(join(dir, "vim"), "not executable\n");
+		chmodSync(join(dir, "vim"), 0o644);
+		expect(findOnPath("ex", dir)).toBeUndefined();
+		expect(findOnPath("vim", dir)).toBeUndefined();
+	});
+
+	it("finds PATHEXT binaries", () => {
+		const dir = fakeBin(["rg.exe"]);
+		expect(findOnPath("rg", dir, { extensions: [".exe"] })).toBe(join(dir, "rg.exe"));
+		expect(findOnPath("rg", dir, { extensions: [] })).toBeUndefined();
+	});
+});
+
+describe("unixKitPath", () => {
+	it("prepends the Trek bin dir when PATH is omitted", () => {
+		expect(unixKitPath().split(delimiter)[0]).toBe(getBinDir());
+	});
+
+	it("keeps an explicit PATH", () => {
+		expect(unixKitPath("/tmp/bin")).toBe("/tmp/bin");
 	});
 });
 
