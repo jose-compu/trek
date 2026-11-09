@@ -91,11 +91,12 @@ fi
 if [[ "$SKIP_DEPS" == "false" ]]; then
     echo "==> Installing cross-platform native bindings..."
     CLIPBOARD_VERSION=$(node -p "require('./packages/coding-agent/package.json').optionalDependencies['@mariozechner/clipboard']")
-    # npm ci only installs optional deps for the current platform
-    # We need the base clipboard package and all platform bindings for bun cross-compilation
-    # Use --force to bypass platform checks (os/cpu restrictions in package.json)
-    # Install all in one command to avoid npm removing packages from previous installs
-    npm install --include=optional --omit=dev --no-save --package-lock=false --force --ignore-scripts \
+    # npm ci only installs optional deps for the current platform.
+    # Install the bindings in a throwaway tree so --force cannot re-resolve
+    # workspace packages (that 404'd on a yanked rollup tarball) or prune tsgo.
+    NATIVE_DIR="$(mktemp -d)"
+    npm init --yes --prefix "$NATIVE_DIR" >/dev/null
+    npm install --prefix "$NATIVE_DIR" --include=optional --force --ignore-scripts \
         @mariozechner/clipboard@"$CLIPBOARD_VERSION" \
         @mariozechner/clipboard-darwin-arm64@"$CLIPBOARD_VERSION" \
         @mariozechner/clipboard-darwin-x64@"$CLIPBOARD_VERSION" \
@@ -103,6 +104,9 @@ if [[ "$SKIP_DEPS" == "false" ]]; then
         @mariozechner/clipboard-linux-arm64-gnu@"$CLIPBOARD_VERSION" \
         @mariozechner/clipboard-win32-x64-msvc@"$CLIPBOARD_VERSION" \
         @mariozechner/clipboard-win32-arm64-msvc@"$CLIPBOARD_VERSION"
+    mkdir -p node_modules/@mariozechner
+    cp -R "$NATIVE_DIR/node_modules/@mariozechner/." node_modules/@mariozechner/
+    rm -rf "$NATIVE_DIR"
 else
     echo "==> Skipping cross-platform native bindings (--skip-deps)"
 fi
