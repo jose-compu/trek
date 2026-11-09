@@ -13,6 +13,9 @@ export interface StructureChunk {
 	lineEnd: number;
 	signature?: string;
 	kind: "function" | "class" | "type" | "heading" | "fence" | "section" | "unknown";
+	parentContext?: string;
+	isLeaf?: boolean;
+	hierarchyLevel?: number;
 }
 
 export interface ChunkOptions {
