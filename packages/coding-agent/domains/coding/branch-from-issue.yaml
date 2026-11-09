@@ -1,0 +1,29 @@
+name: branch-from-issue
+description: |
+  Create a branch for the change. The branch name describes the work, never
+  includes cursor, and is checked out locally.
+nodes:
+  - id: parse-issue
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Extract the issue number and the one-line summary of the change. Do not
+      create the branch yet.
+  - id: name-branch
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Propose a branch name. The name is lowercase with hyphens. It includes the
+      change summary but never the word cursor. Examples: fix-login-bug,
+      add-user-profile. One line.
+    depends_on: [parse-issue]
+  - id: checkout-branch
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      State the git command to create and checkout the branch from
+      $name-branch.output. Do not run it. The command is `git checkout -b
+      <branch-name>`.
+    depends_on: [name-branch]

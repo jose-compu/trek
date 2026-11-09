@@ -1,0 +1,35 @@
+name: review-pr
+description: |
+  Review a pull request diff. Approve or request changes. Do not merge.
+nodes:
+  - id: fetch-diff
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Name the PR to review. State the command to fetch the diff with the host
+      CLI. Do not run it yet.
+  - id: read-diff
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Read the diff. Summarize the changes in one paragraph. Do not review yet.
+    depends_on: [fetch-diff]
+  - id: findings
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Review the diff from $read-diff.output. List findings: bugs, style issues,
+      missing tests, unclear logic. One finding per line. If none, state that the
+      diff is clean.
+    depends_on: [read-diff]
+  - id: verdict
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Approve the PR if $findings.output is clean, or request changes if findings
+      were listed. State the command with the host CLI. Do not run it. Do not
+      merge the PR.
+    depends_on: [findings]

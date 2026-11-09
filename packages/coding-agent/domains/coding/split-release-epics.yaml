@@ -1,0 +1,37 @@
+name: split-release-epics
+description: |
+  Split a release or milestone into a parent epic and child epics. Use the
+  detected host CLI.
+nodes:
+  - id: identify-release
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Name the release or milestone to split. State its version and the high-level
+      goals. Do not create epics yet.
+  - id: draft-parent-epic
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Draft the parent epic for the release from $identify-release.output. The
+      title is the release version. The body is the release summary and links to
+      ROADMAP or contributing docs if relevant. Do not file yet.
+    depends_on: [identify-release]
+  - id: draft-child-epics
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      List the child epics under this release. One epic per major feature or area.
+      Each has a title and a one-paragraph scope. Do not file yet.
+    depends_on: [draft-parent-epic]
+  - id: file-epics-command
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      State the commands to file the parent epic from $draft-parent-epic.output
+      and the child epics from $draft-child-epics.output with the host CLI. Link
+      child epics to the parent. Do not run them.
+    depends_on: [draft-child-epics]

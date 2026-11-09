@@ -1,0 +1,37 @@
+name: open-issue
+description: |
+  Open an issue on the detected host (GitHub, GitLab, or Forgejo). File title,
+  body, and labels. Do not download missing host CLIs.
+nodes:
+  - id: detect-host
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Name the host CLI present on PATH: gh for GitHub, glab for GitLab, tea for
+      Forgejo. One line. If none are present, state that clearly.
+  - id: draft-issue
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Draft the issue title and body. The title is one line. The body is the
+      problem statement and acceptance criteria. Do not file it yet.
+    depends_on: [detect-host]
+  - id: select-labels
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      List labels for this issue if any, one per line. Common labels: bug,
+      enhancement, documentation, good-first-issue. Leave empty if none apply.
+    depends_on: [draft-issue]
+  - id: file-issue
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      State the command to file the issue with the detected host CLI. Use
+      $detect-host.output, $draft-issue.output, and $select-labels.output. Do
+      not run the command. If no host CLI was detected, state that the issue
+      cannot be filed without a host CLI.
+    depends_on: [select-labels]

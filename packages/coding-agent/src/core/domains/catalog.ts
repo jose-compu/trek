@@ -10,6 +10,16 @@ import { getPackageDir } from "../../config.ts";
 import { type ArchonWorkflow, loadArchonFile, parseArchonWorkflow } from "./archon.ts";
 import { warmLessonPatterns } from "./lesson-pattern.ts";
 
+export interface WorkflowEntry {
+	file: string;
+	terms: string[];
+	name: string;
+	description: string;
+	yaml: string;
+	nodeIds: string[];
+	workflow: ArchonWorkflow;
+}
+
 export interface DomainDefinition {
 	id: string;
 	title: string;
@@ -21,6 +31,7 @@ export interface DomainDefinition {
 	yaml: string;
 	nodeIds: string[];
 	workflow: ArchonWorkflow;
+	workflows?: WorkflowEntry[];
 }
 
 export interface DomainCatalog {
@@ -33,7 +44,8 @@ interface DomainManifest {
 	title: string;
 	alwaysOn?: boolean;
 	terms: string[];
-	workflow: string;
+	workflow?: string;
+	workflows?: Array<{ file: string; terms: string[] }>;
 }
 
 interface DomainState {
@@ -342,17 +354,37 @@ function readDomainDir(root: string, added: boolean): DomainDefinition[] {
 		} catch {
 			continue;
 		}
-		if (
-			!manifest ||
-			manifest.id !== name ||
-			!Array.isArray(manifest.terms) ||
-			typeof manifest.workflow !== "string"
-		) {
+		if (!manifest || manifest.id !== name || !Array.isArray(manifest.terms)) {
 			continue;
 		}
-		const workflowPath = join(root, name, manifest.workflow);
+		if (typeof manifest.workflow !== "string" && !Array.isArray(manifest.workflows)) {
+			continue;
+		}
+		const hasMultiple = Array.isArray(manifest.workflows) && manifest.workflows.length > 0;
+		const primaryFile = hasMultiple && manifest.workflows ? manifest.workflows[0].file : manifest.workflow;
+		if (typeof primaryFile !== "string") {
+			continue;
+		}
+		const workflowPath = join(root, name, primaryFile);
 		const yaml = readFileSync(workflowPath, "utf8");
 		const workflow = parseArchonWorkflow(yaml, workflowPath);
+		const workflowEntries: WorkflowEntry[] | undefined =
+			hasMultiple && manifest.workflows
+				? manifest.workflows.map((entry) => {
+						const entryPath = join(root, name, entry.file);
+						const entryYaml = readFileSync(entryPath, "utf8");
+						const entryWorkflow = parseArchonWorkflow(entryYaml, entryPath);
+						return {
+							file: entry.file,
+							terms: entry.terms.map((term) => term.toLowerCase()),
+							name: entryWorkflow.name,
+							description: entryWorkflow.description,
+							yaml: entryYaml,
+							nodeIds: entryWorkflow.nodes.map((node) => node.id),
+							workflow: entryWorkflow,
+						};
+					})
+				: undefined;
 		domains.push({
 			id: manifest.id,
 			title:
@@ -365,6 +397,7 @@ function readDomainDir(root: string, added: boolean): DomainDefinition[] {
 			yaml,
 			nodeIds: workflow.nodes.map((node) => node.id),
 			workflow,
+			workflows: workflowEntries,
 		});
 	}
 	return domains;
