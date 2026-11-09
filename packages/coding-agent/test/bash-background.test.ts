@@ -163,6 +163,16 @@ describe("bash background", () => {
 		killProcessTree(result.details?.pid as number);
 	});
 
+	it("does not run or show a layering-control echo", async () => {
+		const bash = createBashTool(process.cwd());
+		const result = await bash.execute("quiet-delegate", {
+			command: `echo '{"action":"delegate","target":"tooling","reason":"live fetch"}'`,
+		});
+		expect(getText(result)).toBe("");
+		expect(getText(result)).not.toContain("delegate");
+		expect(result.details?.backgrounded).toBeUndefined();
+	});
+
 	it("still waits for a short command to exit", async () => {
 		const bash = createBashTool(process.cwd());
 		const result = await bash.execute("fg-1", { command: "echo ready" });

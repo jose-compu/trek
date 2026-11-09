@@ -1,10 +1,16 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.19.3`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.19.4`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.19.4] - 2026-11-09
+
+### Fixed
+
+- Layering control JSON (`{"action":"delegate",…}`, escalate/descalate) is not shown when the model `echo`s it via bash. The dim climb/delegate card stays.
 
 ## [0.19.3] - 2026-11-09
 

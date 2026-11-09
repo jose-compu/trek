@@ -412,6 +412,46 @@ export function stripEscalateSignal(text: string): string {
 	return next.replace(/\n{3,}/g, "\n\n").trim();
 }
 
+/**
+ * Weak models `echo` the control JSON instead of writing it in the assistant message.
+ * That bash card must stay off-screen; the dim climb/delegate line is enough.
+ */
+export function looksLikeLayeringControlEcho(command: string): boolean {
+	const trimmed = command.trim();
+	if (!/^(?:echo|printf)\b/i.test(trimmed)) {
+		return false;
+	}
+	const payload = unwrapEchoPayload(trimmed);
+	if (!payload) {
+		return false;
+	}
+	if (isLayeringControl(tryJson(payload))) {
+		return true;
+	}
+	return (
+		stripEscalateSignal(payload).length === 0 && /"(?:escalate|descalate|action|delegate|new_topic)"/.test(payload)
+	);
+}
+
+function unwrapEchoPayload(command: string): string | undefined {
+	const rest = command.replace(/^(?:echo|printf)\s+(?:-[neE]+\s+)*/i, "").trim();
+	if (!rest) {
+		return undefined;
+	}
+	const quote = rest[0];
+	if (quote === "'" || quote === '"') {
+		if (rest.length < 2 || rest[rest.length - 1] !== quote) {
+			return undefined;
+		}
+		let inner = rest.slice(1, -1);
+		if (quote === '"') {
+			inner = inner.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+		}
+		return inner.trim();
+	}
+	return rest.trim();
+}
+
 function isLayeringControl(value: unknown): boolean {
 	if (!value || typeof value !== "object" || Array.isArray(value)) {
 		return false;

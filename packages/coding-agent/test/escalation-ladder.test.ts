@@ -14,6 +14,7 @@ import {
 	frontierConsultRole,
 	isLadderNavPrompt,
 	isToolArgumentValidationError,
+	looksLikeLayeringControlEcho,
 	nextLadderRole,
 	parseDelegateAsk,
 	parseDescalateAsk,
@@ -291,6 +292,13 @@ Received arguments:
 		).toBeUndefined();
 		expect(parseDescalateSignal("descalate to tooling model", "planning", resolved)).toBeUndefined();
 		expect(formatDelegateCard("workhorse", "live fetch")).toBe("→ workhorse ⇄ tooling · live fetch");
+		expect(
+			looksLikeLayeringControlEcho('echo \'{"action":"delegate","target":"tooling","reason":"live fetch"}\''),
+		).toBe(true);
+		expect(looksLikeLayeringControlEcho('echo \'{"escalate":"planning","why":"stuck"}\'')).toBe(true);
+		expect(looksLikeLayeringControlEcho("echo hello")).toBe(false);
+		expect(looksLikeLayeringControlEcho("echo '{\"hits\": 3}'")).toBe(false);
+		expect(looksLikeLayeringControlEcho("curl -s https://api.github.com")).toBe(false);
 		expect(shouldRebindSessionRole("delegate")).toBe(false);
 		expect(shouldRebindSessionRole("escalate")).toBe(true);
 		expect(shouldRebindSessionRole(undefined)).toBe(true);
