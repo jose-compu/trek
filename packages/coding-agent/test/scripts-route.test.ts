@@ -23,6 +23,7 @@ describe("parseScriptsIntent", () => {
 	it("formats an ex script with wq and a sed program without it", () => {
 		expect(replaceScript("foo", "bar", "ex")).toBe("%s/foo/bar/g\nwq\n");
 		expect(replaceScript("foo", "bar", "sed")).toBe("s/foo/bar/g");
+		expect(replaceScript("a.b", "x&y", "sed")).toBe("s/a\\.b/x\\&y/g");
 	});
 
 	it("parses replace X with Y in F", () => {
@@ -39,11 +40,14 @@ describe("parseScriptsIntent", () => {
 describe("runScriptsIntent", () => {
 	it("runs replace with zero model calls", async () => {
 		const modelCalls = 0;
+		let sawDryRun = false;
 		const output = await runScriptsIntent(
 			"/tmp",
 			{ kind: "replace", from: "foo", to: "bar", path: "a.txt" },
 			{
-				runEdit: async () => {
+				dryRun: () => true,
+				runEdit: async (_cwd, _input, options) => {
+					sawDryRun = options?.dryRun?.() === true;
 					return {
 						engine: "ex",
 						path: "a.txt",
@@ -56,14 +60,16 @@ describe("runScriptsIntent", () => {
 						stdout: "",
 						stderr: "",
 						killed: false,
-						dryRun: false,
+						dryRun: true,
 					};
 				},
 			},
 		);
 		expect(modelCalls).toBe(0);
+		expect(sawDryRun).toBe(true);
 		expect(output).toContain("script_edit");
 		expect(output).toContain("a.txt");
+		expect(output).toContain("dry-run");
 	});
 
 	it("rewrites a file through the Unix kit", async () => {

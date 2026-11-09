@@ -4799,8 +4799,13 @@ export class AgentSession {
 		}
 		try {
 			const args = { path: intent.path };
+			const verdict = await this._checkToolSafety("script_edit", args);
+			if (!verdict.allowed) {
+				this._recordLocalTurn(this._lastPromptTask, verdict.reason ?? "blocked", "script");
+				return true;
+			}
 			await this._captureEditCheckpoint("script_edit", args);
-			const output = await runScriptsIntent(this._cwd, intent);
+			const output = await runScriptsIntent(this._cwd, intent, { dryRun: () => this._dryRunEnabled });
 			await this._recordTrekVersion("script_edit", args);
 			this._recordLocalTurn(this._lastPromptTask, output, "script");
 			return true;

@@ -2,7 +2,9 @@
  * Decision/Scripts route. Mechanical replace with no chat model.
  */
 
-import { pickScriptEngine, runScriptEdit } from "./tools/script-edit.ts";
+import { withFileMutationQueue } from "./tools/file-mutation-queue.ts";
+import { resolveToCwd } from "./tools/path-utils.ts";
+import { pickScriptEngine, runScriptEdit, type ScriptEditOptions } from "./tools/script-edit.ts";
 import { probeUnixTools } from "./tools/unix-tools.ts";
 
 export interface ReplaceIntent {
@@ -30,9 +32,17 @@ export function parseScriptsIntent(task: string): ScriptsIntent | undefined {
 	return { kind: "replace", from, to, path };
 }
 
+function escapePattern(value: string): string {
+	return value.replace(/[/\\.*^$[\]~]/g, "\\$&");
+}
+
+function escapeReplacement(value: string): string {
+	return value.replace(/[/\\&]/g, "\\$&");
+}
+
 export function replaceScript(from: string, to: string, engine: "ex" | "sed" = "ex"): string {
-	const escapedFrom = from.replace(/[/\\]/g, "\\$&");
-	const escapedTo = to.replace(/[/\\]/g, "\\$&");
+	const escapedFrom = escapePattern(from);
+	const escapedTo = escapeReplacement(to);
 	if (engine === "sed") {
 		return `s/${escapedFrom}/${escapedTo}/g`;
 	}
@@ -42,17 +52,24 @@ export function replaceScript(from: string, to: string, engine: "ex" | "sed" = "
 export async function runScriptsIntent(
 	cwd: string,
 	intent: ScriptsIntent,
-	options: { runEdit?: typeof runScriptEdit } = {},
+	options: { runEdit?: typeof runScriptEdit; dryRun?: ScriptEditOptions["dryRun"] } = {},
 ): Promise<string> {
 	const edit = options.runEdit ?? runScriptEdit;
 	if (intent.kind === "replace") {
 		const engine = pickScriptEngine("auto", probeUnixTools());
-		const result = await edit(cwd, {
-			path: intent.path,
-			script: replaceScript(intent.from, intent.to, engine === "sed" ? "sed" : "ex"),
-			engine: engine ?? "auto",
-		});
-		return `script_edit ${result.engine} ${intent.path}  +${result.added} -${result.removed}  ok`;
+		const result = await withFileMutationQueue(resolveToCwd(intent.path, cwd), () =>
+			edit(
+				cwd,
+				{
+					path: intent.path,
+					script: replaceScript(intent.from, intent.to, engine === "sed" ? "sed" : "ex"),
+					engine: engine ?? "auto",
+				},
+				{ dryRun: options.dryRun },
+			),
+		);
+		const status = result.dryRun ? "dry-run" : "ok";
+		return `script_edit ${result.engine} ${intent.path}  +${result.added} -${result.removed}  ${status}`;
 	}
 	throw new Error("unknown scripts intent");
 }
