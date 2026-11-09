@@ -1,11 +1,11 @@
 # Static AI-safety scan (Lacan). Findings at/above fail-on fail the job.
 # False positives are skipped in `.lacan.toml` (loaded automatically).
-# Same cadence as CI: daily 06:00 CET, only if main moved in the last 24h.
+# Same cadence as CI: daily 05:00 UTC, only if main moved in the last 24h.
 name: Lacan Scan
 
 on:
   schedule:
-    - cron: "0 5 * * *" # 06:00 CET (UTC+1)
+    - cron: "0 5 * * *" # 05:00 UTC (06:00 CET / 07:00 CEST)
   workflow_dispatch:
 
 concurrency:

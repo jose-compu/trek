@@ -1,10 +1,10 @@
 name: CI
 
 # Local Husky hooks (check + tests on commit, build on push) replace per-PR CI.
-# This job runs once a day at 06:00 CET, and only if main moved in the last 24h.
+# This job runs once a day at 05:00 UTC, and only if main moved in the last 24h.
 on:
   schedule:
-    - cron: "0 5 * * *" # 06:00 CET (UTC+1)
+    - cron: "0 5 * * *" # 05:00 UTC (06:00 CET / 07:00 CEST)
   workflow_dispatch:
 
 concurrency:
@@ -75,4 +75,4 @@ jobs:
         run: npm run check
 
       - name: Test
-        run: npm test
+        run: ./test.sh
