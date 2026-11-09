@@ -26,10 +26,10 @@
 ## Commands
 
 - After code changes (not docs): `npm run check` (full output, no tail). Fix all errors, warnings, and infos before committing. Does not run tests.
-- Before every commit (code or tests, not docs-only): run the **full** test suite from the repo root and wait for it to finish. Do not commit if it fails. Prefer `./test.sh` (same workspace tests as `npm test`, but unsets API keys / auth so live e2e stays skipped). `npm test` is acceptable when matching CI and no provider keys are set. Show the full output; do not tail or hide failures. The Husky pre-commit hook runs check + `./test.sh`; pre-push runs `npm run build`. GitHub `CI` / Lacan Scan run once daily at 05:00 UTC, and only if `main` moved in the last 24 hours. Daily CI uses `./test.sh`.
+- Before every commit (code or tests, not docs-only): wait for the Husky pre-commit hook. It runs `npm run check` and `./test.sh --affected` (workspaces whose source or reverse-deps are staged; only the staged test files when that package’s source did not change). Docs-only skips tests. `TREK_FULL_TEST=1` or `./test.sh` is the full suite. Show the full output; do not tail or hide failures. Pre-push runs `npm run build`. GitHub `CI` / Lacan Scan run once daily at 05:00 UTC, and only if `main` moved in the last 24 hours. Daily CI uses `./test.sh`.
 - Never run `npm run build` unless requested by the user.
-- Never run a package vitest suite as a substitute for the full root run before commit. During iteration, targeted tests from the package root are fine: `node ../../node_modules/vitest/dist/cli.js --run test/specific.test.ts`.
-- If you create or modify a test file, run it and iterate on test or implementation until it passes. Then still run the full suite before committing.
+- During iteration, targeted tests from the package root are fine: `node ../../node_modules/vitest/dist/cli.js --run test/specific.test.ts`. Pre-commit runs the affected set, not every workspace. Daily CI still runs `./test.sh`.
+- If you create or modify a test file, run it and iterate on test or implementation until it passes. Pre-commit then runs that file (and reverse-dep suites if a workspace they import changed).
 - For `packages/coding-agent/test/suite/`, use `test/suite/harness.ts` + the faux provider. No real provider APIs, keys, or paid tokens.
 - Put issue-specific regressions under `packages/coding-agent/test/suite/regressions/` named `<issue-number>-<short-slug>.test.ts`.
 - For ad-hoc scripts, `write` them to a temp file (e.g. `/tmp`), run, edit if needed, remove when done. Don't embed multi-line scripts in `bash` commands.
@@ -52,7 +52,7 @@ Committing:
 - Only commit files YOU changed in THIS session.
 - Stage explicit paths (`git add <path1> <path2>`); never `git add -A` / `git add .`.
 - Before committing, run `git status` and verify you are only staging your files.
-- Before committing, the full root test suite must have passed in this session (`./test.sh`, or `npm test` with no live provider keys). See Commands.
+- Before committing, affected tests must have passed (`./test.sh --affected`, which the pre-commit hook runs). The daily CI job still runs the full `./test.sh`. See Commands.
 - `packages/ai/src/models.generated.ts` may always be included alongside your files.
 
 Never run (destroys other agents' work or bypasses checks):

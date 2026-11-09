@@ -159,7 +159,8 @@ export function fuzzyFindText(content: string, oldText: string): FuzzyMatchResul
 function lineMatchKey(line: string): string {
 	return normalizeForFuzzyMatch(line)
 		.trimStart()
-		.replace(/[ \t]+/g, " ");
+		.replace(/[ \t]+/g, " ")
+		.replace(/'/g, '"');
 }
 
 const COPIED_LINE_NUMBER = /^[ \t]*\d{1,6}[ \t]*[|:][ \t]?/;
@@ -224,7 +225,7 @@ function collectLineSpans(content: string, oldText: string): Array<{ index: numb
 
 		const last = i + needle.length - 1;
 		let end = starts[last] + lines[last].length;
-		if (last < lines.length - 1) {
+		if (oldText.endsWith("\n") && last < lines.length - 1) {
 			end += 1;
 		}
 		spans.push({ index: starts[i], matchLength: end - starts[i] });
@@ -314,7 +315,7 @@ function findAnchoredBlock(content: string, oldText: string): { index: number; m
 
 	const end = best.end;
 	let endOffset = starts[end] + lines[end].length;
-	if (end < lines.length - 1) {
+	if (oldText.endsWith("\n") && end < lines.length - 1) {
 		endOffset += 1;
 	}
 	return { index: starts[start], matchLength: endOffset - starts[start] };
@@ -375,33 +376,46 @@ function collectAllMatches(
 	return spans;
 }
 
-function similarLineHint(content: string, oldText: string): string {
-	const token = oldText
-		.split(/\s+/)
-		.filter((part) => part.length >= 4)
-		.sort((left, right) => right.length - left.length)[0];
-	if (!token) {
-		return "";
-	}
-	const hits: string[] = [];
+function similarLineHint(content: string, oldText: string): { line: number; text: string } | undefined {
+	const tokens = [
+		...new Set(
+			oldText
+				.split(/\s+/)
+				.map((part) => part.trim())
+				.filter((part) => part.length >= 4),
+		),
+	].sort((left, right) => right.length - left.length);
 	const lines = content.split("\n");
-	for (let i = 0; i < lines.length; i++) {
-		if (!lines[i].includes(token)) {
+	let best: { firstHit: number; count: number } | undefined;
+	for (const token of tokens) {
+		let firstHit = -1;
+		let count = 0;
+		for (let i = 0; i < lines.length; i++) {
+			if (!lines[i].includes(token)) {
+				continue;
+			}
+			if (firstHit === -1) {
+				firstHit = i;
+			}
+			count++;
+		}
+		if (count === 0) {
 			continue;
 		}
-		hits.push(`  ${i + 1}: ${lines[i]}`);
-		if (hits.length >= 5) {
+		if (!best || count < best.count) {
+			best = { firstHit, count };
+		}
+		if (count === 1) {
 			break;
 		}
 	}
-	if (hits.length === 0) {
-		return "";
+	if (!best) {
+		return undefined;
 	}
-	const firstHit = lines.findIndex((line) => line.includes(token));
-	const windowEnd = Math.min(lines.length, firstHit + 12);
-	const window = lines.slice(firstHit, windowEnd).map((line, offset) => `  ${firstHit + offset + 1}: ${line}`);
-	const clipped = window.join("\n").length > 1200 ? `${window.join("\n").slice(0, 1200)}\n  …` : window.join("\n");
-	return ` Lines still containing ${JSON.stringify(token)}:\n${hits.join("\n")}\n Current text from the first hit:\n${clipped}`;
+	const start = best.firstHit;
+	const end = Math.min(lines.length, start + 4);
+	const window = lines.slice(start, end).map((line, offset) => `  ${start + offset + 1}| ${line}`);
+	return { line: start + 1, text: window.join("\n") };
 }
 
 /** Strip UTF-8 BOM if present, return both the BOM (if any) and the text without it */
@@ -422,13 +436,14 @@ function getNotFoundError(
 	content: string,
 	oldText: string,
 ): Error {
-	const hint = "Re-read the file and retry edit with the current text. Do not rewrite the entire file.";
 	const similar = similarLineHint(content, oldText);
+	const where = similar ? ` (nearest L${similar.line})` : "";
+	const hint = "Re-read and retry with those lines. Do not rewrite the file.";
 	const prefix =
 		totalEdits === 1
-			? `Could not find the exact text in ${path}. The old text must match the current file. ${hint}`
-			: `Could not find edits[${editIndex}] in ${path}. The oldText must match the current file. ${hint}`;
-	return new Error(similar.length > 0 ? `${prefix}${similar}` : prefix);
+			? `Could not find the exact text in ${path}${where}. ${hint}`
+			: `Could not find edits[${editIndex}] in ${path}${where}. ${hint}`;
+	return new Error(similar ? `${prefix}\n${similar.text}` : prefix);
 }
 
 function getDuplicateError(path: string, editIndex: number, totalEdits: number, occurrences: number): Error {

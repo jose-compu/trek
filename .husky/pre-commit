@@ -51,8 +51,8 @@ for file in $STAGED_FILES; do
 done
 
 if [ $CODE_STAGED -eq 1 ]; then
-  echo "Running full test suite (GitHub CI is daily only)..."
-  ./test.sh
+  echo "Running tests affected by staged files (GitHub CI is the daily full suite)..."
+  ./test.sh --affected
   if [ $? -ne 0 ]; then
     echo "Tests failed. Fix them before committing."
     exit 1

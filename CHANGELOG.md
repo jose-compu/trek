@@ -6,6 +6,10 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Changed
+
+- Pre-commit runs `./test.sh --affected`: only workspaces whose source or reverse-deps are staged. Staged test files only, when that package’s source did not change. Docs-only skips tests. Daily CI still runs the full suite. `TREK_FULL_TEST=1` forces it locally.
+
 ## [0.19.6] - 2026-11-09
 
 ### Changed

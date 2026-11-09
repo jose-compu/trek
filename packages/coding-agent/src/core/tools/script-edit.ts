@@ -360,6 +360,7 @@ export function createScriptEditToolDefinition(
 		promptGuidelines: [
 			"Prefer script_edit over write for substitutions, deleting matching lines, and mechanical edits.",
 			"Never call interactive vim, nano, emacs, or a pager.",
+			"Snapshot is the Law 1 read. Do not read the file first.",
 		],
 		parameters: scriptEditSchema,
 		async execute(_toolCallId, params, signal) {

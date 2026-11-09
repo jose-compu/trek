@@ -6,12 +6,14 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fauxAssistantMessage, fauxToolCall } from "@trek/ai";
 import { afterEach, describe, expect, it } from "vitest";
 import { checkLaw1 } from "../src/core/safety/laws.ts";
 import { formatScriptEditCard, pickScriptEngine, runScriptEdit } from "../src/core/tools/script-edit.ts";
 import { findOnPath, probeUnixTools, unixKitPath } from "../src/core/tools/unix-tools.ts";
 import { nodeTrekStoreFs, TrekVersionStore } from "../src/core/trek-store/index.ts";
 import { compactCardLines } from "../src/modes/interactive/components/compact-card.ts";
+import { createHarness, type Harness } from "./suite/harness.ts";
 
 const dirs: string[] = [];
 
@@ -122,9 +124,24 @@ describe("runScriptEdit", () => {
 });
 
 describe("Law 1", () => {
-	it("refuses script_edit on an unread existing path", async () => {
+	it("lets script_edit proceed unread; snapshot is the read", async () => {
 		const reason = await checkLaw1(
 			{ toolName: "script_edit", args: { path: "notes.txt", script: "%s/a/b/g" }, tier: "cheap" },
+			{
+				halted: false,
+				requireDestructiveConfirm: false,
+				enforceReadBeforeWrite: true,
+				hasReadFile: () => false,
+				fileExists: async () => true,
+				resolvePath: (p) => `/repo/${p}`,
+			},
+		);
+		expect(reason).toBeUndefined();
+	});
+
+	it("still refuses write on an unread existing path", async () => {
+		const reason = await checkLaw1(
+			{ toolName: "write", args: { path: "notes.txt", content: "x" }, tier: "cheap" },
 			{
 				halted: false,
 				requireDestructiveConfirm: false,
@@ -167,5 +184,37 @@ describe("compact card", () => {
 		expect(expanded).toContain("g/^#/d");
 		expect(expanded).toContain("wq");
 		expect(expanded).toContain("+bar");
+	});
+});
+
+describe("bash sed -i then edit", () => {
+	const harnesses: Harness[] = [];
+	afterEach(() => {
+		while (harnesses.length > 0) {
+			harnesses.pop()?.cleanup();
+		}
+	});
+
+	it("counts a lone sed -i as the Law 1 read for a later edit", async () => {
+		const harness = await createHarness();
+		harnesses.push(harness);
+		const file = join(harness.tempDir, "notes.txt");
+		writeFileSync(file, "foo line\n", "utf8");
+		harness.setResponses([
+			fauxAssistantMessage([fauxToolCall("bash", { command: "sed -i '' 's/foo/bar/g' notes.txt" })], {
+				stopReason: "toolUse",
+			}),
+			fauxAssistantMessage(
+				[fauxToolCall("edit", { path: "notes.txt", edits: [{ oldText: "bar line", newText: "baz line" }] })],
+				{ stopReason: "toolUse" },
+			),
+			fauxAssistantMessage("done"),
+		]);
+		await harness.session.prompt("sed then edit notes.txt");
+		const edit = harness.session.messages.find(
+			(message) => message.role === "toolResult" && "toolName" in message && message.toolName === "edit",
+		);
+		expect(edit && "isError" in edit ? edit.isError : undefined).not.toBe(true);
+		expect(readFileSync(file, "utf8")).toContain("baz");
 	});
 });

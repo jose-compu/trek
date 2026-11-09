@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Fixed
+
+- An `edit` miss is one nearest-line card (`L80| …`), not a duplicated hit list. Quote drift (`'` vs `"`) still applies when the line is unique.
+- A long-task pin stops when the original request is done. “Original request is complete” / “nothing left to run” unpins instead of injecting another continue.
+- `script_edit` snapshot satisfies Law 1 (no unread refuse). A lone bash `sed -i` becomes the ⬡ card; mixed `sed -i` plus grep/git stays on bash. No “Use script_edit” error.
+
 ## [0.19.6] - 2026-11-09
 
 ### Fixed

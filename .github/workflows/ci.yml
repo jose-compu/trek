@@ -1,6 +1,6 @@
 name: CI
 
-# Local Husky hooks (check + tests on commit, build on push) replace per-PR CI.
+# Local Husky hooks (check + affected tests on commit, build on push) replace per-PR CI.
 # This job runs once a day at 05:00 UTC, and only if main moved in the last 24h.
 on:
   schedule:

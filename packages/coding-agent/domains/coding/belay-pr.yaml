@@ -1,0 +1,28 @@
+name: belay-pr
+description: |
+  Belay holds the rope on a pull request. Read the branch diff. Emit a compact
+  findings table. Do not merge. Do not implement unless the turn asked.
+nodes:
+  - id: scope
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Name the diff Belay will read: branch changes from the merge base, unless
+      the turn asked for uncommitted only. One line. Do not merge.
+  - id: findings
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Review that diff. Emit a table: Severity | Location | Finding. Highest
+      severity first. Real defects only. If none, write Belay found no defects.
+      Do not implement. Do not congratulate. Do not merge.
+    depends_on: [scope]
+  - id: verdict
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      One line: LGTM or request changes. Not a merge. Not an implement. Name the
+      highest remaining finding if any.
+    depends_on: [findings]

@@ -57,7 +57,7 @@ npm run check
 npm run build
 ```
 
-All three must pass. The Husky pre-commit hook runs `npm run check` and `./test.sh`; pre-push runs `npm run build`. GitHub CI is daily at 05:00 UTC on `main` only if it moved in the last 24 hours.
+All three must pass. The Husky pre-commit hook runs `npm run check` and `./test.sh --affected` (only workspaces touched by the staged files or their reverse-deps). Pre-push runs `npm run build`. GitHub CI is the daily full `./test.sh` at 05:00 UTC on `main` only if it moved in the last 24 hours. `TREK_FULL_TEST=1` forces the full suite locally.
 
 Do not edit `CHANGELOG.md`. Changelog entries are added by maintainers.
 

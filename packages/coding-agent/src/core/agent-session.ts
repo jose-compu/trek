@@ -345,6 +345,7 @@ import { type BashOperations, createLocalBashOperations } from "./tools/bash.ts"
 import { type Edit, editStillNeeded } from "./tools/edit-diff.ts";
 import { createAllToolDefinitions } from "./tools/index.ts";
 import { createMemoryToolDefinitions } from "./tools/memory.ts";
+import { extractInplacePaths } from "./tools/unix-guards.ts";
 import { workflowToolDefinition } from "./tools/workflow-card.ts";
 
 const MEMORY_TOOL_NAMES = new Set(["remember", "recall", "forget"]);
@@ -1110,6 +1111,10 @@ export class AgentSession {
 			if (typeof command !== "string") {
 				return [];
 			}
+			const inplace = extractInplacePaths(command);
+			if (inplace.length > 0) {
+				return inplace;
+			}
 			const ops = parseBashPathOps(command);
 			if (!ops) {
 				return [];
@@ -1630,10 +1635,24 @@ export class AgentSession {
 	 * knowledge of that file's contents.
 	 */
 	private _recordFileAccessForSafety(toolName: string, args: unknown, isError: boolean): void {
-		if (
-			isError ||
-			(toolName !== "read" && toolName !== "write" && toolName !== "edit" && toolName !== "script_edit")
-		) {
+		if (isError) {
+			return;
+		}
+		if (toolName === "bash") {
+			const command = (args as { command?: unknown } | undefined)?.command;
+			if (typeof command !== "string") {
+				return;
+			}
+			for (const filePath of extractInplacePaths(command)) {
+				try {
+					this._readFiles.add(resolveToCwd(filePath, this._cwd));
+				} catch {
+					// Ignore unresolved paths; they simply will not satisfy read-before-write.
+				}
+			}
+			return;
+		}
+		if (toolName !== "read" && toolName !== "write" && toolName !== "edit" && toolName !== "script_edit") {
 			return;
 		}
 		const rawPath = (args as { path?: unknown; file_path?: unknown } | undefined)?.path;
