@@ -1,13 +1,14 @@
 /**
  * Three LogosDB roots. A row in one root is not visible from another.
- * Native logosdb 1.1.0 stores the vector and one text column.
- * Annotations are the 1.3.0 situating header on the embedded string.
+ * Native logosdb 1.2.0 stores the vector and one text column. Rows are read with DB.get.
+ * Annotations are the situating header on the embedded string.
  */
 
 import { existsSync, type FSWatcher, mkdirSync, statSync, watch } from "node:fs";
 import { homedir } from "node:os";
 import { join, relative, sep } from "node:path";
 import type { AgentMessage } from "@trek/agent-core";
+import { DB, type Row } from "logosdb";
 import { loadManifest, manifestPath, saveManifest } from "logosdb-mcp-server/dist/file-index-manifest.js";
 import { hybridRerank } from "logosdb-mcp-server/dist/hybrid.js";
 import { NamespaceStore } from "logosdb-mcp-server/dist/store.js";
@@ -179,15 +180,14 @@ export class MemoryManager {
 	}
 
 	/**
-	 * One-hop neighbors from `[links:…]` via LogosDB get-by-id (no second kNN).
-	 * Manifest maps target paths → chunk ids; `db.get` loads the stored row.
+	 * One-hop neighbors from `[links:…]` via LogosDB DB.get (no second kNN).
+	 * Manifest maps target paths → chunk ids.
 	 */
 	private expandLinkedHits(hits: MemoryHit[], topK: number): MemoryHit[] {
 		if (!this.projectEnabled() || hits.length === 0) return hits;
-		const db = this.open("project", false);
-		const rowDb = db as { get?: (id: number) => { text?: string | null } } | undefined;
-		// logosdb 1.2.0 has get-by-id. logosdb-mcp-server 1.4.0 store.d.ts still omits it.
-		if (!rowDb || typeof rowDb.get !== "function") return hits;
+		const opened = this.open("project", false);
+		if (!(opened instanceof DB)) return hits;
+		const db: DB = opened;
 		const manifestFile = manifestPath(this.layerRoot("project"), NS);
 		let files: Record<string, { ids?: number[] }>;
 		try {
@@ -200,7 +200,7 @@ export class MemoryManager {
 		for (const hit of hits.slice(0, LINK_EXPAND_PRIMARY)) {
 			if (hit.layer !== "project") continue;
 			if (hit.kind !== "file" && hit.kind !== "note") continue;
-			const links = this.linksForHit(hit, files, rowDb as { get: (id: number) => { text?: string | null } });
+			const links = this.linksForHit(hit, files, db);
 			if (links.length === 0) continue;
 			for (const link of links) {
 				const entry = files[link.targetPath];
@@ -209,9 +209,9 @@ export class MemoryManager {
 				for (const rowId of ids.slice(0, 2)) {
 					const neighborId = `project:${rowId}`;
 					if (seen.has(neighborId)) continue;
-					let row: { text?: string | null } | undefined;
+					let row: Row | undefined;
 					try {
-						row = rowDb.get(rowId);
+						row = db.get(rowId);
 					} catch {
 						continue;
 					}
@@ -237,7 +237,7 @@ export class MemoryManager {
 	private linksForHit(
 		hit: MemoryHit,
 		files: Record<string, { ids?: number[] }>,
-		db: { get: (id: number) => { text?: string | null } },
+		db: DB,
 	): ReturnType<typeof parseCrossFileLinks> {
 		const links = parseCrossFileLinks(hit.text);
 		const file = /\[file:([^\]]+)\]/.exec(hit.text)?.[1];
@@ -246,7 +246,7 @@ export class MemoryManager {
 		const seen = new Set(links.map((link) => `${link.linkType}:${link.targetPath}`));
 		for (const rowId of ids.slice(0, 6)) {
 			if (`project:${rowId}` === hit.id) continue;
-			let row: { text?: string | null } | undefined;
+			let row: Row | undefined;
 			try {
 				row = db.get(rowId);
 			} catch {
