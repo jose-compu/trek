@@ -4,7 +4,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
-## [1.0.0-rc.1] - unreleased
+## [1.0.0-rc.1] - 2026-11-10
 
 ### Changed
 

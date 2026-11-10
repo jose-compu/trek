@@ -6,7 +6,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
-## [1.0.0-rc.1] - unreleased
+## [1.0.0-rc.1] - 2026-11-10
 
 ### Changed
 
