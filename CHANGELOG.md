@@ -1,10 +1,33 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.20.4`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.3`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [1.0.0-rc.3] - 2026-11-10
+
+### Added
+
+- Science domain LaTeX / peer-review / slides / poster workflows (multi-workflow catalog).
+
+## [1.0.0-rc.2] - 2026-11-10
+
+### Fixed
+
+- Debug log redacts `--api-key` argv values and provider-shaped secrets before writing `trek-debug.log`.
+
+## [1.0.0-rc.1] - 2026-11-10
+
+### Changed
+
+- Major line prep: roadmap Release stage is **1.0.0** (was 0.21 / GitHub v0.22). Multilingual embeddings stay **0.21**.
+- Packages lockstep at `1.0.0-rc.1`. GitHub prerelease only when tagged; **no npm**.
+
+### Note
+
+RC checklist and ship gate: [ROADMAP.md §1.0.0](./ROADMAP.md).
 
 ## [0.20.4] - 2026-11-10
 

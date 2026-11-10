@@ -5,7 +5,148 @@
 	"terms": [
 		"data leakage",
 		"p-value",
-		"train test split"
+		"train test split",
+		"latex",
+		"manuscript",
+		"paper",
+		"bibtex",
+		"beamer",
+		"poster",
+		"referee",
+		"rebuttal",
+		"abstract",
+		"supplementary"
 	],
-	"workflow": "method-check.yaml"
+	"workflows": [
+		{
+			"file": "method-check.yaml",
+			"terms": [
+				"data leakage",
+				"p-value",
+				"train test split",
+				"method check",
+				"methodology"
+			]
+		},
+		{
+			"file": "write-paper.yaml",
+			"terms": [
+				"write a paper",
+				"draft the manuscript",
+				"latex paper",
+				"write manuscript",
+				"new paper",
+				"article draft"
+			]
+		},
+		{
+			"file": "review-paper-coauthor.yaml",
+			"terms": [
+				"coauthor review",
+				"review as coauthor",
+				"co-author review",
+				"internal review",
+				"friendly review"
+			]
+		},
+		{
+			"file": "review-paper-referee.yaml",
+			"terms": [
+				"referee review",
+				"peer review",
+				"review as referee",
+				"reviewer report",
+				"journal review"
+			]
+		},
+		{
+			"file": "respond-to-reviews.yaml",
+			"terms": [
+				"respond to reviews",
+				"address referee",
+				"revision letter",
+				"reply to reviewers",
+				"camera ready fixes"
+			]
+		},
+		{
+			"file": "write-rebuttal.yaml",
+			"terms": [
+				"rebuttal",
+				"author response",
+				"conference rebuttal",
+				"response to reviewers"
+			]
+		},
+		{
+			"file": "generate-slides.yaml",
+			"terms": [
+				"generate slides",
+				"beamer slides",
+				"talk slides",
+				"presentation latex",
+				"conference talk"
+			]
+		},
+		{
+			"file": "generate-poster.yaml",
+			"terms": [
+				"generate poster",
+				"conference poster",
+				"beamerposter",
+				"latex poster"
+			]
+		},
+		{
+			"file": "polish-bibtex.yaml",
+			"terms": [
+				"polish bibtex",
+				"fix bibliography",
+				"clean .bib",
+				"bibtex",
+				"citation keys"
+			]
+		},
+		{
+			"file": "check-latex-build.yaml",
+			"terms": [
+				"check latex",
+				"latex build",
+				"latexmk",
+				"pdflatex error",
+				"compile the paper",
+				"latex build log",
+				"tex log",
+				"undefined control sequence"
+			]
+		},
+		{
+			"file": "figure-pass.yaml",
+			"terms": [
+				"figure pass",
+				"caption pass",
+				"figure captions",
+				"label ref",
+				"float check"
+			]
+		},
+		{
+			"file": "extract-claims.yaml",
+			"terms": [
+				"extract claims",
+				"claim evidence",
+				"contribution list",
+				"claims table"
+			]
+		},
+		{
+			"file": "write-abstract.yaml",
+			"terms": [
+				"write abstract",
+				"highlights",
+				"graphical abstract",
+				"summary for abstract"
+			]
+		}
+	]
 }

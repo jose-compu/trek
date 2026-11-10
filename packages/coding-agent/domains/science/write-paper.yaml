@@ -1,0 +1,40 @@
+name: write-paper
+description: |
+  Draft or extend a LaTeX manuscript. Prefer existing .tex layout. Do not invent
+  results, statistics, or citations that are not in the turn or the project files.
+nodes:
+  - id: inventory
+    allowed_tools: [bash, read]
+    output_type: findings
+    prompt: |
+      Run bash and/or bash/read now. Locate the manuscript root (.tex, .bib, figures/,
+      Makefile or latexmkrc). Quote the main .tex path and class/template if present.
+      If none exists, say so and propose a minimal article/IEEEtran/acmart skeleton
+      path only. Do not invent results.
+  - id: outline
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      From $inventory.output and the user turn, list section order (title, abstract,
+      intro, related, method, experiments, discussion, conclusion, refs). Mark which
+      sections already exist in the .tex. Do not invent numbers.
+    depends_on: [inventory]
+  - id: draft
+    trigger_rule: all_success
+    allowed_tools: [read, edit, write]
+    output_type: findings
+    prompt: |
+      Draft or extend the named sections from $outline.output in LaTeX. Use read/edit/write
+      on the main .tex. Keep placeholders as TODO{\ldots} when evidence is missing. Cite
+      only keys that exist in the .bib or that the user supplied. Do not claim results
+      that are not supported. Quote paths you changed.
+    depends_on: [outline]
+  - id: next
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      One short list: remaining TODO{\ldots} items, missing figures, and the next
+      concrete edit. Do not congratulate.
+    depends_on: [draft]

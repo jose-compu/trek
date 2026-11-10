@@ -4,6 +4,25 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [1.0.0-rc.3] - 2026-11-10
+
+### Added
+
+- Science domain multi-workflow catalog for LaTeX-centric research: `write-paper`, `review-paper-coauthor`, `review-paper-referee`, `respond-to-reviews`, `write-rebuttal`, `generate-slides`, `generate-poster`, `polish-bibtex`, `check-latex-build`, `figure-pass`, `extract-claims`, `write-abstract` (keeps `method-check`).
+
+## [1.0.0-rc.2] - 2026-11-10
+
+### Fixed
+
+- Debug logging redacts `--api-key` (and similar flags), secret-shaped strings (`sk-or-v1-…`, `sk-ant-…`, `xai-…`, Bearer tokens), and secret object keys before writing `trek-debug.log`.
+
+## [1.0.0-rc.1] - 2026-11-10
+
+### Changed
+
+- Start of the **1.0** major line. Roadmap Release stage moved from 0.21 → **1.0.0**; multilingual memory remains **0.21**.
+- Version `1.0.0-rc.1`. GitHub prerelease when tagged; npm stays off.
+
 ## [0.20.4] - 2026-11-10
 
 ### Changed

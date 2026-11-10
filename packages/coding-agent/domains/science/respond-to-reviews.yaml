@@ -1,0 +1,37 @@
+name: respond-to-reviews
+description: |
+  Plan and apply a revision pass against referee comments. Keep a point-by-point
+  response letter. Edit LaTeX only where the response claims a change. Do not invent data.
+nodes:
+  - id: collect
+    allowed_tools: [bash, read]
+    output_type: findings
+    prompt: |
+      Run bash/read now. Locate referee comments (review*.txt/md/pdf text, email paste
+      in the turn) and the main .tex/.bib. Quote how many distinct comments you see.
+  - id: map
+    trigger_rule: all_success
+    allowed_tools: [read]
+    output_type: findings
+    prompt: |
+      Build a table: Comment id | Referee ask | Response stance (agree / clarify / disagree)
+      | Manuscript locus (.tex section) | Action. Use only comments from $collect.output.
+    depends_on: [collect]
+  - id: revise
+    trigger_rule: all_success
+    allowed_tools: [read, edit, write]
+    output_type: findings
+    prompt: |
+      Apply the agree/clarify edits from $map.output with edit/write. Keep changes minimal
+      and localized. For disagree rows, do not silently change claims; leave a TODO note in
+      the response letter instead. Quote paths changed.
+    depends_on: [map]
+  - id: letter
+    trigger_rule: all_success
+    allowed_tools: [read, edit, write]
+    output_type: findings
+    prompt: |
+      Draft or update a point-by-point response letter (LaTeX or Markdown as the project
+      already uses). Each comment: thank briefly, answer, and point to the revised locus.
+      No flattery. No new results.
+    depends_on: [revise]

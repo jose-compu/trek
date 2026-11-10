@@ -1,0 +1,35 @@
+name: polish-bibtex
+description: |
+  Clean a .bib file and align citation keys with the manuscript. Prefer mechanical
+  fixes. Do not fabricate DOIs or titles.
+nodes:
+  - id: inventory
+    allowed_tools: [bash, read]
+    output_type: findings
+    prompt: |
+      Run bash/read now. Locate .bib files and list \cite/\citep/\citepp keys used
+      in the main .tex. Quote counts: keys cited, entries present, obvious orphans.
+  - id: hygiene
+    trigger_rule: all_success
+    allowed_tools: [read]
+    output_type: findings
+    prompt: |
+      From $inventory.output, table: Key | Problem (missing entry, duplicate, empty field,
+      bad year, missing DOI if required by the user) | Action. Do not invent metadata.
+    depends_on: [inventory]
+  - id: apply
+    trigger_rule: all_success
+    allowed_tools: [read, edit, write]
+    output_type: findings
+    prompt: |
+      Apply safe fixes from $hygiene.output (remove true duplicates, fill fields only when
+      the user provided values, rename keys only if both .bib and .tex are updated together).
+      Leave unresolved rows as a short TODO list. Quote paths changed.
+    depends_on: [hygiene]
+  - id: report
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Summarize remaining missing cites and entries still needing human metadata. Stop.
+    depends_on: [apply]

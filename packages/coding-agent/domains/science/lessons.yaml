@@ -13,6 +13,9 @@ areas:
   - modeling
   - validation
   - publication
+  - latex
+  - peer_review
+  - presentation
 severity:
   default: medium
   data_quality: high

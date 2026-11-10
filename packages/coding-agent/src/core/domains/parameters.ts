@@ -75,9 +75,13 @@ const BARE_FACT: Record<string, RegExp> = {
  * Hold the model only when every slot for this domain is missing or bare.
  * One specific fact is enough to start. A multi-workflow miss does not call this.
  * Coding lint/type facts apply only to `defect-fix` — not open-pr / review-pr / merge-pr.
+ * Science leakage/split facts apply only to `method-check` — not LaTeX paper workflows.
  */
 export function workflowNeedsFacts(domainId: string, text: string, workflowName?: string): boolean {
 	if (domainId === "coding" && workflowName && workflowName !== "defect-fix") {
+		return false;
+	}
+	if (domainId === "science" && workflowName && workflowName !== "method-check") {
 		return false;
 	}
 	const specs = SPECS[domainId];
