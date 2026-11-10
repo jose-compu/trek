@@ -1,7 +1,7 @@
 {
   "name": "trek-extension-custom-provider-anthropic",
   "private": true,
-  "version": "0.20.4",
+  "version": "1.0.0-rc.1",
   "type": "module",
   "scripts": {
     "clean": "echo 'nothing to clean'",

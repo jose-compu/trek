@@ -4,6 +4,13 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [1.0.0-rc.1] - unreleased
+
+### Changed
+
+- Start of the **1.0** major line. Roadmap Release stage moved from 0.21 → **1.0.0**; multilingual memory remains **0.21**.
+- Version `1.0.0-rc.1`. GitHub prerelease when tagged; npm stays off.
+
 ## [0.20.4] - 2026-11-10
 
 ### Changed

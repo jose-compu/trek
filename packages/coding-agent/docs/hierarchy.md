@@ -109,7 +109,7 @@ Purpose-built for classification, routing, and scoring ([Liquid Decision Models]
 
 ## Suite defaults (chat + Decision)
 
-See the [Roadmap model suite table](../../../../ROADMAP.md#5-model-suite-reference). Chat GGUFs stay suite-specific (Mistral / Qwen / LFM). **Decision is always LFM `d1-omni-600M`**: Mistral, mistral-pro, and Qwen have no suite-native Decision model, so they reuse the same Liquid d1 weights as the LFM suite (overrideable in `models.yaml`).
+See the [Roadmap model suite table](../../../ROADMAP.md#5-model-suite-reference). Chat GGUFs stay suite-specific (Mistral / Qwen / LFM). **Decision is always LFM `d1-omni-600M`**: Mistral, mistral-pro, and Qwen have no suite-native Decision model, so they reuse the same Liquid d1 weights as the LFM suite (overrideable in `models.yaml`).
 
 | Role | mistral | mistral-pro | qwen | lfm |
 | --- | --- | --- | --- | --- |
