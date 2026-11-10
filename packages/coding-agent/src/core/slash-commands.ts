@@ -51,14 +51,18 @@ export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
 	{
 		name: "domains",
 		description:
-			"List domains, /domains enable <id>, or /domains disable <id>. Detection still chooses the workflow.",
+			"List domains, /domains add <id>, /domains enable <id>, or /domains disable <id>. Detection still chooses the workflow.",
 	},
-	{ name: "workflows", description: "List workflows, or /workflows show <id>. Does not run a workflow." },
+	{
+		name: "workflows",
+		description:
+			"List workflows, /workflows show <id>, or /workflows add <domain> <workflow>. Detection chooses on the next prompt.",
+	},
 	{ name: "lessons", description: "List stored lessons: /lessons or /lessons <domain>." },
 	{
 		name: "patterns",
 		description:
-			"List or edit domain patterns: /patterns, /patterns <id>, /patterns edit <id> categories|targets|never.",
+			"List or edit domain patterns: /patterns, /patterns <id>, /patterns edit <id> categories|targets|never. Or say add lesson category X to finance.",
 	},
 	{
 		name: "crystallize",

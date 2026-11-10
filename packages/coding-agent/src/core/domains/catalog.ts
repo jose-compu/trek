@@ -161,6 +161,110 @@ export function addDomain(cwd: string, id: string, workflowFile: string): string
 	return fileName;
 }
 
+/** Append a workflow YAML to an existing domain under `.trek/domains/<id>/`. */
+export function addWorkflowToDomain(
+	cwd: string,
+	domainId: string,
+	yamlText: string,
+	terms: string[] = [],
+): { name: string; file: string } {
+	if (!ID_PATTERN.test(domainId)) {
+		throw new Error("domain id must be lowercase letters, numbers, and hyphens");
+	}
+	const current = loadDomainCatalog(cwd).domains.find((domain) => domain.id === domainId);
+	if (!current) {
+		throw new Error(`unknown domain ${domainId}`);
+	}
+	const workflow = parseArchonWorkflow(yamlText);
+	if (!ID_PATTERN.test(workflow.name)) {
+		throw new Error("workflow name must be lowercase letters, numbers, and hyphens");
+	}
+	for (const node of workflow.nodes) {
+		if (node.kind !== "prompt" && node.kind !== "bash") {
+			throw new Error(`node ${node.id} must be a prompt or bash step`);
+		}
+	}
+	const text = ensureNewline(yamlText);
+	const dir = join(cwd, ".trek", "domains", domainId);
+	const manifest = ensureDomainOverlayManifest(cwd, current);
+	const fileName = `${workflow.name}.yaml`;
+	const entries = listManifestWorkflows(manifest);
+	if (entries.some((entry) => entry.file === fileName || entry.file === `${workflow.name}.yaml`)) {
+		throw new Error(`workflow ${workflow.name} already exists on ${domainId}`);
+	}
+	if (current.workflows?.some((entry) => entry.name === workflow.name)) {
+		throw new Error(`workflow ${workflow.name} already exists on ${domainId}`);
+	}
+	mkdirSync(dir, { recursive: true });
+	writeFileSync(join(dir, fileName), text);
+	entries.push({
+		file: fileName,
+		terms: terms.length > 0 ? terms.map((term) => term.toLowerCase()) : termsFromWorkflow(workflow),
+	});
+	const next: DomainManifest = {
+		id: current.id,
+		title: current.title,
+		alwaysOn: current.alwaysOn,
+		terms: current.terms,
+		workflows: entries,
+	};
+	writeFileSync(join(dir, "domain.json"), `${JSON.stringify(next, null, "\t")}\n`);
+	return { name: workflow.name, file: fileName };
+}
+
+function ensureDomainOverlayManifest(cwd: string, current: DomainDefinition): DomainManifest {
+	const dir = join(cwd, ".trek", "domains", current.id);
+	mkdirSync(dir, { recursive: true });
+	const manifestPath = join(dir, "domain.json");
+	if (existsSync(manifestPath)) {
+		return JSON.parse(readFileSync(manifestPath, "utf8")) as DomainManifest;
+	}
+	const bundledManifestPath = join(bundledDomainsRoot(), current.id, "domain.json");
+	if (existsSync(bundledManifestPath)) {
+		const bundled = JSON.parse(readFileSync(bundledManifestPath, "utf8")) as DomainManifest;
+		for (const entry of listManifestWorkflows(bundled)) {
+			const src = join(bundledDomainsRoot(), current.id, entry.file);
+			const dest = join(dir, entry.file);
+			if (existsSync(src) && !existsSync(dest)) {
+				writeFileSync(dest, readFileSync(src));
+			}
+		}
+		const lessonsSrc = join(bundledDomainsRoot(), current.id, "lessons.yaml");
+		const lessonsDest = join(dir, "lessons.yaml");
+		if (existsSync(lessonsSrc) && !existsSync(lessonsDest)) {
+			writeFileSync(lessonsDest, readFileSync(lessonsSrc));
+		}
+		writeFileSync(manifestPath, `${JSON.stringify(bundled, null, "\t")}\n`);
+		return bundled;
+	}
+	const fileName = `${current.workflowName}.yaml`;
+	if (!existsSync(join(dir, fileName))) {
+		writeFileSync(join(dir, fileName), ensureNewline(current.yaml));
+	}
+	const manifest: DomainManifest = {
+		id: current.id,
+		title: current.title,
+		alwaysOn: current.alwaysOn,
+		terms: current.terms,
+		workflows: [{ file: fileName, terms: current.terms }],
+	};
+	writeFileSync(manifestPath, `${JSON.stringify(manifest, null, "\t")}\n`);
+	return manifest;
+}
+
+function listManifestWorkflows(manifest: DomainManifest): Array<{ file: string; terms: string[] }> {
+	if (Array.isArray(manifest.workflows) && manifest.workflows.length > 0) {
+		return manifest.workflows.map((entry) => ({
+			file: entry.file,
+			terms: Array.isArray(entry.terms) ? entry.terms.map((term) => String(term).toLowerCase()) : [],
+		}));
+	}
+	if (typeof manifest.workflow === "string") {
+		return [{ file: manifest.workflow, terms: [] }];
+	}
+	return [];
+}
+
 export interface SavedWorkflow {
 	name: string;
 	created: boolean;

@@ -4,19 +4,21 @@ description: |
   findings table. Do not merge. Do not implement unless the turn asked.
 nodes:
   - id: scope
-    allowed_tools: []
+    allowed_tools: [bash]
     output_type: findings
     prompt: |
-      Name the diff Belay will read: branch changes from the merge base, unless
-      the turn asked for uncommitted only. One line. Do not merge.
+      Run bash now. Capture the diff Belay will read: branch changes from the
+      merge base (`git diff $(git merge-base HEAD main 2>/dev/null || git merge-base HEAD master)..HEAD`
+      or uncommitted only if the turn asked). Keep the diff text. Do not merge.
   - id: findings
     trigger_rule: all_success
-    allowed_tools: []
+    allowed_tools: [read]
     output_type: findings
     prompt: |
-      Review that diff. Emit a table: Severity | Location | Finding. Highest
-      severity first. Real defects only. If none, write Belay found no defects.
-      Do not implement. Do not congratulate. Do not merge.
+      Review the diff from $scope.output. You may read named files. Emit a table:
+      Severity | Location | Finding. Highest severity first. Real defects only. If
+      none, write Belay found no defects. Do not implement. Do not congratulate. Do
+      not merge.
     depends_on: [scope]
   - id: verdict
     trigger_rule: all_success

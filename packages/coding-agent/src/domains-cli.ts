@@ -222,6 +222,7 @@ function printDomainsHelp(): void {
 	console.log("  domains <id> shows workflows and lesson categories for that domain.");
 	console.log("  The list shows lesson categories (abstract types) for each domain.");
 	console.log("  patterns edits .trek/domains/<id>/lessons.yaml and leaves the bundled file alone.");
+	console.log("  In-session: /domains add <id>, or say create a domain workflow for <id>.");
 }
 
 function printWorkflowsHelp(): void {
@@ -231,4 +232,7 @@ function printWorkflowsHelp(): void {
 	console.log("  list includes each coding workflow and its trigger phrases.");
 	console.log("  show coding lists those workflows; show open-pr prints that DAG.");
 	console.log("  run calls bash nodes. A prompt node is an AI step and is called in the session, one step per node.");
+	console.log(
+		"  In-session: /workflows add <domain> <workflow>, or say add a workflow called <name> to the <domain> domain.",
+	);
 }

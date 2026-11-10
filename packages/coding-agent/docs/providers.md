@@ -61,7 +61,7 @@ pi
 | Cloudflare AI Gateway | `CLOUDFLARE_API_KEY` (+ `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_GATEWAY_ID`) | `cloudflare-ai-gateway` |
 | Cloudflare Workers AI | `CLOUDFLARE_API_KEY` (+ `CLOUDFLARE_ACCOUNT_ID`) | `cloudflare-workers-ai` |
 | xAI | `XAI_API_KEY` | `xai` |
-| OpenRouter | `OPENROUTER_API_KEY` | `openrouter` |
+| OpenRouter | `OPENROUTER_API_KEY` | `openrouter` (default model `openrouter/free`) |
 | Vercel AI Gateway | `AI_GATEWAY_API_KEY` | `vercel-ai-gateway` |
 | ZAI | `ZAI_API_KEY` | `zai` |
 | ZAI Coding Plan (China) | `ZAI_CODING_CN_API_KEY` | `zai-coding-cn` |
@@ -239,6 +239,19 @@ export GOOGLE_CLOUD_LOCATION=us-central1
 ```
 
 Or set `GOOGLE_APPLICATION_CREDENTIALS` to a service account key file.
+
+### OpenRouter
+
+Set `OPENROUTER_API_KEY` (or store the key under `openrouter` in `auth.json`). Trek’s default OpenRouter model is `openrouter/free`, the Free Models Router that picks a suitable $0 model for you.
+
+```bash
+export OPENROUTER_API_KEY=sk-or-...
+trek --provider openrouter
+# same as:
+trek --provider openrouter --model openrouter/free
+```
+
+Free models are the OpenRouter SKUs whose IDs end in `:free` (for example `nvidia/nemotron-3-ultra-550b-a55b:free`, `google/gemma-4-31b-it:free`). They cost $0 per token. Rate limits depend on lifetime OpenRouter credits (low daily caps under ~$10 purchased; higher after). The free lineup rotates — check [openrouter.ai/models?q=free](https://openrouter.ai/models?q=free) or pick a specific `:free` id in `/model`. One key works for both free and paid OpenRouter models.
 
 ## Custom Providers
 

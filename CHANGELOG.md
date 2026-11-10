@@ -1,10 +1,30 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.20.2`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.20.4`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.20.4] - 2026-11-10
+
+### Changed
+
+- Coding workflows execute host/git steps with tools; `/domains add` and `/workflows add` create catalog entries; OpenRouter defaults to `openrouter/free`.
+
+### Fixed
+
+- CLI `--provider` / `--model` pins the session so Decision park cannot override it with global hierarchy roles.
+
+## [0.20.3] - 2026-11-09
+
+### Changed
+
+- Domain help surfaces, specialized `lessons.yaml`, and coding `publish-release` workflow. See `packages/coding-agent/CHANGELOG.md`.
+
+### Fixed
+
+- Fact gate limited to `defect-fix`; lesson draft fallbacks; Decision footer sticky cleared on model switch.
 
 ## [0.20.2] - 2026-11-09
 

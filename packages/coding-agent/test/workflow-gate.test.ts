@@ -367,10 +367,12 @@ describe("workflow gate", () => {
 		expect(orderNodes(workflow).map((node) => node.id)).toEqual(["scope", "findings", "verdict"]);
 		for (const node of workflow.nodes) {
 			expect(node.kind).toBe("prompt");
-			expect(node.allowedTools).toEqual([]);
 			expect(node.outputType).toBe("findings");
 			expect(node.body).not.toMatch(/gh pr merge|merge-pr/);
 		}
+		expect(workflow.nodes.find((node) => node.id === "scope")?.allowedTools).toEqual(["bash"]);
+		expect(workflow.nodes.find((node) => node.id === "findings")?.allowedTools).toEqual(["read"]);
+		expect(workflow.nodes.find((node) => node.id === "verdict")?.allowedTools).toEqual([]);
 		expect(workflow.description).toMatch(/Do not merge/);
 		expect(workflow.nodes.find((node) => node.id === "findings")?.body).toMatch(/Severity \| Location \| Finding/);
 		expect(workflow.nodes.find((node) => node.id === "verdict")?.body).toMatch(/LGTM or request changes/);

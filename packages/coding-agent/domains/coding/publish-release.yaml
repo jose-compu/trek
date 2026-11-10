@@ -17,12 +17,12 @@ nodes:
     depends_on: [detect-host]
   - id: verify-main
     trigger_rule: all_success
-    allowed_tools: []
+    allowed_tools: [bash]
     output_type: findings
     prompt: |
-      State how to verify HEAD is on main or master (or the release branch named
-      in the turn) and that the working tree is clean enough to tag. Do not run
-      the commands yet.
+      Run bash now. Verify HEAD is on main or master (or the release branch named
+      in the turn) and that the working tree is clean enough to tag. Use
+      `git branch --show-current` and `git status --porcelain`. Quote the results.
     depends_on: [identify-version]
   - id: draft-notes
     trigger_rule: all_success
@@ -45,23 +45,23 @@ nodes:
     depends_on: [draft-notes]
   - id: tag-command
     trigger_rule: all_success
-    allowed_tools: []
+    when: "$refuse-ai-trailer.output contains 'acceptable'"
+    allowed_tools: [bash]
     output_type: findings
     prompt: |
-      State the annotated tag command for $identify-version.output using the
-      notes from $draft-notes.output, only if $refuse-ai-trailer.output says the
-      notes are acceptable. Do not run it. Prefer
-      `git tag -a <tag> -m "<summary>"` then `git push origin <tag>`.
+      Run bash now. Create an annotated tag for $identify-version.output with the
+      notes from $draft-notes.output (`git tag -a <tag> -m "<summary>"`), then
+      push that tag (`git push origin <tag>`). Quote the tag name.
     depends_on: [refuse-ai-trailer]
   - id: publish-command
     trigger_rule: all_success
-    allowed_tools: []
+    when: "$detect-host.output != 'none'"
+    allowed_tools: [bash]
     output_type: findings
     prompt: |
-      State the host CLI command to publish the release for the tag from
-      $identify-version.output using $detect-host.output (gh release create,
-      glab release create, or tea). Include the notes from $draft-notes.output.
-      Do not run it. If no host CLI was detected, state that the release cannot
-      be published without a host CLI. Do not force-push main or delete an
-      existing tag unless the user asked for a re-release.
+      Run bash now. Publish the release for the tag from $identify-version.output
+      with the host CLI from $detect-host.output (gh release create, glab release
+      create, or tea) using notes from $draft-notes.output. Quote the release URL.
+      Do not force-push main or delete an existing tag unless the user asked for a
+      re-release.
     depends_on: [tag-command]

@@ -16,7 +16,22 @@ import { formatLessonPattern, lessonPatternFor } from "./lesson-pattern.ts";
 
 const HELP = "Detection still chooses the workflow. This command only changes which domains are candidates.";
 
+/** Session hint so interactive mode can open a create/add ask. */
+export type DomainSessionAction =
+	| { kind: "text"; text: string }
+	| { kind: "create-domain"; id: string }
+	| { kind: "add-workflow"; domain: string; workflowName: string };
+
 export function runDomainSessionCommand(cwd: string, name: "domains" | "workflows", arg: string): string {
+	const action = dispatchDomainSessionCommand(cwd, name, arg);
+	return action.kind === "text" ? action.text : formatDomainSessionHint(action);
+}
+
+export function dispatchDomainSessionCommand(
+	cwd: string,
+	name: "domains" | "workflows",
+	arg: string,
+): DomainSessionAction {
 	const parts = arg
 		.trim()
 		.split(/\s+/)
@@ -24,33 +39,56 @@ export function runDomainSessionCommand(cwd: string, name: "domains" | "workflow
 	const sub = parts[0] ?? "";
 	try {
 		if (name === "workflows" && sub === "show") {
-			return showWorkflow(cwd, parts[1]);
+			return { kind: "text", text: showWorkflow(cwd, parts[1]) };
+		}
+		if (name === "workflows" && sub === "add") {
+			requireId(parts[1], "/workflows add <domain> <workflow>");
+			requireId(parts[2], "/workflows add <domain> <workflow>");
+			return { kind: "add-workflow", domain: parts[1], workflowName: parts[2] };
 		}
 		if (name === "workflows" && (sub === "run" || sub === "enable" || sub === "disable")) {
-			return "This command does not run a workflow. Detection chooses it on the next prompt.";
+			return {
+				kind: "text",
+				text: "This command does not run a workflow. Detection chooses it on the next prompt.",
+			};
+		}
+		if (name === "domains" && sub === "add") {
+			requireId(parts[1], "/domains add <id>");
+			return { kind: "create-domain", id: parts[1] };
 		}
 		if (name === "domains" && sub === "enable") {
 			requireId(parts[1], "/domains enable <id>");
 			enableDomain(cwd, parts[1]);
-			return formatDomainList(cwd);
+			return { kind: "text", text: formatDomainList(cwd) };
 		}
 		if (name === "domains" && sub === "disable") {
 			requireId(parts[1], "/domains disable <id>");
 			disableDomain(cwd, parts[1]);
-			return formatDomainList(cwd);
+			return { kind: "text", text: formatDomainList(cwd) };
 		}
 		if (name === "domains" && (sub === "show" || looksLikeDomainId(sub))) {
 			const id = sub === "show" ? parts[1] : sub;
 			requireId(id, "/domains <id>");
-			return formatDomainHelp(cwd, id);
+			return { kind: "text", text: formatDomainHelp(cwd, id) };
 		}
 		if (sub === "" || sub === "list") {
-			return name === "workflows" ? formatWorkflowList(cwd) : formatDomainList(cwd);
+			return {
+				kind: "text",
+				text: name === "workflows" ? formatWorkflowList(cwd) : formatDomainList(cwd),
+			};
 		}
-		return usage(name);
+		return { kind: "text", text: usage(name) };
 	} catch (error) {
-		return error instanceof Error ? error.message : String(error);
+		return { kind: "text", text: error instanceof Error ? error.message : String(error) };
 	}
+}
+
+function formatDomainSessionHint(action: DomainSessionAction): string {
+	if (action.kind === "text") return action.text;
+	if (action.kind === "create-domain") {
+		return `Say what the ${action.id} domain workflow should do, or paste Archon YAML. Say stop to cancel.`;
+	}
+	return `Say what the ${action.workflowName} workflow on ${action.domain} should do, or paste Archon YAML. Say stop to cancel.`;
 }
 
 export function formatDomainList(cwd: string): string {
@@ -268,9 +306,25 @@ export function completeDomainCommand(
 	const partial = rest.join(" ");
 	if (name === "workflows") {
 		if (!sub || (rest.length === 0 && !text.endsWith(" "))) {
-			return ["list", "show"]
+			return ["list", "show", "add"]
 				.filter((item) => item.startsWith(sub ?? ""))
-				.map((item) => ({ value: item, label: item, description: item === "show" ? "domain id" : "the table" }));
+				.map((item) => ({
+					value: item,
+					label: item,
+					description: item === "show" ? "domain id" : item === "add" ? "domain workflow" : "the table",
+				}));
+		}
+		if (sub === "add") {
+			if (rest.length === 0 || (rest.length === 1 && !text.endsWith(" "))) {
+				return catalog.domains
+					.filter((domain) => domain.id.startsWith(partial))
+					.map((domain) => ({
+						value: `add ${domain.id}`,
+						label: domain.id,
+						description: "then workflow name",
+					}));
+			}
+			return [];
 		}
 		if (sub !== "show") return [];
 		const domains = catalog.domains
@@ -302,7 +356,7 @@ export function completeDomainCommand(
 		return [...domains, ...named, ...layers];
 	}
 	if (!sub || (rest.length === 0 && !text.endsWith(" "))) {
-		const verbs = ["list", "show", "enable", "disable"]
+		const verbs = ["list", "show", "add", "enable", "disable"]
 			.filter((item) => item.startsWith(sub ?? ""))
 			.map((item) => ({ value: item, label: item }));
 		const ids = catalog.domains
@@ -317,7 +371,7 @@ export function completeDomainCommand(
 			}));
 		return [...verbs, ...ids];
 	}
-	if (sub !== "enable" && sub !== "disable" && sub !== "show") return [];
+	if (sub !== "enable" && sub !== "disable" && sub !== "show" && sub !== "add") return [];
 	return catalog.domains
 		.filter((domain) => domain.id.startsWith(partial))
 		.filter((domain) => sub !== "disable" || !domain.alwaysOn)
@@ -341,7 +395,7 @@ function requireId(id: string | undefined, usageText: string): asserts id is str
 
 function usage(name: "domains" | "workflows"): string {
 	if (name === "domains") {
-		return "usage: /domains | /domains <id> | /domains enable <id> | /domains disable <id>\n  /domains coding shows workflows and lesson categories for that domain.";
+		return "usage: /domains | /domains <id> | /domains add <id> | /domains enable <id> | /domains disable <id>\n  /domains coding shows workflows and lesson categories for that domain.\n  /domains add <id> asks what the new domain workflow should do.";
 	}
-	return "usage: /workflows | /workflows show <domain|workflow>\n  The list includes each coding workflow and its trigger phrases.";
+	return "usage: /workflows | /workflows show <domain|workflow> | /workflows add <domain> <workflow>\n  The list includes each coding workflow and its trigger phrases.\n  /workflows add asks what the new workflow should do.";
 }

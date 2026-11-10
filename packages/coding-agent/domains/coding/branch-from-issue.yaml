@@ -20,10 +20,10 @@ nodes:
     depends_on: [parse-issue]
   - id: checkout-branch
     trigger_rule: all_success
-    allowed_tools: []
+    allowed_tools: [bash]
     output_type: findings
     prompt: |
-      State the git command to create and checkout the branch from
-      $name-branch.output. Do not run it. The command is `git checkout -b
-      <branch-name>`.
+      Run bash now. Create and check out the branch from $name-branch.output with
+      `git checkout -b <branch-name>`. Quote the new branch name from the command
+      output.
     depends_on: [name-branch]

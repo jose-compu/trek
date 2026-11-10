@@ -24,11 +24,13 @@ nodes:
     depends_on: [draft-issue]
   - id: file-issue
     trigger_rule: all_success
-    allowed_tools: []
+    when: "$detect-host.output != 'none'"
+    allowed_tools: [bash]
     output_type: findings
     prompt: |
-      State the command to file the issue with the detected host CLI. Use
-      $detect-host.output, $draft-issue.output, and $select-labels.output. Do
-      not run the command. If no host CLI was detected, state that the issue
-      cannot be filed without a host CLI.
+      Run bash now. File the issue with the host CLI from $detect-host.output
+      using the title and body from $draft-issue.output and labels from
+      $select-labels.output (gh issue create, glab issue create, or tea). Quote
+      the issue URL from the command output. If $detect-host.output is none, do
+      not invent a CLI.
     depends_on: [select-labels]

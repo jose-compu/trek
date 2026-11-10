@@ -6,11 +6,13 @@ nodes:
     include: _detect-host
     returns: $detect-host.check.output
   - id: check-status
-    allowed_tools: []
+    trigger_rule: all_success
+    when: "$detect-host.output != 'none'"
+    allowed_tools: [bash]
     output_type: findings
     prompt: |
-      Name the PR to merge. State the command to check CI status with the host
-      CLI from $detect-host.output. Do not run it yet.
+      Run bash now. Name the PR to merge from the user turn. Check CI status with
+      the host CLI from $detect-host.output. Keep the status output in the reply.
     depends_on: [detect-host]
   - id: verify-green
     trigger_rule: all_success
@@ -18,16 +20,16 @@ nodes:
     output_type: findings
     prompt: |
       Check if all CI checks are passing from $check-status.output. If any checks
-      are failing or pending, refuse to merge. If all are green, proceed.
+      are failing or pending, refuse to merge. If all are green, state that checks
+      are passing.
     depends_on: [check-status]
   - id: verify-not-main
     trigger_rule: all_success
     allowed_tools: []
     output_type: findings
     prompt: |
-      Verify the target branch is not being force-pushed. The merge must go into
-      main or master via the host's merge process, not a force push. State this
-      constraint.
+      Verify the merge will go into main or master via the host merge process, not
+      a force push. State this constraint.
     depends_on: [verify-green]
   - id: belay
     include: belay-pr
@@ -39,16 +41,16 @@ nodes:
     output_type: findings
     prompt: |
       Check if Belay from $belay.output says LGTM. If not LGTM, refuse to merge
-      and state that Belay must pass or be waived by the operator. If LGTM,
-      proceed.
+      and state that Belay must pass or be waived by the operator. If LGTM, state
+      that Belay LGTM.
     depends_on: [belay]
   - id: merge-command
     trigger_rule: all_success
-    allowed_tools: []
+    when: "$check-belay.output contains 'LGTM'"
+    allowed_tools: [bash]
     output_type: findings
     prompt: |
-      State the command to merge the PR with the host CLI, only if
-      $verify-green.output says checks are passing, $verify-not-main.output
-      confirms no force push, and $check-belay.output confirms Belay LGTM. Do not
-      run it.
+      Run bash now. Merge the PR with the host CLI from $detect-host.output only
+      if $verify-green.output says checks are passing and $check-belay.output
+      confirms Belay LGTM. Do not force-push. Quote the merge result.
     depends_on: [check-belay]

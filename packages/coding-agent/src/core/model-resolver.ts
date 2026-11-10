@@ -23,7 +23,7 @@ export const defaultModelPerProvider: Record<KnownProvider, string> = {
 	google: "gemini-3.1-pro-preview",
 	"google-vertex": "gemini-3.1-pro-preview",
 	"github-copilot": "gpt-5.4",
-	openrouter: "moonshotai/kimi-k2.6",
+	openrouter: "openrouter/free",
 	"vercel-ai-gateway": "zai/glm-5.1",
 	xai: "grok-4.20-0309-reasoning",
 	groq: "openai/gpt-oss-120b",

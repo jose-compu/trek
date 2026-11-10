@@ -71,12 +71,14 @@ import {
 	type ArchonWorkflow,
 	acceptTypedLesson,
 	actingLessonRole,
+	addWorkflowToDomain,
 	attachLayerWorkflow,
 	checkWorkflowNodes,
 	completeDomainCommand,
 	completePatternCommand as completePatternArguments,
 	type DomainSelection,
 	detectMetaLessonTrigger,
+	dispatchDomainSessionCommand,
 	runPatternCommand as executePatternCommand,
 	findLayerWorkflow,
 	formatWorkflowCheck,
@@ -86,9 +88,12 @@ import {
 	lessonIsBlocked,
 	lessonIsOffered,
 	lessonPatternFor,
+	lessonTypeEditCommand,
 	loadDomainCatalog,
 	missingWorkflowFacts,
+	orderNodes,
 	parseArchonWorkflow,
+	parseLessonTypeEdit,
 	parseWorkflowEdit,
 	readDomainSkills,
 	recurrenceKey,
@@ -469,6 +474,11 @@ export interface AgentSessionConfig {
 	extensionRunnerRef?: { current?: ExtensionRunner };
 	/** Session start event metadata emitted when extensions bind to this runtime. */
 	sessionStartEvent?: SessionStartEvent;
+	/**
+	 * When true, CLI/`setModel` chose the chat model explicitly. Skip Decision park and
+	 * hierarchy role rebinds so the footer and chat stay on that model.
+	 */
+	pinModel?: boolean;
 }
 
 export interface ExtensionBindings {
@@ -728,7 +738,9 @@ export class AgentSession {
 	/** The previous turn, kept while Trek waits for workflow facts. */
 	private _workflowFactPrefix: string | undefined;
 	private _workflowFactAsk: { task: string; domain: string; missing: string[] } | undefined;
-	private _workflowEditAsk: { kind: "create" | "edit"; id: string } | undefined;
+	private _workflowEditAsk:
+		| { kind: "create" | "edit" | "add-workflow"; id: string; workflowName?: string }
+		| undefined;
 	/** The user named at least one missing fact. Do not ask again on this turn. */
 	private _workflowFactsAccepted = false;
 	private _workflowHold: { task: string; domain: string; missing: string[] } | undefined;
@@ -762,6 +774,10 @@ export class AgentSession {
 		this._excludedToolNames = config.excludedToolNames ? new Set(config.excludedToolNames) : undefined;
 		this._baseToolsOverride = config.baseToolsOverride;
 		this._sessionStartEvent = config.sessionStartEvent ?? { type: "session_start", reason: "startup" };
+		this._userPinnedModel = Boolean(config.pinModel);
+		if (this._userPinnedModel && this.model) {
+			this._apiSessionModel = this.model;
+		}
 		this._trekStore = new TrekVersionStore(this._cwd, nodeTrekStoreFs);
 		this._editCheckpoints.hydrate(this.sessionManager.getLatestEditBatchCheckpoint<SerializedCheckpoints>());
 		this._diagnosticEnabled = isTrekEnvTruthy("DIAGNOSTIC") || this.settingsManager.getDiagnostic();
@@ -2612,6 +2628,16 @@ export class AgentSession {
 	}
 
 	runDomainCommand(name: "domains" | "workflows", arg: string): string {
+		const action = dispatchDomainSessionCommand(this._cwd, name, arg);
+		if (action.kind === "create-domain") {
+			this._workflowEditAsk = { kind: "create", id: action.id };
+		} else if (action.kind === "add-workflow") {
+			this._workflowEditAsk = {
+				kind: "add-workflow",
+				id: action.domain,
+				workflowName: action.workflowName,
+			};
+		}
 		return runDomainSessionCommand(this._cwd, name, arg);
 	}
 
@@ -3022,6 +3048,11 @@ export class AgentSession {
 	private _llama?: LlamaProcessManager;
 	/** Session model before a local role took the chat call. Not written to settings. */
 	private _apiSessionModel?: Model<any>;
+	/**
+	 * CLI/`setModel` pinned the chat model. Do not park Decision or rebind hierarchy roles
+	 * over that choice (footer and chat stay on the pinned model).
+	 */
+	private _userPinnedModel = false;
 	/** Last chat role on the ladder (Workhorse ⇄ Planning ⇄ Frontier). */
 	private _lastHierarchyRole?: LadderRole;
 	/** Active ladder floor for this prompt. Starts at Workhorse after Decision. */
@@ -3070,6 +3101,10 @@ export class AgentSession {
 	 * Warms Workhorse llama-server quietly; footer stays on Decision until a prompt routes.
 	 */
 	async activateLocalModel(): Promise<void> {
+		if (this._userPinnedModel) {
+			this._clearHierarchyFooterForUserModel();
+			return;
+		}
 		const parked = this._parkOnDecisionFloor();
 		await this._bindLocalCompletion("", { keepDecisionDisplay: parked });
 	}
@@ -3084,6 +3119,10 @@ export class AgentSession {
 			return;
 		}
 		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
+			return;
+		}
+		if (this._userPinnedModel) {
+			this._restoreApiSessionModel();
 			return;
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
@@ -3205,6 +3244,9 @@ export class AgentSession {
 
 	/** Idle floor: footer shows Decision (d1 local, or catalog cheap chat on api). Returns true when parked. */
 	private _parkOnDecisionFloor(): boolean {
+		if (this._userPinnedModel) {
+			return false;
+		}
 		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
 			return false;
 		}
@@ -4881,17 +4923,25 @@ export class AgentSession {
 					};
 				}
 			}
+			const orderedNodes = workflow ? orderNodes(workflow) : [];
 			const findings = workflow
 				? checkWorkflowNodes(
 						this._lastPromptTask,
-						workflow.nodes.map((node) => ({
-							id: node.id,
-							prompt: node.body,
-							output: results.find((result) => result.id === node.id)?.output ?? "",
-							upstream: node.dependsOn
-								.map((id) => results.find((result) => result.id === id)?.output ?? "")
-								.join("\n"),
-						})),
+						orderedNodes
+							.filter((node) => node.kind === "prompt")
+							.map((node) => {
+								const index = orderedNodes.findIndex((entry) => entry.id === node.id);
+								const prior = orderedNodes
+									.slice(0, Math.max(0, index))
+									.map((entry) => results.find((result) => result.id === entry.id)?.output ?? "")
+									.join("\n");
+								return {
+									id: node.id,
+									prompt: node.body,
+									output: results.find((result) => result.id === node.id)?.output ?? "",
+									upstream: prior,
+								};
+							}),
 					)
 				: [];
 			this._noteAntiPatterns(turnStart);
@@ -4946,10 +4996,18 @@ export class AgentSession {
 	}
 
 	private async _takeWorkflowEdit(text: string): Promise<boolean> {
+		if (this._takeLessonTypeEdit(text)) {
+			return true;
+		}
 		if (this._workflowEditAsk) {
 			const ask = this._workflowEditAsk;
 			this._workflowEditAsk = undefined;
-			const request = { kind: ask.kind, id: ask.id, instruction: text.trim() };
+			const request = {
+				kind: ask.kind,
+				id: ask.id,
+				workflowName: ask.workflowName,
+				instruction: text.trim(),
+			};
 			if (workflowFactRefusal(text) || workflowEditIsThin(request)) {
 				this._recordLocalTurn(text, `Workflow stopped. ${ask.id} was not written.`, "workflow");
 				return true;
@@ -4960,7 +5018,11 @@ export class AgentSession {
 		const request = parseWorkflowEdit(text);
 		if (!request) return false;
 		if (request.kind !== "restore" && workflowEditIsThin(request)) {
-			this._workflowEditAsk = { kind: request.kind, id: request.id };
+			this._workflowEditAsk = {
+				kind: request.kind === "add-workflow" ? "add-workflow" : request.kind,
+				id: request.id,
+				workflowName: request.workflowName,
+			};
 			this._recordLocalTurn(text, workflowEditQuestion(request), "workflow");
 			return true;
 		}
@@ -4968,9 +5030,27 @@ export class AgentSession {
 		return true;
 	}
 
+	private _takeLessonTypeEdit(text: string): boolean {
+		const request = parseLessonTypeEdit(text);
+		if (!request) return false;
+		try {
+			const reply = executePatternCommand(this._cwd, lessonTypeEditCommand(request));
+			this._recordLocalTurn(text, reply, "patterns");
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this._recordLocalTurn(text, `Lesson type not saved. ${message}`, "patterns");
+		}
+		return true;
+	}
+
 	private async _commitWorkflowEdit(
 		userText: string,
-		request: { kind: "create" | "edit" | "restore"; id: string; instruction: string },
+		request: {
+			kind: "create" | "edit" | "restore" | "add-workflow";
+			id: string;
+			workflowName?: string;
+			instruction: string;
+		},
 	): Promise<void> {
 		try {
 			if (request.kind === "restore") {
@@ -4982,12 +5062,12 @@ export class AgentSession {
 			if (request.kind === "create" && existing) {
 				this._recordLocalTurn(
 					userText,
-					`${request.id} already has a workflow. Edit it to change the steps.`,
+					`${request.id} already has a workflow. Edit it, or add a workflow called <name> to the ${request.id} domain.`,
 					"workflow",
 				);
 				return;
 			}
-			if (request.kind === "edit" && !existing) {
+			if ((request.kind === "edit" || request.kind === "add-workflow") && !existing) {
 				this._recordLocalTurn(userText, `unknown domain ${request.id}`, "workflow");
 				return;
 			}
@@ -5004,6 +5084,19 @@ export class AgentSession {
 					this.setActiveToolsByName(previous);
 				}
 				yaml = unwrapWorkflowYaml(stripHonestyFooter(this._lastAssistantText()));
+			}
+			if (request.kind === "add-workflow") {
+				const parsed = parseArchonWorkflow(yaml);
+				if (request.workflowName && parsed.name !== request.workflowName) {
+					yaml = yaml.replace(/^name:\s*.+$/m, `name: ${request.workflowName}`);
+				}
+				const saved = addWorkflowToDomain(this._cwd, request.id, yaml);
+				this._recordLocalTurn(
+					userText,
+					`Added ${saved.name} to ${request.id} (${saved.file}). Detection can select it on the next prompt.`,
+					"workflow",
+				);
+				return;
 			}
 			const saved = saveDomainWorkflow(this._cwd, request.id, yaml);
 			const line = saved.created
@@ -5956,6 +6049,7 @@ export class AgentSession {
 	 * footer shows the chosen chat model, not a parked Decision SKU (e.g. Devstral).
 	 */
 	private _clearHierarchyFooterForUserModel(): void {
+		this._userPinnedModel = true;
 		this._hierarchyDisplayRole = undefined;
 		this._hierarchyModelId = undefined;
 		this._hierarchyModelProvider = undefined;

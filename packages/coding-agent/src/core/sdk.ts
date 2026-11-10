@@ -50,6 +50,11 @@ export interface CreateAgentSessionOptions {
 
 	/** Model to use. Default: from settings, else first available */
 	model?: Model<any>;
+	/**
+	 * When true, keep `model` over hierarchy Decision/Workhorse parks and role rebinds.
+	 * Set by CLI `--provider`/`--model` (and later by in-session setModel/cycle).
+	 */
+	pinModel?: boolean;
 	/** Thinking level. Default: from settings, else 'medium' (clamped to model capabilities) */
 	thinkingLevel?: ThinkingLevel;
 	/** Models available for cycling (Ctrl+P in interactive mode) */
@@ -432,6 +437,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		excludedToolNames,
 		extensionRunnerRef,
 		sessionStartEvent: options.sessionStartEvent,
+		pinModel: options.pinModel,
 	});
 	const extensionsResult = resourceLoader.getExtensions();
 

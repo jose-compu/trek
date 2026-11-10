@@ -1,21 +1,20 @@
 name: commit-on-branch
 description: |
   Stage relevant files and commit with a message that explains why. Refuse AI or
-  LLM co-author trailers.
+  LLM co-author trailers. Run the git commands; do not only print them.
 nodes:
   - id: select-files
-    allowed_tools: []
-    output_type: findings
-    prompt: |
-      List the files changed by this turn. One path per line. Do not stage them
-      yet.
+    bash: |
+      git status --porcelain
+    timeout: 15000
   - id: draft-message
     trigger_rule: all_success
     allowed_tools: []
     output_type: findings
     prompt: |
-      Draft a commit message. The first line is a short summary. The body
-      explains why the change was made, not what was changed. Do not commit yet.
+      Using $select-files.output, draft a commit message for those changes. The
+      first line is a short summary. The body explains why the change was made,
+      not what was changed. Do not commit yet.
     depends_on: [select-files]
   - id: refuse-ai-trailer
     trigger_rule: all_success
@@ -29,11 +28,12 @@ nodes:
     depends_on: [draft-message]
   - id: stage-and-commit
     trigger_rule: all_success
-    allowed_tools: []
+    when: "$refuse-ai-trailer.output contains 'acceptable'"
+    allowed_tools: [bash]
     output_type: findings
     prompt: |
-      State the commands to stage the files from $select-files.output and commit
-      with the message from $draft-message.output, only if
-      $refuse-ai-trailer.output says the message is acceptable. Do not run them.
-      The commands are `git add <files>` and `git commit -m "<message>"`.
+      Run bash now. Stage the paths from $select-files.output with `git add`,
+      then commit with `git commit -m` using the message from
+      $draft-message.output. Do not add a Co-authored-by trailer. Do not push.
+      Quote the commit hash from the command output.
     depends_on: [refuse-ai-trailer]

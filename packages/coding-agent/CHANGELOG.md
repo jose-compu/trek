@@ -4,6 +4,19 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [0.20.4] - 2026-11-10
+
+### Changed
+
+- Coding action nodes run with tools (`bash`, and `read`/`edit`/`write` where needed) instead of only printing host/git commands. `_detect-host` is a bash probe.
+- `/domains add <id>`, `/workflows add <domain> <workflow>`, prompts like `add a workflow called X to the coding domain`, and `add lesson category Y to finance` create domains, append workflows, or extend lesson types.
+- OpenRouter’s default model is `openrouter/free` (Free Models Router). Set `OPENROUTER_API_KEY` and run `trek --provider openrouter`, or pick any `:free` SKU in `/model`.
+
+### Fixed
+
+- Coding `commit-on-branch` lists dirty files with bash and runs `git add` / `git commit` through the bash tool instead of only printing the commands. Workflow check skips bash nodes and grounds prompt replies on prior node outputs.
+- CLI `--provider` / `--model` pins the session model so hierarchy Decision park does not rebind chat or the footer to `~/.trek/models.yaml` roles (for example xAI Grok over OpenRouter).
+
 ## [0.20.3] - 2026-11-09
 
 ### Changed

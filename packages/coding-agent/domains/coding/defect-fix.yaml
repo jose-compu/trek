@@ -3,28 +3,33 @@ description: |
   Fix a lint error, a type mismatch, or an anti-pattern with the smallest change that the project can verify.
 nodes:
   - id: reproduce
-    allowed_tools: []
+    allowed_tools: [bash, read]
     output_type: findings
     prompt: |
-      Restate the lint error, type mismatch, or anti-pattern and the file it is in.
+      Restate the lint error, type mismatch, or anti-pattern and the file it is
+      in. You may read the file or run the failing check with bash. Do not edit yet.
   - id: locate
     trigger_rule: all_success
-    allowed_tools: []
+    allowed_tools: [read]
     output_type: findings
     prompt: |
-      Name the lines that cause it. Do not rewrite the file before that.
+      Name the lines that cause it. Read the file if needed. Do not rewrite the
+      file before that.
     depends_on: [reproduce]
   - id: smallest-change
     trigger_rule: all_success
-    allowed_tools: []
+    allowed_tools: [read, edit, write]
     output_type: findings
     prompt: |
-      Describe the smallest edit. Leave unrelated style alone.
+      Apply the smallest edit that fixes it. Leave unrelated style alone. Use
+      edit or write. Summarize what changed.
     depends_on: [locate]
   - id: verify
     trigger_rule: all_success
-    allowed_tools: []
+    allowed_tools: [bash]
     output_type: findings
     prompt: |
-      Name the check that proves the fix: the typecheck, the test, or the linter. Do not claim it passed unless it ran.
+      Run bash now. Run the check that proves the fix: the typecheck, the test, or
+      the linter named in the turn or project. Quote the command output. Do not
+      claim it passed unless it ran.
     depends_on: [smallest-change]

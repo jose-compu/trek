@@ -4,17 +4,20 @@
  * Run: PI_NO_LOCAL_LLM=1 npx vitest --run test/workflow-edit.test.ts --reporter=verbose
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fauxAssistantMessage } from "@trek/ai";
 import { afterEach, describe, expect, test } from "vitest";
 import {
+	addWorkflowToDomain,
 	bundledDomainsRoot,
 	enableDomain,
 	loadDomainCatalog,
 	restoreDomainWorkflow,
 	saveDomainWorkflow,
 } from "../src/core/domains/catalog.ts";
+import { parseLessonTypeEdit } from "../src/core/domains/lesson-edit.ts";
 import { selectDomain } from "../src/core/domains/select.ts";
 import { parseWorkflowEdit } from "../src/core/domains/workflow-edit.ts";
 import { createHarness, type Harness } from "./suite/harness.ts";
@@ -130,6 +133,24 @@ describe("workflow edit", () => {
 		);
 		expect(assistantText(harness)).toContain("Restored finance workflow control-break.");
 		expect(parseWorkflowEdit("The build failed on the adapter.")).toBeUndefined();
+	});
+
+	test("add a named workflow to an existing domain overlays the catalog", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-add-wf-"));
+		const saved = addWorkflowToDomain(cwd, "coding", WAREHOUSE, ["oxblood pump"]);
+		expect(saved.name).toBe("oxblood-check");
+		const coding = loadDomainCatalog(cwd).domains.find((domain) => domain.id === "coding");
+		expect(coding?.workflows?.some((workflow) => workflow.name === "oxblood-check")).toBe(true);
+		expect(parseWorkflowEdit("add a workflow called oxblood-check to the coding domain: pump check")).toMatchObject({
+			kind: "add-workflow",
+			id: "coding",
+			workflowName: "oxblood-check",
+		});
+		expect(parseLessonTypeEdit("add lesson category flaky-test to coding")).toEqual({
+			kind: "add-category",
+			domain: "coding",
+			category: "flaky-test",
+		});
 	});
 });
 

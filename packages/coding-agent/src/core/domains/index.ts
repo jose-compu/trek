@@ -20,6 +20,7 @@ export {
 } from "./archon-when.ts";
 export {
 	addDomain,
+	addWorkflowToDomain,
 	bundledDomainsRoot,
 	type DomainCatalog,
 	type DomainDefinition,
@@ -51,6 +52,7 @@ export {
 	retagRecallForRole,
 	tagRecallForRole,
 } from "./layer-lessons.ts";
+export { type LessonTypeEditRequest, lessonTypeEditCommand, parseLessonTypeEdit } from "./lesson-edit.ts";
 export {
 	acceptTypedLesson,
 	clearLessonPatternCache,
@@ -106,6 +108,8 @@ export {
 } from "./select.ts";
 export {
 	completeDomainCommand,
+	type DomainSessionAction,
+	dispatchDomainSessionCommand,
 	formatDomainHelp,
 	formatDomainList,
 	formatWorkflowList,

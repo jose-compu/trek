@@ -54,9 +54,14 @@ describe("belay integration", () => {
 		const belay = coding?.workflows?.find((w) => w.name === "belay-pr");
 		expect(belay).toBeDefined();
 		expect(belay?.workflow.nodes.map((n) => n.id)).toEqual(["scope", "findings", "verdict"]);
+		const toolsById = Object.fromEntries(
+			(belay?.workflow.nodes ?? []).map((node) => [node.id, node.allowedTools ?? []]),
+		);
+		expect(toolsById.scope).toEqual(["bash"]);
+		expect(toolsById.findings).toEqual(["read"]);
+		expect(toolsById.verdict).toEqual([]);
 		for (const node of belay?.workflow.nodes ?? []) {
 			expect(node.kind).toBe("prompt");
-			expect(node.allowedTools).toEqual([]);
 			expect(node.outputType).toBe("findings");
 		}
 		const verdictNode = belay?.workflow.nodes.find((n) => n.id === "verdict");
@@ -74,8 +79,10 @@ describe("belay integration", () => {
 		expect(yaml).not.toContain("merge-pr");
 		expect(yaml).toContain("do not merge");
 		for (const node of belay?.workflow.nodes ?? []) {
-			expect(node.body.toLowerCase()).not.toContain("gh pr merge");
-			expect(node.body.toLowerCase()).not.toContain("git merge");
+			const body = node.body.toLowerCase();
+			expect(body).not.toContain("gh pr merge");
+			// Allow `git merge-base` for scope; refuse an actual merge command.
+			expect(body).not.toMatch(/\bgit merge\b(?!-base)/);
 		}
 	});
 

@@ -435,6 +435,7 @@ function buildSessionOptions(
 		}
 		if (resolved.model) {
 			options.model = resolved.model;
+			options.pinModel = true;
 			// Allow "--model <pattern>:<thinking>" as a shorthand.
 			// Explicit --thinking still takes precedence (applied later).
 			if (!parsed.thinking && resolved.thinkingLevel) {

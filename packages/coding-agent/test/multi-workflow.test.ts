@@ -176,8 +176,11 @@ describe("multi-workflow catalog", () => {
 					node.kind,
 				);
 				if (node.kind === "prompt") {
-					expect(node.allowedTools).toEqual([]);
 					expect(node.outputType).toBe("findings");
+					const tools = node.allowedTools ?? [];
+					for (const tool of tools) {
+						expect(["bash", "read", "edit", "write"]).toContain(tool);
+					}
 				}
 			}
 		}
@@ -239,5 +242,22 @@ describe("multi-workflow catalog", () => {
 		expect(refuseNode?.body).toContain("LLM");
 		expect(refuseNode?.body).toContain("co-author");
 		expect(refuseNode?.body).toContain("refuse");
+	});
+
+	test("commit-on-branch stages and commits with bash instead of only printing commands", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-commit-run-"));
+		const catalog = loadDomainCatalog(cwd);
+		const coding = catalog.domains.find((domain) => domain.id === "coding");
+		const commitWorkflow = coding?.workflows?.find((workflow) => workflow.name === "commit-on-branch");
+		expect(commitWorkflow).toBeDefined();
+		const select = commitWorkflow?.workflow.nodes.find((node) => node.id === "select-files");
+		expect(select?.kind).toBe("bash");
+		expect(select?.body).toContain("git status --porcelain");
+		const stage = commitWorkflow?.workflow.nodes.find((node) => node.id === "stage-and-commit");
+		expect(stage?.kind).toBe("prompt");
+		expect(stage?.allowedTools).toEqual(["bash"]);
+		expect(stage?.when).toContain("acceptable");
+		expect(stage?.body).toMatch(/Run bash/i);
+		expect(stage?.body).not.toMatch(/Do not run/i);
 	});
 });

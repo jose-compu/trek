@@ -4,22 +4,23 @@ description: |
   summary and test plan. Compose commit-on-branch and Belay. Do not merge.
 nodes:
   - id: verify-branch
-    allowed_tools: []
+    allowed_tools: [bash]
     output_type: findings
     prompt: |
-      State the current branch name. Verify it is not main or master. If it is,
-      state that PRs cannot be opened from the main branch.
+      Run bash now. Print the current branch with `git branch --show-current`.
+      If it is main or master, refuse and state that PRs cannot be opened from
+      the main branch.
   - id: commit
     include: commit-on-branch
     returns: $commit.stage-and-commit.output
     depends_on: [verify-branch]
   - id: push-upstream
     trigger_rule: all_success
-    allowed_tools: []
+    allowed_tools: [bash]
     output_type: findings
     prompt: |
-      State the command to push the branch upstream with tracking. Do not run it.
-      The command is `git push -u origin <branch-name>`.
+      Run bash now. Push the current branch upstream with tracking using
+      `git push -u origin HEAD`. Quote the remote tracking result.
     depends_on: [commit]
   - id: draft-pr-body
     trigger_rule: all_success
@@ -39,12 +40,12 @@ nodes:
     depends_on: [belay]
   - id: open-pr-command
     trigger_rule: all_success
-    allowed_tools: []
+    when: "$detect-host.output != 'none'"
+    allowed_tools: [bash]
     output_type: findings
     prompt: |
-      State the command to open the PR with the detected host CLI from
-      $detect-host.output. Use the title from the branch name and the body from
-      $draft-pr-body.output. Include Belay verdict from $belay.output in the PR
-      description. Do not run it. If no host CLI was detected, state that the PR
-      cannot be opened without a host CLI.
+      Run bash now. Open the PR with the host CLI from $detect-host.output. Use a
+      title from the branch name and the body from $draft-pr-body.output. Include
+      the Belay verdict from $belay.output in the description. Quote the PR URL.
+      Do not merge.
     depends_on: [detect-host]

@@ -68,6 +68,31 @@ describe("AgentSession model and extension characterization", () => {
 		expect(harness.session.hierarchyModelId).toBeUndefined();
 	});
 
+	it("activateLocalModel keeps a CLI-pinned model off the Decision park", async () => {
+		const harness = await createHarness({
+			models: [
+				{ id: "faux-1", name: "One", reasoning: true },
+				{ id: "faux-2", name: "Two", reasoning: true },
+			],
+		});
+		harnesses.push(harness);
+		const session = harness.session as unknown as {
+			_userPinnedModel: boolean;
+			_emitHierarchyModel: (role: string, provider: string, modelId: string) => void;
+			_parkedOnDecision: boolean;
+		};
+		session._userPinnedModel = true;
+		session._emitHierarchyModel("decision", "xai", "grok-4.1-fast");
+		session._parkedOnDecision = true;
+
+		await harness.session.activateLocalModel();
+
+		expect(harness.session.model?.id).toBe("faux-1");
+		expect(harness.session.hierarchyRole).toBeUndefined();
+		expect(harness.session.hierarchyModelId).toBeUndefined();
+		expect(session._parkedOnDecision).toBe(false);
+	});
+
 	it("cycles through scoped models and preserves the scoped thinking preference", async () => {
 		const harness = await createHarness({
 			models: [

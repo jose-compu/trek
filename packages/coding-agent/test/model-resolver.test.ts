@@ -390,6 +390,10 @@ describe("default model selection", () => {
 		expect(defaultModelPerProvider["vercel-ai-gateway"]).toBe("zai/glm-5.1");
 	});
 
+	test("openrouter defaults to the free models router", () => {
+		expect(defaultModelPerProvider.openrouter).toBe("openrouter/free");
+	});
+
 	test("findInitialModel accepts explicit provider custom model ids", async () => {
 		const registry = {
 			getAll: () => allModels,

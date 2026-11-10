@@ -5,8 +5,10 @@ description: |
   this is a utility workflow for inclusion.
 nodes:
   - id: check
-    allowed_tools: []
-    output_type: findings
-    prompt: |
-      Name the host CLI present on PATH: gh for GitHub, glab for GitLab, tea for
-      Forgejo. One line. If none are present, state that no host CLI is available.
+    bash: |
+      if command -v gh >/dev/null 2>&1; then echo gh
+      elif command -v glab >/dev/null 2>&1; then echo glab
+      elif command -v tea >/dev/null 2>&1; then echo tea
+      else echo none
+      fi
+    timeout: 10000

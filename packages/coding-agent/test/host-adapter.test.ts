@@ -30,7 +30,7 @@ describe("host adapter", () => {
 			expect(workflow, `workflow ${workflowName} not found`).toBeDefined();
 			expect(workflow?.workflow.nodes.length).toBeGreaterThan(0);
 			for (const node of workflow?.workflow.nodes ?? []) {
-				expect(["prompt", "include", "fan_out"]).toContain(node.kind);
+				expect(["prompt", "include", "fan_out", "bash"]).toContain(node.kind);
 			}
 		}
 	});
@@ -43,10 +43,11 @@ describe("host adapter", () => {
 		expect(detectHost).toBeDefined();
 		const checkNode = detectHost?.workflow.nodes.find((node) => node.id === "check");
 		expect(checkNode).toBeDefined();
+		expect(checkNode?.kind).toBe("bash");
 		expect(checkNode?.body).toContain("gh");
 		expect(checkNode?.body).toContain("glab");
 		expect(checkNode?.body).toContain("tea");
-		expect(checkNode?.body.toLowerCase()).toContain("none are present");
+		expect(checkNode?.body).toContain("none");
 	});
 
 	test("file-issue node handles missing CLI", () => {
@@ -57,7 +58,9 @@ describe("host adapter", () => {
 		const fileIssue = openIssue?.workflow.nodes.find((node) => node.id === "file-issue");
 		expect(fileIssue).toBeDefined();
 		expect(fileIssue?.body).toContain("detect-host");
-		expect(fileIssue?.body.toLowerCase()).toContain("no host cli");
+		expect(fileIssue?.allowedTools).toEqual(["bash"]);
+		expect(fileIssue?.when).toContain("none");
+		expect(fileIssue?.body.toLowerCase().replace(/\s+/g, " ")).toContain("do not invent a cli");
 	});
 
 	test("no in-process GitHub or GitLab API imports in workflows", () => {
@@ -72,9 +75,12 @@ describe("host adapter", () => {
 			expect(yaml).not.toContain("import");
 			expect(yaml).not.toContain("require");
 			for (const node of workflow.workflow.nodes) {
-				expect(["prompt", "include", "fan_out"]).toContain(node.kind);
+				expect(["prompt", "include", "fan_out", "bash"]).toContain(node.kind);
 				if (node.kind === "prompt") {
-					expect(node.allowedTools).toEqual([]);
+					const tools = node.allowedTools ?? [];
+					for (const tool of tools) {
+						expect(["bash", "read", "edit", "write"]).toContain(tool);
+					}
 					expect(node.body.toLowerCase()).not.toContain("octokit");
 					expect(node.body.toLowerCase()).not.toContain("api.github.com");
 					expect(node.body.toLowerCase()).not.toContain("gitlab.com/api");
