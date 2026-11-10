@@ -1,0 +1,35 @@
+name: check-latex-build
+description: |
+  Compile or dry-check a LaTeX project and triage errors. Prefer latexmk when present.
+  Do not claim a PDF is publication-ready without a clean log.
+nodes:
+  - id: detect
+    allowed_tools: [bash, read]
+    output_type: findings
+    prompt: |
+      Run bash now. Locate the main .tex, latexmkrc/Makefile, and whether latexmk,
+      pdflatex, xelatex, or lualatex exists on PATH. Quote the intended engine.
+  - id: build
+    trigger_rule: all_success
+    allowed_tools: [bash]
+    output_type: findings
+    prompt: |
+      Run bash now. Build with the engine from $detect.output (prefer `latexmk -pdf -interaction=nonstopmode`
+      on the main file). Capture the tail of the log and the exit code. If no engine exists,
+      say so and stop without inventing a successful build.
+    depends_on: [detect]
+  - id: triage
+    trigger_rule: all_success
+    allowed_tools: [read, bash]
+    output_type: findings
+    prompt: |
+      From $build.output and the .log if present, table: Severity | File:line | Message |
+      Likely fix. Group undefined citations/refs separately from fatal TeX errors.
+    depends_on: [build]
+  - id: next
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Ordered fix list (max ten). Note if a second latexmk pass is still required. Stop.
+    depends_on: [triage]

@@ -1,0 +1,37 @@
+name: write-abstract
+description: |
+  Draft or tighten an abstract (and optional highlights) from the manuscript body.
+  Stay inside venue word limits when given. Do not invent results.
+nodes:
+  - id: source
+    allowed_tools: [bash, read]
+    output_type: findings
+    prompt: |
+      Run bash/read now. Pull problem, method, and result sentences from the paper
+      body (not only the old abstract). Note the venue word/character limit if the user
+      set one.
+  - id: draft
+    trigger_rule: all_success
+    allowed_tools: [read, edit, write]
+    output_type: findings
+    prompt: |
+      Write a structured abstract (background, methods, results, conclusions) using only
+      facts from $source.output. Keep within the limit when set. Update the .tex abstract
+      environment if a file path is known. Placeholders as TODO{\ldots} for missing numbers.
+    depends_on: [source]
+  - id: highlights
+    trigger_rule: all_success
+    allowed_tools: [read, edit, write]
+    output_type: findings
+    prompt: |
+      If the venue or user asked for highlights/bullets, write 3–5 one-line highlights.
+      Otherwise say highlights were not requested. No marketing tone.
+    depends_on: [draft]
+  - id: check
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Word/character count versus limit. List any claim in the abstract that is stronger
+      than the body evidence. Stop.
+    depends_on: [highlights]

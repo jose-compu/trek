@@ -1,0 +1,36 @@
+name: figure-pass
+description: |
+  Audit figures, captions, labels, and \ref/\cref consistency in a LaTeX manuscript.
+  Prefer fixing broken refs over rewriting science.
+nodes:
+  - id: inventory
+    allowed_tools: [bash, read]
+    output_type: findings
+    prompt: |
+      Run bash/read now. List figure/table environments, \label values, and
+      \includegraphics paths. Note missing image files when cheap to test.
+  - id: captions
+    trigger_rule: all_success
+    allowed_tools: [read]
+    output_type: findings
+    prompt: |
+      Review captions from $inventory.output. Flag captions that restate the axis labels
+      only, omit the takeaway, or exceed ~40 words without need. Suggest one-line rewrites
+      without inventing results.
+    depends_on: [inventory]
+  - id: refs
+    trigger_rule: all_success
+    allowed_tools: [read, bash]
+    output_type: findings
+    prompt: |
+      Table undefined or unused labels, duplicate labels, and figures never referenced.
+      Severity | Symbol | Issue.
+    depends_on: [captions]
+  - id: fix
+    trigger_rule: all_success
+    allowed_tools: [read, edit, write]
+    output_type: findings
+    prompt: |
+      Apply safe caption/label/\ref fixes from $refs.output and $captions.output when the
+      intent is clear. Leave ambiguous science wording as TODO{\ldots}. Quote paths changed.
+    depends_on: [refs]

@@ -1,0 +1,38 @@
+name: generate-poster
+description: |
+  Scaffold a conference poster in LaTeX (beamerposter, tikzposter, or the project's
+  existing class). Emphasize readable columns, QR/code link placeholders, and honest
+  takeaways. Do not invent results.
+nodes:
+  - id: format
+    allowed_tools: [bash, read]
+    output_type: findings
+    prompt: |
+      Run bash/read now. Detect an existing poster .tex or template. Note target size
+      (A0/A1) if stated. If none, propose beamerposter or tikzposter and a file path only.
+  - id: layout
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Propose column/block layout: title, authors, affiliation, intro, method, results
+      (one key figure), conclusion, references QR. Keep text volume realistic for the size
+      in $format.output.
+    depends_on: [format]
+  - id: build
+    trigger_rule: all_success
+    allowed_tools: [read, edit, write]
+    output_type: findings
+    prompt: |
+      Write or update the poster .tex from $layout.output. Large fonts, short bullets,
+      one primary figure includegraphics placeholder if needed. Results only from the turn
+      or paper source; otherwise TODO{\ldots}. Quote the path.
+    depends_on: [layout]
+  - id: print-check
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Checklist: contrast, margins, QR placeholder, affiliation, funding line if required
+      by the user. Flag anything likely to overflow an A0 column.
+    depends_on: [build]

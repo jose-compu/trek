@@ -1,10 +1,16 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.2`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.3`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [1.0.0-rc.3] - 2026-11-10
+
+### Added
+
+- Science domain LaTeX / peer-review / slides / poster workflows (multi-workflow catalog).
 
 ## [1.0.0-rc.2] - 2026-11-10
 

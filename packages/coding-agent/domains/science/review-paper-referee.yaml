@@ -1,0 +1,46 @@
+name: review-paper-referee
+description: |
+  External referee-style report. Skeptical, evidence-bound, and structured like a
+  journal/conference review. Do not rewrite the manuscript. Do not invent missing experiments.
+nodes:
+  - id: scope
+    allowed_tools: [bash, read]
+    output_type: findings
+    prompt: |
+      Run bash/read now. Open the main .tex or the review PDF text if that is all
+      that exists. Quote the claimed contributions in the authors' own words (short).
+  - id: summary
+    trigger_rule: all_success
+    allowed_tools: [read]
+    output_type: findings
+    prompt: |
+      Write a 5–8 sentence referee summary of $scope.output: problem, method, claimed
+      results, and evaluation setting. Mark anything that was not actually stated.
+    depends_on: [scope]
+  - id: major
+    trigger_rule: all_success
+    allowed_tools: [read]
+    output_type: findings
+    prompt: |
+      List major concerns as numbered items (validity, novelty vs prior art named in the
+      turn, missing baselines, statistical misuse, irreproducibility). Each item: claim in
+      the paper → why it fails → what evidence would resolve it. No invented experiments
+      as if already run.
+    depends_on: [summary]
+  - id: minor
+    trigger_rule: all_success
+    allowed_tools: [read]
+    output_type: findings
+    prompt: |
+      List minor issues: clarity, notation, figure/table readability, related-work gaps,
+      typos in visible text. Location + fix. Keep short.
+    depends_on: [major]
+  - id: verdict
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      One recommendation: accept / minor revision / major revision / reject. One sentence
+      justification tied to $major.output. Optional confidential note to the area chair in
+      one short paragraph. Do not congratulate the authors.
+    depends_on: [minor]

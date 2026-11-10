@@ -1,0 +1,38 @@
+name: review-paper-coauthor
+description: |
+  Internal coauthor review of a manuscript. Constructive, specific, and honest.
+  Prefer LaTeX sources over a PDF when both exist. Do not rewrite the paper unless asked.
+nodes:
+  - id: scope
+    allowed_tools: [bash, read]
+    output_type: findings
+    prompt: |
+      Run bash/read now. Identify the main .tex (and abstract if separate). Quote
+      title, authors block if present, and page/section count if cheap to obtain. Do not
+      invent missing author lists.
+  - id: strengths
+    trigger_rule: all_success
+    allowed_tools: [read]
+    output_type: findings
+    prompt: |
+      From $scope.output, list up to five concrete strengths (clarity, novelty framing,
+      method honesty, figures). One line each. No flattery.
+    depends_on: [scope]
+  - id: issues
+    trigger_rule: all_success
+    allowed_tools: [read]
+    output_type: findings
+    prompt: |
+      Emit a table: Severity | Location (.tex section/line or float) | Issue | Suggested fix.
+      Cover claims without evidence, unclear notation, missing related work the user named,
+      LaTeX structure problems, and reproducibility gaps. Highest severity first. Do not
+      invent citations.
+    depends_on: [strengths]
+  - id: polish
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      From $issues.output, list the three edits a coauthor should make before submission.
+      Separate must-fix from nice-to-have. Do not merge or submit anything.
+    depends_on: [issues]

@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [1.0.0-rc.3] - 2026-11-10
+
+### Added
+
+- Science domain multi-workflow catalog for LaTeX-centric research: `write-paper`, `review-paper-coauthor`, `review-paper-referee`, `respond-to-reviews`, `write-rebuttal`, `generate-slides`, `generate-poster`, `polish-bibtex`, `check-latex-build`, `figure-pass`, `extract-claims`, `write-abstract` (keeps `method-check`).
+
 ## [1.0.0-rc.2] - 2026-11-10
 
 ### Fixed

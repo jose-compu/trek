@@ -82,6 +82,55 @@ describe("multi-workflow catalog", () => {
 		expect(engineering?.workflowName).toBe("change-review");
 	});
 
+	test("science domain loads LaTeX and review workflows", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-science-workflows-"));
+		const catalog = loadDomainCatalog(cwd);
+		const science = catalog.domains.find((domain) => domain.id === "science");
+		expect(science).toBeDefined();
+		expect(science?.workflows?.length).toBeGreaterThanOrEqual(12);
+		const names = science?.workflows?.map((workflow) => workflow.name) ?? [];
+		expect(names).toContain("method-check");
+		expect(names).toContain("write-paper");
+		expect(names).toContain("review-paper-coauthor");
+		expect(names).toContain("review-paper-referee");
+		expect(names).toContain("respond-to-reviews");
+		expect(names).toContain("write-rebuttal");
+		expect(names).toContain("generate-slides");
+		expect(names).toContain("generate-poster");
+		expect(names).toContain("polish-bibtex");
+		expect(names).toContain("check-latex-build");
+		expect(names).toContain("figure-pass");
+		expect(names).toContain("extract-claims");
+		expect(names).toContain("write-abstract");
+		for (const workflow of science?.workflows ?? []) {
+			expect(workflow.workflow.nodes.length).toBeGreaterThan(0);
+			for (const node of workflow.workflow.nodes) {
+				expect(node.kind).toBe("prompt");
+				expect(node.outputType).toBe("findings");
+				for (const tool of node.allowedTools ?? []) {
+					expect(["bash", "read", "edit", "write"]).toContain(tool);
+				}
+			}
+		}
+	});
+
+	test("science write-paper and referee review select by terms", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-science-select-"));
+		const catalog = loadDomainCatalog(cwd);
+		const paper = selectDomain(catalog, { task: "Draft the manuscript latex paper for the study" });
+		expect(paper.domain).toBe("science");
+		expect(paper.workflow).toBe("write-paper");
+		const referee = selectDomain(catalog, { task: "Write a referee review / peer review report" });
+		expect(referee.domain).toBe("science");
+		expect(referee.workflow).toBe("review-paper-referee");
+		const slides = selectDomain(catalog, { task: "Generate beamer slides for the conference talk" });
+		expect(slides.domain).toBe("science");
+		expect(slides.workflow).toBe("generate-slides");
+		const poster = selectDomain(catalog, { task: "Generate a conference poster in latex" });
+		expect(poster.domain).toBe("science");
+		expect(poster.workflow).toBe("generate-poster");
+	});
+
 	test("open-issue workflow is selected for open issue prompt", () => {
 		const cwd = mkdtempSync(join(tmpdir(), "trek-open-issue-"));
 		const catalog = loadDomainCatalog(cwd);
