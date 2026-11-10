@@ -86,6 +86,9 @@ describe("lesson patterns", () => {
 			"modeling",
 			"validation",
 			"publication",
+			"latex",
+			"peer_review",
+			"presentation",
 		]);
 		expect(patterns.get("finance")?.beforeAfter).toBe(true);
 		expect(patterns.get("security")?.fields.some((field) => field.name === "remediation" && field.required)).toBe(

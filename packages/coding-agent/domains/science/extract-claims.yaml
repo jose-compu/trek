@@ -1,0 +1,28 @@
+name: extract-claims
+description: |
+  Extract a claim–evidence table from a manuscript for honesty and rebuttal prep.
+  Mark unsupported claims. Do not invent evidence.
+nodes:
+  - id: scope
+    allowed_tools: [bash, read]
+    output_type: findings
+    prompt: |
+      Run bash/read now. Open the abstract, introduction contributions, and
+      conclusion of the main .tex (or the user paste). Quote candidate claim sentences.
+  - id: table
+    trigger_rule: all_success
+    allowed_tools: [read]
+    output_type: findings
+    prompt: |
+      Emit a table: Claim | Evidence locus (section/figure/table) | Status
+      (supported / partial / unsupported) | Risk if overclaimed. Use only text from
+      $scope.output. No new experiments.
+    depends_on: [scope]
+  - id: gaps
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      From $table.output, list the unsupported or partial claims and the cheapest honest
+      fix (soften language, add cite, move to future work). Stop.
+    depends_on: [table]

@@ -1,0 +1,37 @@
+name: write-rebuttal
+description: |
+  Draft a short conference rebuttal / author response within a tight character budget.
+  Prioritize factual corrections. Do not add new experiments unless the venue allows and
+  the user supplied the numbers.
+nodes:
+  - id: constraints
+    allowed_tools: [read]
+    output_type: findings
+    prompt: |
+      State the rebuttal budget if the user gave one (characters/pages). List the reviewer
+      comments to answer from the turn or named files. If a comment is missing, say so.
+  - id: triage
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Rank comments from $constraints.output by impact on acceptance. Mark which can be
+      answered with existing manuscript text versus which need new evidence the user must
+      provide.
+    depends_on: [constraints]
+  - id: draft
+    trigger_rule: all_success
+    allowed_tools: [read, edit, write]
+    output_type: findings
+    prompt: |
+      Write a concise rebuttal addressing the ranked comments. Use page/line or section
+      pointers into the PDF/.tex. Stay inside the budget from $constraints.output when set.
+      No hostility. No invented results.
+    depends_on: [triage]
+  - id: trim
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Report approximate length versus budget. List cuts if over budget. Stop.
+    depends_on: [draft]

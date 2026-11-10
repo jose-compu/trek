@@ -1,0 +1,36 @@
+name: generate-slides
+description: |
+  Build or extend a Beamer talk from a paper or outline. Prefer an existing .tex beamer
+  file. Keep slides sparse; one claim per slide. Do not invent results.
+nodes:
+  - id: source
+    allowed_tools: [bash, read]
+    output_type: findings
+    prompt: |
+      Run bash/read now. Find an existing beamer .tex or the paper .tex to distill.
+      Quote title and the contribution bullets if present.
+  - id: storyboard
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Propose a 10–15 slide outline (title, problem, idea, method, results, limits,
+      conclusion, backup). Map each slide to a paper section when available. Mark backup
+      slides clearly.
+    depends_on: [source]
+  - id: build
+    trigger_rule: all_success
+    allowed_tools: [read, edit, write]
+    output_type: findings
+    prompt: |
+      Create or update the Beamer .tex from $storyboard.output. Use \begin{frame}, short
+      bullets, and \pause sparingly. For results, use only numbers from the source or
+      TODO{\ldots}. Quote the output path.
+    depends_on: [storyboard]
+  - id: speaker
+    trigger_rule: all_success
+    allowed_tools: []
+    output_type: findings
+    prompt: |
+      Give 5–8 speaker notes (one line each) for the riskiest slides. No congratulations.
+    depends_on: [build]
