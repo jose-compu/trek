@@ -129,6 +129,9 @@ describe("multi-workflow catalog", () => {
 		const poster = selectDomain(catalog, { task: "Generate a conference poster in latex" });
 		expect(poster.domain).toBe("science");
 		expect(poster.workflow).toBe("generate-poster");
+		expect(workflowNeedsFacts("science", "draft the latex paper", "write-paper")).toBe(false);
+		expect(workflowNeedsFacts("science", "generate beamer slides", "generate-slides")).toBe(false);
+		expect(workflowNeedsFacts("science", "data leakage", "method-check")).toBe(true);
 	});
 
 	test("open-issue workflow is selected for open issue prompt", () => {

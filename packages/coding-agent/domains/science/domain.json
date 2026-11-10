@@ -114,7 +114,10 @@
 				"latex build",
 				"latexmk",
 				"pdflatex error",
-				"compile the paper"
+				"compile the paper",
+				"latex build log",
+				"tex log",
+				"undefined control sequence"
 			]
 		},
 		{
