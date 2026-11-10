@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [1.0.0-rc.2] - 2026-11-10
+
+### Fixed
+
+- Debug logging redacts `--api-key` (and similar flags), secret-shaped strings (`sk-or-v1-…`, `sk-ant-…`, `xai-…`, Bearer tokens), and secret object keys before writing `trek-debug.log`.
+
 ## [1.0.0-rc.1] - 2026-11-10
 
 ### Changed
