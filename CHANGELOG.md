@@ -6,6 +6,10 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Fixed
+
+- Debug log redacts `--api-key` argv values and provider-shaped secrets before writing `trek-debug.log`.
+
 ## [0.20.4] - 2026-11-10
 
 ### Changed
