@@ -6,6 +6,7 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { getDebugLogPath } from "../config.ts";
+import { redactDebugData } from "./debug-redact.ts";
 import { isTrekEnvTruthy } from "./trek-env.ts";
 
 let debugEnabled = false;
@@ -33,8 +34,9 @@ export function getActiveDebugLogPath(): string {
 
 export function debugLog(component: string, message: string, data?: unknown): void {
 	if (!isDebugEnabled()) return;
-	const suffix = data !== undefined ? ` ${JSON.stringify(data)}` : "";
-	const line = `[${new Date().toISOString()}] [trek:debug:${component}] ${message}${suffix}\n`;
+	const safeMessage = typeof message === "string" ? String(redactDebugData(message)) : message;
+	const suffix = data !== undefined ? ` ${JSON.stringify(redactDebugData(data))}` : "";
+	const line = `[${new Date().toISOString()}] [trek:debug:${component}] ${safeMessage}${suffix}\n`;
 	const path = getActiveDebugLogPath();
 	mkdirSync(dirname(path), { recursive: true });
 	if (!debugSessionStarted) {
