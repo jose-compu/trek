@@ -265,7 +265,7 @@ function orderedLineOverlap(needle: string[], keys: string[], start: number, end
  */
 function findAnchoredBlock(content: string, oldText: string): { index: number; matchLength: number } | undefined {
 	const needle = needleLineKeys(oldText).filter((line) => line.length > 0);
-	if (needle.length < 4) {
+	if (needle.length < 3) {
 		return undefined;
 	}
 	const startKey = needle[0];
@@ -287,6 +287,17 @@ function findAnchoredBlock(content: string, oldText: string): { index: number; m
 	}
 
 	const start = startHits[0];
+	if (needle.length === 3) {
+		const end = start + 2;
+		if (end >= lines.length || keys[end] !== endKey) {
+			return undefined;
+		}
+		let endOffset = starts[end] + lines[end].length;
+		if (oldText.endsWith("\n") && end < lines.length - 1) {
+			endOffset += 1;
+		}
+		return { index: starts[start], matchLength: endOffset - starts[start] };
+	}
 	const minSpan = Math.max(4, Math.floor(needle.length * 0.5));
 	const maxSpan = Math.ceil(needle.length * 2);
 	const lastAllowed = Math.min(lines.length - 1, start + maxSpan - 1);

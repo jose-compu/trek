@@ -6,6 +6,10 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ## [Unreleased]
 
+### Fixed
+
+- A three-line `edit` applies when the first and third lines bound a unique block and the middle line has drifted.
+
 ## [0.20.5] - 2026-11-15
 
 ### Fixed
