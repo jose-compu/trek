@@ -1,10 +1,16 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.20.5`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `0.20.6`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [0.20.6] - 2026-11-15
+
+### Fixed
+
+- A three-line `edit` applies when the first and third lines bound a unique block and the middle line has drifted.
 
 ## [0.20.5] - 2026-11-15
 
