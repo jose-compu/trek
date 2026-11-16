@@ -35,9 +35,15 @@ const NONE: DomainSelection = {
 	parameters: [],
 };
 
-/** A fix, a push, or a blocked session needs tools. A review workflow must not take that turn. */
+/** A named file the user told the agent to write or edit. */
+const NAMED_FILE_WRITE = /\b(?:write|edit|update|replace)\b[^\n]{0,80}\b[\w./-]+\.[A-Za-z0-9]{1,8}\b/i;
+
+/**
+ * A fix, a push, a blocked session, or an explicit file write needs tools.
+ * A review or method-check workflow must not take that turn.
+ */
 export function turnNeedsTools(task: string): boolean {
-	return /\b(fix|push|blocked|unblock|what is happening|what happened)\b/i.test(task);
+	return /\b(fix|push|blocked|unblock|what is happening|what happened)\b/i.test(task) || NAMED_FILE_WRITE.test(task);
 }
 
 export function selectDomain(catalog: DomainCatalog, input: SelectDomainInput): DomainSelection {

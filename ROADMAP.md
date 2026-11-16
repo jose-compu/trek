@@ -77,6 +77,7 @@
 | **0.20.0** | Semantic Memory | Index the working repo and docs in LogosDB; smart/advanced chunking; retrieve related code and docs that `grep` / bash cannot find. Coding domain gains SE workflows (issue → PR → **Belay** → merge; split epics/issues) | 0.11.0, 0.12.0, 0.16.0, 0.18.0 | **Done** (`v0.20.0` … `v0.20.4`) |
 | **0.21.0** | Multilingual memory | Multilingual / longer-context embeddings (e5-small, multilingual MiniLM); optional embedder switch without corrupting MiniLM indexes | 0.20.0 | Planned |
 | **1.0.0** | Release | Major ship gate: test suites (static unit + local e2e), packages, HF download, cheatsheet, install docs. First RC: `v1.0.0-rc.1` (GitHub only; no npm) | All prior (0.21 optional for RC1) | In progress (`release-1-0-rc1`) |
+| **1.1.0** | Agentic benchmark | Scored tool-using tasks plus a confirm-gated lesson loop so Trek can be optimized against the score. Faux pack is the CI gate. Not `trek models benchmark` (tokens/s) | 1.0.0, 0.14.0, 0.15.0 | Planned |
 
 **Note:** Three-layer memory shipped in `v0.11.0` (also in `v0.10.1`–`v0.10.3`). **0.20.0** is the working-tree + docs semantic index: related files that do not share tokens with the query. **0.21.0** keeps English MiniLM as default and adds selectable multilingual embedders. **1.0.0** was formerly roadmap **0.21.0 Release** / GitHub **v0.22.0 Major Release**. Domain and workflow are detected again for every task context. A session menu does not choose them.
 
@@ -1614,6 +1615,32 @@ Ship a GitHub prerelease only. Do **not** publish npm. Do **not** tag until the 
 - [ ] `trek/assets/cheatsheet-1.0.png` matches `cheatsheet.html`, and every command on it exists.
 - [ ] `v1.0.0-rc.1` GitHub prerelease assets install and report `1.0.0-rc.1` (RC1).
 - [ ] Final `v1.0.0` tag only after RC feedback; still no npm unless decided.
+
+---
+
+### 1.1.0 — Agentic benchmark (self-improve)
+
+**Goal:** Score Trek on tool-using tasks and turn failures into confirmed lessons so later runs can be optimized against that score. First minor after 1.0. `trek models benchmark` stays tokens/s and is not this suite.
+
+**Tracking:** [v1.1.0 milestone](https://github.com/jose-compu/trek/milestone/18) · epic [#292](https://github.com/jose-compu/trek/issues/292) · [#293](https://github.com/jose-compu/trek/issues/293) harness · [#294](https://github.com/jose-compu/trek/issues/294) packs · [#295](https://github.com/jose-compu/trek/issues/295) metrics · [#296](https://github.com/jose-compu/trek/issues/296) lesson loop · [#297](https://github.com/jose-compu/trek/issues/297) levers · [#298](https://github.com/jose-compu/trek/issues/298) CLI and CI baseline.
+
+**Scope**
+- Isolated fixture workspaces. Faux provider in CI. No API keys.
+- Packs: coding edits, science/LaTeX honesty, tool-use budget, short multi-step.
+- Score: success, tool budget, honesty (no invented numbers), safety (no echoed secrets). Tokens are recorded only.
+- A failed task may draft one domain lesson. Confirm before write. No automatic workflow edits.
+- A score delta must name the lever (workflow text, hierarchy, thinking). A safety or honesty miss is a regression even if the mean rises.
+- `trek bench run|report|diff`. Checked-in faux baseline. CI fails when that baseline drops.
+
+**Out of scope:** weight training; full SWE-bench in default CI; unattended prompt search; weakening laws to raise the score; npm.
+
+**1.0.0-rc.4 slice:** `trek bench` pack plus a live same-model single vs auto run. Full faux CI gate is still 1.1.
+
+**Test gate**
+- [ ] Faux pack runs with no network.
+- [ ] One honesty fail and one secret-echo fail are fixtures.
+- [ ] Confirm / deny on a lesson draft is tested.
+- [ ] CI fails on a faux pass-rate drop once the baseline is locked.
 
 ---
 

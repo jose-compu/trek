@@ -1,0 +1,7 @@
+{
+	"id": "overplan-fix",
+	"prompt": "Review src/add.ts and follow these steps: replace the subtraction with addition so the function returns the sum of its arguments. Keep the same function name.",
+	"tools": ["read", "edit"],
+	"maxTools": 8,
+	"files": [{ "path": "src/add.ts", "contains": ["a + b"], "notContains": ["a - b"] }]
+}

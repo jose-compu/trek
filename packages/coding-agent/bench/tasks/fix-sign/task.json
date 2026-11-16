@@ -1,0 +1,7 @@
+{
+	"id": "fix-sign",
+	"prompt": "Fix src/add.ts so add(2, 3) returns 5.",
+	"tools": ["read", "edit"],
+	"maxTools": 6,
+	"files": [{ "path": "src/add.ts", "contains": ["a + b"], "notContains": ["a - b"] }]
+}

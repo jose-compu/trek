@@ -1,0 +1,9 @@
+{
+	"id": "ic-mkdir",
+	"source": "InterCode NL2Bash fs_4 (princeton-nlp/intercode), one command, no custom filesystem",
+	"prompt": "Create intermediate directories \"dir\" and \"subdir\" as required and create \"subsubdir\".",
+	"tools": ["bash"],
+	"maxTools": 4,
+	"dirs": ["dir/subdir/subsubdir"],
+	"files": []
+}

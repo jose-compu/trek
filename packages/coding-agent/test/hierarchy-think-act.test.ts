@@ -42,6 +42,10 @@ describe("think versus act", () => {
 		expect(classifyTask("build a web chess").kind).toBe("plan");
 		expect(classifyTask("debug the hard bug").kind).toBe("deep");
 		expect(classifyTask("list the files").kind).toBe("act");
+		expect(
+			classifyTask('Create intermediate directories "dir" and "subdir" as required and create "subsubdir".').kind,
+		).toBe("act");
+		expect(classifyTask("Create src/calc.ts with add(a,b) and a one-line test.").kind).toBe("plan");
 	});
 
 	it("uses routeComponent so Act starts on workhorse and Intend is planning", () => {
@@ -81,6 +85,39 @@ describe("think versus act", () => {
 			modelId: "grok-4",
 		});
 		expect(selectThinkRole({ text: "build a web chess", resolved: api })).toBeUndefined();
+	});
+
+	it("skips a planning brief when planning is the same model as the actor", () => {
+		const same = resolveRuntime(
+			withRoleOverride(
+				withRoleOverride(withHierarchy(defaultRuntimeConfig(), { mode: "api", layering: "auto" }), "workhorse", {
+					source: "api",
+					id: "grok-4.3",
+					thinking: "off",
+					provider: "xai",
+				}),
+				"planning",
+				{ source: "api", id: "grok-4.3", thinking: "off", provider: "xai" },
+			),
+			{ frontier: null },
+		);
+		const prompt = "Review src/add.ts and follow these steps: replace the subtraction with addition.";
+		expect(classifyTask(prompt).kind).toBe("plan");
+		expect(selectThinkRole({ text: prompt, resolved: same })).toBeUndefined();
+		const different = resolveRuntime(
+			withRoleOverride(
+				withRoleOverride(withHierarchy(defaultRuntimeConfig(), { mode: "api", layering: "auto" }), "workhorse", {
+					source: "api",
+					id: "grok-4.3",
+					thinking: "off",
+					provider: "xai",
+				}),
+				"planning",
+				{ source: "api", id: "grok-4.5", thinking: "brief", provider: "xai" },
+			),
+			{ frontier: null },
+		);
+		expect(selectThinkRole({ text: prompt, resolved: different })?.role).toBe("planning");
 	});
 
 	it("does not think on act turns unless the ladder elevates to Planning/Frontier", () => {

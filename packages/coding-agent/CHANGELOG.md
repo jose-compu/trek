@@ -4,6 +4,20 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [1.0.0-rc.4] - 2026-11-16
+
+### Added
+
+- `trek bench run [--live]` scores isolated tool tasks (success, tool budget, honesty, safety). `--live` compares hierarchy `single` and `auto` on the same Grok model. This is not `trek models benchmark` (tokens/s).
+
+### Fixed
+
+- An explicit `write`/`edit` of a named file is no longer taken over by a domain workflow. A “write result.txt” turn that only mentioned a p-value was held as science `method-check` and never called a tool.
+- A planning brief is skipped when Planning and Workhorse are the same model. On `grok-4.3`, `auto` did not beat `single` (mean 0.88, then 1.00 after the write fix) and was slower on plan-class tasks.
+- One-shot shell requests (InterCode NL2Bash `fs_4`: mkdir, a sum, a trim, `1:2:…:10`) stay on Act. `create` no longer sends `mkdir` up to Planning. Bash turns are told to run the command and keep stdout exact.
+- `trek bench run --profile climb` compares `grok-4.20-0309-non-reasoning` alone with that floor plus `grok-4.7` on Planning and Frontier. Task `rules-win` is the case: the source comment states the usual points table, and `RULES.md` reverses it.
+- `trek bench run --profile fan` is `fan-headings`: `grok-4.7` plans, and `spawn_branches` runs the four independent edits on the workhorse in parallel.
+
 ## [1.0.0-rc.3] - 2026-11-10
 
 ### Added

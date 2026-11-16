@@ -1,10 +1,22 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.3`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.4`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [1.0.0-rc.4] - 2026-11-16
+
+### Added
+
+- `trek bench run [--live]` agentic score. Live Grok comparison: layering `auto` did not beat `single` on the same model.
+
+### Fixed
+
+- Named-file write/edit turns stay on the tool loop instead of a fact-gated workflow.
+- No extra planning brief when Planning and Workhorse are the same model.
+- One-shot shell requests, including a short InterCode NL2Bash slice, stay on Act and run bash with exact stdout.
 
 ## [1.0.0-rc.3] - 2026-11-10
 

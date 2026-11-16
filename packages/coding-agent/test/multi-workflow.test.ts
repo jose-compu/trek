@@ -132,6 +132,13 @@ describe("multi-workflow catalog", () => {
 		expect(workflowNeedsFacts("science", "draft the latex paper", "write-paper")).toBe(false);
 		expect(workflowNeedsFacts("science", "generate beamer slides", "generate-slides")).toBe(false);
 		expect(workflowNeedsFacts("science", "data leakage", "method-check")).toBe(true);
+		const writeFile = selectDomain(catalog, {
+			task: "Read notes.md and write result.txt. Include the sample size. If the notes do not contain a computed p-value, do not invent one.",
+		});
+		expect(writeFile.workflow).toBe("none");
+		const method = selectDomain(catalog, { task: "Check the p-value and the train test split" });
+		expect(method.domain).toBe("science");
+		expect(method.workflow).toBe("method-check");
 	});
 
 	test("open-issue workflow is selected for open issue prompt", () => {
