@@ -110,6 +110,8 @@ ${same}
 ${same}
   planning:
 ${same}
+  frontier:
+${same}
 `;
 }
 

@@ -41,6 +41,7 @@ describe("agentic bench score", () => {
 		expect(leverModelsYaml("auto")).toContain("layering: auto");
 		expect(leverModelsYaml("single")).toContain("id: grok-4.3");
 		expect(leverModelsYaml("auto")).toContain("id: grok-4.3");
+		expect(leverModelsYaml("auto")).toContain("frontier:");
 		expect(leverModelsYaml("single")).not.toContain("workhorse:");
 		const climbSingle = leverModelsYaml("single", "climb");
 		const climbAuto = leverModelsYaml("auto", "climb");
