@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.0.0-rc.4] - 2026-11-16
+
+### Added
+
+- xAI catalog id `grok-4.1-fast` (2M context, text and image).
+
 ## [1.0.0-rc.3] - 2026-11-10
 
 ## [1.0.0-rc.2] - 2026-11-10

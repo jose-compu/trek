@@ -1833,6 +1833,18 @@ async function generateModels() {
 			maxTokens: 8192,
 		},
 		{
+			id: "grok-4.1-fast",
+			name: "Grok 4.1 Fast",
+			api: "openai-completions",
+			baseUrl: "https://api.x.ai/v1",
+			provider: "xai",
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 0.2, output: 0.5, cacheRead: 0.05, cacheWrite: 0 },
+			contextWindow: 2_000_000,
+			maxTokens: 30000,
+		},
+		{
 			id: "grok-code-fast-1",
 			name: "Grok Code Fast 1",
 			api: "openai-completions",

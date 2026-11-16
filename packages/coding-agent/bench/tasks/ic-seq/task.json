@@ -1,0 +1,9 @@
+{
+	"id": "ic-seq",
+	"source": "InterCode NL2Bash fs_4 (princeton-nlp/intercode), one command, no custom filesystem",
+	"prompt": "Print numbers 1 through 10 separated by \":\".",
+	"tools": ["bash"],
+	"maxTools": 3,
+	"outputExact": ["1:2:3:4:5:6:7:8:9:10"],
+	"files": []
+}

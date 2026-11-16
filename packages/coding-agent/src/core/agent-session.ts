@@ -1940,6 +1940,29 @@ export class AgentSession {
 		return results;
 	}
 
+	/** Parallel branches do the mechanical edits. A heavier parent keeps the plan. */
+	private _branchModel(): { model: Model<any>; thinkingLevel: ThinkingLevel } {
+		const current = this.agent.state.model;
+		const thinkingLevel = this.agent.state.thinkingLevel;
+		if (!current || current.provider === "faux") {
+			return { model: current, thinkingLevel };
+		}
+		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const workhorse = resolved.roles.workhorse;
+		if (resolved.layering === "single" || !workhorse || workhorse.source !== "api") {
+			return { model: current, thinkingLevel };
+		}
+		if (workhorse.id === current.id) {
+			return { model: current, thinkingLevel };
+		}
+		const mapped = this._apiRoleModel(workhorse.provider, workhorse.id);
+		if (!mapped) {
+			return { model: current, thinkingLevel };
+		}
+		const nextThinking: ThinkingLevel = workhorse.thinking === "off" ? "off" : thinkingLevel;
+		return { model: mapped, thinkingLevel: clampThinkingLevel(mapped, nextThinking) };
+	}
+
 	private async _runBranch(
 		task: BranchTask,
 		count: number,
@@ -1960,11 +1983,12 @@ export class AgentSession {
 						}
 					: tool,
 			);
+		const branchModel = this._branchModel();
 		const child = new Agent({
 			initialState: {
-				model: this.agent.state.model,
+				model: branchModel.model,
 				systemPrompt: this.agent.state.systemPrompt,
-				thinkingLevel: this.agent.state.thinkingLevel,
+				thinkingLevel: branchModel.thinkingLevel,
 				tools,
 			},
 			convertToLlm: this.agent.convertToLlm,

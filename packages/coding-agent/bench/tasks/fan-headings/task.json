@@ -1,0 +1,12 @@
+{
+	"id": "fan-headings",
+	"prompt": "Debug the hard bug in the four heading files. Investigate SPEC.md. The files are independent. Plan the four fixes, then run them with spawn_branches, one branch per file. Do not edit the files in the parent turn.",
+	"tools": ["read", "edit", "spawn_branches"],
+	"maxTools": 8,
+	"files": [
+		{ "path": "src/north.ts", "contains": ["heading = 0"], "notContains": ["heading = -1"] },
+		{ "path": "src/east.ts", "contains": ["heading = 90"], "notContains": ["heading = -1"] },
+		{ "path": "src/south.ts", "contains": ["heading = 180"], "notContains": ["heading = -1"] },
+		{ "path": "src/west.ts", "contains": ["heading = 270"], "notContains": ["heading = -1"] }
+	]
+}

@@ -25407,6 +25407,23 @@ export const MODELS = {
 			contextWindow: 131072,
 			maxTokens: 8192,
 		} satisfies Model<"openai-completions">,
+		"grok-4.1-fast": {
+			id: "grok-4.1-fast",
+			name: "Grok 4.1 Fast",
+			api: "openai-completions",
+			provider: "xai",
+			baseUrl: "https://api.x.ai/v1",
+			reasoning: true,
+			input: ["text", "image"],
+			cost: {
+				input: 0.2,
+				output: 0.5,
+				cacheRead: 0.05,
+				cacheWrite: 0,
+			},
+			contextWindow: 2000000,
+			maxTokens: 30000,
+		} satisfies Model<"openai-completions">,
 		"grok-4.20-0309-non-reasoning": {
 			id: "grok-4.20-0309-non-reasoning",
 			name: "Grok 4.20 (Non-Reasoning)",

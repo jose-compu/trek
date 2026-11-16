@@ -122,6 +122,11 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
 	if (hasBash && !hasGrep && !hasFind && !hasLs) {
 		addGuideline("Use bash for file operations like ls, rg, find");
 	}
+	if (hasBash) {
+		addGuideline(
+			"For a one-shot shell request, run bash. Do not plan it. The command's own stdout must be exactly the requested value, with no extra words.",
+		);
+	}
 
 	for (const guideline of promptGuidelines ?? []) {
 		const normalized = guideline.trim();

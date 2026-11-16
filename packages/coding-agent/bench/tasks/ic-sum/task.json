@@ -1,0 +1,8 @@
+{
+	"id": "ic-sum",
+	"source": "InterCode NL2Bash fs_4 (princeton-nlp/intercode), one command, no custom filesystem",
+	"prompt": "Calculate the sum of all the numbers from 1 to 10. Write digits only to sum.txt.",
+	"tools": ["bash", "write"],
+	"maxTools": 4,
+	"files": [{ "path": "sum.txt", "contains": ["55"], "notContains": ["56", "45"] }]
+}

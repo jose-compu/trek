@@ -1,0 +1,13 @@
+{
+	"id": "rules-win",
+	"prompt": "Debug the hard bug in src/score.ts. Investigate RULES.md before editing. The rules file is authoritative over the comment and over the usual tournament table. Keep the function signature.",
+	"tools": ["read", "edit"],
+	"maxTools": 8,
+	"files": [
+		{
+			"path": "src/score.ts",
+			"containsAny": ["draws * 3", "3 * draws", "draws*3", "3*draws"],
+			"notContains": ["return wins * 3 + draws"]
+		}
+	]
+}

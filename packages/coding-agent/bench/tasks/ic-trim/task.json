@@ -1,0 +1,8 @@
+{
+	"id": "ic-trim",
+	"source": "InterCode NL2Bash fs_4 (princeton-nlp/intercode), one command, no custom filesystem",
+	"prompt": "Remove the last 3 characters from \"987654321\". Write the remaining digits only to trimmed.txt.",
+	"tools": ["bash", "write"],
+	"maxTools": 4,
+	"files": [{ "path": "trimmed.txt", "contains": ["987654"], "notContains": ["987654321"] }]
+}

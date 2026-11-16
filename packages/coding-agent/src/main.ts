@@ -111,6 +111,10 @@ async function handleSubcommands(args: string[]): Promise<boolean> {
 			const { handleRecipesCommand } = await import("./recipes-cli.ts");
 			return handleRecipesCommand(args);
 		}
+		case "bench": {
+			const { handleBenchCommand } = await import("./bench-cli.ts");
+			return handleBenchCommand(args);
+		}
 		default:
 			return false;
 	}

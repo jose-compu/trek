@@ -22,6 +22,10 @@ const MAKE_ARTIFACT =
 /** A one-line correction stays low on the ladder. */
 const SMALL_EDIT = /\b(typo|format|lint|rename|spell(?:ing)?)\b/i;
 
+/** One shell effect. "create" here is mkdir, not a new app. */
+const ONE_SHOT_SHELL =
+	/\b(?:director(?:y|ies)|mkdir|rmdir|calculate the sum|print numbers \d|remove the last \d+ characters)\b/i;
+
 const DEEP_WORK =
 	/\b(debug|diagnos|root[- ]cause|hard bug|investigate|architect(?:ure)?|deep (?:think|plan|dive)|research|consult(?:\s+only|\s+frontier|\s+planning))\b/i;
 
@@ -36,6 +40,17 @@ export interface TaskClass {
 	complexity: number;
 }
 
+export function isOneShotShell(text: string): boolean {
+	const trimmed = text.trim();
+	if (!trimmed || trimmed.length > 280) {
+		return false;
+	}
+	if (/\b(app|application|website|game|project|scaffold|refactor|server|library|package)\b/i.test(trimmed)) {
+		return false;
+	}
+	return ONE_SHOT_SHELL.test(trimmed);
+}
+
 export function isSmallEdit(text: string): boolean {
 	const trimmed = text.trim();
 	if (!trimmed || !SMALL_EDIT.test(trimmed)) {
@@ -46,7 +61,7 @@ export function isSmallEdit(text: string): boolean {
 
 export function promptNeedsPlanning(text: string): boolean {
 	const trimmed = text.trim();
-	if (!trimmed || isSmallEdit(trimmed)) {
+	if (!trimmed || isSmallEdit(trimmed) || isOneShotShell(trimmed)) {
 		return false;
 	}
 	if (HARD_TASK.test(trimmed) || MAKE_ARTIFACT.test(trimmed)) {
@@ -69,6 +84,9 @@ export function classifyTask(text: string): TaskClass {
 	if (/(?:^|\s)\/frontier\b/i.test(trimmed) || DEEP_WORK.test(trimmed)) {
 		return { kind: "deep", component: "intend", complexity: 0.85 };
 	}
+	if (isOneShotShell(trimmed)) {
+		return { kind: "act", component: "toolIntent", complexity: 0.2 };
+	}
 	if (/\b(plan|planning|research)\b/i.test(trimmed) || promptNeedsPlanning(trimmed)) {
 		return { kind: "plan", component: "intend", complexity: 0.4 };
 	}
@@ -84,6 +102,17 @@ export interface RoleSelection {
 	reason: string;
 }
 
+function planningMatchesActor(resolved: ResolvedRuntime): boolean {
+	const actor = resolved.roles.workhorse;
+	const planning = resolved.roles.planning;
+	if (!actor || !planning) {
+		return false;
+	}
+	const actorProvider = actor.provider ?? actor.source;
+	const planningProvider = planning.provider ?? planning.source;
+	return actor.id === planning.id && actorProvider === planningProvider;
+}
+
 export function selectThinkRole(input: {
 	text: string;
 	resolved: ResolvedRuntime;
@@ -95,6 +124,10 @@ export function selectThinkRole(input: {
 	overrides?: Parameters<typeof routeComponent>[0]["overrides"];
 }): RoleSelection | undefined {
 	if (input.resolved.effectiveMode === "api" && !input.resolved.roles.workhorse) {
+		return undefined;
+	}
+	// A planning brief to the same model as the actor adds a call and no score. Bench: auto == single.
+	if (planningMatchesActor(input.resolved)) {
 		return undefined;
 	}
 	if (input.elevateTo === "planning" || input.elevateTo === "frontier") {
