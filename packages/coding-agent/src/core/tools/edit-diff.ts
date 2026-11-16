@@ -288,15 +288,37 @@ function findAnchoredBlock(content: string, oldText: string): { index: number; m
 
 	const start = startHits[0];
 	if (needle.length === 3) {
-		const end = start + 2;
+		const anchorSpan = (end: number): { index: number; matchLength: number } | undefined => {
+			if (end >= lines.length || keys[end] !== endKey) {
+				return undefined;
+			}
+			let endOffset = starts[end] + lines[end].length;
+			if (oldText.endsWith("\n") && end < lines.length - 1) {
+				endOffset += 1;
+			}
+			return { index: starts[start], matchLength: endOffset - starts[start] };
+		};
+
+		const distance2 = anchorSpan(start + 2);
+		if (distance2) {
+			return distance2;
+		}
+
+		const end = start + 3;
 		if (end >= lines.length || keys[end] !== endKey) {
 			return undefined;
 		}
-		let endOffset = starts[end] + lines[end].length;
-		if (oldText.endsWith("\n") && end < lines.length - 1) {
-			endOffset += 1;
+		let hasBlankBetween = false;
+		for (let i = start + 1; i < end; i++) {
+			if (keys[i] === "") {
+				hasBlankBetween = true;
+				break;
+			}
 		}
-		return { index: starts[start], matchLength: endOffset - starts[start] };
+		if (!hasBlankBetween) {
+			return undefined;
+		}
+		return anchorSpan(end);
 	}
 	const minSpan = Math.max(4, Math.floor(needle.length * 0.5));
 	const maxSpan = Math.ceil(needle.length * 2);
