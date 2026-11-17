@@ -4,6 +4,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Fixed
+
+- An explicit `write` or `edit` of a named file stays on the tool loop. A “write result.txt” turn that only mentioned a p-value was held as science `method-check` and never called a tool.
+
 ## [0.20.7] - 2026-11-16
 
 ### Fixed
