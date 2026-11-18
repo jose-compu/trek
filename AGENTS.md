@@ -160,7 +160,7 @@ Attribution:
 
 ## Cheatsheet
 
-The one-page session map is `assets/cheatsheet.html`. The image is `assets/cheatsheet-1.0.png` (Chrome headless, scale 2, window 1400×1120, output 2800×2240). `assets/cheatsheet-0.18.png` stays for the 0.18 line. `/hotkeys` stays the full binding table.
+The one-page session map is `assets/cheatsheet.html`. The image is `assets/cheatsheet-1.0.png` (Chrome headless, scale 2, window 1400×1460, output 2800×2920). `assets/cheatsheet-0.18.png` stays for the 0.18 line (1400×1120 → 2800×2240). `/hotkeys` stays the full binding table.
 
 When a command, key, or lesson rule on that sheet changes, update the HTML and regenerate the PNG in the same change. List only commands and keys that work. Do not list `shift+ctrl` chords; Terminal.app drops them ([#143](https://github.com/jose-compu/trek/issues/143)).
 
