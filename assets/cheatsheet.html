@@ -26,29 +26,29 @@
   .sheet {
     width: 1400px;
     height: 1120px;
-    padding: 28px 36px 20px;
+    padding: 24px 34px 16px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 11px;
   }
   header {
     display: flex;
     align-items: center;
     gap: 18px;
-    padding: 8px 8px 4px;
+    padding: 4px 8px 2px;
   }
   .lockup {
     display: flex;
     align-items: center;
     gap: 12px;
-    font-size: 32px;
+    font-size: 30px;
     font-weight: 750;
     letter-spacing: -0.03em;
     color: var(--ink);
   }
-  .lockup .emoji { font-size: 40px; line-height: 1; }
+  .lockup .emoji { font-size: 38px; line-height: 1; }
   h1 {
-    font-size: 42px;
+    font-size: 40px;
     line-height: 0.95;
     letter-spacing: -0.04em;
     font-weight: 750;
@@ -57,90 +57,83 @@
     display: block;
     margin-top: 4px;
     color: var(--violet);
-    font-size: 22px;
+    font-size: 21px;
     font-weight: 650;
     letter-spacing: -0.03em;
   }
   .tagline {
     margin-left: auto;
     color: var(--muted);
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 550;
   }
   .grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 14px;
+    gap: 11px;
   }
   .card {
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 18px;
-    padding: 18px 20px 16px;
+    border-radius: 16px;
+    padding: 14px 18px 12px;
   }
   .card.wide { grid-column: 1 / -1; }
   h2 {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 20px;
+    font-size: 18px;
     letter-spacing: -0.03em;
     font-weight: 700;
-    margin-bottom: 12px;
+    margin-bottom: 9px;
   }
   .n {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     border-radius: 999px;
     background: var(--violet);
     color: white;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex: none;
   }
-  p, li { font-size: 15px; line-height: 1.35; color: #2a2a33; }
-  .lead { color: var(--muted); margin: -4px 0 10px; }
-  ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  p, li { font-size: 14px; line-height: 1.32; color: #2a2a33; }
+  .lead { color: var(--muted); margin: -2px 0 7px; font-size: 13px; }
+  ul { list-style: none; display: flex; flex-direction: column; gap: 5px; }
   li { display: flex; gap: 8px; }
-  li::before { content: ""; width: 5px; height: 5px; border-radius: 99px; background: var(--violet); margin-top: 7px; flex: none; }
+  li::before { content: ""; width: 5px; height: 5px; border-radius: 99px; background: var(--violet); margin-top: 6px; flex: none; }
   code, .k {
     font-family: "SF Mono", ui-monospace, Menlo, monospace;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     background: var(--violet-soft);
     color: #3b2d86;
-    border-radius: 6px;
-    padding: 1px 6px;
+    border-radius: 5px;
+    padding: 1px 5px;
   }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th {
     text-align: left;
-    font-size: 12px;
+    font-size: 11px;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--faint);
     font-weight: 650;
-    padding: 0 8px 8px 0;
+    padding: 0 8px 6px 0;
   }
-  td { padding: 5px 10px 5px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td { padding: 4px 8px 4px 0; border-top: 1px solid var(--line); vertical-align: top; }
   td:first-child { font-weight: 650; white-space: nowrap; }
-  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .box {
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 10px 12px;
-  }
-  .box strong { display: block; font-size: 14px; margin-bottom: 4px; }
-  .box span { display: block; color: var(--muted); font-size: 13px; line-height: 1.35; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
   .chip {
     border: 1px solid var(--line);
     border-radius: 999px;
-    padding: 3px 9px;
-    font-size: 13px;
+    padding: 2px 8px;
+    font-size: 12px;
     color: #2a2a33;
   }
   .chip b { color: var(--violet); font-weight: 700; }
@@ -148,7 +141,7 @@
     display: flex;
     justify-content: space-between;
     color: var(--faint);
-    font-size: 13px;
+    font-size: 12px;
     padding: 0 8px;
     font-family: "SF Mono", ui-monospace, Menlo, monospace;
   }
@@ -158,7 +151,7 @@
   <div class="sheet">
     <header>
       <div class="lockup"><span class="emoji" aria-hidden="true">🏔️</span> Trek Agent</div>
-      <h1>Cheatsheet<span>The session, the domain, the lesson.</span></h1>
+      <h1>Cheatsheet<span>1.0 — session, domains, tools, bench</span></h1>
       <div class="tagline">Powerful. Precise. Honest.</div>
     </header>
     <div class="grid">
@@ -166,58 +159,66 @@
         <h2><span class="n">1</span> Open a session</h2>
         <ul>
           <li><code>trek</code> in the project. Memory and the reflective loop are on.</li>
+          <li><code>--memory off</code> <code>--effort off|normal|loose</code> <code>--operator-mode supervised|delegated|checkpoint|diagnostic|ask</code></li>
+          <li><code>--debug</code> or <code>TREK_DEBUG=1</code> → <code>~/.trek/agent/trek-debug.log</code> (secrets redacted).</li>
           <li><code>TREK_NO_LOCAL_LLM=1</code> uses the API model. <code>PI_NO_LOCAL_LLM</code> is still accepted.</li>
-          <li><code>/login</code> <code>/model</code> <code>/new</code> <code>/quit</code></li>
-          <li>Default is one Workhorse. <code>/hierarchy auto</code> maps extra roles from a catalog.</li>
-          <li>Enter sends. The prompt stays in the transcript when Working... starts.</li>
+          <li>Factory <code>single</code>: one Workhorse. <code>/hierarchy</code> sets <code>single</code>, <code>auto</code>, or <code>manual</code>.</li>
+          <li><code>/login</code> <code>/model</code> <code>/new</code> <code>/quit</code>. Enter sends. Prompt stays when Working... starts.</li>
+          <li>In your shell: <code>set -o vi</code> for vi line editing (operator only; not a trek tool).</li>
         </ul>
       </section>
       <section class="card">
         <h2><span class="n">2</span> One turn</h2>
         <ul>
           <li>The words in the turn choose the domain. A menu does not.</li>
-          <li>The workflow runs one node at a time. A prompt node does not call a tool.</li>
-          <li>The next node receives the earlier reply. An empty reply is <code>(none)</code>.</li>
-          <li>A fact that is not in the turn is said to be not in the turn.</li>
-          <li>A request to fix or push does not start the review. The session uses tools.</li>
+          <li>Workflow runs one Archon node at a time. A prompt node does not call a tool.</li>
+          <li>Write/edit/update/replace plus a filename → no domain workflow; the tool loop runs.</li>
+          <li>Fix, push, blocked, or “what is happening” → tools, not a workflow.</li>
+          <li>Short one-shot shell prompts (mkdir, sum, trim, …) classify as Act when bash is available.</li>
+          <li>Same model on Workhorse and Planning → no extra planning brief.</li>
+          <li>A fact not in the turn is said to be not in the turn. Empty upstream reply is <code>(none)</code>.</li>
         </ul>
       </section>
       <section class="card">
-        <h2><span class="n">3</span> Domains</h2>
-        <p class="lead">Twenty domains. Four stay on: Meta, AI, Security, Engineering.</p>
+        <h2><span class="n">3</span> Domains &amp; science</h2>
+        <p class="lead">Twenty domains. Meta, AI, Security, Engineering stay on. Science can be off.</p>
         <ul>
-          <li><code>/domains</code> lists them. <code>/domains enable finance</code> <code>/domains disable finance</code></li>
-          <li><code>/workflows show finance</code> prints the steps. It does not run them.</li>
-          <li>Detection still chooses the workflow on the next prompt.</li>
+          <li><code>/domains</code> <code>/domains enable finance</code> <code>/domains disable finance</code></li>
+          <li><code>/workflows show finance</code> prints the DAG. It does not run it.</li>
+          <li>Science workflows: <code>method-check</code>, <code>write-paper</code>, <code>review-paper-coauthor</code>, <code>review-paper-referee</code>, <code>respond-to-reviews</code>, <code>write-rebuttal</code>, <code>generate-slides</code>, <code>generate-poster</code>, <code>polish-bibtex</code>, <code>check-latex-build</code>, <code>figure-pass</code>, <code>extract-claims</code>, <code>write-abstract</code>.</li>
+          <li>Leakage / train-test holds apply only for <code>method-check</code>.</li>
         </ul>
       </section>
       <section class="card">
-        <h2><span class="n">4</span> Lessons</h2>
+        <h2><span class="n">4</span> Lessons &amp; patterns</h2>
         <ul>
-          <li>A failed turn, or a correction that starts with <code>No.</code>, may store one lesson.</li>
-          <li>The lesson takes the domain of that turn: category, area, before, and after.</li>
-          <li><code>/lessons</code> <code>/lessons finance</code> shows id, category, area, severity, count, status.</li>
-          <li><code>/crystallize &lt;id&gt;</code> writes a skill only after you confirm, and only for that domain.</li>
+          <li>Failed turn, or correction starting with <code>No.</code>, may store one lesson in that domain.</li>
+          <li><code>/lessons</code> <code>/lessons finance</code> — id, category, area, severity, count, status.</li>
+          <li><code>/crystallize &lt;id&gt;</code> writes a skill only after Yes, only for that domain.</li>
+          <li>Patterns: <code>.trek/domains/&lt;id&gt;/lessons.yaml</code>. Bundled file stays as shipped.</li>
+          <li><code>/patterns</code> <code>/patterns edit finance categories add tax_gap</code> <code>/patterns restore finance</code></li>
+          <li>Keys and private keys refused everywhere. Finance drops account numbers. Cross-domain recall rules apply.</li>
         </ul>
       </section>
       <section class="card">
-        <h2><span class="n">5</span> Patterns</h2>
-        <p class="lead">Edits go to <code>.trek/domains/&lt;id&gt;/lessons.yaml</code>. The bundled file stays as it shipped.</p>
+        <h2><span class="n">5</span> Edit &amp; branches</h2>
         <ul>
-          <li><code>/patterns</code> <code>/patterns finance</code></li>
-          <li><code>/patterns edit finance categories add tax_gap</code></li>
-          <li><code>/patterns edit finance targets add sox-memo SOX memo</code></li>
-          <li><code>/patterns edit finance never add west-cistern</code></li>
-          <li><code>/patterns restore finance</code> steps back one edit.</li>
+          <li>Three-line <code>edit</code>: first non-empty line unique, match key ≥12 chars; third non-empty line exactly two file lines below the first; middle may differ.</li>
+          <li>Match keys trim indent, collapse spaces, treat <code>'</code> as <code>"</code>. Blank lines inside <code>oldText</code> are not counted.</li>
+          <li>Not in 1.0: third line three rows down when a blank line sits between anchors (0.20.7 case).</li>
+          <li><code>spawn_branches</code> (≤4 subtasks) + <code>gather</code>. First branch to write a path owns it.</li>
+          <li>Bench <code>fan-headings</code>: one <code>spawn_branches</code>, one branch per file, no edit in the parent turn.</li>
         </ul>
       </section>
       <section class="card">
-        <h2><span class="n">6</span> Never stored</h2>
+        <h2><span class="n">6</span> Bench &amp; debug</h2>
         <ul>
-          <li>Keys and private keys are refused in every domain.</li>
-          <li>A finance lesson also drops an account number.</li>
-          <li>A lesson that still matches is not stored.</li>
-          <li>A finance lesson is not recalled on a robotics turn. Meta, AI, Security, and Engineering may be.</li>
+          <li><code>trek bench run</code> — checked-in pack, no model. Not <code>trek models benchmark</code>.</li>
+          <li><code>trek bench run --live</code> needs <code>XAI_API_KEY</code> or <code>.env</code>.</li>
+          <li><code>--profile same|climb|fan</code> <code>--lever single|auto|both</code> <code>--task id</code> <code>--timeout ms</code></li>
+          <li><code>same</code>: <code>grok-4.3</code> every role. <code>climb</code>: floor vs floor+<code>grok-4.7</code> Planning/Frontier.</li>
+          <li><code>fan</code>: <code>grok-4.7</code> alone vs <code>grok-4.7</code> Planning + <code>grok-4.20-0309-non-reasoning</code> Workhorse (<code>--lever auto</code>).</li>
+          <li>Debug log redacts <code>--api-key</code>, <code>--token</code>, <code>--password</code>, <code>--secret</code>, Bearer, and <code>sk-</code> / <code>ghp_</code> / <code>hf_</code> shapes.</li>
         </ul>
       </section>
       <section class="card wide">
@@ -227,13 +228,15 @@
             <thead><tr><th>In the session</th><th></th></tr></thead>
             <tbody>
               <tr><td><code>/patterns</code></td><td>List or edit a domain pattern</td></tr>
+              <tr><td><code>/domains</code></td><td>List, enable, disable, or add a domain</td></tr>
+              <tr><td><code>/workflows show &lt;id&gt;</code></td><td>Print a workflow DAG</td></tr>
               <tr><td><code>/lessons finance</code></td><td>Lessons stored for that domain</td></tr>
               <tr><td><code>/crystallize &lt;id&gt;</code></td><td>Offer a skill, then wait for Yes</td></tr>
               <tr><td><code>/memory</code></td><td>Status, index, add, or remove a path</td></tr>
-              <tr><td><code>/confirm bash</code></td><td>Allow the next call of one gated tool</td></tr>
-              <tr><td><code>/thinking briefly</code></td><td>Pin the compact thinking card</td></tr>
-              <tr><td><code>/hierarchy auto</code></td><td>Map catalog roles; <code>single</code> stays one model</td></tr>
-              <tr><td><code>/hotkeys</code></td><td>The full shortcut list</td></tr>
+              <tr><td><code>/confirm bash</code></td><td>Allow the next gated tool once (supervised)</td></tr>
+              <tr><td><code>/thinking briefly|deep|off</code></td><td>Pin thinking card level</td></tr>
+              <tr><td><code>/hierarchy</code></td><td>Layering, mode, suite, one role</td></tr>
+              <tr><td><code>/hotkeys</code></td><td>Full shortcut list</td></tr>
             </tbody>
           </table>
           <table>
@@ -250,18 +253,19 @@
           </table>
         </div>
         <div class="chips">
-          <span class="chip"><b>trek lessons list</b> outside the session</span>
+          <span class="chip"><b>trek lessons list</b></span>
           <span class="chip"><b>trek patterns finance</b></span>
           <span class="chip"><b>trek domains lessons finance</b></span>
           <span class="chip"><b>trek workflows show finance</b></span>
-          <span class="chip"><b>trek models</b></span>
-          <span class="chip"><b>trek models set-layering</b></span>
+          <span class="chip"><b>trek models set-layering auto</b></span>
+          <span class="chip"><b>trek bench run --profile fan</b></span>
+          <span class="chip"><b>trek --debug</b></span>
         </div>
       </section>
     </div>
     <footer>
       <span>github.com/jose-compu/trek</span>
-      <span>Ships with 0.18</span>
+      <span>Ships with 1.0</span>
     </footer>
   </div>
 </body>
