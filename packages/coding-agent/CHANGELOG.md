@@ -5,6 +5,19 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 ## [Unreleased]
 
 ## [1.0.0-rc.5] - 2026-11-18
+## [0.20.8] - 2026-11-17
+
+### Fixed
+
+- An explicit `write` or `edit` of a named file stays on the tool loop. A “write result.txt” turn that only mentioned a p-value was held as science `method-check` and never called a tool.
+
+## [0.20.7] - 2026-11-16
+
+### Fixed
+
+- A three-line `edit` applies when one blank line sits between a unique first line and the matching third line. A non-blank extra line still blocks that shorter snippet.
+
+## [0.20.6] - 2026-11-15
 
 ### Fixed
 
@@ -31,6 +44,7 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 - Science domain multi-workflow catalog for LaTeX-centric research: `write-paper`, `review-paper-coauthor`, `review-paper-referee`, `respond-to-reviews`, `write-rebuttal`, `generate-slides`, `generate-poster`, `polish-bibtex`, `check-latex-build`, `figure-pass`, `extract-claims`, `write-abstract` (keeps `method-check`).
 
 ## [1.0.0-rc.2] - 2026-11-10
+## [0.20.5] - 2026-11-15
 
 ### Fixed
 

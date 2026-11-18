@@ -306,6 +306,19 @@ describe("workflow gate", () => {
 		expect(harness.session.getWorkflowCheck()).toBeUndefined();
 	});
 
+	test("an explicit write of a named file is not taken by science method-check", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "trek-named-file-write-"));
+		const catalog = loadDomainCatalog(cwd);
+		const writeFile = selectDomain(catalog, {
+			task: "Read notes.md and write result.txt. Include the sample size. If the notes do not contain a computed p-value, do not invent one.",
+		});
+		expect(writeFile.domain).toBe("none");
+		expect(writeFile.workflow).toBe("none");
+		const method = selectDomain(catalog, { task: "Check the p-value and the train test split" });
+		expect(method.domain).toBe("science");
+		expect(method.workflow).toBe("method-check");
+	});
+
 	test("a complete engineering turn keeps the layer rule and does not ask", () => {
 		expect(missingWorkflowFacts("engineering", ENGINEERING_TURN)).toEqual([]);
 		expect(missingWorkflowFacts("engineering", "The build failed.")).toEqual(["build", "violation", "debt"]);

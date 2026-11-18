@@ -1205,6 +1205,127 @@ describe("edit tool fuzzy matching", () => {
 		expect(content).toContain("const tail = true;");
 	});
 
+	it("replaces a three-line block when a blank line sits before the closing brace", async () => {
+		const testFile = join(testDir, "verify-blank-before-close.ts");
+		writeFileSync(
+			testFile,
+			[
+				"export function verify(proof: Proof) {",
+				"  return vdf.verify(challenge, 100, proof);",
+				"",
+				"}",
+				"const tail = true;",
+				"",
+			].join("\n"),
+		);
+
+		const result = await editTool.execute("test-anchor-three-blank-before-close", {
+			path: testFile,
+			edits: [
+				{
+					oldText: [
+						"export function verify(proof: Proof) {",
+						"  return vdf.verify(challenge, 256, proof);",
+						"}",
+					].join("\n"),
+					newText: [
+						"export function verify(proof: Proof) {",
+						"  return vdf.verify(challenge, 256, proof);",
+						"}",
+					].join("\n"),
+				},
+			],
+		});
+
+		expect(getTextOutput(result)).toContain("Successfully replaced");
+		const content = readFileSync(testFile, "utf-8");
+		expect(content).toContain("256");
+		expect(content).not.toContain("100");
+		expect(content).not.toMatch(/\n\n\}/);
+		expect(content).toContain("const tail = true;");
+	});
+
+	it("replaces a three-line block when a blank line sits before the body", async () => {
+		const testFile = join(testDir, "verify-blank-before-body.ts");
+		writeFileSync(
+			testFile,
+			[
+				"export function verify(proof: Proof) {",
+				"",
+				"  return vdf.verify(challenge, 100, proof);",
+				"}",
+				"const tail = true;",
+				"",
+			].join("\n"),
+		);
+
+		const result = await editTool.execute("test-anchor-three-blank-before-body", {
+			path: testFile,
+			edits: [
+				{
+					oldText: [
+						"export function verify(proof: Proof) {",
+						"  return vdf.verify(challenge, 256, proof);",
+						"}",
+					].join("\n"),
+					newText: [
+						"export function verify(proof: Proof) {",
+						"  return vdf.verify(challenge, 256, proof);",
+						"}",
+					].join("\n"),
+				},
+			],
+		});
+
+		expect(getTextOutput(result)).toContain("Successfully replaced");
+		const content = readFileSync(testFile, "utf-8");
+		expect(content).toContain("256");
+		expect(content).not.toContain("100");
+		expect(content).not.toMatch(/{\n\n {2}return/);
+		expect(content).toContain("const tail = true;");
+	});
+
+	it("does not replace a three-line block when a non-blank line sits before the closing brace", async () => {
+		const testFile = join(testDir, "verify-extra-before-close.ts");
+		writeFileSync(
+			testFile,
+			[
+				"export function verify(proof: Proof) {",
+				"  return vdf.verify(challenge, 100, proof);",
+				"  audit(proof);",
+				"}",
+				"const tail = true;",
+				"",
+			].join("\n"),
+		);
+
+		await expect(
+			editTool.execute("test-anchor-three-extra-before-close", {
+				path: testFile,
+				edits: [
+					{
+						oldText: [
+							"export function verify(proof: Proof) {",
+							"  return vdf.verify(challenge, 256, proof);",
+							"}",
+						].join("\n"),
+						newText: [
+							"export function verify(proof: Proof) {",
+							"  return vdf.verify(challenge, 256, proof);",
+							"}",
+						].join("\n"),
+					},
+				],
+			}),
+		).rejects.toThrow(/Could not find the exact text/);
+
+		const content = readFileSync(testFile, "utf-8");
+		expect(content).toContain("100");
+		expect(content).toContain("audit(proof);");
+		expect(content).not.toContain("256");
+		expect(content).toContain("const tail = true;");
+	});
+
 	it("does not replace a longer block from a three-line oldText with misaligned closing", async () => {
 		const testFile = join(testDir, "short-buttons.jsx");
 		const lines = ["const buttonsConfig = ["];
