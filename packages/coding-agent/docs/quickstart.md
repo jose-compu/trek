@@ -1,42 +1,29 @@
 # Quickstart
 
-This page gets you from install to a useful first pi session.
+This page gets you from install to a first `trek` session on **1.0.0-rc.5**. Coming from 0.20, read [Upgrade from 0.20](upgrade-1.0.md) first.
 
 ## Install
 
-Pi is distributed as an npm package:
+Download the GitHub release archive. `releases/latest` is the stable tag v0.20.8, not this candidate. `@trek/coding-agent` is not on npm.
 
 ```bash
-npm install -g --ignore-scripts @trek/coding-agent
+curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.5/trek-darwin-arm64.tar.gz
+tar -xzf trek.tar.gz
+export PATH="$PWD/trek:$PATH"
+trek --version
 ```
 
-`--ignore-scripts` disables dependency lifecycle scripts during install. Pi does not require install scripts for normal npm installs.
+Use `trek-darwin-x64.tar.gz`, `trek-linux-x64.tar.gz`, `trek-linux-arm64.tar.gz`, `trek-windows-x64.zip`, or `trek-windows-arm64.zip` for the other builds. The zip is unzipped and run as `trek.exe`.
 
 ### Uninstall
 
-Use the package manager that installed pi. The curl installer uses npm globally, so curl and npm installs are removed with npm:
+Delete the unpacked `trek/` directory and remove it from `PATH`. That leaves settings, credentials, sessions, and installed packages in `~/.trek/agent/`.
 
-```bash
-# curl installer or npm install -g
-npm uninstall -g @trek/coding-agent
-
-# pnpm
-pnpm remove -g @trek/coding-agent
-
-# Yarn
-yarn global remove @trek/coding-agent
-
-# Bun
-bun uninstall -g @trek/coding-agent
-```
-
-Uninstalling pi leaves settings, credentials, sessions, and installed pi packages in `~/.trek/agent/`.
-
-Then start pi in the project directory you want it to work on:
+Then start trek in the project directory you want it to work on:
 
 ```bash
 cd /path/to/project
-pi
+trek
 ```
 
 ## Authenticate
@@ -55,11 +42,11 @@ Then select a provider. Built-in subscription logins include Claude Pro/Max, Cha
 
 ### Option 2: API key
 
-Set an API key before launching pi:
+Set an API key before launching trek:
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
-pi
+trek
 ```
 
 You can also run `/login` and select an API-key provider to store the key in `~/.trek/agent/auth.json`.
@@ -68,24 +55,24 @@ See [Providers](providers.md) for all supported providers, environment variables
 
 ## First session
 
-Once pi starts, type a request and press Enter:
+Once trek starts, type a request and press Enter:
 
 ```text
 Summarize this repository and tell me how to run its checks.
 ```
 
-By default, pi gives the model four tools:
+By default, trek gives the model these built-in tools: `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`, `remember`, `recall`, and `forget`. The core four are:
 
 - `read` - read files
 - `write` - create or overwrite files
 - `edit` - patch files
 - `bash` - run shell commands
 
-Additional built-in read-only tools (`grep`, `find`, `ls`) are available through tool options. Pi runs in your current working directory and can modify files there. Use git or another checkpointing workflow if you want easy rollback.
+Trek runs in your current working directory and can modify files there. Use git or `trek revert` if you want a way back.
 
-## Give pi project instructions
+## Give trek project instructions
 
-Pi loads context files at startup. Add an `AGENTS.md` file to tell it how to work in a project:
+Trek loads context files at startup. Add an `AGENTS.md` file to tell it how to work in a project:
 
 ```markdown
 # Project Instructions
@@ -95,12 +82,12 @@ Pi loads context files at startup. Add an `AGENTS.md` file to tell it how to wor
 - Keep responses concise.
 ```
 
-Pi loads:
+Trek loads:
 
 - `~/.trek/agent/AGENTS.md` for global instructions
 - `AGENTS.md` or `CLAUDE.md` from parent directories and the current directory
 
-Restart pi, or run `/reload`, after changing context files.
+Restart trek, or run `/reload`, after changing context files.
 
 ## Common things to try
 
@@ -109,8 +96,8 @@ Restart pi, or run `/reload`, after changing context files.
 Type `@` in the editor to fuzzy-search files, or pass files on the command line:
 
 ```bash
-pi @README.md "Summarize this"
-pi @src/app.ts @src/app.test.ts "Review these together"
+trek @README.md "Summarize this"
+trek @src/app.ts @src/app.test.ts "Review these together"
 ```
 
 Images can be pasted with Ctrl+V (Alt+V on Windows) or dragged into supported terminals.
@@ -127,36 +114,36 @@ The command output is sent to the model. Use `!!command` to run a command withou
 
 ### Switch models
 
-Use `/model` or Ctrl+L to choose a model. Use Shift+Tab to cycle thinking level. Use Ctrl+P / Shift+Ctrl+P to cycle through scoped models.
+Use `/model` or Ctrl+L to open the model list. Use Shift+Tab to cycle thinking level. Ctrl+P cycles to the next model. Alt+P cycles to the previous model.
 
 ### Continue later
 
 Sessions are saved automatically:
 
 ```bash
-pi -c                  # Continue most recent session
-pi -r                  # Browse previous sessions
-pi --name "my task"    # Set session display name at startup
-pi --session <path|id> # Open a specific session
+trek -c                  # Continue most recent session
+trek -r                  # Browse previous sessions
+trek --name "my task"    # Set session display name at startup
+trek --session <path|id> # Open a specific session
 ```
 
-Inside pi, use `/resume`, `/new`, `/tree`, `/fork`, and `/clone` to manage sessions.
+Inside the session, use `/resume`, `/new`, `/tree`, `/fork`, and `/clone` to manage sessions.
 
 ### Non-interactive mode
 
 For one-shot prompts:
 
 ```bash
-pi -p "Summarize this codebase"
-cat README.md | pi -p "Summarize this text"
-pi -p @screenshot.png "What's in this image?"
+trek -p "Summarize this codebase"
+cat README.md | trek -p "Summarize this text"
+trek -p @screenshot.png "What's in this image?"
 ```
 
 Use `--mode json` for JSON event output or `--mode rpc` for process integration.
 
 ## Next steps
 
-- [Using Pi](usage.md) - interactive mode, slash commands, sessions, context files, and CLI reference.
+- [Using Trek](usage.md) - interactive mode, slash commands, sessions, context files, and CLI reference.
 - [Providers](providers.md) - authentication and model setup.
 - [Settings](settings.md) - global and project configuration.
 - [Keybindings](keybindings.md) - shortcuts and customization.

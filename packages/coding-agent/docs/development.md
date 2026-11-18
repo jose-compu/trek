@@ -1,38 +1,40 @@
 # Development
 
-See [AGENTS.md](https://github.com/earendil-works/pi-mono/blob/main/AGENTS.md) for additional guidelines.
+See [AGENTS.md](../../../AGENTS.md) in this repository.
 
 ## Setup
 
 ```bash
-git clone https://github.com/earendil-works/pi-mono
-cd pi-mono
+git clone https://github.com/jose-compu/trek
+cd trek
 npm install
 npm run build
 ```
 
+The 1.0 candidate line is `release-1-0-rc1`. The stable line is `release-0-20` (v0.20.8).
+
 Run from source:
 
 ```bash
-/path/to/pi-mono/trek-test.sh
+/path/to/trek/trek-test.sh
 ```
 
-The script can be run from any directory. Pi keeps the caller's current working directory.
+The script can be run from any directory. Trek keeps the caller's current working directory.
 
 ## Forking / Rebranding
 
-Configure via `package.json`:
+This package sets `trekConfig` in `package.json`. `piConfig` is only the fallback for a Pi plugin package that does not set `trekConfig`.
 
 ```json
 {
-  "piConfig": {
-    "name": "pi",
+  "trekConfig": {
+    "name": "trek",
     "configDir": ".trek"
   }
 }
 ```
 
-Change `name`, `configDir`, and `bin` field for your fork. Affects CLI banner, config paths, and environment variable names.
+`name` becomes the CLI banner and the debug-log file prefix. `configDir` is the project directory name.
 
 ## Path Resolution
 
@@ -46,11 +48,11 @@ import { getPackageDir, getThemeDir } from "./config.js";
 
 Never use `__dirname` directly for package assets.
 
-## Debug Command
+## Debug logs
 
-`/debug` (hidden) writes to `~/.trek/agent/trek-debug.log`:
-- Rendered TUI lines with ANSI codes
-- Last messages sent to the LLM
+`trek --debug` or `TREK_DEBUG=1` appends to `~/.trek/agent/trek-debug.log` through `debugLog`. Before a line is written, flag values for `--api-key`, `--api_key`, `--token`, `--access-token`, `--auth-token`, `--password`, and `--secret` are replaced with `[redacted]`, including the `--flag=value` form. The same pass replaces provider-shaped secrets (`sk-`, `sk-ant-`, `sk-or-v1-`, `xai-`, `ghp_`, `hf_`, `gsk_`, `csk-`, Bearer tokens) and object keys such as `api_key`, `authorization`, `password`, `secret`, and `token`.
+
+`/debug` is a different file. It overwrites `~/.trek/agent/trek-render-debug.log` with the rendered TUI lines and `JSON.stringify` of the session messages. That snapshot is not run through the redactor.
 
 ## Testing
 

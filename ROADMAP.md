@@ -1,8 +1,8 @@
 # Trek Agent — Implementation Roadmap
 
-**Status:** **0.20.4 current** (`v0.20.4`). Semantic memory + coding SE workflows shipped. **Next:** 0.21.0 Multilingual memory, then **1.0.0** Release (first RC: `v1.0.0-rc.1`).  
+**Status:** **1.0.0-rc.5** on `release-1-0-rc1` (merge `78a153e`). Stable line remains **0.20.8** on `release-0-20`. **Next:** final `v1.0.0` after the remaining ship gate. Multilingual memory (**0.21**) and the rest of the agentic bench (**1.1**) are post-1.0.  
 **Baseline:** `pi-original/` (Pi Coding Agent monorepo) → hard fork into `trek/` (independent repo)  
-**Versioning:** Stages through 0.20 are **minor** releases (`0.1.0` … `0.20.x`). **1.0.0** is the first **major** ship gate. Patch releases remain hotfixes within a stage. Pre-1.0 RCs use `1.0.0-rc.N` (GitHub release only; **no npm** until an explicit later decision).  
+**Versioning:** Stages through 0.20 are **minor** releases (`0.1.0` … `0.20.x`). **1.0.0** is the first **major** ship gate. Patch releases remain hotfixes within a stage. Release candidates use `1.0.0-rc.N` (GitHub prerelease only; **no npm** until an explicit later decision).  
 **Sources:** `PROMPT.md`, `SPECS_SAFETY_HARNESS.md` (safety harness), `SPECS_REFLECTIVE_AGENT.md` (reflective loop). **Canonical agent cycle:** `Observe → Intend → Act → Reflect` (O→I→A→R). The safety spec’s Plan→Act→Reflect maps to the same loop with **Plan = Intend** and **Observe** mandatory upfront — not a separate P→A→R stack.
 
 ---
@@ -62,9 +62,9 @@
 | **0.5.0** | Undo | `.trek` versioning, git undo, reversibility tiers | 0.4.0 | **Done** (`v0.5.0`, patch `v0.5.1`) |
 | **0.6.0** | Trace | Full trace log, session tree, Telegram remote (DM + Groups) | 0.5.1 | **Done** (`v0.6.0`) |
 | **0.7.0** | Audit | Determinism policy, seed logging, reproducibility modes | 0.6.0 | **Done** (`v0.7.0`) |
-| **0.8.0** | Runtime | API-first hierarchy; opt-in llama.cpp; Mistral local suite | 0.7.0 | In progress |
-| **0.9.0** | Routing | Per-component model assignment, effort regulator, DF branch | 0.8.0 | Planned |
-| **0.10.0** | Algebra | cpa-agents integration, parallel ops, inversion | 0.9.0 | Planned |
+| **0.8.0** | Runtime | API-first hierarchy; opt-in llama.cpp; Mistral local suite | 0.7.0 | **Done** (`v0.8.0`, patch `v0.8.1`) |
+| **0.9.0** | Routing | Per-component model assignment, effort regulator, DF branch | 0.8.0 | **Done** (`v0.9.0`, patch `v0.9.1`) |
+| **0.10.0** | Algebra | cpa-agents integration, parallel ops, inversion | 0.9.0 | **Done** (`v0.10.0`, patches `v0.10.1`–`v0.10.3`) |
 | **0.11.0** | Memory | LogosDB 3-layer memory, incremental indexing | 0.8.0, 0.9.0 | **Done** (`v0.11.0`) |
 | **0.12.0** | Domains | Auto-detect work domain and workflow per task context | 0.9.0, 0.11.0 | **Done** (`v0.12.0`) |
 | **0.13.0** | Guardrails+ | Advanced safety (curiosity, modes, anti-patterns) | 0.4.0, 0.9.0 | **Done** (`v0.13.0`, patch `v0.13.1`) |
@@ -74,10 +74,10 @@
 | **0.17.0** | Performance | At least 2× on every module / turn; compact console (tools + thinking) | 0.16.0 | **Done** (`v0.17.0`) |
 | **0.18.0** | Layering | Optional stack; two child epics: domain workflows × layering, self-improving × layering | 0.10.0, 0.12.0, 0.15.0, 0.16.0, 0.17.0 | **Done** (`v0.18.0`) |
 | **0.19.0** | CLI power tools | Scripted `ex`/`vim -Es`/`ed`/`sed`, plus fast Unix tools; Scripts layer uses them with no model | 0.10.0, 0.16.0, 0.17.0, 0.18.0 | **Done** (`v0.19.0`) |
-| **0.20.0** | Semantic Memory | Index the working repo and docs in LogosDB; smart/advanced chunking; retrieve related code and docs that `grep` / bash cannot find. Coding domain gains SE workflows (issue → PR → **Belay** → merge; split epics/issues) | 0.11.0, 0.12.0, 0.16.0, 0.18.0 | **Done** (`v0.20.0` … `v0.20.4`) |
-| **0.21.0** | Multilingual memory | Multilingual / longer-context embeddings (e5-small, multilingual MiniLM); optional embedder switch without corrupting MiniLM indexes | 0.20.0 | Planned |
-| **1.0.0** | Release | Major ship gate: test suites (static unit + local e2e), packages, HF download, cheatsheet, install docs. First RC: `v1.0.0-rc.1` (GitHub only; no npm) | All prior (0.21 optional for RC1) | In progress (`release-1-0-rc1`) |
-| **1.1.0** | Agentic benchmark | Scored tool-using tasks plus a confirm-gated lesson loop so Trek can be optimized against the score. Faux pack is the CI gate. Not `trek models benchmark` (tokens/s) | 1.0.0, 0.14.0, 0.15.0 | Planned |
+| **0.20.0** | Semantic Memory | Index the working repo and docs in LogosDB; smart/advanced chunking; retrieve related code and docs that `grep` / bash cannot find. Coding domain gains SE workflows (issue → PR → **Belay** → merge; split epics/issues) | 0.11.0, 0.12.0, 0.16.0, 0.18.0 | **Done** (`v0.20.0` … `v0.20.8` on `release-0-20`) |
+| **0.21.0** | Multilingual memory | Multilingual / longer-context embeddings (e5-small, multilingual MiniLM); optional embedder switch without corrupting MiniLM indexes | 0.20.0 | Post-1.0 |
+| **1.0.0** | Release | Major ship gate. RC line through `v1.0.0-rc.5`: science catalog, `trek bench` slice, debug-log redaction, named-file tool loop, three-line `edit` anchor. Final tag not cut. No npm | All prior (0.21 is post-1.0) | **RC** (`v1.0.0-rc.5`) |
+| **1.1.0** | Agentic benchmark | Scored tool-using tasks plus a confirm-gated lesson loop. Faux pack is the CI gate. Not `trek models benchmark` (tokens/s). An rc.4 slice of `trek bench run` already ships | 1.0.0, 0.14.0, 0.15.0 | Post-1.0 (slice in rc.4) |
 
 **Note:** Three-layer memory shipped in `v0.11.0` (also in `v0.10.1`–`v0.10.3`). **0.20.0** is the working-tree + docs semantic index: related files that do not share tokens with the query. **0.21.0** keeps English MiniLM as default and adds selectable multilingual embedders. **1.0.0** was formerly roadmap **0.21.0 Release** / GitHub **v0.22.0 Major Release**. Domain and workflow are detected again for every task context. A session menu does not choose them.
 
@@ -1582,39 +1582,36 @@ Use an advanced field **when it helps**. Do not paste nodes. Do not invent a sec
 
 **Goal:** Shippable installable packages (PROMPT §14–16, §18). First **major** line. Formerly roadmap 0.21.0 Release / GitHub v0.22.0 Major Release.
 
-**Tracking:** [v1.0.0 milestone](https://github.com/jose-compu/trek/milestone/12) · branch `release-1-0-rc1`.
+**Tracking:** [v1.0.0 milestone](https://github.com/jose-compu/trek/milestone/12) · branch `release-1-0-rc1` · current tag `v1.0.0-rc.5`.
 
-**Scope**
-- **Unit tests:** static LLM fixtures (canned inputs/outputs); no network; fast CI.
-- **E2E tests:** local models only; optional CI job with downloaded weights.
-- **CLI test harness:** batch files + exit codes in CI.
-- **Packages:** GitHub binary releases first; install script. **npm stays off** until an explicit later decision (`publish-npm` remains disabled).
-- **HF API key** flow for model download on first `trek models pull`.
-- **Pi plugin compatibility** regression suite.
-- Documentation: install, config, determinism honesty, model suites, 0.18 layering, 0.19 CLI tools, 0.20 semantic memory, optional 0.21 multilingual.
-- **Cheatsheet:** one poster for the session a person actually runs. Source `trek/assets/cheatsheet.html`. Image `trek/assets/cheatsheet-1.0.png`. Ships with release notes and README. `/hotkeys` stays the full binding table.
+#### Shipped on the release-candidate line (through rc.5)
 
-#### RC1 plan (`v1.0.0-rc.1`)
+Verified against the tree at `78a153e` and the package changelogs. This is not a `## [1.0.0]` changelog section.
 
-Ship a GitHub prerelease only. Do **not** publish npm. Do **not** tag until the RC1 checklist below is green on `release-1-0-rc1`.
+- **rc.1.** Lockstep package version `1.0.0-rc.1`. Roadmap Release stage is 1.0.0. Multilingual memory stays 0.21.
+- **rc.2.** `trek --debug` / `TREK_DEBUG` redacts `--api-key` and similar flags, provider-shaped secrets, and secret object keys before appending `~/.trek/agent/trek-debug.log`.
+- **rc.3.** Science domain catalog: `method-check` plus twelve LaTeX / review / slides / poster workflows under `packages/coding-agent/domains/science/`.
+- **rc.4.** `trek bench run [--live]` with profiles `same`, `climb`, and `fan`. An explicit write or edit of a named file stays on the tool loop (`selectDomain` returns none). No planning brief when Planning and Workhorse are the same model id and provider. A one-shot shell request is classed as Act. xAI catalog id `grok-4.1-fast` (`packages/ai`).
+- **rc.5.** A three-line `edit` applies when the first line is unique and the third line is two file lines below it, even if the middle line differs. A shorter snippet still cannot replace a longer block. The 0.20.7 case (one blank line between those anchors, third line three file lines below) is on `v0.20.8` and is not in this RC.
 
-| Track | RC1 deliverable |
-|---|---|
-| **Identity** | Lockstep packages at `1.0.0-rc.1`; README / CHANGELOG / ROADMAP say 1.0 RC1; GitHub milestone `v1.0.0`. |
-| **Tests** | Confirm unit suite stays under ~2 min in CI; add or tighten one install/`trek --version` smoke path used by the release workflow. |
-| **Docs** | Install + determinism honesty pages current for 0.20 features; ROADMAP 1.0 section authoritative. |
-| **Cheatsheet** | Update `cheatsheet.html` for 1.0 commands; render `cheatsheet-1.0.png` (or ship HTML-only in RC1 if image lag). |
-| **Packaging** | Tag `v1.0.0-rc.1` when ready → `build-binaries.yml` GitHub prerelease assets; keep `publish-npm: if: false`. |
-| **Explicitly deferred** | Full HF pull UX polish; multilingual 0.21; npm; final `v1.0.0` (no `-rc`). |
+GitHub release `v1.0.0-rc.5` exists, is marked prerelease, and has six archive assets. `@trek/coding-agent` is not on the npm registry. `publish-npm` remains `if: false`.
 
-**Test gate (full 1.0.0)**
-- [ ] Unit suite < 2 min CI.
-- [ ] E2E smoke with mocked local server passes.
-- [ ] Fresh install script on clean VM produces working `trek --version`.
-- [ ] Public Pi plugin sample installs and runs.
-- [ ] `trek/assets/cheatsheet-1.0.png` matches `cheatsheet.html`, and every command on it exists.
-- [ ] `v1.0.0-rc.1` GitHub prerelease assets install and report `1.0.0-rc.1` (RC1).
-- [ ] Final `v1.0.0` tag only after RC feedback; still no npm unless decided.
+#### Still required before the final `v1.0.0` tag
+
+- [ ] Unit suite timing and an install / `trek --version` smoke on the release branch (daily CI checks out `main`).
+- [ ] E2E smoke with a mocked local server.
+- [ ] Fresh install script on a clean machine produces a working `trek --version`.
+- [ ] A public Pi plugin sample installs and runs.
+- [ ] `assets/cheatsheet-1.0.png` matches `assets/cheatsheet.html`. The tree still has `assets/cheatsheet-0.18.png`.
+- [ ] Port the 0.20.7 blank-line `edit` anchor (`2c7c2db`) so 1.0 is not behind `v0.20.8`.
+- [ ] `build-binaries.yml` passes `--prerelease` for tags that contain `-rc`.
+- [ ] Final `v1.0.0` tag only after that gate. No npm unless decided.
+
+#### Post-1.0
+
+- **0.21.0** multilingual embeddings ([#289](https://github.com/jose-compu/trek/issues/289)). Not required for the 1.0 tag.
+- **1.1.0** faux bench CI gate, confirm-gated lesson loop, and locked baseline ([#292](https://github.com/jose-compu/trek/issues/292)–[#298](https://github.com/jose-compu/trek/issues/298)). The rc.4 CLI slice is the part that shipped.
+- npm publish, HF download polish, and Archon fields that are still unchecked under 0.20-F.
 
 ---
 
@@ -1634,7 +1631,7 @@ Ship a GitHub prerelease only. Do **not** publish npm. Do **not** tag until the 
 
 **Out of scope:** weight training; full SWE-bench in default CI; unattended prompt search; weakening laws to raise the score; npm.
 
-**1.0.0-rc.4 slice:** `trek bench` pack plus a live same-model single vs auto run. Full faux CI gate is still 1.1.
+**1.0.0-rc.4 slice (shipped, not the 1.1 gate):** `trek bench run` lists the pack offline. `--live` scores it on xAI. Profiles: `same` (`grok-4.3` on every role), `climb` (floor `grok-4.20-0309-non-reasoning` vs that floor plus `grok-4.7` on Planning and Frontier), `fan` (`grok-4.7` plans; Workhorse is `grok-4.20-0309-non-reasoning` and `spawn_branches` is the `fan-headings` case). Full faux CI gate, confirm-gated lessons, and a locked baseline stay 1.1.
 
 **Test gate**
 - [ ] Faux pack runs with no network.
@@ -1847,7 +1844,8 @@ flowchart TD
 | Release | Tag | Notes |
 |---|---|---|
 | **0.1.0** … **0.19.x** | see tags | Genesis through CLI power tools |
-| **0.20.0** Semantic Memory | `v0.20.0` … `v0.20.4` | LogosDB repo/docs index, coding SE DAGs, OpenRouter free default, CLI model pin |
+| **0.20.0** Semantic Memory | `v0.20.0` … `v0.20.8` | LogosDB repo/docs index, coding SE DAGs, OpenRouter free default, CLI model pin. Stable branch `release-0-20` |
+| **1.0.0-rc.5** | `v1.0.0-rc.1` … `v1.0.0-rc.5` | Science catalog, `trek bench` slice, debug-log redaction, named-file tool loop, three-line `edit` anchor. Final `v1.0.0` not tagged |
 
 Run from `trek/`:
 
@@ -1860,12 +1858,10 @@ npx trek --debug                  # runtime log → ~/.trek/agent/trek-debug.log
 tail -f ~/.trek/agent/trek-debug.log   # watch debug in another terminal
 ```
 
-### Next: 1.0.0-rc.1
+### Next: final `v1.0.0`
 
-Branch `release-1-0-rc1`. Remap complete: Release stage is **1.0.0**; multilingual stays **0.21.0**. Tag `v1.0.0-rc.1` and open a GitHub **prerelease** when the RC1 checklist is green. **No npm.**
-
-**Estimated effort:** 1–2 weeks for RC1; final 1.0.0 after feedback.
+Branch `release-1-0-rc1` is at **v1.0.0-rc.5**. The remaining ship gate is in §1.0.0 above. Multilingual memory stays **0.21.0**. The rest of the agentic bench stays **1.1.0**. **No npm** until an explicit decision.
 
 ---
 
-*Roadmap last synced with `trek/` at **v0.20.4** / **1.0.0-rc.1** prep.*
+*Roadmap last synced with `trek/` at **v1.0.0-rc.5** (`78a153e`). Stable line **v0.20.8**.*

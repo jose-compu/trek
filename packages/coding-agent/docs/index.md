@@ -1,45 +1,30 @@
-# Pi Documentation
+# Trek documentation
 
-Pi is a minimal terminal coding harness. It is designed to stay small at the core while being extended through TypeScript extensions, skills, prompt templates, themes, and pi packages.
+Trek **1.0.0-rc.5** is a GitHub prerelease of the terminal coding agent. The binary is `trek`. The stable tag is **0.20.8**. `@trek/coding-agent` is not on the npm registry, and `https://pi.dev/install.sh` does not install this release.
 
 ## Quick start
 
-Install Pi with npm:
+Download the archive for this candidate. `releases/latest` is v0.20.8.
 
 ```bash
-npm install -g --ignore-scripts @trek/coding-agent
+curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.5/trek-darwin-arm64.tar.gz
+tar -xzf trek.tar.gz
+export PATH="$PWD/trek:$PATH"
+cd /path/to/your/project
+trek
 ```
 
-`--ignore-scripts` disables dependency lifecycle scripts during install. Pi does not require install scripts for normal npm installs.
+Swap the archive name for your machine (`trek-darwin-x64`, `trek-linux-x64`, `trek-linux-arm64`, `trek-windows-x64.zip`, `trek-windows-arm64.zip`). From a checkout: `npm install`, `npm run build`, `npx trek`.
 
-On Linux or macOS, you can also use the installer:
+Authenticate with `/login`, or set an API key such as `ANTHROPIC_API_KEY` before starting `trek`.
 
-```bash
-curl -fsSL https://pi.dev/install.sh | sh
-```
-
-To uninstall pi itself, use npm for curl and npm installs:
-
-```bash
-npm uninstall -g @trek/coding-agent
-```
-
-For pnpm, Yarn, or Bun installs, use the matching global remove command: `pnpm remove -g @trek/coding-agent`, `yarn global remove @trek/coding-agent`, or `bun uninstall -g @trek/coding-agent`.
-
-Then run it in a project directory:
-
-```bash
-pi
-```
-
-Authenticate with `/login` for subscription providers, or set an API key such as `ANTHROPIC_API_KEY` before starting pi.
-
-For the full first-run flow, see [Quickstart](quickstart.md).
+Moving from 0.20: [Upgrade to 1.0.0-rc.5](upgrade-1.0.md). First-run detail: [Quickstart](quickstart.md). Pages below sometimes say `pi` for the upstream harness. The command in this distribution is `trek`.
 
 ## Start here
 
 - [Quickstart](quickstart.md) - install, authenticate, and run a first session.
-- [Using Pi](usage.md) - interactive mode, slash commands, context files, domains, and the CLI reference.
+- [Upgrade from 0.20](upgrade-1.0.md) - what 1.0.0-rc.5 changes, and what it does not.
+- [Using Trek](usage.md) - interactive mode, slash commands, context files, domains, and the CLI reference.
 - [Providers](providers.md) - subscription and API-key setup for built-in providers.
 - [Containerization](containerization.md) - sandbox pi with OpenShell, Gondolin, or Docker.
 - [Settings](settings.md) - global and project settings.

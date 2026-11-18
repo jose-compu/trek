@@ -16,14 +16,18 @@ pkg update && pkg upgrade
 # Install dependencies
 pkg install nodejs termux-api git
 
-# Install pi
-npm install -g --ignore-scripts @trek/coding-agent
+# @trek/coding-agent is not on npm. 1.0.0-rc.5 has no Termux archive.
+# Build from a checkout instead:
+git clone https://github.com/jose-compu/trek
+cd trek
+npm install
+npm run build
 
 # Create config directory
 mkdir -p ~/.trek/agent
 
-# Run pi
-pi
+# Run trek
+npx trek
 ```
 
 ## Clipboard Support

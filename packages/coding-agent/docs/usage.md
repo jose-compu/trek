@@ -1,4 +1,4 @@
-# Using Pi
+# Using Trek
 
 This page collects day-to-day usage details that do not fit on the quickstart page.
 
@@ -61,7 +61,7 @@ Type `/` in the editor to open command completion. Extensions can register custo
 | `/memory remove <path>` | Drop that path from the index |
 | `/tools unix` | PATH probe for the Unix kit. Missing optional tools skip; nothing is downloaded |
 | `/recipes [tool]` | List checked-in Unix recipes. Optional sg/mlr skip when missing |
-| `/quit` | Quit pi |
+| `/quit` | Quit trek |
 
 ## Message Queue
 
@@ -72,7 +72,7 @@ You can submit messages while the agent is still working:
 - **Escape** aborts and restores queued messages to the editor.
 - **Alt+Up** retrieves queued messages back to the editor.
 
-On Windows Terminal, Alt+Enter is fullscreen by default. Remap it as described in [Terminal setup](terminal-setup.md) if you want pi to receive the shortcut.
+On Windows Terminal, Alt+Enter is fullscreen by default. Remap it as described in [Terminal setup](terminal-setup.md) if you want trek to receive the shortcut.
 
 Configure delivery in [Settings](settings.md) with `steeringMode` and `followUpMode`.
 
@@ -81,12 +81,12 @@ Configure delivery in [Settings](settings.md) with `steeringMode` and `followUpM
 Sessions are saved automatically to `~/.trek/agent/sessions/`, organized by working directory.
 
 ```bash
-pi -c                  # Continue most recent session
-pi -r                  # Browse and select a session
-pi --no-session        # Ephemeral mode; do not save
-pi --name "my task"    # Set session display name at startup
-pi --session <path|id> # Use a specific session file or session ID
-pi --fork <path|id>    # Fork a session into a new session file
+trek -c                  # Continue most recent session
+trek -r                  # Browse and select a session
+trek --no-session        # Ephemeral mode; do not save
+trek --name "my task"    # Set session display name at startup
+trek --session <path|id> # Use a specific session file or session ID
+trek --fork <path|id>    # Fork a session into a new session file
 ```
 
 Useful session commands:
@@ -113,7 +113,7 @@ Use context files for project conventions, commands, safety rules, and preferenc
 
 Replace the default system prompt with:
 
-- `.pi/SYSTEM.md` for a project
+- `.trek/SYSTEM.md` for a project
 - `~/.trek/agent/SYSTEM.md` globally
 
 Append to the default prompt without replacing it with `APPEND_SYSTEM.md` in either location.
@@ -129,24 +129,24 @@ If you use pi for open source work and want to publish sessions for model, promp
 ## CLI Reference
 
 ```bash
-pi [options] [@files...] [messages...]
+trek [options] [@files...] [messages...]
 ```
 
 ### Package Commands
 
 ```bash
-pi install <source> [-l]     # Install package, -l for project-local
-pi remove <source> [-l]      # Remove package
-pi uninstall <source> [-l]   # Alias for remove
-pi update [source|self|pi]   # Update pi and packages; reconcile pinned git refs
-pi update --extensions       # Update packages only; reconcile pinned git refs
-pi update --self             # Update pi only
-pi update --extension <src>  # Update one package
-pi list                      # List installed packages
-pi config                    # Enable/disable package resources
+trek install <source> [-l]     # Install package, -l for project-local
+trek remove <source> [-l]      # Remove package
+trek uninstall <source> [-l]   # Alias for remove
+trek update [source|self|pi]   # Update trek and packages; `pi` is the self alias
+trek update --extensions       # Update packages only; reconcile pinned git refs
+trek update --self             # Update trek only
+trek update --extension <src>  # Update one package
+trek list                      # List installed packages
+trek config                    # Enable/disable package resources
 ```
 
-These commands manage pi packages, not the pi CLI installation. To uninstall pi itself, see [Quickstart](quickstart.md#uninstall).
+These commands manage trek packages, not the unpacked GitHub archive. To remove that archive, see [Quickstart](quickstart.md#uninstall). `trek update pi` is the self alias (`source === "pi"`).
 
 See [Pi Packages](packages.md) for package sources and security notes.
 
@@ -160,10 +160,10 @@ See [Pi Packages](packages.md) for package sources and security notes.
 | `--mode rpc` | RPC mode over stdin/stdout; see [RPC mode](rpc.md) |
 | `--export <in> [out]` | Export a session to HTML |
 
-In print mode, pi also reads piped stdin and merges it into the initial prompt:
+In print mode, trek also reads piped stdin and merges it into the initial prompt:
 
 ```bash
-cat README.md | pi -p "Summarize this text"
+cat README.md | trek -p "Summarize this text"
 ```
 
 ### Model Options
@@ -200,6 +200,8 @@ cat README.md | pi -p "Summarize this text"
 
 Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`, `remember`, `recall`, `forget`.
 
+A three-line `edit` applies when the first non-empty line is unique, that line's match key is at least 12 characters, and the third non-empty line is exactly two file lines below the first. The middle line may differ. Match keys trim a leading indent, collapse repeated spaces, and treat `'` as `"`. Empty lines are not counted, so a blank line inside `oldText` is not one of the three. This candidate does not accept the 0.20.7 case where a blank line in the file pushes the third line one row further down. A shorter snippet still cannot replace a longer block. See [Upgrade from 0.20](upgrade-1.0.md).
+
 ### Memory
 
 | Option | Description |
@@ -214,13 +216,17 @@ See [Memory](memory.md). Lessons and skills are in [Learning](learning.md).
 
 ### Learning
 
-`spawn_branches` runs up to four independent subtasks at once. Each branch has the same tools, laws, and operator mode. The first branch to write a path owns it for that spawn. `gather` returns the summaries in the order given.
+`spawn_branches` runs up to four independent subtasks at once. Each branch has the same tools, laws, and operator mode. The first branch to write a path owns it for that spawn. `gather` returns the summaries in the order given. The bench task `fan-headings` asks for one `spawn_branches` call, one branch per file, and no edit in the parent turn. With `--profile fan --lever auto`, Planning is `grok-4.7` and `spawn_branches` uses the Workhorse id `grok-4.20-0309-non-reasoning` when that role is a different API model. `--lever single` stays on `grok-4.7`.
 
 A failed turn, or a correction, stores one lesson in project memory. The Frontier model, or Planning when Frontier is not assigned, picks up to five lessons for the next prompt. `/crystallize <id>` turns one lesson into a skill only after you confirm. `/lessons` lists them. `/crystallize remove <id>` takes the skill back and keeps the file under `history/`.
 
 ### Domains
 
 `trek domains` lists the twenty initial domains. Meta, AI, Security, and Engineering stay on. `trek domains disable <id>` removes another domain from the next turn. `trek domains add <id> <file.yaml>` copies an Archon workflow into `.trek/domains/` and leaves it disabled until `trek domains enable`.
+
+A prompt that says write, edit, update, or replace and names a file with an extension (within 80 characters of that verb) does not enter a domain workflow. The same is true for fix, push, blocked, unblock, and "what is happening" / "what happened". `selectDomain` returns none and the tool loop runs. A "write result.txt" turn that only mentioned a p-value is not held as science `method-check`.
+
+Science is one of the sixteen domains that can be turned off. It ships `method-check` plus `write-paper`, `review-paper-coauthor`, `review-paper-referee`, `respond-to-reviews`, `write-rebuttal`, `generate-slides`, `generate-poster`, `polish-bibtex`, `check-latex-build`, `figure-pass`, `extract-claims`, and `write-abstract`. Phrases that select each file are in `domains/science/domain.json`. Leakage and train/test-split fact holds apply only when the workflow is `method-check`. A `write-paper` outline node has an empty tool list. Its draft node may `read`, `edit`, and `write`.
 
 `trek workflows show <id>` prints the YAML. `trek workflows run <id>` runs that workflow for this command. The next prompt detects a domain again. A `SKILL.md` file is not a workflow. Coding action nodes run bash (and read/edit/write where needed); they do not only print commands.
 
@@ -233,6 +239,16 @@ In a session, `/domains` lists each domain, whether it is on, every workflow nam
 A prompt can create a domain workflow, add a workflow to an existing domain, edit one, or restore the previous version. `create a domain workflow for warehouse: ...` writes `.trek/domains/warehouse/` and leaves it off until `/domains enable warehouse`. `add a workflow called ship-hotfix to the coding domain: ...` appends that DAG under `.trek/domains/coding/`. `edit the finance workflow: ...` keeps the previous YAML under `.trek/domains/finance/history/` and replaces the live file. `restore the finance workflow` goes back one version. A bundled workflow is copied into that history first, so the package file stays as it shipped. If the prompt does not say what to write, Trek asks once. Stop leaves the file unwritten.
 
 Lesson types (categories) are editable with `/patterns edit <id> categories add|remove <name>` or a prompt such as `add lesson category flaky-test to coding`.
+
+### Bench
+
+`trek bench run` lists the checked-in task pack and does not call a model. `trek bench run --live` scores that pack on xAI. It needs `XAI_API_KEY`, or a `.env` in the working directory. This is not `trek models benchmark` (tokens per second).
+
+```text
+trek bench run [--live] [--lever single|auto|both] [--profile same|climb|fan] [--task id] [--timeout ms] [--out file]
+```
+
+`--lever` defaults to `both`. `--profile` defaults to `same`, which puts `grok-4.3` on every role. `climb` compares `grok-4.20-0309-non-reasoning` alone with that floor plus `grok-4.7` on Planning and Frontier. `fan` compares `grok-4.7` alone (`--lever single`) with `grok-4.7` on Planning and Frontier and `grok-4.20-0309-non-reasoning` on Workhorse (`--lever auto`). On that auto lever, `spawn_branches` uses the Workhorse model. `--timeout` defaults to 120000. The pack ids are `fan-headings`, `fix-sign`, `ic-mkdir`, `ic-sum`, `ic-trim`, `ic-seq`, `no-invent`, `overplan-fix`, `rules-win`, and `skip-secret`. Each live task prints `success`, `honesty`, `safety`, and `budget`.
 
 ### Operator modes
 
@@ -277,7 +293,7 @@ On Telegram, `safe_mode` `owner_and_guest` with `owner_user_ids` splits the allo
 Combine `--no-*` with explicit flags to load exactly what you need, ignoring settings. Example:
 
 ```bash
-pi --no-extensions -e ./my-extension.ts
+trek --no-extensions -e ./my-extension.ts
 ```
 
 ### Other Options
@@ -295,43 +311,43 @@ pi --no-extensions -e ./my-extension.ts
 Prefix files with `@` to include them in the message:
 
 ```bash
-pi @prompt.md "Answer this"
-pi -p @screenshot.png "What's in this image?"
-pi @code.ts @test.ts "Review these files"
+trek @prompt.md "Answer this"
+trek -p @screenshot.png "What's in this image?"
+trek @code.ts @test.ts "Review these files"
 ```
 
 ### Examples
 
 ```bash
 # Interactive with initial prompt
-pi "List all .ts files in src/"
+trek "List all .ts files in src/"
 
 # Non-interactive
-pi -p "Summarize this codebase"
+trek -p "Summarize this codebase"
 
 # Non-interactive with piped stdin
-cat README.md | pi -p "Summarize this text"
+cat README.md | trek -p "Summarize this text"
 
 # Named one-shot session
-pi --name "release audit" -p "Audit this repository"
+trek --name "release audit" -p "Audit this repository"
 
 # Different model
-pi --provider openai --model gpt-4o "Help me refactor"
+trek --provider openai --model gpt-4o "Help me refactor"
 
 # Model with provider prefix
-pi --model openai/gpt-4o "Help me refactor"
+trek --model openai/gpt-4o "Help me refactor"
 
 # Model with thinking level shorthand
-pi --model sonnet:high "Solve this complex problem"
+trek --model sonnet:high "Solve this complex problem"
 
 # Limit model cycling
-pi --models "claude-*,gpt-4o"
+trek --models "claude-*,gpt-4o"
 
 # Read-only mode
-pi --tools read,grep,find,ls -p "Review the code"
+trek --tools read,grep,find,ls -p "Review the code"
 
 # Disable one extension or built-in tool while keeping the rest available
-pi --exclude-tools ask_question
+trek --exclude-tools ask_question
 ```
 
 ### Environment Variables

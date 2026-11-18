@@ -12,8 +12,28 @@
           "path": "quickstart.md"
         },
         {
-          "title": "Using Pi",
+          "title": "Upgrade from 0.20",
+          "path": "upgrade-1.0.md"
+        },
+        {
+          "title": "Using Trek",
           "path": "usage.md"
+        },
+        {
+          "title": "Memory",
+          "path": "memory.md"
+        },
+        {
+          "title": "Learning",
+          "path": "learning.md"
+        },
+        {
+          "title": "Hierarchy",
+          "path": "hierarchy.md"
+        },
+        {
+          "title": "Operator modes",
+          "path": "operator-modes.md"
         },
         {
           "title": "Providers",

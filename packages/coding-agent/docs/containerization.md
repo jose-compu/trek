@@ -67,7 +67,7 @@ Run from the project you want mounted:
 
 ```bash
 cd /path/to/project
-pi -e ~/.trek/agent/extensions/gondolin
+trek -e ~/.trek/agent/extensions/gondolin
 ```
 
 The extension mounts the host cwd at `/workspace` in the VM and overrides `read`, `write`, `edit`, `bash`, `grep`, `find`, and `ls`.
@@ -78,32 +78,35 @@ Requirements: Node.js >= 23.6.0 for `@earendil-works/gondolin`, plus QEMU (requi
 
 ## Plain Docker
 
-Run the whole `pi` process in Docker when you want the simplest local container boundary.
+Run the `trek` process in Docker when you want the simplest local container boundary.
 
-`Dockerfile.pi`:
+`Dockerfile.trek` for the 1.0.0-rc.5 Linux x64 archive. `@trek/coding-agent` is not on npm, and the package bin is `trek`.
 
 ```dockerfile
-FROM node:24-bookworm-slim
+FROM debian:bookworm-slim
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates git ripgrep \
-  && rm -rf /var/lib/apt/lists/*
-RUN npm install -g --ignore-scripts @trek/coding-agent
+  && apt-get install -y --no-install-recommends bash ca-certificates curl tar \
+  && rm -rf /var/lib/apt/lists/* \
+  && curl -fsSL -o /tmp/trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.5/trek-linux-x64.tar.gz \
+  && tar -xzf /tmp/trek.tar.gz -C /opt \
+  && ln -s /opt/trek/trek /usr/local/bin/trek \
+  && rm /tmp/trek.tar.gz
 
 WORKDIR /workspace
-ENTRYPOINT ["pi"]
+ENTRYPOINT ["trek"]
 ```
 
 Build and run:
 
 ```bash
-docker build -t pi-sandbox -f Dockerfile.pi .
+docker build -t trek-sandbox -f Dockerfile.trek .
 
 docker run --rm -it \
   -e ANTHROPIC_API_KEY \
   -v "$PWD:/workspace" \
-  -v pi-agent-home:/root/.trek/agent \
-  pi-sandbox
+  -v trek-agent-home:/root/.trek/agent \
+  trek-sandbox
 ```
 
 The `-v "$PWD:/workspace"` mounts your current directory into the container at /workspace such that reads and writes in `/workspace` inside Docker directly affect your host files, like in the Gondolin example.
