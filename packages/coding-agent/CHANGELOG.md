@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [1.0.0-rc.5] - 2026-11-18
+
+### Fixed
+
+- A three-line `edit` applies when the first line is unique and the third line is two lines below it, even if the middle line has drifted. A shorter snippet still cannot replace a longer block.
+
 ## [1.0.0-rc.4] - 2026-11-16
 
 ### Added

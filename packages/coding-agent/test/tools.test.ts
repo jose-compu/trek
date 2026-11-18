@@ -1167,6 +1167,111 @@ describe("edit tool fuzzy matching", () => {
 		expect(content).toContain("export function App()");
 	});
 
+	it("replaces a three-line block when the middle line has drifted", async () => {
+		const testFile = join(testDir, "verify.ts");
+		writeFileSync(
+			testFile,
+			[
+				"export function verify(proof: Proof) {",
+				"  return vdf.verify(challenge, 100, proof);",
+				"}",
+				"const tail = true;",
+				"",
+			].join("\n"),
+		);
+
+		const result = await editTool.execute("test-anchor-three-lines", {
+			path: testFile,
+			edits: [
+				{
+					oldText: [
+						"export function verify(proof: Proof) {",
+						"  return vdf.verify(challenge, 256, proof);",
+						"}",
+					].join("\n"),
+					newText: [
+						"export function verify(proof: Proof) {",
+						"  return vdf.verify(challenge, 256, proof);",
+						"}",
+					].join("\n"),
+				},
+			],
+		});
+
+		expect(getTextOutput(result)).toContain("Successfully replaced");
+		const content = readFileSync(testFile, "utf-8");
+		expect(content).toContain("256");
+		expect(content).not.toContain("100");
+		expect(content).toContain("const tail = true;");
+	});
+
+	it("does not replace a longer block from a three-line oldText with misaligned closing", async () => {
+		const testFile = join(testDir, "short-buttons.jsx");
+		const lines = ["const buttonsConfig = ["];
+		for (let i = 0; i < 16; i++) {
+			lines.push(`  { label: '${i}', pos: [0, 0, 0] },`);
+		}
+		lines.push("];", "const tail = true;", "");
+		writeFileSync(testFile, lines.join("\n"));
+
+		await expect(
+			editTool.execute("test-anchor-three-misaligned", {
+				path: testFile,
+				edits: [
+					{
+						oldText: ["const buttonsConfig = [", "  { label: '0', pos: [1, 1, 1] },", "];"].join("\n"),
+						newText: "const buttonsConfig = [];",
+					},
+				],
+			}),
+		).rejects.toThrow(/Could not find the exact text/);
+
+		const content = readFileSync(testFile, "utf-8");
+		expect(content).toContain("label: '15'");
+		expect(content).toContain("const tail = true;");
+	});
+
+	it("does not replace a three-line block when the first line is repeated", async () => {
+		const testFile = join(testDir, "dup-verify.ts");
+		writeFileSync(
+			testFile,
+			[
+				"export function verify(proof: Proof) {",
+				"  return vdf.verify(challenge, 100, proof);",
+				"}",
+				"export function verify(proof: Proof) {",
+				"  return vdf.verify(challenge, 200, proof);",
+				"}",
+				"",
+			].join("\n"),
+		);
+
+		await expect(
+			editTool.execute("test-anchor-three-dupe", {
+				path: testFile,
+				edits: [
+					{
+						oldText: [
+							"export function verify(proof: Proof) {",
+							"  return vdf.verify(challenge, 256, proof);",
+							"}",
+						].join("\n"),
+						newText: [
+							"export function verify(proof: Proof) {",
+							"  return vdf.verify(challenge, 999, proof);",
+							"}",
+						].join("\n"),
+					},
+				],
+			}),
+		).rejects.toThrow(/Could not find the exact text/);
+
+		const content = readFileSync(testFile, "utf-8");
+		expect(content).toContain("100");
+		expect(content).toContain("200");
+		expect(content).not.toContain("999");
+	});
+
 	it("does not replace a long block from a much shorter oldText", async () => {
 		const testFile = join(testDir, "long-buttons.jsx");
 		const lines = ["const buttonsConfig = ["];
