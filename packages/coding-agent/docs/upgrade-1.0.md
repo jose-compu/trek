@@ -88,7 +88,6 @@ trek bench run [--live] [--lever single|auto|both] [--profile same|climb|fan] [-
 - npm packages
 - Multilingual embeddings (0.21, issue 289)
 - The 1.1 faux-pack CI gate, confirm-gated bench lessons, and a locked score baseline (issues 292–298)
-- `assets/cheatsheet-1.0.png` (the tree has `assets/cheatsheet-0.18.png`)
 - The 0.20.7 blank-line `edit` anchor
 
 ## Rollback

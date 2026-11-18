@@ -37,6 +37,8 @@ Pi compatibility is preserved: community packages from [pi.dev/packages](https:/
 
 `~/.trek/agent/` and project `.trek/` are unchanged. Replacing the binary does not rewrite settings, sessions, or lessons.
 
+One-page session map: [assets/cheatsheet-1.0.png](./assets/cheatsheet-1.0.png) (source [assets/cheatsheet.html](./assets/cheatsheet.html)).
+
 ## Quick start
 
 Download the archive for your machine from [v1.0.0-rc.5](https://github.com/jose-compu/trek/releases/tag/v1.0.0-rc.5). `releases/latest` is the stable tag (**v0.20.8**), not this candidate. `@trek/coding-agent` is not on the npm registry.

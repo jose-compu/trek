@@ -160,21 +160,11 @@ Attribution:
 
 ## Cheatsheet
 
-The one-page session map is `assets/cheatsheet.html`. The image is `assets/cheatsheet-0.18.png` (Chrome headless, scale 2, window 1400×1120, output 2800×2240). It ships with 0.18. `/hotkeys` stays the full binding table.
+The one-page session map is `assets/cheatsheet.html`. The image is `assets/cheatsheet-1.0.png` (Chrome headless, scale 2, window 1400×1460, output 2800×2920). `assets/cheatsheet-0.18.png` stays for the 0.18 line (1400×1120 → 2800×2240). `/hotkeys` stays the full binding table.
 
-When a command, key, or lesson rule on that sheet changes, update the HTML and regenerate the PNG in the same change. List only commands and keys that work. Do not add `/hierarchy` until that command exists. Do not list `shift+ctrl` chords; Terminal.app drops them ([#143](https://github.com/jose-compu/trek/issues/143)).
+When a command, key, or lesson rule on that sheet changes, update the HTML and regenerate the PNG in the same change. List only commands and keys that work. Do not list `shift+ctrl` chords; Terminal.app drops them ([#143](https://github.com/jose-compu/trek/issues/143)).
 
-Current sheet:
-
-- **Open.** `trek` in the project. Memory and the reflective loop are on. `TREK_NO_LOCAL_LLM=1` uses the API model. `PI_NO_LOCAL_LLM` is still accepted. `/login` `/model` `/new` `/quit`. Enter sends. The prompt stays in the transcript when Working... starts.
-- **One turn.** The words choose the domain. The workflow runs one node at a time. A prompt node does not call a tool. The next node receives the earlier reply, or `(none)`. A fact that is not in the turn is said to be not in the turn. A request to fix, push, or unblock does not start that review. The session uses tools.
-- **Domains.** Twenty domains. Meta, AI, Security, and Engineering stay on. `/domains`, `/domains enable finance`, `/domains disable finance`. `/workflows show finance` prints the steps and does not run them.
-- **Lessons.** A failed turn, or a correction that starts with `No.`, may store one lesson in that turn's domain. `/lessons` and `/lessons finance`. `/crystallize <id>` writes a skill only after Yes, and only for that domain.
-- **Patterns.** Edits go to `.trek/domains/<id>/lessons.yaml`. `/patterns`, `/patterns finance`, `/patterns edit finance categories add tax_gap`, `/patterns edit finance targets add sox-memo SOX memo`, `/patterns edit finance never add west-cistern`, `/patterns restore finance`.
-- **Never stored.** Keys and private keys are refused in every domain. A finance lesson also drops an account number. A matching lesson is not stored. A finance lesson is not recalled on a robotics turn. Meta, AI, Security, and Engineering may be.
-- **Commands.** `/patterns`, `/lessons finance`, `/crystallize <id>`, `/memory`, `/confirm bash`, `/thinking briefly`, `/hierarchy auto`, `/hotkeys`.
-- **Keys.** Esc interrupts. Ctrl+C clears the editor and twice quits. Ctrl+D quits when the editor is empty. Shift+Tab cycles thinking. Ctrl+P cycles the model. Ctrl+L opens the model list. Ctrl+O expands compact cards. Alt+Enter queues a follow-up.
-- **Outside the session.** `trek lessons list`, `trek patterns finance`, `trek domains lessons finance`, `trek workflows show finance`, `trek models`.
+Current sheet (1.0): open flags (`--memory`, `--effort`, `--operator-mode`, `--debug`), one-turn routing (named-file skip, one-shot shell, planning-brief skip), science workflow catalog, three-line `edit` and `spawn_branches`, `trek bench run` profiles (`same` / `climb` / `fan`), debug-log redaction, operator `set -o vi`, and the slash commands / keys listed in `assets/cheatsheet.html`.
 
 ## User Override
 
