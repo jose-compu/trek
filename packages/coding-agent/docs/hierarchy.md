@@ -30,6 +30,10 @@ Role `thinking` is `off`, `brief`, or `deep`. YAML `true`/`on` still means deep;
 
 Frontier `source: local` starts llama-server like Planning. `source: lmstudio` uses the LM Studio endpoint. API Frontier stays hybrid/api only.
 
+When Planning and Workhorse resolve to the same model id and the same provider (or the same `source` when provider is unset), Trek does not attach a planning brief. The extra call is skipped.
+
+A one-shot shell request stays on Act. The prompt must be at most 280 characters and mention a directory, `mkdir`, `rmdir`, a sum, a printed number sequence, or trimming the last N characters. It must not mention an app, website, game, project, scaffold, refactor, server, library, or package. The word `create` in that request does not by itself select Planning. When `bash` is available, the system prompt says to run bash and to keep that command's stdout exact.
+
 Per-role `source` wins over `hierarchy.mode`. An api session may still start llama-server for a locally bound Tooling (or other) role. A bound verifier must be a different `provider` than Workhorse when mix-vendor is on. Escalates write `trek:layer_route` (includes `source`) to the session JSONL. `trek models benchmark --layering` emits `trek-layering-benchmark.json` from fixture traces; CI does not run live keys.
 
 Layered API sessions pin that bash can reach the network. Weather, URLs, and live facts auto-delegate to Tooling when that runner is bound (`→ workhorse ⇄ tooling`). Workhorse must not claim it has no internet. A capability follow-up (`do you have internet access?`) does not drop to Decision.
