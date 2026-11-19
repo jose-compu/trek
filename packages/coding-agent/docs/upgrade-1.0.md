@@ -1,13 +1,13 @@
-# Upgrade from 0.20 to 1.0.0-rc.5
+# Upgrade from 0.20 to 1.0.0-rc.6
 
-`1.0.0-rc.5` is a GitHub prerelease on branch `release-1-0-rc1` (merge `78a153e`). The stable line is **0.20.8** on `release-0-20`. This page is the migration note for that candidate. It is not a final `v1.0.0` changelog.
+`1.0.0-rc.6` is a GitHub prerelease on branch `release-1-0-rc1` (merge `78a153e`). The stable line is **0.20.8** on `release-0-20`. This page is the migration note for that candidate. It is not a final `v1.0.0` changelog.
 
 ## Install
 
-Download the archive from the [v1.0.0-rc.5](https://github.com/jose-compu/trek/releases/tag/v1.0.0-rc.5) release. `releases/latest` is **v0.20.8**, because the candidate is a prerelease.
+Download the archive from the [v1.0.0-rc.6](https://github.com/jose-compu/trek/releases/tag/v1.0.0-rc.6) release. `releases/latest` is **v0.20.8**, because the candidate is a prerelease.
 
 ```bash
-curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.5/trek-linux-x64.tar.gz
+curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.6/trek-linux-x64.tar.gz
 tar -xzf trek.tar.gz
 export PATH="$PWD/trek:$PATH"
 trek --version
@@ -42,7 +42,7 @@ The binary name stays `trek`. `PI_*` environment variables that 0.20 accepted ar
 
 The candidate and the 0.20.5–0.20.8 stable patches share three fixes. `packages/coding-agent/src/utils/debug-redact.ts` and `packages/coding-agent/src/core/domains/select.ts` match `v0.20.8`. The `edit` anchor does not.
 
-| Change | 0.20.8 | 1.0.0-rc.5 |
+| Change | 0.20.8 | 1.0.0-rc.6 |
 |---|---|---|
 | Debug log redacts `--api-key`, `--token`, `--password`, `--secret`, and `=value` forms, plus `sk-` / `sk-ant-` / `sk-or-v1-` / `xai-` / `ghp_` / `hf_` / `gsk_` / `csk-` shapes, Bearer tokens, and object keys such as `api_key` and `authorization` | yes (0.20.5) | yes (rc.2) |
 | A turn that says write, edit, update, or replace and names a file with an extension does not enter a domain workflow | yes (0.20.8) | yes (rc.4) |

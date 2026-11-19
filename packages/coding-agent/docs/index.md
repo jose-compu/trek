@@ -1,13 +1,13 @@
 # Trek documentation
 
-Trek **1.0.0-rc.5** is a GitHub prerelease of the terminal coding agent. The binary is `trek`. The stable tag is **0.20.8**. `@trek/coding-agent` is not on the npm registry, and `https://pi.dev/install.sh` does not install this release.
+Trek **1.0.0-rc.6** is a GitHub prerelease of the terminal coding agent. The binary is `trek`. The stable tag is **0.20.8**. `@trek/coding-agent` is not on the npm registry, and `https://pi.dev/install.sh` does not install this release.
 
 ## Quick start
 
 Download the archive for this candidate. `releases/latest` is v0.20.8.
 
 ```bash
-curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.5/trek-darwin-arm64.tar.gz
+curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.6/trek-darwin-arm64.tar.gz
 tar -xzf trek.tar.gz
 export PATH="$PWD/trek:$PATH"
 cd /path/to/your/project
@@ -18,12 +18,12 @@ Swap the archive name for your machine (`trek-darwin-x64`, `trek-linux-x64`, `tr
 
 Authenticate with `/login`, or set an API key such as `ANTHROPIC_API_KEY` before starting `trek`.
 
-Moving from 0.20: [Upgrade to 1.0.0-rc.5](upgrade-1.0.md). First-run detail: [Quickstart](quickstart.md). One-page reference: `assets/cheatsheet-1.0.png` (source `assets/cheatsheet.html`). Pages below sometimes say `pi` for the upstream harness. The command in this distribution is `trek`.
+Moving from 0.20: [Upgrade to 1.0.0-rc.6](upgrade-1.0.md). First-run detail: [Quickstart](quickstart.md). One-page reference: `assets/cheatsheet-1.0.png` (source `assets/cheatsheet.html`). Pages below sometimes say `pi` for the upstream harness. The command in this distribution is `trek`.
 
 ## Start here
 
 - [Quickstart](quickstart.md) - install, authenticate, and run a first session.
-- [Upgrade from 0.20](upgrade-1.0.md) - what 1.0.0-rc.5 changes, and what it does not.
+- [Upgrade from 0.20](upgrade-1.0.md) - what 1.0.0-rc.6 changes, and what it does not.
 - [Using Trek](usage.md) - interactive mode, slash commands, context files, domains, and the CLI reference.
 - [Providers](providers.md) - subscription and API-key setup for built-in providers.
 - [Containerization](containerization.md) - sandbox pi with OpenShell, Gondolin, or Docker.

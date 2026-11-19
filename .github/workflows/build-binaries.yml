@@ -66,11 +66,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd packages/coding-agent/binaries
+
+          RELEASE_FLAGS=()
+          if [[ "${RELEASE_TAG}" == *-* ]]; then
+            RELEASE_FLAGS+=(--prerelease --latest=false)
+          fi
           
           # Create release with changelog notes (or update if exists)
           gh release create "${RELEASE_TAG}" \
             --title "${RELEASE_TAG}" \
             --notes-file /tmp/release-notes.md \
+            "${RELEASE_FLAGS[@]}" \
             trek-darwin-arm64.tar.gz \
             trek-darwin-x64.tar.gz \
             trek-linux-x64.tar.gz \
