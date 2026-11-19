@@ -1,10 +1,10 @@
 # Upgrade from 0.20 to 1.0.0-rc.6
 
-`1.0.0-rc.6` is a GitHub prerelease on branch `release-1-0-rc1` (merge `78a153e`). The stable line is **0.20.8** on `release-0-20`. This page is the migration note for that candidate. It is not a final `v1.0.0` changelog.
+`1.0.0-rc.6` is the release candidate on branch `release-1-0-rc1` (GitHub prerelease once `v1.0.0-rc.6` is tagged). The stable line is **0.20.8** on `release-0-20`. This page is the migration note for that candidate. It is not a final `v1.0.0` changelog.
 
 ## Install
 
-Download the archive from the [v1.0.0-rc.6](https://github.com/jose-compu/trek/releases/tag/v1.0.0-rc.6) release. `releases/latest` is **v0.20.8**, because the candidate is a prerelease.
+After `v1.0.0-rc.6` is tagged, download the archive from `https://github.com/jose-compu/trek/releases/tag/v1.0.0-rc.6`. Until then, build from `release-1-0-rc1`. `releases/latest` is **v0.20.8**, because the candidate is a prerelease.
 
 ```bash
 curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.6/trek-linux-x64.tar.gz

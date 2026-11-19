@@ -1,6 +1,6 @@
 # Trek Agent — Implementation Roadmap
 
-**Status:** **1.0.0-rc.6** on `release-1-0-rc1` (merge `78a153e`). Stable line remains **0.20.8** on `release-0-20`. **Next:** final `v1.0.0` after the remaining ship gate. Multilingual memory (**0.21**) and the rest of the agentic bench (**1.1**) are post-1.0.  
+**Status:** **1.0.0-rc.6** on `release-1-0-rc1`. Stable line remains **0.20.8** on `release-0-20`. **Next:** final `v1.0.0` after the remaining ship gate. Multilingual memory (**0.21**) and the rest of the agentic bench (**1.1**) are post-1.0.  
 **Baseline:** `pi-original/` (Pi Coding Agent monorepo) → hard fork into `trek/` (independent repo)  
 **Versioning:** Stages through 0.20 are **minor** releases (`0.1.0` … `0.20.x`). **1.0.0** is the first **major** ship gate. Patch releases remain hotfixes within a stage. Release candidates use `1.0.0-rc.N` (GitHub prerelease only; **no npm** until an explicit later decision).  
 **Sources:** `PROMPT.md`, `SPECS_SAFETY_HARNESS.md` (safety harness), `SPECS_REFLECTIVE_AGENT.md` (reflective loop). **Canonical agent cycle:** `Observe → Intend → Act → Reflect` (O→I→A→R). The safety spec’s Plan→Act→Reflect maps to the same loop with **Plan = Intend** and **Observe** mandatory upfront — not a separate P→A→R stack.
@@ -1586,7 +1586,7 @@ Use an advanced field **when it helps**. Do not paste nodes. Do not invent a sec
 
 #### Shipped on the release-candidate line (through rc.5)
 
-Verified against the tree at `78a153e` and the package changelogs. This is not a `## [1.0.0]` changelog section.
+Verified against the tree on `release-1-0-rc1` and the package changelogs. This is not a `## [1.0.0]` changelog section.
 
 - **rc.1.** Lockstep package version `1.0.0-rc.1`. Roadmap Release stage is 1.0.0. Multilingual memory stays 0.21.
 - **rc.2.** `trek --debug` / `TREK_DEBUG` redacts `--api-key` and similar flags, provider-shaped secrets, and secret object keys before appending `~/.trek/agent/trek-debug.log`.
@@ -1594,7 +1594,7 @@ Verified against the tree at `78a153e` and the package changelogs. This is not a
 - **rc.4.** `trek bench run [--live]` with profiles `same`, `climb`, and `fan`. An explicit write or edit of a named file stays on the tool loop (`selectDomain` returns none). No planning brief when Planning and Workhorse are the same model id and provider. A one-shot shell request is classed as Act. xAI catalog id `grok-4.1-fast` (`packages/ai`).
 - **rc.5.** A three-line `edit` applies when the first line is unique and the third line is two file lines below it, even if the middle line differs. A shorter snippet still cannot replace a longer block. The 0.20.7 case (one blank line between those anchors, third line three file lines below) is on `v0.20.8` and is not in this RC.
 
-GitHub release `v1.0.0-rc.6` exists, is marked prerelease, and has six archive assets. `@trek/coding-agent` is not on the npm registry. `publish-npm` remains `if: false`.
+Tag `v1.0.0-rc.6` will publish a GitHub prerelease (`--prerelease`, not `latest`) with six archive assets. `@trek/coding-agent` is not on the npm registry. `publish-npm` remains `if: false`.
 
 #### Still required before the final `v1.0.0` tag
 
@@ -1864,4 +1864,4 @@ Branch `release-1-0-rc1` is at **v1.0.0-rc.6**. The remaining ship gate is in §
 
 ---
 
-*Roadmap last synced with `trek/` at **v1.0.0-rc.6** (`78a153e`). Stable line **v0.20.8**.*
+*Roadmap last synced with `trek/` at **v1.0.0-rc.6** on `release-1-0-rc1`. Stable line **v0.20.8**.*

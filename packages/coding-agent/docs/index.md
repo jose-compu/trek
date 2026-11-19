@@ -1,10 +1,10 @@
 # Trek documentation
 
-Trek **1.0.0-rc.6** is a GitHub prerelease of the terminal coding agent. The binary is `trek`. The stable tag is **0.20.8**. `@trek/coding-agent` is not on the npm registry, and `https://pi.dev/install.sh` does not install this release.
+Trek **1.0.0-rc.6** is the release candidate on `release-1-0-rc1` (GitHub prerelease once `v1.0.0-rc.6` is tagged). The binary is `trek`. The stable tag is **0.20.8**. `@trek/coding-agent` is not on the npm registry, and `https://pi.dev/install.sh` does not install this release.
 
 ## Quick start
 
-Download the archive for this candidate. `releases/latest` is v0.20.8.
+After `v1.0.0-rc.6` is tagged, download the archive for this candidate (or build from the branch until then). `releases/latest` is v0.20.8.
 
 ```bash
 curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.6/trek-darwin-arm64.tar.gz
