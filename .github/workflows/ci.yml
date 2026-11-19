@@ -1,11 +1,19 @@
 name: CI
 
-# Local Husky hooks (check + affected tests on commit, build on push) replace per-PR CI.
-# This job runs once a day at 05:00 UTC, and only if main moved in the last 24h.
+# Local Husky hooks (check + affected tests on commit, build on push) replace per-PR CI on main.
+# Daily: 05:00 UTC when main moved in the last 24h. Release branches: full CI on every push/PR.
 on:
   schedule:
     - cron: "0 5 * * *" # 05:00 UTC (06:00 CET / 07:00 CEST)
   workflow_dispatch:
+  push:
+    branches:
+      - release-1-0-rc1
+      - release-0-20
+  pull_request:
+    branches:
+      - release-1-0-rc1
+      - release-0-20
 
 concurrency:
   group: ci-daily
@@ -29,7 +37,7 @@ jobs:
       - name: Run only after commits in the last 24 hours
         id: gate
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi

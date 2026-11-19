@@ -1,25 +1,28 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.5`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.6`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
 
+## [1.0.0-rc.6] - 2026-11-19
+
+### Fixed
+
+Included from 0.20.x:
+
+- (0.20.8) An explicit `write` or `edit` of a named file stays on the tool loop. A “write result.txt” turn that only mentioned a p-value was held as science `method-check` and never called a tool.
+- (0.20.7) A three-line `edit` applies when one blank line sits between a unique first line and the matching third line. A non-blank extra line still blocks that shorter snippet.
+- (0.20.6) A three-line `edit` applies when the first and third lines bound a unique block and the middle line has drifted.
+
+### Changed
+
+- CHANGELOG sections for the 1.0 line are contiguous again after merging `release-0-20`.
+- GitHub release workflow marks tags with a `-` prerelease suffix as `--prerelease` and not `latest`.
+- CI runs the full build/check/test workflow on `release-1-0-rc1` and `release-0-20` pushes and PRs.
+
 ## [1.0.0-rc.5] - 2026-11-18
-## [0.20.8] - 2026-11-17
-
-### Fixed
-
-- An explicit `write` or `edit` of a named file stays on the tool loop. A “write result.txt” turn that only mentioned a p-value was held as science `method-check` and never called a tool.
-
-## [0.20.7] - 2026-11-16
-
-### Fixed
-
-- A three-line `edit` applies when one blank line sits between a unique first line and the matching third line. A non-blank extra line still blocks that shorter snippet.
-
-## [0.20.6] - 2026-11-15
 
 ### Fixed
 
@@ -44,7 +47,6 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 - Science domain LaTeX / peer-review / slides / poster workflows (multi-workflow catalog).
 
 ## [1.0.0-rc.2] - 2026-11-10
-## [0.20.5] - 2026-11-15
 
 ### Fixed
 
@@ -60,6 +62,30 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 ### Note
 
 RC checklist and ship gate: [ROADMAP.md §1.0.0](./ROADMAP.md).
+
+## [0.20.8] - 2026-11-17
+
+### Fixed
+
+- An explicit `write` or `edit` of a named file stays on the tool loop. A “write result.txt” turn that only mentioned a p-value was held as science `method-check` and never called a tool.
+
+## [0.20.7] - 2026-11-16
+
+### Fixed
+
+- A three-line `edit` applies when one blank line sits between a unique first line and the matching third line. A non-blank extra line still blocks that shorter snippet.
+
+## [0.20.6] - 2026-11-15
+
+### Fixed
+
+- A three-line `edit` applies when the first and third lines bound a unique block and the middle line has drifted.
+
+## [0.20.5] - 2026-11-15
+
+### Fixed
+
+- Debug log redacts `--api-key` argv values and provider-shaped secrets before writing `trek-debug.log`.
 
 ## [0.20.4] - 2026-11-10
 

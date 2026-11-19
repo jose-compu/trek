@@ -4,20 +4,17 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [1.0.0-rc.6] - 2026-11-19
+
+### Fixed
+
+Included from 0.20.x:
+
+- (0.20.8) An explicit `write` or `edit` of a named file stays on the tool loop. A “write result.txt” turn that only mentioned a p-value was held as science `method-check` and never called a tool.
+- (0.20.7) A three-line `edit` applies when one blank line sits between a unique first line and the matching third line. A non-blank extra line still blocks that shorter snippet.
+- (0.20.6) A three-line `edit` applies when the first line is unique and the third line is two lines below it, even if the middle line has drifted. A shorter snippet still cannot replace a longer block.
+
 ## [1.0.0-rc.5] - 2026-11-18
-## [0.20.8] - 2026-11-17
-
-### Fixed
-
-- An explicit `write` or `edit` of a named file stays on the tool loop. A “write result.txt” turn that only mentioned a p-value was held as science `method-check` and never called a tool.
-
-## [0.20.7] - 2026-11-16
-
-### Fixed
-
-- A three-line `edit` applies when one blank line sits between a unique first line and the matching third line. A non-blank extra line still blocks that shorter snippet.
-
-## [0.20.6] - 2026-11-15
 
 ### Fixed
 
@@ -44,7 +41,6 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 - Science domain multi-workflow catalog for LaTeX-centric research: `write-paper`, `review-paper-coauthor`, `review-paper-referee`, `respond-to-reviews`, `write-rebuttal`, `generate-slides`, `generate-poster`, `polish-bibtex`, `check-latex-build`, `figure-pass`, `extract-claims`, `write-abstract` (keeps `method-check`).
 
 ## [1.0.0-rc.2] - 2026-11-10
-## [0.20.5] - 2026-11-15
 
 ### Fixed
 
@@ -56,6 +52,30 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 - Start of the **1.0** major line. Roadmap Release stage moved from 0.21 → **1.0.0**; multilingual memory remains **0.21**.
 - Version `1.0.0-rc.1`. GitHub prerelease when tagged; npm stays off.
+
+## [0.20.8] - 2026-11-17
+
+### Fixed
+
+- An explicit `write` or `edit` of a named file stays on the tool loop. A “write result.txt” turn that only mentioned a p-value was held as science `method-check` and never called a tool.
+
+## [0.20.7] - 2026-11-16
+
+### Fixed
+
+- A three-line `edit` applies when one blank line sits between a unique first line and the matching third line. A non-blank extra line still blocks that shorter snippet.
+
+## [0.20.6] - 2026-11-15
+
+### Fixed
+
+- A three-line `edit` applies when the first line is unique and the third line is two lines below it, even if the middle line has drifted. A shorter snippet still cannot replace a longer block.
+
+## [0.20.5] - 2026-11-15
+
+### Fixed
+
+- Debug logging redacts `--api-key` (and similar flags), secret-shaped strings (`sk-or-v1-…`, `sk-ant-…`, `xai-…`, Bearer tokens), and secret object keys before writing `trek-debug.log`.
 
 ## [0.20.4] - 2026-11-10
 
