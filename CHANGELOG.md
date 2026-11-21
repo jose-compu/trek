@@ -1,10 +1,16 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.7`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.8`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [1.0.0-rc.8] - 2026-11-21
+
+### Changed
+
+- Prologue/Constitution optimization: a sealed constitution is injected into every coding-agent session prologue to keep the tool loop leaner ([#309](https://github.com/jose-compu/trek/issues/309)).
 
 ## [1.0.0-rc.7] - 2026-11-21
 
