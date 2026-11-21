@@ -2,6 +2,8 @@
  * Redact secrets before they hit trek-debug.log (argv, payloads, free text).
  */
 
+import { visibleWidth } from "@trek/tui";
+
 const REDACTED = "[redacted]";
 
 /** CLI flags whose following value (or =value) must not be logged. */
@@ -100,4 +102,29 @@ export function redactDebugData(data: unknown): unknown {
 		return out;
 	}
 	return data;
+}
+
+export function buildRenderDebugLog(options: {
+	width: number;
+	height: number;
+	allLines: readonly string[];
+	messages: readonly unknown[];
+}): string {
+	const { width, height, allLines, messages } = options;
+	return [
+		`Debug output at ${new Date().toISOString()}`,
+		`Terminal: ${width}x${height}`,
+		`Total lines: ${allLines.length}`,
+		"",
+		"=== All rendered lines with visible widths ===",
+		...allLines.map((line, idx) => {
+			const vw = visibleWidth(line);
+			const escaped = JSON.stringify(redactSecretText(line));
+			return `[${idx}] (w=${vw}) ${escaped}`;
+		}),
+		"",
+		"=== Agent messages (JSONL) ===",
+		...messages.map((msg) => JSON.stringify(redactDebugData(msg))),
+		"",
+	].join("\n");
 }

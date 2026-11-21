@@ -1,6 +1,6 @@
 {
 	"name": "@trek/tui",
-	"version": "1.0.0-rc.6",
+	"version": "1.0.0-rc.7",
 	"description": "Terminal User Interface library with differential rendering for efficient text-based applications",
 	"type": "module",
 	"main": "dist/index.js",

@@ -1,10 +1,16 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.6`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.7`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [1.0.0-rc.7] - 2026-11-21
+
+### Fixed
+
+- `/debug` redacts provider-shaped secrets and secret object keys before writing `trek-render-debug.log`, using the same redactor as `trek-debug.log`.
 
 ## [1.0.0-rc.6] - 2026-11-19
 

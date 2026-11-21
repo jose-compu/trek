@@ -52,7 +52,7 @@ Never use `__dirname` directly for package assets.
 
 `trek --debug` or `TREK_DEBUG=1` appends to `~/.trek/agent/trek-debug.log` through `debugLog`. Before a line is written, flag values for `--api-key`, `--api_key`, `--token`, `--access-token`, `--auth-token`, `--password`, and `--secret` are replaced with `[redacted]`, including the `--flag=value` form. The same pass replaces provider-shaped secrets (`sk-`, `sk-ant-`, `sk-or-v1-`, `xai-`, `ghp_`, `hf_`, `gsk_`, `csk-`, Bearer tokens) and object keys such as `api_key`, `authorization`, `password`, `secret`, and `token`.
 
-`/debug` is a different file. It overwrites `~/.trek/agent/trek-render-debug.log` with the rendered TUI lines and `JSON.stringify` of the session messages. That snapshot is not run through the redactor.
+`/debug` overwrites `~/.trek/agent/trek-render-debug.log`. Each rendered line is logged as `JSON.stringify(redactSecretText(line))` with visible width taken from the original line. Session messages are logged as `JSON.stringify(redactDebugData(message))`. Header lines (`Debug output at`, `Terminal:`, `Total lines:`) are not redacted.
 
 ## Testing
 
