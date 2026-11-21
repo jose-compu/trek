@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [1.0.0-rc.7] - 2026-11-21
+
+### Fixed
+
+- `/debug` writes `~/.trek/agent/trek-render-debug.log` through the debug redactor. Rendered lines and session JSON drop `sk-` / `sk-ant-` / `sk-or-v1-` / `xai-` / `ghp_` / `hf_` / `gsk_` / `csk-` values, Bearer tokens, and secret object keys (`api_key`, `authorization`, `password`, `secret`, `token`).
+
 ## [1.0.0-rc.6] - 2026-11-19
 
 ### Fixed

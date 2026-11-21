@@ -43,7 +43,6 @@ import {
 	Text,
 	TruncatedText,
 	TUI,
-	visibleWidth,
 } from "@trek/tui";
 import chalk from "chalk";
 import { spawn, spawnSync } from "child_process";
@@ -95,6 +94,7 @@ import { filterEntriesUpToVersion, getChangelogPath, getNewEntries, parseChangel
 import { copyToClipboard } from "../../utils/clipboard.ts";
 import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipboard-image.ts";
 import { debugLog, getActiveDebugLogPath, isDebugEnabled } from "../../utils/debug-log.ts";
+import { buildRenderDebugLog } from "../../utils/debug-redact.ts";
 import { parseGitUrl } from "../../utils/git.ts";
 import { getCwdRelativePath } from "../../utils/paths.ts";
 import { getPiUserAgent } from "../../utils/pi-user-agent.ts";
@@ -5962,22 +5962,12 @@ export class InteractiveMode {
 		const allLines = this.ui.render(width);
 
 		const renderDebugLogPath = getRenderDebugLogPath();
-		const debugData = [
-			`Debug output at ${new Date().toISOString()}`,
-			`Terminal: ${width}x${height}`,
-			`Total lines: ${allLines.length}`,
-			"",
-			"=== All rendered lines with visible widths ===",
-			...allLines.map((line, idx) => {
-				const vw = visibleWidth(line);
-				const escaped = JSON.stringify(line);
-				return `[${idx}] (w=${vw}) ${escaped}`;
-			}),
-			"",
-			"=== Agent messages (JSONL) ===",
-			...this.session.messages.map((msg) => JSON.stringify(msg)),
-			"",
-		].join("\n");
+		const debugData = buildRenderDebugLog({
+			width,
+			height,
+			allLines,
+			messages: this.session.messages,
+		});
 
 		fs.mkdirSync(path.dirname(renderDebugLogPath), { recursive: true });
 		fs.writeFileSync(renderDebugLogPath, debugData);

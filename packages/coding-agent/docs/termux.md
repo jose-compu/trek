@@ -16,7 +16,7 @@ pkg update && pkg upgrade
 # Install dependencies
 pkg install nodejs termux-api git
 
-# @trek/coding-agent is not on npm. 1.0.0-rc.6 has no Termux archive.
+# @trek/coding-agent is not on npm. 1.0.0-rc.7 has no Termux archive.
 # Build from a checkout instead:
 git clone https://github.com/jose-compu/trek
 cd trek
