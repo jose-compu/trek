@@ -8,31 +8,52 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { getGlobalProloguePath, getProjectProloguePath } from "../config.ts";
+import { getSealedPrologueSource, loadSealedConstitution } from "./prologue/constitution.ts";
 
 export interface LoadedPrologue {
 	content: string | undefined;
 	sources: string[];
 }
 
+function isSealedPrologueEnabled(): boolean {
+	const flag = process.env.TREK_PROLOGUE;
+	return flag !== "0" && flag !== "false";
+}
+
 /** Load prologue for a project cwd. Project file overrides global when it exists. */
 export function loadPrologue(cwd: string): LoadedPrologue {
+	const sources: string[] = [];
+	const parts: string[] = [];
+
+	if (isSealedPrologueEnabled()) {
+		parts.push(loadSealedConstitution());
+		sources.push(getSealedPrologueSource());
+	}
+
 	const projectPath = getProjectProloguePath(cwd);
 	if (existsSync(projectPath)) {
-		return {
-			content: readFileSync(projectPath, "utf8").trim() || undefined,
-			sources: [projectPath],
-		};
+		const fileContent = readFileSync(projectPath, "utf8").trim();
+		if (fileContent) {
+			parts.push(fileContent);
+			sources.push(projectPath);
+		}
+		return { content: parts.join("\n\n"), sources };
 	}
 
 	const globalPath = getGlobalProloguePath();
 	if (existsSync(globalPath)) {
-		return {
-			content: readFileSync(globalPath, "utf8").trim() || undefined,
-			sources: [globalPath],
-		};
+		const fileContent = readFileSync(globalPath, "utf8").trim();
+		if (fileContent) {
+			parts.push(fileContent);
+			sources.push(globalPath);
+		}
+		return { content: parts.length > 0 ? parts.join("\n\n") : undefined, sources };
 	}
 
-	return { content: undefined, sources: [] };
+	return {
+		content: parts.length > 0 ? parts.join("\n\n") : undefined,
+		sources,
+	};
 }
 
 /** Short SHA-256 prefix for trace metadata. */

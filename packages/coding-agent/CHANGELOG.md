@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [1.0.0-rc.8] - 2026-11-21
+
+### Changed
+
+- Every session loads a sealed Prologue Constitution into the system prompt unless `TREK_PROLOGUE=0` ([#309](https://github.com/jose-compu/trek/issues/309)).
+
 ## [1.0.0-rc.7] - 2026-11-21
 
 ### Fixed

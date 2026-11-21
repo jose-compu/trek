@@ -1,13 +1,13 @@
-# Upgrade from 0.20 to 1.0.0-rc.7
+# Upgrade from 0.20 to 1.0.0-rc.8
 
-`1.0.0-rc.7` is the release candidate on branch `release-1-0-rc1` (GitHub prerelease once `v1.0.0-rc.7` is tagged). The stable line is **0.20.8** on `release-0-20`. This page is the migration note for that candidate. It is not a final `v1.0.0` changelog.
+`1.0.0-rc.8` is the release candidate on branch `release-1-0-rc1` (GitHub prerelease once `v1.0.0-rc.8` is tagged). The stable line is **0.20.8** on `release-0-20`. This page is the migration note for that candidate. It is not a final `v1.0.0` changelog.
 
 ## Install
 
-After `v1.0.0-rc.7` is tagged, download the archive from `https://github.com/jose-compu/trek/releases/tag/v1.0.0-rc.7`. Until then, build from `release-1-0-rc1`. `releases/latest` is **v0.20.8**, because the candidate is a prerelease.
+After `v1.0.0-rc.8` is tagged, download the archive from `https://github.com/jose-compu/trek/releases/tag/v1.0.0-rc.8`. Until then, build from `release-1-0-rc1`. `releases/latest` is **v0.20.8**, because the candidate is a prerelease.
 
 ```bash
-curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.7/trek-linux-x64.tar.gz
+curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.8/trek-linux-x64.tar.gz
 tar -xzf trek.tar.gz
 export PATH="$PWD/trek:$PATH"
 trek --version
@@ -42,7 +42,7 @@ The binary name stays `trek`. `PI_*` environment variables that 0.20 accepted ar
 
 The candidate and the 0.20.5–0.20.8 stable patches share three fixes. `packages/coding-agent/src/utils/debug-redact.ts` and `packages/coding-agent/src/core/domains/select.ts` match `v0.20.8`. The `edit` anchor does not.
 
-| Change | 0.20.8 | 1.0.0-rc.7 |
+| Change | 0.20.8 | 1.0.0-rc.8 |
 |---|---|---|
 | Debug log redacts `--api-key`, `--token`, `--password`, `--secret`, and `=value` forms, plus `sk-` / `sk-ant-` / `sk-or-v1-` / `xai-` / `ghp_` / `hf_` / `gsk_` / `csk-` shapes, Bearer tokens, and object keys such as `api_key` and `authorization` | yes (0.20.5) | yes (rc.2) |
 | `/debug` snapshot (`trek-render-debug.log`) uses the same redactor before writing the file | no | yes (rc.7) |
