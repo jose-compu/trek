@@ -1,6 +1,6 @@
 /**
  * Three LogosDB roots. A row in one root is not visible from another.
- * Native logosdb 1.2.0 stores the vector and one text column. Rows are read with DB.get.
+ * Native logosdb stores the vector and one text column. Rows are read with DB.get.
  * Annotations are the situating header on the embedded string.
  */
 

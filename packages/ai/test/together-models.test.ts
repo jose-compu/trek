@@ -53,7 +53,7 @@ describe("Together models", () => {
 			thinkingFormat: "together",
 		});
 
-		const minimax = getModel("together", "MiniMaxAI/MiniMax-M3.1-Flash");
+		const minimax = getModel("together", "MiniMaxAI/MiniMax-M3");
 		expect(minimax.thinkingLevelMap).toEqual({ minimal: null, low: null, medium: null });
 		expect(minimax.compat).toMatchObject({
 			supportsReasoningEffort: false,

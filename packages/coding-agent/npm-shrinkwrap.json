@@ -22,8 +22,8 @@
 				"hosted-git-info": "9.0.3",
 				"ignore": "7.0.5",
 				"jiti": "2.7.0",
-				"logosdb": "1.2.0",
-				"logosdb-mcp-server": "1.4.0",
+				"logosdb": "1.6.0",
+				"logosdb-mcp-server": "1.4.5",
 				"minimatch": "10.2.5",
 				"proper-lockfile": "4.1.2",
 				"typebox": "1.1.38",
@@ -2344,107 +2344,6 @@
 				"safe-buffer": "^5.0.1"
 			}
 		},
-		"node_modules/logosdb": {
-			"version": "1.2.0",
-			"resolved": "https://registry.npmjs.org/logosdb/-/logosdb-1.2.0.tgz",
-			"integrity": "sha512-N3+YsCkF5L42r9BmgepCixI4rBFAlHPkBcwh1ph4+igrtxojDSSyZe839bw+cDN3MQE1jAijRQ06w7ERdKNHFA==",
-			"license": "MIT",
-			"dependencies": {
-				"bindings": "^1.5.0",
-				"node-addon-api": "^7.0.0",
-				"prebuild-install": "npm:@mmomtchev/prebuild-install@^1.0.2"
-			},
-			"engines": {
-				"node": ">=16.0.0"
-			},
-			"os": [
-				"darwin",
-				"linux",
-				"win32"
-			],
-			"cpu": [
-				"x64",
-				"arm64"
-			],
-			"hasInstallScript": true
-		},
-		"node_modules/logosdb-mcp-server": {
-			"version": "1.4.0",
-			"resolved": "https://registry.npmjs.org/logosdb-mcp-server/-/logosdb-mcp-server-1.4.0.tgz",
-			"integrity": "sha512-8sAq7cZ0+bOMHDnF9eKCVbuENpVwMS+orMn6SuaNxrsICsQaSS3bwpezSZMKikyeiDOcMIk9YdLdVRZHei4FJg==",
-			"license": "MIT",
-			"dependencies": {
-				"@modelcontextprotocol/sdk": "^1.29.0",
-				"@xenova/transformers": "^2.17.2",
-				"ignore": "^7.0.5",
-				"logosdb": "^1.2.0"
-			},
-			"bin": {
-				"logosdb-mcp-server": "dist/index.js"
-			},
-			"engines": {
-				"node": ">=18.0.0"
-			}
-		},
-		"node_modules/logosdb/node_modules/napi-build-utils": {
-			"version": "1.0.2",
-			"resolved": "https://registry.npmjs.org/napi-build-utils/-/napi-build-utils-1.0.2.tgz",
-			"integrity": "sha512-ONmRUqK7zj7DWX0D9ADe03wbwOBZxNAfF20PlGfCWQcD3+/MakShIHrMqx9YwPTfxDdF1zLeL+RGZiR9kGMLdg==",
-			"license": "MIT"
-		},
-		"node_modules/logosdb/node_modules/prebuild-install": {
-			"name": "@mmomtchev/prebuild-install",
-			"version": "1.0.2",
-			"resolved": "https://registry.npmjs.org/@mmomtchev/prebuild-install/-/prebuild-install-1.0.2.tgz",
-			"integrity": "sha512-0Vje0eg5XQa8Ta1jtQiWqnT1kS/P7OAAvFJ4VZG5EXT2gJmpmPA5SrsDrh++BqNjIxYy8O6aF4wZjJc/k4JQ6w==",
-			"license": "MIT",
-			"dependencies": {
-				"detect-libc": "^2.0.3",
-				"expand-template": "^2.0.3",
-				"github-from-package": "^0.0.0",
-				"minimist": "^1.2.8",
-				"mkdirp-classic": "^0.5.3",
-				"napi-build-utils": "^1.0.2",
-				"node-abi": "^3.63.0",
-				"pump": "^3.0.0",
-				"rc": "^1.2.8",
-				"simple-get": "^4.0.1",
-				"tar-fs": "^3.0.6",
-				"tunnel-agent": "^0.6.0"
-			},
-			"bin": {
-				"prebuild-install": "bin.js"
-			},
-			"engines": {
-				"node": ">=18"
-			}
-		},
-		"node_modules/logosdb/node_modules/tar-fs": {
-			"version": "3.1.3",
-			"resolved": "https://registry.npmjs.org/tar-fs/-/tar-fs-3.1.3.tgz",
-			"integrity": "sha512-/hU4AXnIdZu+Gvl1pk0oI5f5HxWsCJRtY2aFaJdk9VvyL48DWU6iU5WAIPG+wIi1YvWA6eTJvIviP/tMAZZNwQ==",
-			"license": "MIT",
-			"dependencies": {
-				"pump": "^3.0.0",
-				"tar-stream": "^3.1.5"
-			},
-			"optionalDependencies": {
-				"bare-fs": "^4.0.1",
-				"bare-path": "^3.0.0"
-			}
-		},
-		"node_modules/logosdb/node_modules/tar-stream": {
-			"version": "3.2.2",
-			"resolved": "https://registry.npmjs.org/tar-stream/-/tar-stream-3.2.2.tgz",
-			"integrity": "sha512-+8NeqHRjQWH9nYlwo2gamAMImZCVzI4UoEgDpWorBt9OEfppiZn+uSkskzQKPWIZyji/C8fpWO7u69G0DX0tbg==",
-			"license": "MIT",
-			"dependencies": {
-				"b4a": "^1.9.0",
-				"bare-fs": "^4.8.2",
-				"fast-fifo": "^1.3.2",
-				"streamx": "^2.28.1"
-			}
-		},
 		"node_modules/long": {
 			"version": "4.0.0",
 			"resolved": "https://registry.npmjs.org/long/-/long-4.0.0.tgz",
@@ -3656,6 +3555,107 @@
 			"license": "ISC",
 			"peerDependencies": {
 				"zod": "^3.25.28 || ^4"
+			}
+		},
+		"packages/coding-agent/node_modules/logosdb": {
+			"version": "1.6.0",
+			"resolved": "https://registry.npmjs.org/logosdb/-/logosdb-1.6.0.tgz",
+			"integrity": "sha512-KFvqiL3STJXq7Xkn7Q7il2PMF/OcALjkZpRS10Wr06wRLmdjV0MX0sHM5y+VQBG2nObjBsKxzSzFuhBxbntPUQ==",
+			"license": "MIT",
+			"dependencies": {
+				"bindings": "^1.5.0",
+				"node-addon-api": "^7.0.0",
+				"prebuild-install": "npm:@mmomtchev/prebuild-install@^1.0.2"
+			},
+			"engines": {
+				"node": ">=16.0.0"
+			},
+			"os": [
+				"darwin",
+				"linux",
+				"win32"
+			],
+			"cpu": [
+				"x64",
+				"arm64"
+			],
+			"hasInstallScript": true
+		},
+		"packages/coding-agent/node_modules/logosdb-mcp-server": {
+			"version": "1.4.5",
+			"resolved": "https://registry.npmjs.org/logosdb-mcp-server/-/logosdb-mcp-server-1.4.5.tgz",
+			"integrity": "sha512-vZApKnO9efLPbnJKp3usOBKDlMC1XlIP3r4Zx6T7YyOR1YfJhhlZJRYAmgXUrnZ6UgwnvQ4pnbPh+gHu6d1kLw==",
+			"license": "MIT",
+			"dependencies": {
+				"@modelcontextprotocol/sdk": "^1.29.0",
+				"@xenova/transformers": "^2.17.2",
+				"ignore": "^7.0.5",
+				"logosdb": "^1.6.0"
+			},
+			"bin": {
+				"logosdb-mcp-server": "dist/index.js"
+			},
+			"engines": {
+				"node": ">=18.0.0"
+			}
+		},
+		"packages/coding-agent/node_modules/napi-build-utils": {
+			"version": "1.0.2",
+			"resolved": "https://registry.npmjs.org/napi-build-utils/-/napi-build-utils-1.0.2.tgz",
+			"integrity": "sha512-ONmRUqK7zj7DWX0D9ADe03wbwOBZxNAfF20PlGfCWQcD3+/MakShIHrMqx9YwPTfxDdF1zLeL+RGZiR9kGMLdg==",
+			"license": "MIT"
+		},
+		"packages/coding-agent/node_modules/prebuild-install": {
+			"name": "@mmomtchev/prebuild-install",
+			"version": "1.0.2",
+			"resolved": "https://registry.npmjs.org/@mmomtchev/prebuild-install/-/prebuild-install-1.0.2.tgz",
+			"integrity": "sha512-0Vje0eg5XQa8Ta1jtQiWqnT1kS/P7OAAvFJ4VZG5EXT2gJmpmPA5SrsDrh++BqNjIxYy8O6aF4wZjJc/k4JQ6w==",
+			"license": "MIT",
+			"dependencies": {
+				"detect-libc": "^2.0.3",
+				"expand-template": "^2.0.3",
+				"github-from-package": "^0.0.0",
+				"minimist": "^1.2.8",
+				"mkdirp-classic": "^0.5.3",
+				"napi-build-utils": "^1.0.2",
+				"node-abi": "^3.63.0",
+				"pump": "^3.0.0",
+				"rc": "^1.2.8",
+				"simple-get": "^4.0.1",
+				"tar-fs": "^3.0.6",
+				"tunnel-agent": "^0.6.0"
+			},
+			"bin": {
+				"prebuild-install": "bin.js"
+			},
+			"engines": {
+				"node": ">=18"
+			}
+		},
+		"packages/coding-agent/node_modules/tar-fs": {
+			"version": "3.1.4",
+			"resolved": "https://registry.npmjs.org/tar-fs/-/tar-fs-3.1.4.tgz",
+			"integrity": "sha512-S0lrlrJkynj6otwBGsd+1YHWvbgac42+LeHavSzgokehNdiRg1D4eGFDi1cceiG1fQlSTnnss+agdRQl5Bb1DA==",
+			"license": "MIT",
+			"dependencies": {
+				"pump": "^3.0.0",
+				"tar-stream": "^3.3.0"
+			},
+			"optionalDependencies": {
+				"bare-fs": "^4.0.1",
+				"bare-path": "^3.0.0"
+			}
+		},
+		"packages/coding-agent/node_modules/tar-stream": {
+			"version": "3.3.0",
+			"resolved": "https://registry.npmjs.org/tar-stream/-/tar-stream-3.3.0.tgz",
+			"integrity": "sha512-rQZZfW2Q4YDCFJyP8KFDG+gfMzcOHaMYq0gb9jzH2gsK0P5qXVpu+UoKE1qaZcs3/R6QVkJr2228nlZoM1V5PA==",
+			"license": "MIT",
+			"dependencies": {
+				"b4a": "^1.9.0",
+				"bare-fs": "^4.8.2",
+				"fast-fifo": "^1.3.2",
+				"streamx": "^2.28.1"
 			}
 		}
 	}
