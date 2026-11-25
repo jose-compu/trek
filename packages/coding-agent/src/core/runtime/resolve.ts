@@ -20,6 +20,11 @@ export interface ResolveRuntimeOptions {
 	 * `null` forces no Frontier key.
 	 */
 	frontier?: FrontierHint | null;
+	/**
+	 * User pinned this provider (`--provider` / `--model`).
+	 * API roles saved for a different provider are not applied.
+	 */
+	lockProvider?: string;
 }
 
 export interface ResolvedRuntime {
@@ -133,6 +138,16 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 
 	if (mixVendorVerifierError(roles)) {
 		delete roles.verifier;
+	}
+
+	const lockProvider = options.lockProvider?.trim().toLowerCase();
+	if (lockProvider) {
+		for (const name of ["decision", "tooling", "workhorse", "planning", "frontier", "verifier"] as const) {
+			const role = roles[name];
+			if (role?.source === "api" && role.provider && role.provider.toLowerCase() !== lockProvider) {
+				delete roles[name];
+			}
+		}
 	}
 
 	return {

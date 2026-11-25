@@ -290,6 +290,30 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(detectFrontier({ XAI_API_KEY: "x", OPENAI_API_KEY: "o" })?.provider).toBe("xai");
 	});
 
+	it("drops saved xAI roles when the session provider is locked to google", () => {
+		let config = withHierarchy(defaultRuntimeConfig(), { mode: "api", layering: "auto" });
+		config = withRoleOverride(config, "workhorse", {
+			source: "api",
+			id: "grok-4.3",
+			provider: "xai",
+			thinking: "brief",
+		});
+		config = withRoleOverride(config, "frontier", {
+			source: "api",
+			id: "grok-4.7",
+			provider: "xai",
+			thinking: "deep",
+		});
+		const locked = resolveRuntime(config, {
+			env: { XAI_API_KEY: "x", GEMINI_API_KEY: "g" },
+			lockProvider: "google",
+		});
+		expect(locked.roles.workhorse).toBeUndefined();
+		expect(locked.roles.frontier?.provider).not.toBe("xai");
+		const open = resolveRuntime(config, { env: { XAI_API_KEY: "x", GEMINI_API_KEY: "g" } });
+		expect(open.roles.workhorse?.provider).toBe("xai");
+	});
+
 	it("switches Mistral, Qwen, and LFM without a download", () => {
 		const mistral = resolveRuntime(localConfig("mistral"), { frontier: null });
 		const qwen = resolveRuntime(localConfig("qwen"), { frontier: null });

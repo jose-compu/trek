@@ -1,10 +1,20 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.9`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.10`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [1.0.0-rc.10] - 2026-11-25
+
+### Added
+
+- Free-tier Gemini notes: AI Studio key, and `gemini-3.5-flash-lite` as the id that answered on 2026-11-25.
+
+### Fixed
+
+- A CLI `--model` pin is kept when `~/.trek/models.yaml` names another provider. Includes logosdb 1.6.0 already on this branch.
 
 ## [1.0.0-rc.9] - 2026-11-25
 

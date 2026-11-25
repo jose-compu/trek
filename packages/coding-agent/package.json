@@ -1,6 +1,6 @@
 {
 	"name": "@trek/coding-agent",
-	"version": "1.0.0-rc.9",
+	"version": "1.0.0-rc.10",
 	"description": "Coding agent CLI with read, bash, edit, write tools and session management",
 	"type": "module",
 	"trekConfig": {
@@ -44,9 +44,9 @@
 	},
 	"dependencies": {
 		"@silvia-odwyer/photon-node": "0.3.4",
-		"@trek/agent-core": "^1.0.0-rc.9",
-		"@trek/ai": "^1.0.0-rc.9",
-		"@trek/tui": "^1.0.0-rc.9",
+		"@trek/agent-core": "^1.0.0-rc.10",
+		"@trek/ai": "^1.0.0-rc.10",
+		"@trek/tui": "^1.0.0-rc.10",
 		"chalk": "5.6.2",
 		"cpa-agents": "0.4.1",
 		"cross-spawn": "7.0.6",

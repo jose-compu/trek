@@ -1643,7 +1643,7 @@ export class AgentSession {
 		if (!verdict.allowed) {
 			return verdict;
 		}
-		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const resolved = this._resolvedRuntime();
 		if (toolNeedsVerifier(toolName, (args ?? {}) as Record<string, unknown>, verifierBound(resolved.roles))) {
 			const grant = consumeVerifierGrant(this._verifierDecision);
 			this._verifierDecision = grant.remaining;
@@ -1944,10 +1944,10 @@ export class AgentSession {
 	private _branchModel(): { model: Model<any>; thinkingLevel: ThinkingLevel } {
 		const current = this.agent.state.model;
 		const thinkingLevel = this.agent.state.thinkingLevel;
-		if (!current || current.provider === "faux") {
+		if (!current || current.provider === "faux" || this._userPinnedModel) {
 			return { model: current, thinkingLevel };
 		}
-		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const resolved = this._resolvedRuntime();
 		const workhorse = resolved.roles.workhorse;
 		if (resolved.layering === "single" || !workhorse || workhorse.source !== "api") {
 			return { model: current, thinkingLevel };
@@ -2753,7 +2753,7 @@ export class AgentSession {
 
 	private memory(): MemoryManager {
 		if (!this._memory) {
-			const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+			const resolved = this._resolvedRuntime();
 			this._memory = new MemoryManager({
 				cwd: this._cwd,
 				sessionId: this.sessionManager.getSessionId(),
@@ -2781,7 +2781,7 @@ export class AgentSession {
 			this._catalogIds = new Set(catalog.domains.map((domain) => domain.id));
 			this._alwaysOnIds = new Set(catalog.domains.filter((domain) => domain.alwaysOn).map((domain) => domain.id));
 			const selection = selectDomain(catalog, { task, previous: this._previousTask });
-			const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+			const resolved = this._resolvedRuntime();
 			return attachLayerWorkflow(selection, resolved.layering, task);
 		} catch {
 			return none;
@@ -2981,7 +2981,7 @@ export class AgentSession {
 			return `${LOCAL_SUITE_WORK_SECTION}\n\n${built}`;
 		}
 		try {
-			const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+			const resolved = this._resolvedRuntime();
 			if (shouldInjectLayerNetwork(resolved)) {
 				const toolingBound = resolved.layering !== "single" && Boolean(resolved.roles.tooling);
 				return `${layeringNetworkSection(toolingBound)}\n\n${built}`;
@@ -2995,7 +2995,7 @@ export class AgentSession {
 	/** Pure local mode works in the folder. API mode keeps the normal chat prompt. */
 	private _localSuiteShouldBuildHere(): boolean {
 		try {
-			const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+			const resolved = this._resolvedRuntime();
 			return resolved.effectiveMode === "local";
 		} catch {
 			return false;
@@ -3113,6 +3113,21 @@ export class AgentSession {
 	private _toolErrorStreak = 0;
 	private _apiThinkingLevel?: ThinkingLevel;
 
+	/** Pinned `--provider`/`--model` ignores saved API roles from a different provider. */
+	private _resolve(config: ReturnType<typeof loadRuntimeConfig>) {
+		if (this._userPinnedModel && this.model) {
+			return resolveRuntime(config, {
+				frontier: { provider: this.model.provider, modelId: this.model.id },
+				lockProvider: this.model.provider,
+			});
+		}
+		return resolveRuntime(config);
+	}
+
+	private _resolvedRuntime() {
+		return this._resolve(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+	}
+
 	private _llamaManager(): LlamaProcessManager {
 		if (!this._llama) {
 			this._llama = createDefaultLlamaProcessManager();
@@ -3150,7 +3165,7 @@ export class AgentSession {
 			return;
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
-		const resolved = resolveRuntime(config);
+		const resolved = this._resolve(config);
 		const previousRole = this._lastHierarchyRole ?? sessionRoleForModel(resolved, this.model);
 		const floor = this._pendingElevate?.tier ?? this._ladderRole ?? startLadderRole(resolved);
 		this._ladderRole = floor;
@@ -3275,7 +3290,7 @@ export class AgentSession {
 			return false;
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
-		const resolved = resolveRuntime(config);
+		const resolved = this._resolve(config);
 		if (resolved.effectiveMode === "api") {
 			const apiDecision = resolved.roles.decision;
 			if (!apiDecision || apiDecision.source !== "api") {
@@ -3313,7 +3328,7 @@ export class AgentSession {
 			return;
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
-		const resolved = resolveRuntime(config);
+		const resolved = this._resolve(config);
 		if (resolved.effectiveMode === "api") {
 			const fromApi: HierarchyRole | undefined =
 				this._hierarchyDisplayRole ?? this._ladderRole ?? this._lastHierarchyRole;
@@ -3385,7 +3400,7 @@ export class AgentSession {
 			return false;
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
-		const resolved = resolveRuntime(config);
+		const resolved = this._resolve(config);
 		if (resolved.effectiveMode === "api" || !resolved.roles.decision) {
 			return false;
 		}
@@ -3483,7 +3498,7 @@ export class AgentSession {
 			return;
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
-		const resolved = resolveRuntime(config);
+		const resolved = this._resolve(config);
 		const elevate = this._pendingElevate;
 		const think = selectThinkRole({
 			text,
@@ -3544,7 +3559,7 @@ export class AgentSession {
 	/** Climb one step (or to a named higher tier) and show a discreet card. */
 	private async _climbLadder(why: string, requested?: LadderRole | "next"): Promise<LadderRole | undefined> {
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
-		const resolved = resolveRuntime(config);
+		const resolved = this._resolve(config);
 		const from = asClimbRole(this._ladderRole ?? this._lastHierarchyRole, resolved);
 		const signalText =
 			requested && requested !== "next"
@@ -3574,7 +3589,7 @@ export class AgentSession {
 		requested?: LadderRole | "next" | "decision",
 	): Promise<LadderRole | "decision" | undefined> {
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
-		const resolved = resolveRuntime(config);
+		const resolved = this._resolve(config);
 		const from = asClimbRole(this._ladderRole ?? this._lastHierarchyRole, resolved);
 		if (requested === "decision") {
 			const parked = await this._dropToDecision(why);
@@ -3626,7 +3641,7 @@ export class AgentSession {
 			return false;
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
-		const resolved = resolveRuntime(config);
+		const resolved = this._resolve(config);
 		if (resolved.effectiveMode === "api" && !resolved.roles.workhorse) {
 			return false;
 		}
@@ -3671,7 +3686,7 @@ export class AgentSession {
 			return false;
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
-		const resolved = resolveRuntime(config);
+		const resolved = this._resolve(config);
 		if (resolved.effectiveMode === "api" && !resolved.roles.workhorse) {
 			return false;
 		}
@@ -3709,7 +3724,7 @@ export class AgentSession {
 			return false;
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
-		const resolved = resolveRuntime(config);
+		const resolved = this._resolve(config);
 		if (resolved.effectiveMode === "api" && !resolved.roles.workhorse) {
 			return false;
 		}
@@ -3743,7 +3758,7 @@ export class AgentSession {
 			from,
 			to,
 		});
-		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const resolved = this._resolvedRuntime();
 		this.sessionManager.appendCustomEntry(
 			LAYER_ROUTE_CUSTOM_TYPE,
 			layerRouteTrace(from, to, "escalate", resolved.roles[to], why),
@@ -3757,7 +3772,7 @@ export class AgentSession {
 		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
 			return;
 		}
-		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const resolved = this._resolvedRuntime();
 		if (!shouldAutoDelegateLiveNetwork(task, resolved)) {
 			return;
 		}
@@ -3772,7 +3787,7 @@ export class AgentSession {
 		if (!shouldAskDecisionIntent(previous, next)) {
 			return undefined;
 		}
-		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const resolved = this._resolvedRuntime();
 		const decision = resolved.roles.decision;
 		if (!decision || decision.source !== "api") {
 			return undefined;
@@ -3820,7 +3835,7 @@ export class AgentSession {
 		if (process.env.PI_NO_LOCAL_LLM === "1" || this.model?.provider === "faux") {
 			return false;
 		}
-		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const resolved = this._resolvedRuntime();
 		if (!resolved.roles.tooling) {
 			return false;
 		}
@@ -3837,7 +3852,7 @@ export class AgentSession {
 			return this._parkOnDecisionFloor();
 		}
 		if (role === "tooling") {
-			const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+			const resolved = this._resolvedRuntime();
 			if (!resolved.roles.tooling) {
 				return false;
 			}
@@ -3863,7 +3878,7 @@ export class AgentSession {
 			this._emitHierarchyModel("tooling", mapped.provider, mapped.id);
 			return true;
 		}
-		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const resolved = this._resolvedRuntime();
 		let bindRole: LadderRole = role;
 		if (role === "frontier" && !resolved.roles.frontier) {
 			bindRole = frontierConsultRole(resolved).role;
@@ -3898,7 +3913,7 @@ export class AgentSession {
 
 	/** Bind Tooling as a runner. The climb floor stays Workhorse/Planning/Frontier. */
 	private async _delegateToTooling(why: string): Promise<boolean> {
-		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const resolved = this._resolvedRuntime();
 		const tooling = resolved.roles.tooling;
 		if (!tooling) {
 			return false;
@@ -3956,7 +3971,7 @@ export class AgentSession {
 			this._honorThinkingPin();
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
-		const resolved = resolveRuntime(config);
+		const resolved = this._resolve(config);
 		const from = this._ladderRole ?? this._lastHierarchyRole ?? startLadderRole(resolved);
 		const topicSignal = parseNewTopicSignal(text);
 		if (topicSignal) {
@@ -4081,7 +4096,7 @@ export class AgentSession {
 			return;
 		}
 		const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
-		const resolved = resolveRuntime(config);
+		const resolved = this._resolve(config);
 		const elevate = this._pendingElevate;
 		const floor = elevate?.tier ?? this._ladderRole;
 		if (floor !== "planning" && floor !== "frontier" && !this._planningBriefActive) {
@@ -4206,7 +4221,7 @@ export class AgentSession {
 	/** Frontier when assigned, else Planning. CI and faux runs use the session model. */
 	private _promotionModel(): { model: Model<any>; role: string; reason: string } | undefined {
 		if (process.env.TREK_PROMOTION_MODEL === "0") return undefined;
-		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const resolved = this._resolvedRuntime();
 		const pick = promotionRole(resolved);
 		if (!pick) return undefined;
 		const api =
@@ -4600,7 +4615,7 @@ export class AgentSession {
 		if (this.model.provider === "faux" || process.env.PI_NO_LOCAL_LLM === "1") {
 			return this.model;
 		}
-		const resolved = resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd }));
+		const resolved = this._resolvedRuntime();
 		const workhorse = resolved.roles.workhorse;
 		if (!workhorse || workhorse.source === "api") {
 			return this.model;
@@ -4730,7 +4745,7 @@ export class AgentSession {
 	} {
 		try {
 			const config = loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd });
-			const resolved = resolveRuntime(config);
+			const resolved = this._resolve(config);
 			const text = latestUserPrompt(prior);
 			const selection = selectSessionRole({
 				text,
@@ -5731,7 +5746,7 @@ export class AgentSession {
 				promptId,
 				cwd: this._cwd,
 				selection: this._turnSelection,
-				layering: resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd })).layering,
+				layering: this._resolvedRuntime().layering,
 				messageCount: this.agent.state.messages.length,
 				getMessageCount: () => this.agent.state.messages.length,
 				act: () => this._actOnTurn(messages),
@@ -7131,7 +7146,7 @@ export class AgentSession {
 				this._cwd,
 				() => this.agent.state.messages.length,
 				() => this._lastPromptTask,
-				() => resolveRuntime(loadRuntimeConfig({ agentDir: getAgentDir(), cwd: this._cwd })),
+				() => this._resolvedRuntime(),
 				{
 					spawn: (subtasks, signal) => this._spawnBranches(subtasks, signal),
 					gather: (ids) => gatherBranches(this._branchResults, ids),

@@ -8,6 +8,8 @@ Pi requires a bash shell on Windows. Checked locations (in order):
 
 For most users, [Git for Windows](https://git-scm.com/download/win) is sufficient.
 
+A free-tier Gemini session uses the same bash. See [Gemini free tier](gemini-free-tier.md).
+
 ## Custom Shell Path
 
 ```json
