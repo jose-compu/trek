@@ -200,7 +200,7 @@ cat README.md | trek -p "Summarize this text"
 
 Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`, `remember`, `recall`, `forget`.
 
-A three-line `edit` applies when the first non-empty line is unique, that line's match key is at least 12 characters, and the third non-empty line is exactly two file lines below the first. The middle line may differ. Match keys trim a leading indent, collapse repeated spaces, and treat `'` as `"`. Empty lines are not counted, so a blank line inside `oldText` is not one of the three. This candidate does not accept the 0.20.7 case where a blank line in the file pushes the third line one row further down. A shorter snippet still cannot replace a longer block. See [Upgrade from 0.20](upgrade-1.0.md).
+A three-line `edit` applies when the first non-empty line is unique, that line's match key is at least 12 characters, and the third non-empty line is exactly two file lines below the first. The middle line may differ. Match keys trim a leading indent, collapse repeated spaces, and treat `'` as `"`. Empty lines are not counted, so a blank line inside `oldText` is not one of the three. When `start + 2` misses, the matcher also accepts `start + 3` if a blank line in the file sits between the anchors (same as `v0.20.8` since **1.0.0-rc.6**). A shorter snippet still cannot replace a longer block. See [Upgrade from 0.20](upgrade-1.0.md).
 
 ### Memory
 

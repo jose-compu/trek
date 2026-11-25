@@ -1,10 +1,16 @@
 # Trek Changelog
 
-Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.8`).
+Monorepo release notes for **Trek Agent** (`trek-monorepo` @ `1.0.0-rc.9`).
 
 User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](packages/coding-agent/CHANGELOG.md) (shown at startup via `/changelog`). Package-specific histories: `packages/{ai,agent,tui}/CHANGELOG.md` (Pi upstream; Trek renames only where noted).
 
 ## [Unreleased]
+
+## [1.0.0-rc.9] - 2026-11-25
+
+### Fixed
+
+- Upgrade guide, usage docs, and roadmap state that blank-line `edit` anchor behavior matches `v0.20.8` from **rc.6** onward ([#311](https://github.com/jose-compu/trek/issues/311)).
 
 ## [1.0.0-rc.8] - 2026-11-21
 

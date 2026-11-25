@@ -80,7 +80,7 @@ Requirements: Node.js >= 23.6.0 for `@earendil-works/gondolin`, plus QEMU (requi
 
 Run the `trek` process in Docker when you want the simplest local container boundary.
 
-`Dockerfile.trek` for the 1.0.0-rc.8 Linux x64 archive. `@trek/coding-agent` is not on npm, and the package bin is `trek`.
+`Dockerfile.trek` for the 1.0.0-rc.9 Linux x64 archive. `@trek/coding-agent` is not on npm, and the package bin is `trek`.
 
 ```dockerfile
 FROM debian:bookworm-slim
@@ -88,7 +88,7 @@ FROM debian:bookworm-slim
 RUN apt-get update \
   && apt-get install -y --no-install-recommends bash ca-certificates curl tar \
   && rm -rf /var/lib/apt/lists/* \
-  && curl -fsSL -o /tmp/trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.8/trek-linux-x64.tar.gz \
+  && curl -fsSL -o /tmp/trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.9/trek-linux-x64.tar.gz \
   && tar -xzf /tmp/trek.tar.gz -C /opt \
   && ln -s /opt/trek/trek /usr/local/bin/trek \
   && rm /tmp/trek.tar.gz
