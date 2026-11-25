@@ -4,6 +4,10 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+### Changed
+
+- Bump logosdb to 1.6.0.
+
 ## [1.0.0-rc.9] - 2026-11-25
 
 ### Fixed
