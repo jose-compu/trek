@@ -3154,6 +3154,9 @@ export class AgentSession {
 	 * PI_NO_LOCAL_LLM=1 keeps the session model, so the CI suite does not spawn llama.cpp.
 	 */
 	private async _bindLocalCompletion(text: string, options?: { keepDecisionDisplay?: boolean }): Promise<void> {
+		if (this._userPinnedModel) {
+			return;
+		}
 		if (!shouldRebindSessionRole(this._turnLayerAction)) {
 			return;
 		}
@@ -3848,6 +3851,9 @@ export class AgentSession {
 
 	/** Switch the session model to a ladder/runner role without a climb card. */
 	private async _bindHierarchyRole(role: HierarchyRole): Promise<boolean> {
+		if (this._userPinnedModel) {
+			return false;
+		}
 		if (role === "decision") {
 			return this._parkOnDecisionFloor();
 		}
@@ -3913,6 +3919,9 @@ export class AgentSession {
 
 	/** Bind Tooling as a runner. The climb floor stays Workhorse/Planning/Frontier. */
 	private async _delegateToTooling(why: string): Promise<boolean> {
+		if (this._userPinnedModel) {
+			return false;
+		}
 		const resolved = this._resolvedRuntime();
 		const tooling = resolved.roles.tooling;
 		if (!tooling) {

@@ -144,7 +144,7 @@ export function resolveRuntime(config: RuntimeConfig, options: ResolveRuntimeOpt
 	if (lockProvider) {
 		for (const name of ["decision", "tooling", "workhorse", "planning", "frontier", "verifier"] as const) {
 			const role = roles[name];
-			if (role?.source === "api" && role.provider && role.provider.toLowerCase() !== lockProvider) {
+			if (role?.source === "api" && (role.provider ?? "").toLowerCase() !== lockProvider) {
 				delete roles[name];
 			}
 		}

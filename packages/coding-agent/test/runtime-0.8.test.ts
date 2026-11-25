@@ -312,6 +312,12 @@ describe("0.8.0 runtime gate (#92)", () => {
 		expect(locked.roles.frontier?.provider).not.toBe("xai");
 		const open = resolveRuntime(config, { env: { XAI_API_KEY: "x", GEMINI_API_KEY: "g" } });
 		expect(open.roles.workhorse?.provider).toBe("xai");
+		const missingProvider = withRoleOverride(
+			withHierarchy(defaultRuntimeConfig(), { mode: "api", layering: "auto" }),
+			"workhorse",
+			{ source: "api", id: "grok-4.3", thinking: "brief" },
+		);
+		expect(resolveRuntime(missingProvider, { lockProvider: "google" }).roles.workhorse).toBeUndefined();
 	});
 
 	it("switches Mistral, Qwen, and LFM without a download", () => {
