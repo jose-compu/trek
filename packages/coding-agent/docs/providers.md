@@ -228,6 +228,30 @@ pi --provider cloudflare-workers-ai --model "@cf/moonshotai/kimi-k2.6"
 
 Pi automatically sets `x-session-affinity` for [prefix caching](https://developers.cloudflare.com/workers-ai/features/prompt-caching/) discounts.
 
+### Google Gemini free tier
+
+`GEMINI_API_KEY` is an AI Studio key. Create it at [aistudio.google.com](https://aistudio.google.com) → Get API key. Leave billing unlinked to stay on the free tier. The free-tier list changes; confirm it on the [Gemini pricing page](https://ai.google.dev/gemini-api/docs/pricing).
+
+Google also serves an OpenAI-compatible chat route at `https://generativelanguage.googleapis.com/v1beta/openai/`. Trek's `google` provider does not use that route. It calls the Gemini API with `GEMINI_API_KEY`.
+
+Checked 2026-11-25 with a free-tier key:
+
+| Model id | OpenAI-compatible `chat/completions` |
+| --- | --- |
+| `gemini-3.5-flash-lite` | Answered in about 1s |
+| `gemini-3.8-flash` | No bytes before timeout |
+| `gemini-3.7-flash` | No bytes before timeout |
+| `gemini-2.5-flash` | 404 for new users |
+
+The native `generateContent` call Trek uses also answered for `gemini-3.5-flash-lite` (about 5s) and returned no body for `gemini-3.8-flash`.
+
+```bash
+export GEMINI_API_KEY=...
+trek --provider google --model gemini-3.5-flash-lite
+```
+
+`--model` pins that id. A saved `~/.trek/models.yaml` that names another provider does not replace it. Pass the same flags on macOS, Linux, and Windows. On Windows, run Trek from Git Bash. See [Gemini free tier](gemini-free-tier.md).
+
 ### Google Vertex AI
 
 Uses Application Default Credentials:

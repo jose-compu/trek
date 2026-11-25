@@ -854,6 +854,7 @@ export async function main(args: string[], options?: MainOptions) {
 			excludeTools: sessionOptions.excludeTools,
 			noTools: sessionOptions.noTools,
 			customTools: sessionOptions.customTools,
+			pinModel: sessionOptions.pinModel,
 		});
 		const cliThinkingOverride = parsed.thinking !== undefined || cliThinkingFromModel;
 		if (created.session.model && cliThinkingOverride) {

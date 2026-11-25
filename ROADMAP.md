@@ -1,6 +1,6 @@
 # Trek Agent — Implementation Roadmap
 
-**Status:** **1.0.0-rc.9** on `release-1-0-rc1`. Stable line remains **0.20.8** on `release-0-20`. **Next:** final `v1.0.0` after the remaining ship gate. Multilingual memory (**0.21**) and the rest of the agentic bench (**1.1**) are post-1.0.  
+**Status:** **1.0.0-rc.10** on `release-1-0-rc1`. Stable line remains **0.20.8** on `release-0-20`. **Next:** final `v1.0.0` after the remaining ship gate. Multilingual memory (**0.21**) and the rest of the agentic bench (**1.1**) are post-1.0.  
 **Baseline:** `pi-original/` (Pi Coding Agent monorepo) → hard fork into `trek/` (independent repo)  
 **Versioning:** Stages through 0.20 are **minor** releases (`0.1.0` … `0.20.x`). **1.0.0** is the first **major** ship gate. Patch releases remain hotfixes within a stage. Release candidates use `1.0.0-rc.N` (GitHub prerelease only; **no npm** until an explicit later decision).  
 **Sources:** `PROMPT.md`, `SPECS_SAFETY_HARNESS.md` (safety harness), `SPECS_REFLECTIVE_AGENT.md` (reflective loop). **Canonical agent cycle:** `Observe → Intend → Act → Reflect` (O→I→A→R). The safety spec’s Plan→Act→Reflect maps to the same loop with **Plan = Intend** and **Observe** mandatory upfront — not a separate P→A→R stack.
@@ -76,7 +76,7 @@
 | **0.19.0** | CLI power tools | Scripted `ex`/`vim -Es`/`ed`/`sed`, plus fast Unix tools; Scripts layer uses them with no model | 0.10.0, 0.16.0, 0.17.0, 0.18.0 | **Done** (`v0.19.0`) |
 | **0.20.0** | Semantic Memory | Index the working repo and docs in LogosDB; smart/advanced chunking; retrieve related code and docs that `grep` / bash cannot find. Coding domain gains SE workflows (issue → PR → **Belay** → merge; split epics/issues) | 0.11.0, 0.12.0, 0.16.0, 0.18.0 | **Done** (`v0.20.0` … `v0.20.8` on `release-0-20`) |
 | **0.21.0** | Multilingual memory | Multilingual / longer-context embeddings (e5-small, multilingual MiniLM); optional embedder switch without corrupting MiniLM indexes | 0.20.0 | Post-1.0 |
-| **1.0.0** | Release | Major ship gate. RC line through `v1.0.0-rc.9`: science catalog, `trek bench` slice, debug-log redaction, render-snapshot redaction, named-file tool loop, three-line `edit` anchor (blank-line case from rc.6). Final tag not cut. No npm | All prior (0.21 is post-1.0) | **RC** (`v1.0.0-rc.9`) |
+| **1.0.0** | Release | Major ship gate. RC line through `v1.0.0-rc.10`: science catalog, `trek bench` slice, debug-log redaction, render-snapshot redaction, named-file tool loop, three-line `edit` anchor (blank-line case from rc.6). Final tag not cut. No npm | All prior (0.21 is post-1.0) | **RC** (`v1.0.0-rc.10`) |
 | **1.1.0** | Agentic benchmark | Scored tool-using tasks plus a confirm-gated lesson loop. Faux pack is the CI gate. Not `trek models benchmark` (tokens/s). An rc.4 slice of `trek bench run` already ships | 1.0.0, 0.14.0, 0.15.0 | Post-1.0 (slice in rc.4) |
 
 **Note:** Three-layer memory shipped in `v0.11.0` (also in `v0.10.1`–`v0.10.3`). **0.20.0** is the working-tree + docs semantic index: related files that do not share tokens with the query. **0.21.0** keeps English MiniLM as default and adds selectable multilingual embedders. **1.0.0** was formerly roadmap **0.21.0 Release** / GitHub **v0.22.0 Major Release**. Domain and workflow are detected again for every task context. A session menu does not choose them.
@@ -1582,7 +1582,7 @@ Use an advanced field **when it helps**. Do not paste nodes. Do not invent a sec
 
 **Goal:** Shippable installable packages (PROMPT §14–16, §18). First **major** line. Formerly roadmap 0.21.0 Release / GitHub v0.22.0 Major Release.
 
-**Tracking:** [v1.0.0 milestone](https://github.com/jose-compu/trek/milestone/12) · branch `release-1-0-rc1` · current tag `v1.0.0-rc.9`.
+**Tracking:** [v1.0.0 milestone](https://github.com/jose-compu/trek/milestone/12) · branch `release-1-0-rc1` · current tag `v1.0.0-rc.10`.
 
 #### Shipped on the release-candidate line (through rc.8)
 
@@ -1597,7 +1597,7 @@ Verified against the tree on `release-1-0-rc1` and the package changelogs. This 
 - **rc.7.** `/debug` render snapshot redaction for `trek-render-debug.log`.
 - **rc.8.** Prologue Constitution sealed into every session system prompt.
 
-Tag `v1.0.0-rc.9` will publish a GitHub prerelease (`--prerelease`, not `latest`) with six archive assets. `@trek/coding-agent` is not on the npm registry. `publish-npm` remains `if: false`.
+Tag `v1.0.0-rc.10` will publish a GitHub prerelease (`--prerelease`, not `latest`) with six archive assets. `@trek/coding-agent` is not on the npm registry. `publish-npm` remains `if: false`.
 
 #### Still required before the final `v1.0.0` tag
 
@@ -1848,7 +1848,7 @@ flowchart TD
 |---|---|---|
 | **0.1.0** … **0.19.x** | see tags | Genesis through CLI power tools |
 | **0.20.0** Semantic Memory | `v0.20.0` … `v0.20.8` | LogosDB repo/docs index, coding SE DAGs, OpenRouter free default, CLI model pin. Stable branch `release-0-20` |
-| **1.0.0-rc.9** | `v1.0.0-rc.1` … `v1.0.0-rc.9` | Science catalog, `trek bench` slice, debug-log redaction, render-snapshot redaction, named-file tool loop, three-line `edit` anchor (blank-line case from rc.6). Final `v1.0.0` not tagged |
+| **1.0.0-rc.10** | `v1.0.0-rc.1` … `v1.0.0-rc.10` | Science catalog, `trek bench` slice, debug-log redaction, render-snapshot redaction, named-file tool loop, three-line `edit` anchor (blank-line case from rc.6). Final `v1.0.0` not tagged |
 
 Run from `trek/`:
 
@@ -1863,8 +1863,8 @@ tail -f ~/.trek/agent/trek-debug.log   # watch debug in another terminal
 
 ### Next: final `v1.0.0`
 
-Branch `release-1-0-rc1` is at **v1.0.0-rc.9**. The remaining ship gate is in §1.0.0 above. Multilingual memory stays **0.21.0**. The rest of the agentic bench stays **1.1.0**. **No npm** until an explicit decision.
+Branch `release-1-0-rc1` is at **v1.0.0-rc.10**. The remaining ship gate is in §1.0.0 above. Multilingual memory stays **0.21.0**. The rest of the agentic bench stays **1.1.0**. **No npm** until an explicit decision.
 
 ---
 
-*Roadmap last synced with `trek/` at **v1.0.0-rc.9** on `release-1-0-rc1`. Stable line **v0.20.8**.*
+*Roadmap last synced with `trek/` at **v1.0.0-rc.10** on `release-1-0-rc1`. Stable line **v0.20.8**.*

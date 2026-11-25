@@ -4,9 +4,19 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [1.0.0-rc.10] - 2026-11-25
+
+### Added
+
+- [Gemini free tier](docs/gemini-free-tier.md): AI Studio key, macOS, Linux, and Windows, and the free model id that answered (`gemini-3.5-flash-lite`).
+
 ### Changed
 
 - Bump logosdb to 1.6.0.
+
+### Fixed
+
+- `--provider` / `--model` stays on that model. A saved hierarchy for another provider is not applied.
 
 ## [1.0.0-rc.9] - 2026-11-25
 

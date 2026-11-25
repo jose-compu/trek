@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.0.0-rc.10] - 2026-11-25
+
+### Fixed
+
+- Version lockstep with the coding-agent pin that keeps a CLI `--model` on its provider.
+
 ## [1.0.0-rc.9] - 2026-11-25
 
 ### Fixed
