@@ -1,6 +1,6 @@
 ![Trek Agent banner. The artwork is the 0.20 semantic-memory graphic.](./assets/banner-0.20.png)
 
-# Trek Agent v1.0.0-rc.8
+# Trek Agent v1.0.0-rc.9
 
 Trek is a **hard fork of the [Pi Coding Agent](https://pi.dev/)** — the minimal terminal coding agent with read, bash, edit, write, and `script_edit` tools, sessions, and a TypeScript extension ecosystem.
 
@@ -23,17 +23,17 @@ Pi optimizes for simplicity and adaptability: you extend it with plugins rather 
 | **Layering** | Optional stack (`single` / `auto` / `manual`). Climb is Workhorse ⇄ Planning ⇄ Frontier. Tooling is a runner. `/thinking briefly` | **0.18.0 Layering** |
 | **CLI power tools** | `script_edit` (ex / `vim -Es` / ed / sed), Unix kit probe, recipes, Scripts route with no chat model | **0.19.0** |
 | **Semantic memory** | Chunked index, one-hop neighbors, coding DAGs in the catalog | **0.20.0** |
-| **1.0 release candidate** | Science LaTeX catalog, `trek bench`, debug-log redaction, render-snapshot redaction, named-file writes stay on the tool loop, three-line `edit` anchor, no planning brief when Planning and Workhorse are the same model | **1.0.0-rc.8** |
+| **1.0 release candidate** | Science LaTeX catalog, `trek bench`, debug-log redaction, render-snapshot redaction, named-file writes stay on the tool loop, three-line `edit` anchor, no planning brief when Planning and Workhorse are the same model | **1.0.0-rc.9** |
 
 Every user turn follows **Observe → Intend → Act → Reflect** (O→I→A→R). Safety checks wrap **Act**. During **Intend**, Trek detects the work domain from that task context and selects the workflow the context needs. The next turn detects again. Traces and audit metadata accumulate over time so behavior is inspectable, not opaque.
 
 Pi compatibility is preserved: community packages from [pi.dev/packages](https://pi.dev/packages) install with `trek install npm:<package>`. See [Pi Coding Agent plugins](#pi-coding-agent-plugins) below.
 
-**Version:** 1.0.0-rc.8 on `release-1-0-rc1`. Stable line: **0.20.8** on `release-0-20`. See [CHANGELOG.md](./CHANGELOG.md) and [ROADMAP.md](./ROADMAP.md). Upgrade from 0.20: [packages/coding-agent/docs/upgrade-1.0.md](packages/coding-agent/docs/upgrade-1.0.md).
+**Version:** 1.0.0-rc.9 on `release-1-0-rc1`. Stable line: **0.20.8** on `release-0-20`. See [CHANGELOG.md](./CHANGELOG.md) and [ROADMAP.md](./ROADMAP.md). Upgrade from 0.20: [packages/coding-agent/docs/upgrade-1.0.md](packages/coding-agent/docs/upgrade-1.0.md).
 
 ## What 1.0.0 means
 
-1.0.0 is the first major ship gate. `1.0.0-rc.8` is a GitHub prerelease, not the final `v1.0.0` tag. It keeps the 0.20 agent (tools, sessions, domains, memory, layering) and adds the rc.1–rc.7 behavior in the upgrade guide. Multilingual embeddings stay **0.21**. The faux agentic-bench CI gate stays **1.1**. npm publish stays off.
+1.0.0 is the first major ship gate. `1.0.0-rc.9` is a GitHub prerelease, not the final `v1.0.0` tag. It keeps the 0.20 agent (tools, sessions, domains, memory, layering) and adds the rc.1–rc.7 behavior in the upgrade guide. Multilingual embeddings stay **0.21**. The faux agentic-bench CI gate stays **1.1**. npm publish stays off.
 
 `~/.trek/agent/` and project `.trek/` are unchanged. Replacing the binary does not rewrite settings, sessions, or lessons.
 
@@ -41,7 +41,7 @@ One-page session map: [assets/cheatsheet-1.0.png](./assets/cheatsheet-1.0.png) (
 
 ## Quick start
 
-After the `v1.0.0-rc.8` tag is pushed, download the archive for your machine from `https://github.com/jose-compu/trek/releases/tag/v1.0.0-rc.8`. Until then, build from this branch. `releases/latest` is the stable tag (**v0.20.8**), not this candidate. `@trek/coding-agent` is not on the npm registry.
+After the `v1.0.0-rc.9` tag is pushed, download the archive for your machine from `https://github.com/jose-compu/trek/releases/tag/v1.0.0-rc.9`. Until then, build from this branch. `releases/latest` is the stable tag (**v0.20.8**), not this candidate. `@trek/coding-agent` is not on the npm registry.
 
 | OS | Archive |
 |---|---|
@@ -55,7 +55,7 @@ After the `v1.0.0-rc.8` tag is pushed, download the archive for your machine fro
 macOS / Linux (swap the archive name for your machine):
 
 ```bash
-curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.8/trek-darwin-arm64.tar.gz
+curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.9/trek-darwin-arm64.tar.gz
 tar -xzf trek.tar.gz
 export PATH="$PWD/trek:$PATH"
 cd /path/to/your/project
@@ -77,7 +77,7 @@ npx trek --help
 
 ## Status
 
-**1.0.0-rc.8** is the current release-candidate on `release-1-0-rc1`; the `v1.0.0-rc.8` GitHub prerelease ships when that tag is published. Stable tag remains **0.20.8**. There is no published `@trek/*` package on npm. Factory `layering: single` (one Workhorse). `/hierarchy auto` maps Tooling / Workhorse / Planning / Frontier from a catalog. Climb is Workhorse ⇄ Planning ⇄ Frontier; Tooling is a runner, not a rung. `/thinking briefly`. A domain DAG and a `layer-*` DAG may run on the same turn. Lessons stay domain-typed. **0.17.0** compact cards (`ctrl+o`), faster startup and JSONL, CI budgets, several TUI sessions at once. **0.16.1** parks on Decision (d1) and may solve structured turns there (or invent a Decision pack via Tooling). Footer chords work in Terminal.app. Bash recipes and `trek models benchmark` ship. **0.15.1** stopped a fix/push/unblock prompt from starting the engineering review. **0.15.0** types a lesson by its domain and recalls it only there. `/patterns` edits the pattern. `/crystallize` writes a domain skill only after you confirm. A workflow node calls a tool only when that node allows it. **0.14.1** shows the honesty line, a stored lesson, and Working... as soon as there is something to report. Shortcut keys, the branch, and the model name use a quiet accent. **0.14.0** runs up to four branches at once. A failed turn stores a lesson. `/crystallize` writes a skill only after you confirm. **0.13.1** `/domains` turns a domain on or off for the next prompt. A workflow reply that skips a node, or adds a fact that is not in the turn, is marked on that turn. **0.13.0** added operator modes. `--operator-mode` chooses supervised, delegated, checkpoint, diagnostic, or ask. Ask answers and may read. It does not write. The laws stay in force. A selected Archon workflow is called one node at a time. An ambiguous prompt asks one question. On Telegram, a guest may talk and cannot run tools. **0.12.0** draws a green workflow call. Domain commands are in [Domains](#domains). **0.11.0** memory is documented in [Memory](#memory). **0.10.0** runs independent reads, and edits of different files, together. `trek processes` prints the seeded tree. `--effort loose` multiplies the effort stops by 10, and `--effort off` does not stop the turn for effort. **0.9.1** hides an edit that already matches the file. **0.9.0** routes each component, keeps same-file edits from colliding, and stops a prompt that repeats a failed command or a no-op edit. **0.8.1** updated production dependencies flagged by `npm audit`. **0.8.0** made remote API the default and kept llama.cpp opt-in. **0.7.0 Audit** shipped the session seed (default `42`), `default` / `strict_audit` modes, per-step `trek:audit_step` records, and honest warnings when a provider cannot honor seed. Bit-exact replay is not claimed on closed APIs or on GPU llama.cpp. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
+**1.0.0-rc.9** is the current release-candidate on `release-1-0-rc1`; the `v1.0.0-rc.9` GitHub prerelease ships when that tag is published. Stable tag remains **0.20.8**. There is no published `@trek/*` package on npm. Factory `layering: single` (one Workhorse). `/hierarchy auto` maps Tooling / Workhorse / Planning / Frontier from a catalog. Climb is Workhorse ⇄ Planning ⇄ Frontier; Tooling is a runner, not a rung. `/thinking briefly`. A domain DAG and a `layer-*` DAG may run on the same turn. Lessons stay domain-typed. **0.17.0** compact cards (`ctrl+o`), faster startup and JSONL, CI budgets, several TUI sessions at once. **0.16.1** parks on Decision (d1) and may solve structured turns there (or invent a Decision pack via Tooling). Footer chords work in Terminal.app. Bash recipes and `trek models benchmark` ship. **0.15.1** stopped a fix/push/unblock prompt from starting the engineering review. **0.15.0** types a lesson by its domain and recalls it only there. `/patterns` edits the pattern. `/crystallize` writes a domain skill only after you confirm. A workflow node calls a tool only when that node allows it. **0.14.1** shows the honesty line, a stored lesson, and Working... as soon as there is something to report. Shortcut keys, the branch, and the model name use a quiet accent. **0.14.0** runs up to four branches at once. A failed turn stores a lesson. `/crystallize` writes a skill only after you confirm. **0.13.1** `/domains` turns a domain on or off for the next prompt. A workflow reply that skips a node, or adds a fact that is not in the turn, is marked on that turn. **0.13.0** added operator modes. `--operator-mode` chooses supervised, delegated, checkpoint, diagnostic, or ask. Ask answers and may read. It does not write. The laws stay in force. A selected Archon workflow is called one node at a time. An ambiguous prompt asks one question. On Telegram, a guest may talk and cannot run tools. **0.12.0** draws a green workflow call. Domain commands are in [Domains](#domains). **0.11.0** memory is documented in [Memory](#memory). **0.10.0** runs independent reads, and edits of different files, together. `trek processes` prints the seeded tree. `--effort loose` multiplies the effort stops by 10, and `--effort off` does not stop the turn for effort. **0.9.1** hides an edit that already matches the file. **0.9.0** routes each component, keeps same-file edits from colliding, and stops a prompt that repeats a failed command or a no-op edit. **0.8.1** updated production dependencies flagged by `npm audit`. **0.8.0** made remote API the default and kept llama.cpp opt-in. **0.7.0 Audit** shipped the session seed (default `42`), `default` / `strict_audit` modes, per-step `trek:audit_step` records, and honest warnings when a provider cannot honor seed. Bit-exact replay is not claimed on closed APIs or on GPU llama.cpp. Artifact files under `.trek/versions/` are local history (keep them out of git; labeled commits are the git undo layer).
 
 ## Memory
 

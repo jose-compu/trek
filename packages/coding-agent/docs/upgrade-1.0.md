@@ -1,13 +1,13 @@
-# Upgrade from 0.20 to 1.0.0-rc.8
+# Upgrade from 0.20 to 1.0.0-rc.9
 
-`1.0.0-rc.8` is the release candidate on branch `release-1-0-rc1` (GitHub prerelease once `v1.0.0-rc.8` is tagged). The stable line is **0.20.8** on `release-0-20`. This page is the migration note for that candidate. It is not a final `v1.0.0` changelog.
+`1.0.0-rc.9` is the release candidate on branch `release-1-0-rc1` (GitHub prerelease once `v1.0.0-rc.9` is tagged). The stable line is **0.20.8** on `release-0-20`. This page is the migration note for that candidate. It is not a final `v1.0.0` changelog.
 
 ## Install
 
-After `v1.0.0-rc.8` is tagged, download the archive from `https://github.com/jose-compu/trek/releases/tag/v1.0.0-rc.8`. Until then, build from `release-1-0-rc1`. `releases/latest` is **v0.20.8**, because the candidate is a prerelease.
+After `v1.0.0-rc.9` is tagged, download the archive from `https://github.com/jose-compu/trek/releases/tag/v1.0.0-rc.9`. Until then, build from `release-1-0-rc1`. `releases/latest` is **v0.20.8**, because the candidate is a prerelease.
 
 ```bash
-curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.8/trek-linux-x64.tar.gz
+curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.9/trek-linux-x64.tar.gz
 tar -xzf trek.tar.gz
 export PATH="$PWD/trek:$PATH"
 trek --version
@@ -40,15 +40,15 @@ The binary name stays `trek`. `PI_*` environment variables that 0.20 accepted ar
 
 ## What changed since 0.20.4
 
-The candidate and the 0.20.5–0.20.8 stable patches share three fixes. `packages/coding-agent/src/utils/debug-redact.ts` and `packages/coding-agent/src/core/domains/select.ts` match `v0.20.8`. The `edit` anchor does not.
+The candidate and the 0.20.5–0.20.8 stable patches share these fixes. `packages/coding-agent/src/utils/debug-redact.ts`, `packages/coding-agent/src/core/domains/select.ts`, and `packages/coding-agent/src/core/tools/edit-diff.ts` match `v0.20.8` from **rc.6** onward for the `edit` rows below.
 
-| Change | 0.20.8 | 1.0.0-rc.8 |
+| Change | 0.20.8 | 1.0.0-rc.9 |
 |---|---|---|
 | Debug log redacts `--api-key`, `--token`, `--password`, `--secret`, and `=value` forms, plus `sk-` / `sk-ant-` / `sk-or-v1-` / `xai-` / `ghp_` / `hf_` / `gsk_` / `csk-` shapes, Bearer tokens, and object keys such as `api_key` and `authorization` | yes (0.20.5) | yes (rc.2) |
 | `/debug` snapshot (`trek-render-debug.log`) uses the same redactor before writing the file | no | yes (rc.7) |
 | A turn that says write, edit, update, or replace and names a file with an extension does not enter a domain workflow | yes (0.20.8) | yes (rc.4) |
 | Three-line `edit`: unique first line, third line two file lines below, middle line may differ | yes (0.20.6) | yes (rc.5) |
-| Three-line `edit` across one blank line (third line three file lines below, and a blank line between the anchors) | yes (0.20.7) | no |
+| Three-line `edit` across one blank line (third line three file lines below, and a blank line between the anchors) | yes (0.20.7) | yes (rc.6) |
 | Science workflows beyond `method-check` | no | yes (rc.3) |
 | `trek bench run` | no | yes (rc.4) |
 | Planning brief skipped when Planning and Workhorse are the same model | no | yes (rc.4) |
@@ -65,7 +65,7 @@ Science can be turned off. It is not one of Meta, AI, Security, and Engineering.
 
 ### Edit
 
-For an `oldText` of at least three non-empty lines, the anchor applies only when the first line's match key is unique and at least 12 characters, and the last line sits on a small window around that snippet. The three-line case requires the third line to be exactly two file lines below the first (`start + 2`). The middle line is not required to match. Empty lines are dropped before the line count, so a blank line inside `oldText` is not one of the three lines. On `v0.20.8`, if `start + 2` misses, the matcher also accepts `start + 3` when a blank line sits between the anchors. That second accept is not in rc.5.
+For an `oldText` of at least three non-empty lines, the anchor applies only when the first line's match key is unique and at least 12 characters, and the last line sits on a small window around that snippet. The three-line case requires the third line to be exactly two file lines below the first (`start + 2`). The middle line is not required to match. Empty lines are dropped before the line count, so a blank line inside `oldText` is not one of the three lines. If `start + 2` misses, the matcher also accepts `start + 3` when a blank line sits between the anchors, same as `v0.20.8` since **rc.6**.
 
 Match keys trim leading whitespace, collapse repeated spaces and tabs, and treat `'` as `"`.
 
@@ -89,8 +89,7 @@ trek bench run [--live] [--lever single|auto|both] [--profile same|climb|fan] [-
 - npm packages
 - Multilingual embeddings (0.21, issue 289)
 - The 1.1 faux-pack CI gate, confirm-gated bench lessons, and a locked score baseline (issues 292–298)
-- The 0.20.7 blank-line `edit` anchor
 
 ## Rollback
 
-Install [v0.20.8](https://github.com/jose-compu/trek/releases/tag/v0.20.8) the same way, using that tag in the download URL. Settings and sessions do not need a reverse migration. You lose the science catalog, `trek bench`, the planning-brief skip, and the one-shot shell classification. You gain the blank-line `edit` anchor.
+Install [v0.20.8](https://github.com/jose-compu/trek/releases/tag/v0.20.8) the same way, using that tag in the download URL. Settings and sessions do not need a reverse migration. You lose the science catalog, `trek bench`, the planning-brief skip, and the one-shot shell classification. The blank-line `edit` anchor matches `v0.20.8` from **rc.6** onward, so rollback is not needed for that fix alone.

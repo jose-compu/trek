@@ -1,13 +1,13 @@
 # Quickstart
 
-This page gets you from install to a first `trek` session on **1.0.0-rc.8**. Coming from 0.20, read [Upgrade from 0.20](upgrade-1.0.md) first.
+This page gets you from install to a first `trek` session on **1.0.0-rc.9**. Coming from 0.20, read [Upgrade from 0.20](upgrade-1.0.md) first.
 
 ## Install
 
 Download the GitHub release archive. `releases/latest` is the stable tag v0.20.8, not this candidate. `@trek/coding-agent` is not on npm.
 
 ```bash
-curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.8/trek-darwin-arm64.tar.gz
+curl -fsSL -o trek.tar.gz https://github.com/jose-compu/trek/releases/download/v1.0.0-rc.9/trek-darwin-arm64.tar.gz
 tar -xzf trek.tar.gz
 export PATH="$PWD/trek:$PATH"
 trek --version

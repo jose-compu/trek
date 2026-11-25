@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [1.0.0-rc.9] - 2026-11-25
+
+### Fixed
+
+- [Upgrade from 0.20](docs/upgrade-1.0.md) and [usage](docs/usage.md) document blank-line `edit` anchor parity with `v0.20.8` from **rc.6** ([#311](https://github.com/jose-compu/trek/issues/311)).
+
 ## [1.0.0-rc.8] - 2026-11-21
 
 ### Changed

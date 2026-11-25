@@ -1,6 +1,6 @@
 {
 	"name": "@trek/ai",
-	"version": "1.0.0-rc.8",
+	"version": "1.0.0-rc.9",
 	"description": "Unified LLM API with automatic model discovery and provider configuration",
 	"type": "module",
 	"main": "./dist/index.js",

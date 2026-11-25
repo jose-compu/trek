@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.0.0-rc.9] - 2026-11-25
+
+### Fixed
+
+- Trek 1.0 upgrade docs note blank-line `edit` anchor parity with `v0.20.8` from **rc.6** ([#311](https://github.com/jose-compu/trek/issues/311)).
+
 ## [1.0.0-rc.8] - 2026-11-21
 
 ## [1.0.0-rc.7] - 2026-11-21
