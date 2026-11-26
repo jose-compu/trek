@@ -118,6 +118,27 @@ else
     echo "==> Skipping package build (--skip-build)"
 fi
 
+# logosdb's install is `prebuild-install || node-gyp`. npm ci --ignore-scripts
+# leaves the addon unbuilt. The host binary (and any prebuilt tree in
+# LOGOSDB_NATIVE_DIR/<platform>/logosdb.node) is copied next to trek.
+if [[ ! -f node_modules/logosdb/build/Release/logosdb.node ]]; then
+    echo "==> Building host logosdb addon..."
+    npm rebuild logosdb || echo "warning: logosdb native rebuild failed; this host's archive will not include native/logosdb.node"
+fi
+HOST_NODE="$(node -p "process.platform + '-' + process.arch")"
+case "$HOST_NODE" in
+    darwin-arm64) HOST_PLATFORM=darwin-arm64 ;;
+    darwin-x64) HOST_PLATFORM=darwin-x64 ;;
+    linux-x64) HOST_PLATFORM=linux-x64 ;;
+    linux-arm64) HOST_PLATFORM=linux-arm64 ;;
+    win32-x64) HOST_PLATFORM=windows-x64 ;;
+    win32-arm64) HOST_PLATFORM=windows-arm64 ;;
+    *) HOST_PLATFORM="" ;;
+esac
+# These three archives must contain native/logosdb.node. The other three
+# still build; memory there reports a missing addon instead of the bindings error.
+REQUIRED_LOGOSDB_PLATFORMS="windows-x64 linux-x64 darwin-arm64"
+
 echo "==> Building binaries..."
 cd packages/coding-agent
 
@@ -136,11 +157,12 @@ for platform in "${PLATFORMS[@]}"; do
     echo "Building for $platform..."
     # Bun compiled executables only embed worker scripts when they are passed as
     # explicit build entrypoints. The runtime can still use new URL(...), but the
-    # worker must be present in the compiled executable.
+    # worker must be present in the compiled executable. The compile script also
+    # rewrites logosdb so bindings() is not called on the virtual B:/~BUN path.
     if [[ "$platform" == windows-* ]]; then
-        bun build --compile --target=bun-$platform ./dist/bun/cli.js ./src/utils/image-resize-worker.ts --outfile "$OUTPUT_DIR/$platform/trek.exe"
+        bun ../../scripts/compile-binary.mjs "$platform" "$OUTPUT_DIR/$platform/trek.exe"
     else
-        bun build --compile --target=bun-$platform ./dist/bun/cli.js ./src/utils/image-resize-worker.ts --outfile "$OUTPUT_DIR/$platform/trek"
+        bun ../../scripts/compile-binary.mjs "$platform" "$OUTPUT_DIR/$platform/trek"
     fi
 done
 
@@ -199,6 +221,23 @@ for platform in "${PLATFORMS[@]}"; do
         mkdir -p "$OUTPUT_DIR/$platform/native/win32/prebuilds/$win32_arch_dir"
         cp ../tui/native/win32/prebuilds/$win32_arch_dir/win32-console-mode.node "$OUTPUT_DIR/$platform/native/win32/prebuilds/$win32_arch_dir/"
     fi
+
+    # LogosDB addon. bindings() cannot see this folder from B:/~BUN/root.
+    addon=""
+    if [[ -n "${LOGOSDB_NATIVE_DIR:-}" && -f "$LOGOSDB_NATIVE_DIR/$platform/logosdb.node" ]]; then
+        addon="$LOGOSDB_NATIVE_DIR/$platform/logosdb.node"
+    elif [[ "$platform" == "$HOST_PLATFORM" && -f ../../node_modules/logosdb/build/Release/logosdb.node ]]; then
+        addon="../../node_modules/logosdb/build/Release/logosdb.node"
+    fi
+    if [[ -n "$addon" ]]; then
+        mkdir -p "$OUTPUT_DIR/$platform/native"
+        cp "$addon" "$OUTPUT_DIR/$platform/native/logosdb.node"
+    elif [[ " $REQUIRED_LOGOSDB_PLATFORMS " == *" $platform "* ]]; then
+        echo "error: native/logosdb.node is required for $platform"
+        exit 1
+    else
+        echo "warning: no logosdb.node for $platform (memory in that archive needs native/logosdb.node)"
+    fi
 done
 
 # Create archives
@@ -226,6 +265,23 @@ for platform in "${PLATFORMS[@]}"; do
         tar -xzf trek-$platform.tar.gz && mv trek "$platform"
     fi
 done
+
+if [[ -n "$HOST_PLATFORM" && " ${PLATFORMS[*]} " == *" $HOST_PLATFORM "* ]]; then
+    if [[ "$HOST_PLATFORM" == windows-* ]]; then
+        host_bin="$OUTPUT_DIR/$HOST_PLATFORM/trek.exe"
+    else
+        host_bin="$OUTPUT_DIR/$HOST_PLATFORM/trek"
+    fi
+    if [[ -x "$host_bin" ]]; then
+        echo "==> $HOST_PLATFORM trek --help from an empty directory"
+        smoke="$(mktemp -d)"
+        (cd "$smoke" && "$host_bin" --help >/dev/null)
+        rm -rf "$smoke"
+        if [[ " $REQUIRED_LOGOSDB_PLATFORMS " == *" $HOST_PLATFORM "* ]]; then
+            test -f "$OUTPUT_DIR/$HOST_PLATFORM/native/logosdb.node"
+        fi
+    fi
+fi
 
 echo ""
 echo "==> Build complete!"
