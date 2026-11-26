@@ -123,7 +123,8 @@ fi
 # LOGOSDB_NATIVE_DIR/<platform>/logosdb.node) is copied next to trek.
 if [[ ! -f node_modules/logosdb/build/Release/logosdb.node ]]; then
     echo "==> Building host logosdb addon..."
-    npm rebuild logosdb || echo "warning: logosdb native rebuild failed; this host's archive will not include native/logosdb.node"
+    # npm rebuild stops on the workspace brace-expansion override before node-gyp runs.
+    (cd node_modules/logosdb && npx --yes node-gyp@11.5.0 rebuild -j 1)
 fi
 HOST_NODE="$(node -p "process.platform + '-' + process.arch")"
 case "$HOST_NODE" in
