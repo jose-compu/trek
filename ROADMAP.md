@@ -1,6 +1,6 @@
 # Trek Agent — Implementation Roadmap
 
-**Status:** **1.0.0-rc.11** on `release-1-0-rc1`. Stable line remains **0.20.8** on `release-0-20`. **Next:** final `v1.0.0` after the remaining ship gate. Multilingual memory (**0.21**) and the rest of the agentic bench (**1.1**) are post-1.0.  
+**Status:** **1.0.0-rc.12** on `release-1-0-rc1`. Stable line remains **0.20.8** on `release-0-20`. **Next:** final `v1.0.0` after the remaining ship gate. Multilingual memory (**0.21**) and the rest of the agentic bench (**1.1**) are post-1.0.  
 **Baseline:** `pi-original/` (Pi Coding Agent monorepo) → hard fork into `trek/` (independent repo)  
 **Versioning:** Stages through 0.20 are **minor** releases (`0.1.0` … `0.20.x`). **1.0.0** is the first **major** ship gate. Patch releases remain hotfixes within a stage. Release candidates use `1.0.0-rc.N` (GitHub prerelease only; **no npm** until an explicit later decision).  
 **Sources:** `PROMPT.md`, `SPECS_SAFETY_HARNESS.md` (safety harness), `SPECS_REFLECTIVE_AGENT.md` (reflective loop). **Canonical agent cycle:** `Observe → Intend → Act → Reflect` (O→I→A→R). The safety spec’s Plan→Act→Reflect maps to the same loop with **Plan = Intend** and **Observe** mandatory upfront — not a separate P→A→R stack.
@@ -1596,6 +1596,7 @@ Verified against the tree on `release-1-0-rc1` and the package changelogs. This 
 - **rc.6.** Ports the 0.20.7 blank-line `edit` anchor: when `start + 2` misses, `findAnchoredBlock` accepts `start + 3` if a blank line sits between the first and third anchor lines (matches `v0.20.8`).
 - **rc.7.** `/debug` render snapshot redaction for `trek-render-debug.log`.
 - **rc.8.** Prologue Constitution sealed into every session system prompt.
+- **rc.12.** Google `gemini-3.7-flash` and `gemini-3.8-flash` use `LOW`/`MEDIUM`/`HIGH` thinking levels. Trek no longer sends unsupported `MINIMAL` to the Gemini API.
 - **rc.11.** Compiled binaries load LogosDB from `native/logosdb.node` beside the executable. `trek.exe --help` no longer throws `Could not find module root` for `B:/~BUN/root/trek.exe`.
 
 Tag `v1.0.0-rc.11` will publish a GitHub prerelease (`--prerelease`, not `latest`) with six archive assets. `@trek/coding-agent` is not on the npm registry. `publish-npm` remains `if: false`.

@@ -3,7 +3,15 @@
  */
 
 import { type Content, FinishReason, FunctionCallingConfigMode, type Part } from "@google/genai";
-import type { Context, ImageContent, Model, StopReason, TextContent, Tool } from "../types.ts";
+import type {
+	Context,
+	ImageContent,
+	Model,
+	ModelThinkingLevel,
+	StopReason,
+	TextContent,
+	Tool,
+} from "../types.ts";
 import { sanitizeSurrogates } from "../utils/sanitize-unicode.ts";
 import { transformMessages } from "./transform-messages.ts";
 
@@ -347,4 +355,100 @@ export function mapStopReasonString(reason: string): StopReason {
 		default:
 			return "error";
 	}
+}
+
+type GoogleModelRef = Pick<Model<GoogleApiType>, "id" | "thinkingLevelMap">;
+type GoogleEffortLevel = Exclude<ModelThinkingLevel, "off" | "xhigh">;
+
+export function isGemini3ProModelId(modelId: string): boolean {
+	return /gemini-3(?:\.\d+)?-pro/i.test(modelId);
+}
+
+export function isGemini3FlashModelId(modelId: string): boolean {
+	return /gemini-3(?:\.\d+)?-flash/i.test(modelId);
+}
+
+export function isGemma4ModelId(modelId: string): boolean {
+	return /gemma-?4/i.test(modelId);
+}
+
+/** Gemini 3.7+ and 4.x flash models reject MINIMAL in the thinkingLevel API. */
+export function isGeminiFlashWithoutMinimalModelId(modelId: string): boolean {
+	return /gemini-(?:3\.(?:[7-9]|[1-9]\d+)|[4-9])(?:\.\d+)?-flash/i.test(modelId);
+}
+
+function geminiFlashSupportsMinimalThinking(model: GoogleModelRef): boolean {
+	if (model.thinkingLevelMap?.minimal === null) return false;
+	return !isGeminiFlashWithoutMinimalModelId(model.id);
+}
+
+export function resolveGoogleThinkingLevel(model: GoogleModelRef, effort: GoogleEffortLevel): GoogleThinkingLevel {
+	const mapped = model.thinkingLevelMap?.[effort];
+	if (typeof mapped === "string") {
+		const level = mapped as GoogleThinkingLevel;
+		if (effort === "minimal" && level === "MINIMAL" && !geminiFlashSupportsMinimalThinking(model)) {
+			return "LOW";
+		}
+		return level;
+	}
+
+	if (isGemini3ProModelId(model.id)) {
+		switch (effort) {
+			case "minimal":
+			case "low":
+				return "LOW";
+			case "medium":
+			case "high":
+				return "HIGH";
+		}
+	}
+
+	if (isGemma4ModelId(model.id)) {
+		switch (effort) {
+			case "minimal":
+			case "low":
+				return "MINIMAL";
+			case "medium":
+			case "high":
+				return "HIGH";
+		}
+	}
+
+	if (isGeminiFlashWithoutMinimalModelId(model.id)) {
+		switch (effort) {
+			case "minimal":
+				return "LOW";
+			case "low":
+				return "LOW";
+			case "medium":
+				return "MEDIUM";
+			case "high":
+				return "HIGH";
+		}
+	}
+
+	switch (effort) {
+		case "minimal":
+			return "MINIMAL";
+		case "low":
+			return "LOW";
+		case "medium":
+			return "MEDIUM";
+		case "high":
+			return "HIGH";
+	}
+}
+
+/** Lowest thinkingLevel for models that cannot turn thinking off entirely. */
+export function resolveGoogleDisabledThinkingLevel(model: GoogleModelRef): GoogleThinkingLevel | undefined {
+	if (isGemini3ProModelId(model.id)) {
+		return "LOW";
+	}
+	if (isGemini3FlashModelId(model.id)) {
+		return geminiFlashSupportsMinimalThinking(model) ? "MINIMAL" : "LOW";
+	}
+	if (isGemma4ModelId(model.id)) {
+		return "MINIMAL";
+	}
+	return undefined;
 }

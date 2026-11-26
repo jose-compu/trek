@@ -4,6 +4,12 @@ Release notes for `@trek/coding-agent`. Upstream Pi history lives in the parent 
 
 ## [Unreleased]
 
+## [1.0.0-rc.12] - 2026-11-26
+
+### Fixed
+
+- Pinned Google Gemini 3.7/3.8 flash models no longer fail with `Thinking level MINIMAL is not supported` at medium or when thinking is off.
+
 ## [1.0.0-rc.11] - 2026-11-26
 
 ### Fixed

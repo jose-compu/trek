@@ -1,6 +1,6 @@
 ![Trek Agent banner. The artwork is the 0.20 semantic-memory graphic.](./assets/banner-0.20.png)
 
-# Trek Agent v1.0.0-rc.11
+# Trek Agent v1.0.0-rc.12
 
 Trek is a **hard fork of the [Pi Coding Agent](https://pi.dev/)** — the minimal terminal coding agent with read, bash, edit, write, and `script_edit` tools, sessions, and a TypeScript extension ecosystem.
 
@@ -23,13 +23,13 @@ Pi optimizes for simplicity and adaptability: you extend it with plugins rather 
 | **Layering** | Optional stack (`single` / `auto` / `manual`). Climb is Workhorse ⇄ Planning ⇄ Frontier. Tooling is a runner. `/thinking briefly` | **0.18.0 Layering** |
 | **CLI power tools** | `script_edit` (ex / `vim -Es` / ed / sed), Unix kit probe, recipes, Scripts route with no chat model | **0.19.0** |
 | **Semantic memory** | Chunked index, one-hop neighbors, coding DAGs in the catalog | **0.20.0** |
-| **1.0 release candidate** | Science LaTeX catalog, `trek bench`, debug-log redaction, render-snapshot redaction, named-file writes stay on the tool loop, three-line `edit` anchor, no planning brief when Planning and Workhorse are the same model | **1.0.0-rc.11** |
+| **1.0 release candidate** | Science LaTeX catalog, `trek bench`, debug-log redaction, render-snapshot redaction, named-file writes stay on the tool loop, three-line `edit` anchor, no planning brief when Planning and Workhorse are the same model, Gemini 3.7/3.8 thinking levels | **1.0.0-rc.12** |
 
 Every user turn follows **Observe → Intend → Act → Reflect** (O→I→A→R). Safety checks wrap **Act**. During **Intend**, Trek detects the work domain from that task context and selects the workflow the context needs. The next turn detects again. Traces and audit metadata accumulate over time so behavior is inspectable, not opaque.
 
 Pi compatibility is preserved: community packages from [pi.dev/packages](https://pi.dev/packages) install with `trek install npm:<package>`. See [Pi Coding Agent plugins](#pi-coding-agent-plugins) below.
 
-**Version:** 1.0.0-rc.11 on `release-1-0-rc1`. Stable line: **0.20.8** on `release-0-20`. See [CHANGELOG.md](./CHANGELOG.md) and [ROADMAP.md](./ROADMAP.md). Upgrade from 0.20: [packages/coding-agent/docs/upgrade-1.0.md](packages/coding-agent/docs/upgrade-1.0.md).
+**Version:** 1.0.0-rc.12 on `release-1-0-rc1`. Stable line: **0.20.8** on `release-0-20`. See [CHANGELOG.md](./CHANGELOG.md) and [ROADMAP.md](./ROADMAP.md). Upgrade from 0.20: [packages/coding-agent/docs/upgrade-1.0.md](packages/coding-agent/docs/upgrade-1.0.md).
 
 ## What 1.0.0 means
 
