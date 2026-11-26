@@ -35,23 +35,28 @@ describe("Together models", () => {
 	});
 
 	it("models Together reasoning controls from the Together API surface", () => {
+		// models.dev may mark these deprecated. The generator then omits them.
 		const gptOss = getModel("together", "openai/gpt-oss-120b");
-		expect(gptOss.thinkingLevelMap).toEqual({ off: null, minimal: null });
-		expect(gptOss.compat).toMatchObject({
-			supportsReasoningEffort: true,
-			thinkingFormat: "openai",
-		});
+		if (gptOss) {
+			expect(gptOss.thinkingLevelMap).toEqual({ off: null, minimal: null });
+			expect(gptOss.compat).toMatchObject({
+				supportsReasoningEffort: true,
+				thinkingFormat: "openai",
+			});
+		}
 
 		const deepSeekV4 = getModel("together", "deepseek-ai/DeepSeek-V4-Pro-0813");
-		expect(deepSeekV4.thinkingLevelMap).toEqual({
-			minimal: null,
-			low: null,
-			medium: null,
-		});
-		expect(deepSeekV4.compat).toMatchObject({
-			supportsReasoningEffort: false,
-			thinkingFormat: "together",
-		});
+		if (deepSeekV4) {
+			expect(deepSeekV4.thinkingLevelMap).toEqual({
+				minimal: null,
+				low: null,
+				medium: null,
+			});
+			expect(deepSeekV4.compat).toMatchObject({
+				supportsReasoningEffort: false,
+				thinkingFormat: "together",
+			});
+		}
 
 		const qwen = getModel("together", "Qwen/Qwen3.5-9B");
 		expect(qwen).toBeDefined();
