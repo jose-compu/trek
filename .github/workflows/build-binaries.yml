@@ -30,7 +30,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
+          # windows-latest is Visual Studio 18. node-gyp 11 does not recognize it
+          # (version "undefined"), so the native addon never builds. windows-2022
+          # still has Visual Studio 2022.
+          - os: windows-2022
             platform: windows-x64
           - os: macos-latest
             platform: darwin-arm64

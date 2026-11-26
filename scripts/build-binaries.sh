@@ -119,12 +119,15 @@ else
 fi
 
 # logosdb's install is `prebuild-install || node-gyp`. npm ci --ignore-scripts
-# leaves the addon unbuilt. The host binary (and any prebuilt tree in
-# LOGOSDB_NATIVE_DIR/<platform>/logosdb.node) is copied next to trek.
-if [[ ! -f node_modules/logosdb/build/Release/logosdb.node ]]; then
-    echo "==> Building host logosdb addon..."
-    npm rebuild logosdb || echo "warning: logosdb native rebuild failed; this host's archive will not include native/logosdb.node"
-fi
+# does not leave a usable addon, and npm rebuild stops on the workspace
+# brace-expansion override. Install the package in a clean prefix so its
+# own install script can compile native/logosdb.node for this host.
+LOGOSDB_VERSION="$(node -p "require('./packages/coding-agent/package.json').dependencies.logosdb")"
+LOGOSDB_PREFIX="${RUNNER_TEMP:-/tmp}/logosdb-host"
+rm -rf "$LOGOSDB_PREFIX"
+echo "==> Installing logosdb@${LOGOSDB_VERSION} for the host addon"
+npm install --prefix "$LOGOSDB_PREFIX" "logosdb@${LOGOSDB_VERSION}"
+LOGOSDB_PKG="$LOGOSDB_PREFIX/node_modules/logosdb"
 HOST_NODE="$(node -p "process.platform + '-' + process.arch")"
 case "$HOST_NODE" in
     darwin-arm64) HOST_PLATFORM=darwin-arm64 ;;
@@ -226,8 +229,8 @@ for platform in "${PLATFORMS[@]}"; do
     addon=""
     if [[ -n "${LOGOSDB_NATIVE_DIR:-}" && -f "$LOGOSDB_NATIVE_DIR/$platform/logosdb.node" ]]; then
         addon="$LOGOSDB_NATIVE_DIR/$platform/logosdb.node"
-    elif [[ "$platform" == "$HOST_PLATFORM" && -f ../../node_modules/logosdb/build/Release/logosdb.node ]]; then
-        addon="../../node_modules/logosdb/build/Release/logosdb.node"
+    elif [[ "$platform" == "$HOST_PLATFORM" && -n "${LOGOSDB_PKG:-}" && -f "$LOGOSDB_PKG/build/Release/logosdb.node" ]]; then
+        addon="$LOGOSDB_PKG/build/Release/logosdb.node"
     fi
     if [[ -n "$addon" ]]; then
         mkdir -p "$OUTPUT_DIR/$platform/native"
