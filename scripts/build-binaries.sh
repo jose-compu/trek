@@ -119,12 +119,12 @@ else
 fi
 
 # logosdb's install is `prebuild-install || node-gyp`. npm ci --ignore-scripts
-# leaves the addon unbuilt. The host binary (and any prebuilt tree in
-# LOGOSDB_NATIVE_DIR/<platform>/logosdb.node) is copied next to trek.
-if [[ ! -f node_modules/logosdb/build/Release/logosdb.node ]]; then
-    echo "==> Building host logosdb addon..."
-    # npm rebuild stops on the workspace brace-expansion override before node-gyp runs.
-    (cd node_modules/logosdb && npx --yes node-gyp@11.5.0 rebuild -j 1)
+# leaves the addon unbuilt. npm rebuild also stops on the workspace
+# brace-expansion override, so compile the addon from its own directory.
+LOGOSDB_PKG="$(node -p "require('node:path').dirname(require.resolve('logosdb/package.json'))")"
+if [[ ! -f "$LOGOSDB_PKG/build/Release/logosdb.node" ]]; then
+    echo "==> Building host logosdb addon in $LOGOSDB_PKG"
+    (cd "$LOGOSDB_PKG" && npx --yes node-gyp@11.5.0 rebuild -j 1)
 fi
 HOST_NODE="$(node -p "process.platform + '-' + process.arch")"
 case "$HOST_NODE" in
@@ -227,8 +227,8 @@ for platform in "${PLATFORMS[@]}"; do
     addon=""
     if [[ -n "${LOGOSDB_NATIVE_DIR:-}" && -f "$LOGOSDB_NATIVE_DIR/$platform/logosdb.node" ]]; then
         addon="$LOGOSDB_NATIVE_DIR/$platform/logosdb.node"
-    elif [[ "$platform" == "$HOST_PLATFORM" && -f ../../node_modules/logosdb/build/Release/logosdb.node ]]; then
-        addon="../../node_modules/logosdb/build/Release/logosdb.node"
+    elif [[ "$platform" == "$HOST_PLATFORM" && -n "${LOGOSDB_PKG:-}" && -f "$LOGOSDB_PKG/build/Release/logosdb.node" ]]; then
+        addon="$LOGOSDB_PKG/build/Release/logosdb.node"
     fi
     if [[ -n "$addon" ]]; then
         mkdir -p "$OUTPUT_DIR/$platform/native"
