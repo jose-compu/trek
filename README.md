@@ -1,4 +1,4 @@
-![Trek Agent 0.18 Layering — 🏔️](./assets/banner-0.18.png)
+![Trek Agent 0.20 Semantic Memory — 🏔️](./assets/banner-0.20.png)
 
 # Trek Agent v0.19.9
 
