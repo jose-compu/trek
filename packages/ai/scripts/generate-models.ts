@@ -322,6 +322,13 @@ function applyThinkingLevelMetadata(model: Model<any>): void {
 	if (isGoogleThinkingApi(model) && isGemini3FlashModel(model.id) && isGeminiFlashWithoutMinimalModel(model.id)) {
 		mergeThinkingLevelMap(model, { off: null, minimal: null, low: "LOW", medium: "MEDIUM", high: "HIGH" });
 	}
+	if (
+		model.reasoning &&
+		!isGoogleThinkingApi(model) &&
+		/(?:^|\/)gemini-(?:3\.(?:[7-9]|[1-9]\d+)|[4-9])(?:\.\d+)?-flash/i.test(model.id)
+	) {
+		mergeThinkingLevelMap(model, { minimal: null });
+	}
 	if (isGoogleThinkingApi(model) && isGemma4Model(model.id)) {
 		mergeThinkingLevelMap(model, { off: null, minimal: "MINIMAL", low: null, medium: null, high: "HIGH" });
 	}

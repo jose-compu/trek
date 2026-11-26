@@ -6626,6 +6626,7 @@ export const MODELS = {
 			headers: {"User-Agent":"GitHubCopilotChat/0.35.0","Editor-Version":"vscode/1.107.0","Editor-Plugin-Version":"copilot-chat/0.35.0","Copilot-Integration-Id":"vscode-chat"},
 			compat: {"supportsStore":false,"supportsDeveloperRole":false,"supportsReasoningEffort":false},
 			reasoning: true,
+			thinkingLevelMap: {"minimal":null},
 			input: ["text", "image"],
 			cost: {
 				input: 0.75,
@@ -15231,6 +15232,7 @@ export const MODELS = {
 			provider: "openrouter",
 			baseUrl: "https://openrouter.ai/api/v1",
 			reasoning: true,
+			thinkingLevelMap: {"minimal":null},
 			input: ["text", "image"],
 			cost: {
 				input: 0.75,
@@ -15248,6 +15250,7 @@ export const MODELS = {
 			provider: "openrouter",
 			baseUrl: "https://openrouter.ai/api/v1",
 			reasoning: true,
+			thinkingLevelMap: {"minimal":null},
 			input: ["text", "image"],
 			cost: {
 				input: 0.375,
@@ -15265,6 +15268,7 @@ export const MODELS = {
 			provider: "openrouter",
 			baseUrl: "https://openrouter.ai/api/v1",
 			reasoning: true,
+			thinkingLevelMap: {"minimal":null},
 			input: ["text", "image"],
 			cost: {
 				input: 0.8250000000000001,
@@ -15282,6 +15286,7 @@ export const MODELS = {
 			provider: "openrouter",
 			baseUrl: "https://openrouter.ai/api/v1",
 			reasoning: true,
+			thinkingLevelMap: {"minimal":null},
 			input: ["text", "image"],
 			cost: {
 				input: 0.375,
@@ -22835,6 +22840,7 @@ export const MODELS = {
 			provider: "vercel-ai-gateway",
 			baseUrl: "https://ai-gateway.vercel.sh",
 			reasoning: true,
+			thinkingLevelMap: {"minimal":null},
 			input: ["text", "image"],
 			cost: {
 				input: 0.75,
@@ -22852,6 +22858,7 @@ export const MODELS = {
 			provider: "vercel-ai-gateway",
 			baseUrl: "https://ai-gateway.vercel.sh",
 			reasoning: true,
+			thinkingLevelMap: {"minimal":null},
 			input: ["text", "image"],
 			cost: {
 				input: 0.75,

@@ -385,7 +385,11 @@ function geminiFlashSupportsMinimalThinking(model: GoogleModelRef): boolean {
 export function resolveGoogleThinkingLevel(model: GoogleModelRef, effort: GoogleEffortLevel): GoogleThinkingLevel {
 	const mapped = model.thinkingLevelMap?.[effort];
 	if (typeof mapped === "string") {
-		return mapped as GoogleThinkingLevel;
+		const level = mapped as GoogleThinkingLevel;
+		if (effort === "minimal" && level === "MINIMAL" && !geminiFlashSupportsMinimalThinking(model)) {
+			return "LOW";
+		}
+		return level;
 	}
 
 	if (isGemini3ProModelId(model.id)) {
