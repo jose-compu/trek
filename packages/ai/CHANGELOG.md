@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.0.0-rc.12] - 2026-11-26
+
+### Fixed
+
+- Google `gemini-3.7-flash` and `gemini-3.8-flash` no longer send unsupported `MINIMAL` thinking levels. Trek maps minimal to `LOW`, exposes low/medium/high in the picker, and uses `LOW` for the hidden-thinking fallback.
+
 ## [1.0.0-rc.11] - 2026-11-26
 
 ### Fixed

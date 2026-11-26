@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.0.0-rc.12] - 2026-11-26
+
+### Fixed
+
+- Version lockstep with Google Gemini 3.7/3.8 thinking level mapping.
+
 ## [1.0.0-rc.11] - 2026-11-26
 
 ### Fixed
