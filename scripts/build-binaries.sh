@@ -119,13 +119,15 @@ else
 fi
 
 # logosdb's install is `prebuild-install || node-gyp`. npm ci --ignore-scripts
-# leaves the addon unbuilt. npm rebuild also stops on the workspace
-# brace-expansion override, so compile the addon from its own directory.
-LOGOSDB_PKG="$(node -p "require('node:path').dirname(require.resolve('logosdb/package.json'))")"
-if [[ ! -f "$LOGOSDB_PKG/build/Release/logosdb.node" ]]; then
-    echo "==> Building host logosdb addon in $LOGOSDB_PKG"
-    (cd "$LOGOSDB_PKG" && npx --yes node-gyp@11.5.0 rebuild -j 1)
-fi
+# does not leave a usable addon, and npm rebuild stops on the workspace
+# brace-expansion override. Install the package in a clean prefix so its
+# own install script can compile native/logosdb.node for this host.
+LOGOSDB_VERSION="$(node -p "require('./packages/coding-agent/package.json').dependencies.logosdb")"
+LOGOSDB_PREFIX="${RUNNER_TEMP:-/tmp}/logosdb-host"
+rm -rf "$LOGOSDB_PREFIX"
+echo "==> Installing logosdb@${LOGOSDB_VERSION} for the host addon"
+npm install --prefix "$LOGOSDB_PREFIX" "logosdb@${LOGOSDB_VERSION}"
+LOGOSDB_PKG="$LOGOSDB_PREFIX/node_modules/logosdb"
 HOST_NODE="$(node -p "process.platform + '-' + process.arch")"
 case "$HOST_NODE" in
     darwin-arm64) HOST_PLATFORM=darwin-arm64 ;;
