@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.0.0-rc.11] - 2026-11-26
+
+### Fixed
+
+- Version lockstep with the compiled LogosDB loader.
+
 ## [1.0.0-rc.10] - 2026-11-25
 
 ### Fixed

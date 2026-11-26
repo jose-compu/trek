@@ -8,7 +8,6 @@ import { existsSync, type FSWatcher, mkdirSync, statSync, watch } from "node:fs"
 import { homedir } from "node:os";
 import { join, relative, sep } from "node:path";
 import type { AgentMessage } from "@trek/agent-core";
-import { DB, type Row } from "logosdb";
 import { loadManifest, manifestPath, saveManifest } from "logosdb-mcp-server/dist/file-index-manifest.js";
 import { hybridRerank } from "logosdb-mcp-server/dist/hybrid.js";
 import { NamespaceStore } from "logosdb-mcp-server/dist/store.js";
@@ -77,6 +76,29 @@ const NS = "main";
 interface OpenDb {
 	store: NamespaceStore;
 	db: ReturnType<NamespaceStore["open"]>;
+}
+
+/** Row text from LogosDB DB.get. The native module stays unloaded until a store opens. */
+interface LogosRow {
+	text?: string | null;
+}
+
+type OpenedDb = OpenDb["db"];
+
+interface LogosReadable extends OpenedDb {
+	get(id: number): LogosRow | undefined;
+}
+
+interface LogosBatch extends LogosReadable {
+	putBatch(flat: number[], count: number, texts: string[], stamps: string[]): number[];
+}
+
+function hasGet(db: OpenedDb | undefined): db is LogosReadable {
+	return !!db && typeof (db as { get?: unknown }).get === "function";
+}
+
+function hasPutBatch(db: OpenedDb): db is LogosBatch {
+	return typeof (db as { putBatch?: unknown }).putBatch === "function";
 }
 
 export class MemoryManager {
@@ -186,8 +208,8 @@ export class MemoryManager {
 	private expandLinkedHits(hits: MemoryHit[], topK: number): MemoryHit[] {
 		if (!this.projectEnabled() || hits.length === 0) return hits;
 		const opened = this.open("project", false);
-		if (!(opened instanceof DB)) return hits;
-		const db: DB = opened;
+		if (!hasGet(opened)) return hits;
+		const db = opened;
 		const manifestFile = manifestPath(this.layerRoot("project"), NS);
 		let files: Record<string, { ids?: number[] }>;
 		try {
@@ -209,7 +231,7 @@ export class MemoryManager {
 				for (const rowId of ids.slice(0, 2)) {
 					const neighborId = `project:${rowId}`;
 					if (seen.has(neighborId)) continue;
-					let row: Row | undefined;
+					let row: LogosRow | undefined;
 					try {
 						row = db.get(rowId);
 					} catch {
@@ -237,7 +259,7 @@ export class MemoryManager {
 	private linksForHit(
 		hit: MemoryHit,
 		files: Record<string, { ids?: number[] }>,
-		db: DB,
+		db: LogosReadable,
 	): ReturnType<typeof parseCrossFileLinks> {
 		const links = parseCrossFileLinks(hit.text);
 		const file = /\[file:([^\]]+)\]/.exec(hit.text)?.[1];
@@ -246,7 +268,7 @@ export class MemoryManager {
 		const seen = new Set(links.map((link) => `${link.linkType}:${link.targetPath}`));
 		for (const rowId of ids.slice(0, 6)) {
 			if (`project:${rowId}` === hit.id) continue;
-			let row: Row | undefined;
+			let row: LogosRow | undefined;
 			try {
 				row = db.get(rowId);
 			} catch {
@@ -552,40 +574,32 @@ export class MemoryManager {
 		if (vectors.length === 0) return [];
 		const dim = this.options.embedder.dim;
 		const stamp = new Date().toISOString();
-		if (vectors.length === 1 || !(db instanceof DB)) {
-			const ids: number[] = [];
+		if (vectors.length > 1 && hasPutBatch(db)) {
+			const flat = new Array<number>(vectors.length * dim);
 			for (let i = 0; i < vectors.length; i++) {
-				try {
-					ids.push(db.put(vectors[i] ?? [], texts[i] ?? "", stamp));
-				} catch {
-					// row skipped
-				}
+				const vector = vectors[i] ?? [];
+				for (let j = 0; j < dim; j++) flat[i * dim + j] = vector[j] ?? 0;
 			}
-			return ids;
+			try {
+				return db.putBatch(
+					flat,
+					vectors.length,
+					texts,
+					vectors.map(() => stamp),
+				);
+			} catch {
+				// fall through to one put per row
+			}
 		}
-		const flat = new Array<number>(vectors.length * dim);
+		const ids: number[] = [];
 		for (let i = 0; i < vectors.length; i++) {
-			const vector = vectors[i] ?? [];
-			for (let j = 0; j < dim; j++) flat[i * dim + j] = vector[j] ?? 0;
-		}
-		try {
-			return db.putBatch(
-				flat,
-				vectors.length,
-				texts,
-				vectors.map(() => stamp),
-			);
-		} catch {
-			const ids: number[] = [];
-			for (let i = 0; i < vectors.length; i++) {
-				try {
-					ids.push(db.put(vectors[i] ?? [], texts[i] ?? "", stamp));
-				} catch {
-					// row skipped
-				}
+			try {
+				ids.push(db.put(vectors[i] ?? [], texts[i] ?? "", stamp));
+			} catch {
+				// row skipped
 			}
-			return ids;
 		}
+		return ids;
 	}
 
 	private async embed(text: string): Promise<number[]> {
