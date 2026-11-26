@@ -135,6 +135,9 @@ case "$HOST_NODE" in
     win32-arm64) HOST_PLATFORM=windows-arm64 ;;
     *) HOST_PLATFORM="" ;;
 esac
+# These three archives must contain native/logosdb.node. The other three
+# still build; memory there reports a missing addon instead of the bindings error.
+REQUIRED_LOGOSDB_PLATFORMS="windows-x64 linux-x64 darwin-arm64"
 
 echo "==> Building binaries..."
 cd packages/coding-agent
@@ -229,6 +232,9 @@ for platform in "${PLATFORMS[@]}"; do
     if [[ -n "$addon" ]]; then
         mkdir -p "$OUTPUT_DIR/$platform/native"
         cp "$addon" "$OUTPUT_DIR/$platform/native/logosdb.node"
+    elif [[ " $REQUIRED_LOGOSDB_PLATFORMS " == *" $platform "* ]]; then
+        echo "error: native/logosdb.node is required for $platform"
+        exit 1
     else
         echo "warning: no logosdb.node for $platform (memory in that archive needs native/logosdb.node)"
     fi
@@ -259,6 +265,23 @@ for platform in "${PLATFORMS[@]}"; do
         tar -xzf trek-$platform.tar.gz && mv trek "$platform"
     fi
 done
+
+if [[ -n "$HOST_PLATFORM" && " ${PLATFORMS[*]} " == *" $HOST_PLATFORM "* ]]; then
+    if [[ "$HOST_PLATFORM" == windows-* ]]; then
+        host_bin="$OUTPUT_DIR/$HOST_PLATFORM/trek.exe"
+    else
+        host_bin="$OUTPUT_DIR/$HOST_PLATFORM/trek"
+    fi
+    if [[ -x "$host_bin" ]]; then
+        echo "==> $HOST_PLATFORM trek --help from an empty directory"
+        smoke="$(mktemp -d)"
+        (cd "$smoke" && "$host_bin" --help >/dev/null)
+        rm -rf "$smoke"
+        if [[ " $REQUIRED_LOGOSDB_PLATFORMS " == *" $HOST_PLATFORM "* ]]; then
+            test -f "$OUTPUT_DIR/$HOST_PLATFORM/native/logosdb.node"
+        fi
+    fi
+fi
 
 echo ""
 echo "==> Build complete!"

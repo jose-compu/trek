@@ -12,7 +12,7 @@ A free-tier Gemini session uses the same bash. See [Gemini free tier](gemini-fre
 
 ## Compiled trek.exe
 
-Unzip `trek-windows-x64.zip` and run `trek.exe` from that folder. `trek.exe --help` does not use the `bindings` package. That package walks upward from `B:/~BUN/root/trek.exe` and stops because the virtual path has no `package.json`. LogosDB is loaded from `native/logosdb.node` beside `trek.exe`. Keep that file next to the executable. The Windows ARM64 archive does not include it yet. Memory on that build reports a missing addon instead of the virtual-path error. Git Bash is still required for the interactive agent.
+Unzip `trek-windows-x64.zip` and run `trek.exe` from that folder. `trek.exe --help` does not use the `bindings` package. That package walks upward from `B:/~BUN/root/trek.exe` and stops because the virtual path has no `package.json`. LogosDB is loaded from `native/logosdb.node` beside `trek.exe`. Keep that file next to the executable. The Windows x64 archive includes it. The Windows ARM64 archive does not, yet. Memory on that build reports a missing addon instead of the virtual-path error. Git Bash is still required for the interactive agent.
 
 ## Custom Shell Path
 

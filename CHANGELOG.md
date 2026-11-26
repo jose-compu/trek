@@ -10,7 +10,7 @@ User-facing CLI details also live in [`packages/coding-agent/CHANGELOG.md`](pack
 
 ### Fixed
 
-- Compiled Trek no longer stops in `bindings` on `B:/~BUN/root/trek.exe`. `--help` does not load LogosDB. The executable opens `native/logosdb.node` beside itself. The Windows x64, Linux x64, and macOS arm64 archives include that file.
+- Compiled Trek no longer stops in `bindings` on `B:/~BUN/root/trek.exe`. `--help` does not load LogosDB. The executable opens `native/logosdb.node` beside itself. The Windows x64, Linux x64, and macOS arm64 archives include that file. Windows ARM64, macOS Intel, and Linux ARM64 do not, yet. `--help` still runs. Memory on those three reports the missing file.
 
 ## [1.0.0-rc.10] - 2026-11-25
 
