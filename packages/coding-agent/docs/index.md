@@ -18,7 +18,7 @@ Swap the archive name for your machine (`trek-darwin-x64`, `trek-linux-x64`, `tr
 
 Authenticate with `/login`, or set an API key such as `ANTHROPIC_API_KEY` before starting `trek`.
 
-Moving from 0.20: [Upgrade to 1.0.0-rc.10](upgrade-1.0.md). First-run detail: [Quickstart](quickstart.md). One-page reference: `assets/cheatsheet-1.0.png` (source `assets/cheatsheet.html`). Pages below sometimes say `pi` for the upstream harness. The command in this distribution is `trek`.
+Moving from 0.20: [Upgrade to 1.0.0-rc.10](upgrade-1.0.md). First-run detail: [Quickstart](quickstart.md). One-page reference: `assets/cheatsheet-1.0.png` (source `assets/cheatsheet.html`). En español: `assets/cheatsheet-1.0-es.png` (fuente `assets/cheatsheet-es.html`). Pages below sometimes say `pi` for the upstream harness. The command in this distribution is `trek`.
 
 ## Start here
 

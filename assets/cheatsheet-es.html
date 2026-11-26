@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Trek Agent — hoja de referencia</title>
+<style>
+  :root {
+    --ink: #16161d;
+    --muted: #5e5e6c;
+    --faint: #8a8a98;
+    --line: #e6e6ee;
+    --violet: #6d4aff;
+    --violet-soft: #f3efff;
+    --page: #f4f4f7;
+    --card: #ffffff;
+    --sheet-w: 1400px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: var(--sheet-w);
+    min-height: 1280px;
+    overflow: visible;
+    background: var(--page);
+    color: var(--ink);
+    font-family: "Inter", "SF Pro Display", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+  }
+  .sheet {
+    width: var(--sheet-w);
+    max-width: var(--sheet-w);
+    padding: 26px 32px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 4px 4px 2px;
+    flex-wrap: wrap;
+  }
+  .lockup {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 30px;
+    font-weight: 750;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+  }
+  .lockup .emoji { font-size: 38px; line-height: 1; }
+  h1 {
+    font-size: 40px;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    font-weight: 750;
+  }
+  h1 span {
+    display: block;
+    margin-top: 4px;
+    color: var(--violet);
+    font-size: 21px;
+    font-weight: 650;
+    letter-spacing: -0.03em;
+  }
+  .tagline {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 15px;
+    font-weight: 550;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    width: 100%;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 15px 18px 13px;
+    min-width: 0;
+    overflow: visible;
+  }
+  .card.wide { grid-column: 1 / -1; }
+  h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    letter-spacing: -0.03em;
+    font-weight: 700;
+    margin-bottom: 9px;
+  }
+  .n {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--violet);
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+  }
+  p, li { font-size: 14.5px; line-height: 1.38; color: #2a2a33; }
+  .lead { color: var(--muted); margin: -2px 0 8px; font-size: 13.5px; }
+  ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  li {
+    position: relative;
+    padding-left: 14px;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+  }
+  li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.55em;
+    width: 5px;
+    height: 5px;
+    border-radius: 99px;
+    background: var(--violet);
+  }
+  code, .k {
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    font-size: 12.5px;
+    font-weight: 600;
+    background: var(--violet-soft);
+    color: #3b2d86;
+    border-radius: 5px;
+    padding: 1px 5px;
+    white-space: normal;
+    word-break: break-word;
+  }
+  .wf-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0 4px;
+    padding-left: 0;
+  }
+  .wf-chips .chip {
+    font-size: 12.5px;
+    padding: 4px 10px;
+    line-height: 1.25;
+  }
+  .wf-chips .chip code {
+    background: transparent;
+    padding: 0;
+    font-size: 12.5px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; table-layout: fixed; }
+  th {
+    text-align: left;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 650;
+    padding: 0 6px 6px 0;
+  }
+  td {
+    padding: 5px 6px 5px 0;
+    border-top: 1px solid var(--line);
+    vertical-align: top;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+  }
+  td:first-child { font-weight: 650; width: 42%; }
+  .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; width: 100%; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 12.5px;
+    color: #2a2a33;
+    line-height: 1.3;
+  }
+  .chip b { color: var(--violet); font-weight: 700; }
+  footer {
+    display: flex;
+    justify-content: space-between;
+    color: var(--faint);
+    font-size: 12px;
+    padding: 4px 4px 0;
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  }
+</style>
+</head>
+<body>
+  <div class="sheet" id="cheatsheet">
+    <header>
+      <div class="lockup"><span class="emoji" aria-hidden="true">🏔️</span> Trek Agent</div>
+      <h1>Hoja de referencia<span>1.0 — sesión, dominios, herramientas, bench</span></h1>
+      <div class="tagline">Potente. Preciso. Honesto.</div>
+    </header>
+    <div class="grid">
+      <section class="card">
+        <h2><span class="n">1</span> Abrir una sesión</h2>
+        <ul>
+          <li><code>trek</code> en el proyecto. La memoria y el bucle reflexivo están activos.</li>
+          <li><code>--memory off</code> <code>--effort off|normal|loose</code></li>
+          <li><code>--operator-mode</code> <code>supervised</code> <code>delegated</code> <code>checkpoint</code> <code>diagnostic</code> <code>ask</code></li>
+          <li><code>--debug</code> o <code>TREK_DEBUG=1</code> → <code>~/.trek/agent/trek-debug.log</code> (secretos redactados).</li>
+          <li><code>TREK_NO_LOCAL_LLM=1</code> usa el modelo de API. <code>PI_NO_LOCAL_LLM</code> sigue valiendo.</li>
+          <li>De fábrica <code>single</code>: un Workhorse. <code>/hierarchy</code> fija <code>single</code>, <code>auto</code> o <code>manual</code>.</li>
+          <li><code>/login</code> <code>/model</code> <code>/new</code> <code>/quit</code>. Enter envía. El prompt sigue cuando empieza Working...</li>
+          <li>En tu shell: <code>set -o vi</code> para edición vi (solo el operador; no es una herramienta de trek).</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h2><span class="n">2</span> Un turno</h2>
+        <ul>
+          <li>Las palabras del turno eligen el dominio. Un menú no.</li>
+          <li>El flujo corre un nodo de Archon por vez. Un nodo de prompt no llama una herramienta.</li>
+          <li>Write/edit/update/replace más un archivo → sin flujo de dominio; corre el bucle de herramientas.</li>
+          <li>Fix, push, blocked o “what is happening” → herramientas, no un flujo.</li>
+          <li>Un shell corto de un paso (mkdir, suma, recorte, …) se clasifica como Act si hay bash.</li>
+          <li>El mismo modelo en Workhorse y Planning → sin brief de planificación extra.</li>
+          <li>Un dato que no está en el turno se declara ausente. Una respuesta vacía es <code>(none)</code>.</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h2><span class="n">3</span> Dominios y ciencia</h2>
+        <p class="lead">Veinte dominios. Meta, AI, Security y Engineering siguen activos. Science puede estar apagado.</p>
+        <ul>
+          <li><code>/domains</code> <code>/domains enable finance</code> <code>/domains disable finance</code></li>
+          <li><code>/workflows show finance</code> imprime el DAG. No lo ejecuta.</li>
+          <li>Flujos de Science (ver <code>domains/science/domain.json</code>):</li>
+        </ul>
+        <div class="wf-chips" aria-label="Science workflows">
+          <span class="chip"><code>method-check</code></span>
+          <span class="chip"><code>write-paper</code></span>
+          <span class="chip"><code>review-paper-coauthor</code></span>
+          <span class="chip"><code>review-paper-referee</code></span>
+          <span class="chip"><code>respond-to-reviews</code></span>
+          <span class="chip"><code>write-rebuttal</code></span>
+          <span class="chip"><code>generate-slides</code></span>
+          <span class="chip"><code>generate-poster</code></span>
+          <span class="chip"><code>polish-bibtex</code></span>
+          <span class="chip"><code>check-latex-build</code></span>
+          <span class="chip"><code>figure-pass</code></span>
+          <span class="chip"><code>extract-claims</code></span>
+          <span class="chip"><code>write-abstract</code></span>
+        </div>
+        <ul style="margin-top: 6px;">
+          <li>Fuga y train-test valen solo para <code>method-check</code>.</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h2><span class="n">4</span> Lecciones y patrones</h2>
+        <ul>
+          <li>Un turno fallido, o una corrección que empieza por <code>No.</code>, puede guardar una lección en ese dominio.</li>
+          <li><code>/lessons</code> <code>/lessons finance</code> — id, categoría, área, severidad, cuenta, estado.</li>
+          <li><code>/crystallize &lt;id&gt;</code> escribe una skill solo después de Yes, y solo en ese dominio.</li>
+          <li>Patrones: <code>.trek/domains/&lt;id&gt;/lessons.yaml</code>. El archivo empaquetado queda como se entregó.</li>
+          <li><code>/patterns</code> <code>/patterns edit finance categories add tax_gap</code> <code>/patterns restore finance</code></li>
+          <li>Claves y claves privadas se rechazan siempre. Finance descarta números de cuenta. Vale el recuerdo entre dominios.</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h2><span class="n">5</span> Edición y ramas</h2>
+        <ul>
+          <li><code>edit</code> de tres líneas: la primera línea no vacía es única y la clave tiene ≥12 caracteres; la tercera línea no vacía está exactamente dos líneas de archivo bajo la primera; el medio puede diferir.</li>
+          <li>Las claves recortan la sangría, colapsan espacios y tratan <code>'</code> como <code>"</code>. Las líneas en blanco dentro de <code>oldText</code> no cuentan.</li>
+          <li><code>spawn_branches</code> (≤4 subtareas) + <code>gather</code>. La primera rama que escribe una ruta es la dueña.</li>
+          <li>Bench <code>fan-headings</code>: un <code>spawn_branches</code>, una rama por archivo, sin edit en el turno padre.</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h2><span class="n">6</span> Bench y depuración</h2>
+        <ul>
+          <li><code>trek bench run</code> — paquete incluido, sin modelo. No es <code>trek models benchmark</code>.</li>
+          <li><code>trek bench run --live</code> necesita <code>XAI_API_KEY</code> o <code>.env</code>.</li>
+          <li><code>--profile same|climb|fan</code> <code>--lever single|auto|both</code> <code>--task id</code> <code>--timeout ms</code></li>
+          <li><code>same</code>: <code>grok-4.3</code> en cada rol. <code>climb</code>: piso contra piso+<code>grok-4.7</code> en Planning/Frontier.</li>
+          <li><code>fan</code>: <code>grok-4.7</code> solo contra <code>grok-4.7</code> en Planning + <code>grok-4.20-0309-non-reasoning</code> en Workhorse (<code>--lever auto</code>).</li>
+          <li>El log de depuración redacta <code>--api-key</code>, <code>--token</code>, <code>--password</code>, <code>--secret</code>, Bearer y formas <code>sk-</code> / <code>ghp_</code> / <code>hf_</code>.</li>
+        </ul>
+      </section>
+      <section class="card wide">
+        <h2><span class="n">7</span> Comandos y teclas</h2>
+        <div class="pair">
+          <table>
+            <thead><tr><th>En la sesión</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><code>/patterns</code></td><td>Lista o edita un patrón del dominio</td></tr>
+              <tr><td><code>/domains</code></td><td>Lista, activa, desactiva o añade un dominio</td></tr>
+              <tr><td><code>/workflows show &lt;id&gt;</code></td><td>Imprime el DAG del flujo</td></tr>
+              <tr><td><code>/lessons finance</code></td><td>Lecciones guardadas de ese dominio</td></tr>
+              <tr><td><code>/crystallize &lt;id&gt;</code></td><td>Ofrece una skill y espera Yes</td></tr>
+              <tr><td><code>/memory</code></td><td>Estado, índice, añadir o quitar una ruta</td></tr>
+              <tr><td><code>/confirm bash</code></td><td>Permite la siguiente herramienta restringida una vez (supervisado)</td></tr>
+              <tr><td><code>/thinking briefly|deep|off</code></td><td>Fija el nivel de la tarjeta de razonamiento</td></tr>
+              <tr><td><code>/hierarchy</code></td><td>Capas, modo, suite, un rol</td></tr>
+              <tr><td><code>/hotkeys</code></td><td>Lista completa de atajos</td></tr>
+            </tbody>
+          </table>
+          <table>
+            <thead><tr><th>Tecla</th><th>Acción</th></tr></thead>
+            <tbody>
+              <tr><td>Esc</td><td>Interrumpe el turno</td></tr>
+              <tr><td>Ctrl+C</td><td>Limpia el editor. Dos veces sale.</td></tr>
+              <tr><td>Ctrl+D</td><td>Sale si el editor está vacío</td></tr>
+              <tr><td>Shift+Tab</td><td>Cambia el nivel de razonamiento</td></tr>
+              <tr><td>Ctrl+P / Ctrl+L</td><td>Siguiente modelo / abre la lista</td></tr>
+              <tr><td>Ctrl+O</td><td>Expande o pliega las tarjetas</td></tr>
+              <tr><td>Alt+Enter</td><td>Encola un seguimiento</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="chips">
+          <span class="chip"><b>trek lessons list</b></span>
+          <span class="chip"><b>trek patterns finance</b></span>
+          <span class="chip"><b>trek domains lessons finance</b></span>
+          <span class="chip"><b>trek workflows show finance</b></span>
+          <span class="chip"><b>trek models set-layering auto</b></span>
+          <span class="chip"><b>trek bench run --profile fan</b></span>
+          <span class="chip"><b>trek --debug</b></span>
+        </div>
+      </section>
+    </div>
+    <footer>
+      <span>github.com/jose-compu/trek</span>
+      <span>Se entrega con 1.0</span>
+    </footer>
+  </div>
+</body>
+</html>

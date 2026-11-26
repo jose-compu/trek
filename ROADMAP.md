@@ -1605,7 +1605,7 @@ Tag `v1.0.0-rc.10` will publish a GitHub prerelease (`--prerelease`, not `latest
 - [ ] E2E smoke with a mocked local server.
 - [ ] Fresh install script on a clean machine produces a working `trek --version`.
 - [ ] A public Pi plugin sample installs and runs.
-- [x] `assets/cheatsheet-1.0.png` matches `assets/cheatsheet.html`. The tree still has `assets/cheatsheet-0.18.png`.
+- [x] `assets/cheatsheet-1.0.png` matches `assets/cheatsheet.html`. Spanish: `assets/cheatsheet-1.0-es.png` / `assets/cheatsheet-es.html`. The tree still has `assets/cheatsheet-0.18.png`.
 - [x] Port the 0.20.7 blank-line `edit` anchor (`2c7c2db`) so 1.0 is not behind `v0.20.8` (shipped **rc.6**).
 - [ ] `build-binaries.yml` passes `--prerelease` for tags that contain `-rc`.
 - [ ] Final `v1.0.0` tag only after that gate. No npm unless decided.

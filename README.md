@@ -37,7 +37,7 @@ Pi compatibility is preserved: community packages from [pi.dev/packages](https:/
 
 `~/.trek/agent/` and project `.trek/` are unchanged. Replacing the binary does not rewrite settings, sessions, or lessons.
 
-One-page session map: [assets/cheatsheet-1.0.png](./assets/cheatsheet-1.0.png) (source [assets/cheatsheet.html](./assets/cheatsheet.html)).
+One-page session map: [assets/cheatsheet-1.0.png](./assets/cheatsheet-1.0.png) (source [assets/cheatsheet.html](./assets/cheatsheet.html)). En español: [assets/cheatsheet-1.0-es.png](./assets/cheatsheet-1.0-es.png) (fuente [assets/cheatsheet-es.html](./assets/cheatsheet-es.html)).
 
 ## Quick start
 
